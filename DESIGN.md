@@ -19,7 +19,7 @@ Last updated: 2026-10-08.
 - **Decided.** The focus is interesting data services and a polished delivery pipeline: cloud resources, authentication, containerized services, serverless functions, CI/CD.
 - **Decided.** Interesting heroes and character customization are not the focus. Hard display problems, such as layered character animation and swappable gear, are simplified or left out.
 - **Decided.** Web only, played in a browser. No desktop wrapper.
-- **Decided.** The interface is built from Angular components rather than a canvas renderer, because Angular is part of what is being shown.
+- **Decided.** The page is composed of Angular components, and Angular is the focus, because it is part of what is being shown. Buttons, menus, modals and layout are Angular. A canvas renderer such as PixiJS is allowed inside individual components, for example an animated sprite, but it is never the whole display.
 - **Decided.** Game balance is not a goal. Content is placeholder.
 
 A useful test for any feature: it should justify a service problem worth explaining. If it does not, it goes.
