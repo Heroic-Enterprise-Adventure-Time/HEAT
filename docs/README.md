@@ -1,0 +1,49 @@
+# Project documents
+
+Everything a person or an agent needs in order to understand HEAT and work on it. `AGENTS.md` at the repository root is the entry point. This file is the index, and it says how the documents are written and loaded.
+
+## Index
+
+| Document | Covers | Reaches an agent |
+| --- | --- | --- |
+| [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
+| [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging | Every session |
+| [../DESIGN.md](../DESIGN.md) | The current design: the game, the architecture, options not chosen, open questions | When the agent reads it |
+
+## Planned
+
+These are part of the structure and are not written yet. Each is written when there is a decision to put in it.
+
+| Document | Written when |
+| --- | --- |
+| `design/` and `architecture/` | `DESIGN.md` is split into the game and the system |
+| `decisions/` | With that split: one short record per significant decision, including what was rejected |
+| `process/deployment.md` | There is a deployment |
+| `standards/<language>.md` | The first code in that language lands |
+| `runbooks/` | A multi-step procedure has been done more than once |
+
+## How documents are written
+
+1. **Write for an agent first.** Be explicit and concrete, and assume no background. A person can read a document written that way. An agent cannot reliably work from one written for a person who already knows the project.
+2. **Rules first, reasons after.** A document opens with short rules that can be checked. The reasons follow in their own section.
+3. **One topic per file,** under about 200 lines. Longer files are followed less reliably.
+4. **Write a document when there is a decision to record,** not before. Do not write down what an agent would do anyway, or what it can read from the code.
+5. **Keep documents true.** A change in behavior and the document that describes it go in the same pull request.
+6. **Say what is real.** Nothing is described as built, tested or enforced unless it is.
+
+## Where documents live
+
+Content that a person or another tool might need lives under `docs/`, in plain Markdown. Nothing of that kind lives under `.claude/`, which holds only what is specific to Claude Code: `settings.json`, and later skills that point at files in `docs/runbooks/`.
+
+## How agents load these documents
+
+- `AGENTS.md` is the entry point. It imports the documents that every session needs, using `@path` references.
+- Each area of the repository will have its own `AGENTS.md` that imports the standards for that area. Those load only when an agent works on a file in that area.
+- Beside every `AGENTS.md` there is a `CLAUDE.md` containing only `@AGENTS.md`.
+
+The last rule has no exceptions. Claude Code reads `AGENTS.md` by itself only when no `CLAUDE.md` exists at or above the working directory, so one `CLAUDE.md` without a partner in another directory silently switches that directory's `AGENTS.md` off. Pairing them everywhere avoids that, and it also covers sessions that look for `CLAUDE.md` by name.
+
+Two more things were found by testing with Claude Code 2.1.295:
+
+- An import inside a path-scoped rule under `.claude/rules/` loads at session start, which defeats the scoping. That is why area standards are loaded through per-area `AGENTS.md` files and not through rules.
+- `@path` expansion is a Claude Code feature. Other tools follow the nested `AGENTS.md` convention but may treat an import as a plain file reference, so each import is written as an instruction: "Read and follow ...".
