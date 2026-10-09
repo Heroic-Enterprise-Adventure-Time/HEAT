@@ -1,2 +1,6 @@
 # Private planning notes that must not be committed
 docs/private/
+
+# Personal Claude Code files, never shared
+CLAUDE.local.md
+.claude/settings.local.json
