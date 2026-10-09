@@ -8,6 +8,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | --- | --- | --- |
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging | Every session |
+| [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
 | [architecture/overview.md](architecture/overview.md) | The system: services, data, flows, build order | When the agent reads it |

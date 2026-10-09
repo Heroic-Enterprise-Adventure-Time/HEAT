@@ -6,10 +6,11 @@ No application code exists yet. The design is under `docs/design/` and `docs/arc
 
 ## How to work here
 
-Read and follow these two documents in every session:
+Read and follow these documents in every session:
 
 - How the project owner and an agent work together: @docs/process/collaboration.md
 - How a change gets from an idea to `main`: @docs/process/code-changes.md
+- How decisions are made, especially about security and platform management: @docs/process/best-practices.md
 
 ## Where to find things
 
