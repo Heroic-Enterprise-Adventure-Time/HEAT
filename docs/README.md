@@ -8,7 +8,10 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | --- | --- | --- |
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging | Every session |
-| [../DESIGN.md](../DESIGN.md) | The current design: the game, the architecture, options not chosen, open questions | When the agent reads it |
+| [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
+| [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
+| [architecture/overview.md](architecture/overview.md) | The system: services, data, flows, build order | When the agent reads it |
+| [decisions/](decisions/README.md) | One record per significant decision, including what was rejected | When the agent reads it |
 
 ## Planned
 
@@ -16,8 +19,6 @@ These are part of the structure and are not written yet. Each is written when th
 
 | Document | Written when |
 | --- | --- |
-| `design/` and `architecture/` | `DESIGN.md` is split into the game and the system |
-| `decisions/` | With that split: one short record per significant decision, including what was rejected |
 | `process/deployment.md` | There is a deployment |
 | `standards/<language>.md` | The first code in that language lands |
 | `runbooks/` | A multi-step procedure has been done more than once |
@@ -30,6 +31,8 @@ These are part of the structure and are not written yet. Each is written when th
 4. **Write a document when there is a decision to record,** not before. Do not write down what an agent would do anyway, or what it can read from the code.
 5. **Keep documents true.** A change in behavior and the document that describes it go in the same pull request.
 6. **Say what is real.** Nothing is described as built, tested or enforced unless it is.
+7. **Mark the status of design items.** Each item in a design or architecture document is labeled Decided, Working assumption or Open. The labels are defined at the top of each of those documents.
+8. **Design documents say what is true now.** When a decision changes, edit the design document and add a decision record. The record keeps what was rejected.
 
 ## Where documents live
 
