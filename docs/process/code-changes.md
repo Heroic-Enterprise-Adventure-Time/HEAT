@@ -36,6 +36,11 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 16. The subject line is imperative and says what the commit does. The body says why.
 17. A commit written by an agent is authored as that agent.
 
+### Applying infrastructure
+
+18. Terraform is applied by the project owner, from a reviewed branch, never by an agent. This holds until a pipeline exists, and the pipeline then applies only what has been merged to `main`.
+19. An agent's AWS access is read only. An agent writes the exact commands for a change and the owner runs them. A denied command is reported, not worked around.
+
 ## Why
 
 **Checkpoints before code.** Agreeing the end of a piece of work before starting it is what keeps a pull request small. It also means review compares the change against something already agreed, instead of discovering the scope in the diff.
@@ -46,13 +51,17 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 
 **Documents with the change.** A document that describes behavior is only useful while it is true. Changing both together is the only reliable way to keep them in step.
 
+**The owner applies.** This project's Terraform runs with administrator access inside HEAT's AWS accounts, through a role the organization layer placed there. A mistake in an apply reaches a whole account. Review before apply is the control that exists today, so the apply stays with the person who reviewed. The same two rules hold in the `dcg-platform` repository, whose stack reaches every account in the organization.
+
 ## What enforces this
 
 Most of this document is an agreement, not a mechanism. What is enforced today:
 
 - `.claude/settings.json` denies an agent the commands `git push origin main`, `git push origin HEAD:main` and `gh pr merge`. This is a guardrail against the obvious forms, not a guarantee: a command pattern can be worded around.
+- The agent's AWS profiles carry read-only roles. An agent cannot apply Terraform or run a changing command, even by mistake.
+- The repository's merge settings allow merge commits only; the squash and rebase buttons are off.
 
 What is not enforced yet:
 
-- **Branch protection on `main`.** GitHub does not offer it for a private repository on the organization's current plan. It becomes available when the repository is public.
+- **Branch protection on `main`.** Available on the organization's current plan and not yet configured. Until it is, nothing stops a push to `main` except the agent's settings above and the owner's habit.
 - **Checks on pull requests.** There is no CI yet. Until there is, a pull request arrives with the agent's account of how it was verified and nothing else.
