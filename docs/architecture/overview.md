@@ -57,6 +57,13 @@ The client holds the seed, so a modified client can try override sequences offli
 
 The turn machinery (charge timers, action selection, abilities and tags, the seeded random number generator, events, stepping, overrides) is to be adapted from the author's earlier private project, BattleScript Online. The outer loop of stages, carry-over, cargo and retreat is new, as is replaying an override log, which the earlier project designed and did not build. Files that are copied or adapted will say so.
 
+## Platform
+
+- **Decided.** Three AWS accounts, owned by the Double Cobra Games organization and placed by it: `heat-platform` for Terraform state, artifacts, the container registry and the platform deploy role; `heat-dev` and `heat-prod` for the workloads. The organization layer, in the `dcg-platform` repository, enrolls them in Control Tower, applies the organization's controls to them, and places in each workload account a `PlatformAdminRole` that only `heat-platform` may assume. Everything inside the accounts beyond that role is HEAT's.
+- **Decided.** Every HEAT stack runs from `heat-platform` and keeps its state there, in one S3 bucket with one key per stack (decision 0008). Stacks reach `heat-dev` and `heat-prod` by assuming `PlatformAdminRole`.
+- **Decided.** Account ids are not committed. Stacks take the account id as a variable from an ignored file (`docs/README.md`, rule 9).
+- **Working assumption.** Infrastructure changes run from `heat-platform` through a GitHub pipeline that assumes the platform deploy role; application deploys go from GitHub straight to a narrow role in the workload account whose trust names the repository and the GitHub environment. This is the pattern the organization recorded for both of its projects.
+
 ## Build order
 
 **Working assumption:**
@@ -71,5 +78,4 @@ The turn machinery (charge timers, action selection, abilities and tags, the see
 ## Open
 
 - Where static content lives so that the TypeScript engine and the Java service agree on it.
-- The AWS account and Terraform state layout.
 - The repository layout.

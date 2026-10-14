@@ -1,6 +1,21 @@
 # Private planning notes that must not be committed
 docs/private/
 
+# Terraform working files, state and variable files. State lives in the
+# backend, never in git; variable files hold the account id.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+*.tfplan
+*_override.tf
+*_override.tf.json
+crash.log
+
+# IDE
+.idea/
+
 # Personal Claude Code files, never shared
 CLAUDE.local.md
 .claude/settings.local.json

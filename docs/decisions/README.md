@@ -25,3 +25,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0005](0005-adventure-records-outside-postgres.md) | Adventure records and replays live outside Postgres | Working assumption |
 | [0006](0006-rds-postgres-not-aurora.md) | RDS Postgres, not Aurora | Working assumption |
 | [0007](0007-canned-actions-not-free-text.md) | Canned actions, not free-text chat | Decided |
+| [0008](0008-terraform-state-backend.md) | Terraform state in one S3 bucket in heat-platform, native locking, SSE-S3, account id as a variable | Decided |
