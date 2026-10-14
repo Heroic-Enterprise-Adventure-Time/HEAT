@@ -2,7 +2,7 @@
 
 HEAT (Heroic Enterprise Adventure Time) is a browser game about running an adventuring business, built as a technical showcase. The game is deliberately simple. The interest is in the data services behind it and the pipeline that delivers them.
 
-No application code exists yet. The design is under `docs/design/` and `docs/architecture/`.
+No application code exists yet. The design is under `docs/design/` and `docs/architecture/`. Infrastructure is under `terraform/`, one stack per directory, each with a README that says what it manages and whether it is applied.
 
 ## How to work here
 
@@ -20,6 +20,7 @@ Read and follow these documents in every session:
 | The game: what the player does | `docs/design/game.md` |
 | The system: services, data and flows | `docs/architecture/overview.md` |
 | Why a choice was made, and what was rejected | `docs/decisions/` |
+| The Terraform state bucket, who applies, and the one-time bootstrap | `terraform/backend/README.md` |
 | The index of every project document, and how documents are written | `docs/README.md` |
 
 Read the design and architecture documents before any work that touches them. Read `docs/README.md` before adding or changing a document.

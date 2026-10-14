@@ -13,6 +13,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
 | [architecture/overview.md](architecture/overview.md) | The system: services, data, flows, build order | When the agent reads it |
 | [decisions/](decisions/README.md) | One record per significant decision, including what was rejected | When the agent reads it |
+| [../terraform/backend/README.md](../terraform/backend/README.md) | The state bucket, who applies it, and the one-time bootstrap | When the agent reads it |
 
 ## Planned
 
