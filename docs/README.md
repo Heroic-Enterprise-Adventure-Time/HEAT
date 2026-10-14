@@ -7,7 +7,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | Document | Covers | Reaches an agent |
 | --- | --- | --- |
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
-| [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging | Every session |
+| [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
@@ -34,6 +34,11 @@ These are part of the structure and are not written yet. Each is written when th
 6. **Say what is real.** Nothing is described as built, tested or enforced unless it is.
 7. **Mark the status of design items.** Each item in a design or architecture document is labeled Decided, Working assumption or Open. The labels are defined at the top of each of those documents.
 8. **Design documents say what is true now.** When a decision changes, edit the design document and add a decision record. The record keeps what was rejected.
+9. **AWS account ids do not appear in committed files.** Documents and code name accounts by name (`heat-dev`, `heat-platform`) and never by id. Credentials never appear anywhere. This repository is written to be safe to publish; the organization-level `dcg-platform` repository takes the opposite rule, for reasons recorded there as its decision 0001.
+
+## Not documents
+
+`docs/private/` is ignored by git and holds working notes: account ids, inventories, runbooks in progress, and the hand-over notes from the `dcg-platform` repository. Nothing there is reviewed or kept true. Where a committed document and a private note disagree, the committed document wins, and the AWS APIs win over both.
 
 ## Where documents live
 
