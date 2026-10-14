@@ -26,3 +26,6 @@ The design and architecture documents say what is true now. They are edited as t
 | [0006](0006-rds-postgres-not-aurora.md) | RDS Postgres, not Aurora | Working assumption |
 | [0007](0007-canned-actions-not-free-text.md) | Canned actions, not free-text chat | Decided |
 | [0008](0008-terraform-state-backend.md) | Terraform state in one S3 bucket in heat-platform, native locking, SSE-S3, account id as a variable | Decided |
+| [0009](0009-local-development-environment.md) | Local development against containers and serverless-offline; real AWS only through the pipeline | Decided |
+| [0010](0010-front-doors.md) | API Gateway fronts the API, CloudFront the client; no load balancer; domains per environment | Decided |
+| [0011](0011-deployments-and-the-prod-gate.md) | Code through the pipeline, infrastructure through Terraform, prod behind a version tag | Decided |
