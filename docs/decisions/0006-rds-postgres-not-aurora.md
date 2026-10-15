@@ -1,6 +1,6 @@
 # 0006: RDS Postgres, not Aurora
 
-- **Status:** Working assumption
+- **Status:** Superseded by 0013
 - **Date:** 2026-10-08
 
 ## Decision

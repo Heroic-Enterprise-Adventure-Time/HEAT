@@ -1,6 +1,6 @@
 # 0005: Adventure records and replays live outside Postgres
 
-- **Status:** Working assumption
+- **Status:** Superseded by 0013
 - **Date:** 2026-10-08
 
 ## Decision

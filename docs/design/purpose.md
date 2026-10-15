@@ -6,7 +6,7 @@ HEAT (Heroic Enterprise Adventure Time) is a browser game about running an adven
 
 Each item carries a status. **Decided** items are settled by the project owner. **Working assumption** items were proposed during design and not yet objected to: build on them, but expect them to be revisited. **Open** items are not yet answered.
 
-- **Decided.** The focus is interesting data services and a polished delivery pipeline: cloud resources, authentication, containerized services, serverless functions, CI/CD.
+- **Decided.** The focus is interesting data services and a polished delivery pipeline: cloud resources, authentication, serverless functions, data services, CI/CD. (Reworded 2026-10-15: "containerized services" dropped with decision 0012; there are none.)
 - **Decided.** Interesting heroes and character customization are not the focus. Hard display problems, such as layered character animation and swappable gear, are simplified or left out.
 - **Decided.** Web only, played in a browser. No desktop wrapper.
 - **Decided.** The page is composed of Angular components, and Angular is the focus, because it is part of what is being shown. Buttons, menus, modals and layout are Angular. A canvas renderer such as PixiJS is allowed inside individual components, for example an animated sprite, but it is never the whole display.
