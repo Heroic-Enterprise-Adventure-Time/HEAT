@@ -6,7 +6,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Versions and dependencies
 
-1. **Latest, preferring LTS where it exists.** Node is the current LTS line, pinned by major in `.node-version` at the repository root; `fnm` reads that file. Libraries are kept at their latest release; a library with an LTS line is kept on that line. Falling behind is a defect to fix, not a state to maintain.
+1. **Latest, preferring LTS where it exists.** Node is the current LTS line, pinned by major in `.node-version` at the repository root; `fnm`, CI, the bundler's target and the Lambda runtime identifier (`nodejs<major>.x`, in the emulator and in Terraform) all follow that one number. Libraries are kept at their latest release; a library with an LTS line is kept on that line. Falling behind is a defect to fix, not a state to maintain.
 2. **Exact pins, committed lock file.** `package.json` names exact versions, never ranges, and `package-lock.json` is committed. CI installs with `npm ci`, so what runs there is what ran on the laptop.
 3. **Install scripts are approved by name.** npm withholds packages' install scripts until they are listed under `allowScripts` in the root `package.json`. A new one is approved with `npm install-scripts approve <package>`, in the pull request that introduces the dependency, and the pull request description says what the script does.
 4. **One source of truth for functions and routes.** `local/manifest.json` lists every Lambda and its routes. The emulator, the bundler and Terraform read it; nothing declares a function or route anywhere else.
@@ -29,7 +29,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Bundling
 
-12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild for the Node 22 runtime, dependencies included. The workflow uploads the result; Terraform owns the function (decision 0011).
+12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild, targeting the Node major in `.node-version`, dependencies included. The workflow uploads the result; Terraform owns the function (decision 0011).
 
 ## Why
 

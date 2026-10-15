@@ -24,6 +24,7 @@ These are part of the structure and are not written yet. Each is written when th
 | Document | Written when |
 | --- | --- |
 | `process/deployment.md` | There is a deployment |
+| `standards/<language>.md` | The first code in that language lands; `standards/typescript.md` is the first |
 | `runbooks/` | A multi-step procedure has been done more than once |
 
 ## How documents are written

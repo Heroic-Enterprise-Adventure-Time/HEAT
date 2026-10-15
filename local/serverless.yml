@@ -11,7 +11,8 @@ plugins:
 
 provider:
   name: aws
-  runtime: nodejs22.x
+  # The Lambda runtime follows the major in .node-version (docs/standards/typescript.md).
+  runtime: nodejs24.x
   region: us-east-1
   environment:
     HEAT_TABLE: heat-local

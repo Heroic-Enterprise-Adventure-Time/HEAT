@@ -2,7 +2,8 @@ import { build } from "esbuild";
 import { mkdirSync, readFileSync } from "node:fs";
 
 /**
- * Bundles a function for Lambda: one ESM file per function, Node 22 target,
+ * Bundles a function for Lambda: one ESM file per function, targeting the
+ * Node major in .node-version (the Lambda runtime follows the same number),
  * the AWS SDK v3 bundled in (it tree-shakes well and pinning beats relying
  * on the runtime's copy). The workflow uploads the result and calls
  * update-function-code; Terraform owns the function (decision 0011).
@@ -20,12 +21,14 @@ if (!fn) {
 const outdir = new URL(`../dist/${name}/`, import.meta.url);
 mkdirSync(outdir, { recursive: true });
 
+const nodeMajor = readFileSync(new URL("../.node-version", import.meta.url), "utf8").trim().split(".")[0];
+
 await build({
   entryPoints: [new URL(`../${fn.entry}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1")],
   outfile: new URL("index.mjs", outdir).pathname.replace(/^\/([A-Za-z]:)/, "$1"),
   bundle: true,
   platform: "node",
-  target: "node22",
+  target: `node${nodeMajor}`,
   format: "esm",
   sourcemap: true,
   minify: false,
