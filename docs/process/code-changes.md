@@ -41,6 +41,19 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 18. Terraform is applied by the project owner, from a reviewed branch, never by an agent. This holds until a pipeline exists, and the pipeline then applies only what has been merged to `main`.
 19. An agent's AWS access is read only. An agent writes the exact commands for a change and the owner runs them. A denied command is reported, not worked around.
 
+### The cycle
+
+How one checkpoint moves through the rules above, from the start of a session to a clean `main`. Agreed 2026-10-15.
+
+20. **Agree the work.** The session opens by agreeing, in conversation, which issue comes next. Issues found in that conversation are created then, under their milestone.
+21. **Start clean.** Before a branch is created, the checkout must be on `main` with nothing to commit (`git status --porcelain` prints nothing). If it is not, the agent stops and says so. It does not stash, reset or switch to make it so.
+22. **The agent branches.** It fetches, creates the branch from `origin/main` (`git switch -c <type>/<name> origin/main`) and stays on it. Branch switching is the agent's job, not the owner's IDE's.
+23. **Implement.** The agent commits and pushes as it sees fit, and opens the pull request when it believes the work is ready, which includes running the tests locally.
+24. **Review on the branch.** The branch stays checked out, so the owner can run the service from it while reading the diff. One writer at a time: the owner does not edit files in the checkout during review, and if that happens anyway, the owner either commits them on the branch or discards them, and says which. Before every commit the agent checks that the tree holds only its own changes, and stops if it does not. The owner comments on the pull request and says when done; the comments are talked through in the session; the agent pushes the agreed changes as new commits and replies on each thread.
+25. **Infrastructure reviews end with the apply.** For a Terraform change the owner reads the plan and applies from the branch; the agent verifies the result through its read-only profile and pushes the stack README's status as a commit on the same branch. Only then is the pull request merged, so the README is true at merge time.
+26. **Merge and reset.** The owner merges and says so. "Merged" also means the remote branch is gone: GitHub deletes it on merge. The agent then runs `git switch main`, `git pull --prune` and `git branch -d <branch>`, leaving a clean `main`.
+27. **One piece of work in flight.** Nothing new starts until the open pull request is merged. If two must ever run at once, the second gets a git worktree, so the checkout the IDE has open is not touched.
+
 ## Why
 
 **Checkpoints before code.** Agreeing the end of a piece of work before starting it is what keeps a pull request small. It also means review compares the change against something already agreed, instead of discovering the scope in the diff. The issue is where the agreed end is written down, next to the pull request that delivers it and where a new session finds it cold; a list kept in a note goes stale silently, an issue is closed by the merge. Added 2026-10-15 when the first platform checkpoints were agreed.
@@ -53,6 +66,8 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 
 **The owner applies.** This project's Terraform runs with administrator access inside HEAT's AWS accounts, through a role the organization layer placed there. A mistake in an apply reaches a whole account. Review before apply is the control that exists today, so the apply stays with the person who reviewed. The same two rules hold in the `dcg-platform` repository, whose stack reaches every account in the organization.
 
+**The branch stays checked out.** The earlier practice returned the checkout to `main` as soon as the pull request was open, which kept `main` under the IDE but meant the owner could not run the change without switching branches by hand. One checkout shared by a person and an agent is also one working tree, which is why the cycle names a single writer and makes the agent look before every commit. Serial work follows from the same fact: a second checkpoint would need the branch the first one is being reviewed on. Added 2026-10-15, before the first platform checkpoint.
+
 ## What enforces this
 
 Most of this document is an agreement, not a mechanism. What is enforced today:
@@ -60,8 +75,10 @@ Most of this document is an agreement, not a mechanism. What is enforced today:
 - `.claude/settings.json` denies an agent the commands `git push origin main`, `git push origin HEAD:main` and `gh pr merge`. This is a guardrail against the obvious forms, not a guarantee: a command pattern can be worded around.
 - The agent's AWS profiles carry read-only roles. An agent cannot apply Terraform or run a changing command, even by mistake.
 - The repository's merge settings allow merge commits only; the squash and rebase buttons are off.
+- The "Build and test" workflow runs on every pull request and on `main`: typecheck, tests, schema currency, bundling. It reports; nothing yet requires it to pass.
 
 What is not enforced yet:
 
-- **Branch protection on `main`.** Available on the organization's current plan and not yet configured. Until it is, nothing stops a push to `main` except the agent's settings above and the owner's habit.
-- **Checks on pull requests.** There is no CI yet. Until there is, a pull request arrives with the agent's account of how it was verified and nothing else.
+- **Rulesets on `main` and on `v*` tags.** Defined in `.github/rulesets/` and not yet applied. `main`: changes only through a pull request, merge commits only, "Build and test" passing on a branch that is current with `main`, no force pushes, no deletion, and no bypass, so the owner's own changes go through the same door. `v*` tags: only an organization owner may create, move or delete one, which is the production gate of decision 0011. The owner applies both with `gh api` from the files; the commands are in the pull request that adds them. Until then, nothing stops a push to `main` except the agent's settings above and the owner's habit.
+- **Branch deletion on merge.** Rule 14 relies on the repository setting that deletes the head branch on merge. It is not on yet; the owner switches it on with the rulesets.
+- **Signed commits.** The agent's commits are unsigned, and the `main` ruleset does not require signatures. Deferred until the agent has a signing key; what it leaves open is that authorship in the log is asserted, not proven.
