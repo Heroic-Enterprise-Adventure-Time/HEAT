@@ -6,9 +6,9 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 
 ### Checkpoints
 
-1. Work is divided into checkpoints. A checkpoint is one agreed piece of work with a defined end.
+1. Work is divided into checkpoints. A checkpoint is one agreed piece of work with a defined end. Once agreed, it is a GitHub issue in this repository, under the milestone for its step of the build order in `docs/architecture/overview.md`. The open issues are the backlog; there is no other list.
 2. Checkpoints are agreed in conversation, as part of talking through the implementation, before the work starts.
-3. One pull request contains the implementation up to one checkpoint.
+3. One pull request contains the implementation up to one checkpoint, and its description closes the issue (`Closes #n`), so the merge closes the checkpoint.
 
 ### Branches
 
@@ -43,7 +43,7 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 
 ## Why
 
-**Checkpoints before code.** Agreeing the end of a piece of work before starting it is what keeps a pull request small. It also means review compares the change against something already agreed, instead of discovering the scope in the diff.
+**Checkpoints before code.** Agreeing the end of a piece of work before starting it is what keeps a pull request small. It also means review compares the change against something already agreed, instead of discovering the scope in the diff. The issue is where the agreed end is written down, next to the pull request that delivers it and where a new session finds it cold; a list kept in a note goes stale silently, an issue is closed by the merge. Added 2026-10-15 when the first platform checkpoints were agreed.
 
 **Everything through a pull request.** In a session that runs in the cloud, the project owner cannot see the agent's working tree. The pull request is the review surface: a diff, a description and a merge button.
 
