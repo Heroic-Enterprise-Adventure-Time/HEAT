@@ -1,0 +1,39 @@
+type Adventure {
+  id: String!
+  seed: String!
+  startedAt: String!
+}
+
+type Holding {
+  balance: Int!
+  material: String!
+}
+
+type Mutation {
+  """
+  Spike only: settles the caller's open adventure with the engine's rewards for its seed.
+  """
+  settleAdventure(adventureId: String!): Player
+
+  """
+  Issues the seed and opens the player's one adventure. Fails if one is already open.
+  """
+  startAdventure: Adventure!
+}
+
+type Player {
+  """
+  Private: only the player may read their own holdings. Null, with an error on this field, for anyone else.
+  """
+  holdings: [Holding!]
+  id: String!
+  name: String!
+  openAdventure: Adventure
+}
+
+type Query {
+  me: Player
+
+  """Public: any caller may look a player up by id."""
+  player(id: String!): Player
+}

@@ -1,0 +1,39 @@
+# Build and test on every pull request and on main. No AWS credentials: the
+# integration tests start their own containers (decision 0009). Deploy
+# workflows are separate and come later (decision 0011).
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm test
+
+      - name: Printed schema is current
+        run: |
+          npm run schema:print
+          git diff --exit-code -- packages/hub/schema.graphql
+
+      - name: Bundle the functions
+        run: npm run bundle:hub
