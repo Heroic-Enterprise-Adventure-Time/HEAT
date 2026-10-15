@@ -73,9 +73,11 @@ Read the plan: `Plan: 3 to add, 0 to change, 0 to destroy.` The three are the OI
 
 ```powershell
 terraform apply dev.tfplan
-terraform output -raw deploy_role_arn | gh variable set HEAT_DEV_DEPLOY_ROLE_ARN
+gh variable set HEAT_DEV_DEPLOY_ROLE_ARN --body (terraform output -raw deploy_role_arn)
 Remove-Item dev.tfplan
 ```
+
+The ARN goes in as an argument, not through a pipe. On the first run the piped value reached GitHub with a UTF-8 byte-order mark in front of the ARN, which the deploy workflow would have handed to AWS as part of the role name; seen 2026-10-15 and reset with the form above.
 
 ## Every later apply
 
