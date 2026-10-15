@@ -23,7 +23,30 @@ variable "workload_account_id" {
   }
 }
 
+# The third value that stays out of git, beside the ids in terraform.tfvars or
+# as TF_VAR_budget_alert_email: where budget alerts go.
+variable "budget_alert_email" {
+  description = "The one email address that receives the budget alerts."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.budget_alert_email))
+    error_message = "budget_alert_email must be an email address."
+  }
+}
+
 # The committed per-environment values, one file per environment (dev.tfvars).
+
+variable "monthly_budget_usd" {
+  description = "The monthly cost budget for the workload account, in US dollars. Alerts at 50% and 80% of actual spend and at 100% of forecasted spend."
+  type        = number
+
+  validation {
+    condition     = var.monthly_budget_usd > 0
+    error_message = "monthly_budget_usd must be a positive number."
+  }
+}
 
 variable "environment" {
   description = "The environment name, dev or prod. Names the deploy role and the functions it may update, and is the Environment tag."

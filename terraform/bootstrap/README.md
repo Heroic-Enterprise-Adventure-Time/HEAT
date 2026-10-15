@@ -1,8 +1,8 @@
 # The bootstrap stack
 
-Creates, in a workload account, what GitHub Actions needs in order to deploy code there: the GitHub OIDC identity provider and one narrow deploy role. One configuration, applied once per environment with that environment's backend file and variable file. Design: `docs/architecture/overview.md`, "Environments"; decisions 0008, 0011 and 0012. The dev slice is issue #12.
+Creates, in a workload account, what the account needs before anything runs in it: the GitHub OIDC identity provider and one narrow deploy role, so GitHub Actions can deploy code there, and a monthly cost budget with alerts. One configuration, applied once per environment with that environment's backend file and variable file. Design: `docs/architecture/overview.md`, "Environments"; decisions 0008, 0011 and 0012. The dev slice is issue #12; the budget is issue #19.
 
-**Status: dev slice applied by the owner on 2026-10-15 and verified.** State is at `bootstrap/dev/terraform.tfstate` in the platform bucket. Verified by the agent through the `audit-heat-dev` profile the same day: the provider exists with the URL and the single audience `sts.amazonaws.com`; the role `heat-dev-deploy` exists with the trust document exactly as written, a one-hour session, no managed policy and the one inline policy with the six actions on `function:heat-dev-*`; it is the only role created that day, and both carry the three tags. IAM recorded a thumbprint on the provider by itself; Terraform set none, and for GitHub it is not used (see "Facts checked"). Two snags on the first run, both fixed in the same pull request: PowerShell split the `-flag=value` arguments, and the piped role ARN reached GitHub with a byte-order mark. Nothing exists yet for `heat-prod`.
+**Status: dev slice applied by the owner on 2026-10-15 and verified; the budget (#19) is written and not yet applied.** State is at `bootstrap/dev/terraform.tfstate` in the platform bucket. Verified by the agent through the `audit-heat-dev` profile the same day: the provider exists with the URL and the single audience `sts.amazonaws.com`; the role `heat-dev-deploy` exists with the trust document exactly as written, a one-hour session, no managed policy and the one inline policy with the six actions on `function:heat-dev-*`; it is the only role created that day, and both carry the three tags. IAM recorded a thumbprint on the provider by itself; Terraform set none, and for GitHub it is not used (see "Facts checked"). Two snags on the first run, both fixed in the same pull request: PowerShell split the `-flag=value` arguments, and the piped role ARN reached GitHub with a byte-order mark. Nothing exists yet for `heat-prod`.
 
 ## What it manages
 
@@ -10,17 +10,17 @@ In the workload account named by `workload_account_id`:
 
 - **The GitHub OIDC provider**: URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`, no thumbprint (see "Facts checked").
 - **The role `heat-<environment>-deploy`.** Trust: `sts:AssumeRoleWithWebIdentity` from that provider, with `aud` equal to `sts.amazonaws.com` and `sub` equal to exactly this repository's immutable subject for the GitHub environment: `repo:Heroic-Enterprise-Adventure-Time@339832417/HEAT@1410947079:environment:<github_environment>`. Permissions: update function code, publish versions, read the function and its configuration, read and move aliases, on functions named `heat-<environment>-*` in us-east-1 in that account. Nothing else. The functions, their roles, triggers and aliases are the environment stack's.
+- **The budget `heat-<environment>-monthly-cost`.** A monthly cost budget of `monthly_budget_usd` dollars (dev: 10), with three email alerts to `budget_alert_email`: actual spend above 50%, actual spend above 80%, forecasted spend above 100%. Actual alerts fire once per threshold per month; the forecast alert starts once AWS has about five weeks of usage data. Budgets with notifications are free, and there are no budget actions. Ten dollars for dev because the serverless environment idles near one dollar a month, so ten catches a runaway early and leaves room for experiments.
 
 Nothing is created in `heat-platform`. The stack runs there and keeps its state there.
 
-## What it does not manage yet
+## What it does not manage
 
-Deferred from the dev slice so that the pull request has one purpose. Each line says what is in force in `heat-dev` today, read through the `audit-heat-dev` profile on 2026-10-15, and what the deferral leaves open.
+Each line says what is in force in `heat-dev` today, read through the `audit-heat-dev` profile on 2026-10-15, and what that leaves open.
 
-- **Account-level S3 public access block.** Not set. The account has no buckets, so nothing is exposed; the environment stack puts a block on every bucket it creates. The account-level block comes in the next bootstrap slice.
-- **EBS default encryption.** Off. No instance or volume exists, and the design has none.
+- **Account-level S3 public access block.** Not set, and not this stack's to set. It belongs to the organization layer as an AWS Organizations declarative policy for Amazon S3, which turns on all four settings for every account in scope, is inherited by new accounts and locks the account-level setting; owed on the `dcg-platform` side. Checked 2026-10-15 that no such policy exists yet. Until it does, the account has no buckets, and the environment stack puts a block on every bucket it creates.
+- **EBS default encryption.** Off, and dropped. There is no declarative policy attribute for it, and HEAT has no instances, volumes or VPC (decision 0013), so it would govern nothing.
 - **IAM password policy.** None. The organization's controls deny creating IAM users, so there is nothing for it to govern.
-- **Budgets.** None. Nothing deployed costs money yet. Until a budget exists an unexpected bill is noticed at the invoice, so a budget belongs in place before the environment stack is applied.
 - **GuardDuty.** A detector exists in `heat-dev`, created by the organization's delegated administrator. Nothing for HEAT to do.
 - **IAM Access Analyzer.** No analyzer in `heat-dev`. The organization-level analyzer is `dcg-platform`'s; this stack adds none.
 - **Log group retention.** The environment stack sets retention on each log group it creates.
@@ -28,16 +28,16 @@ Deferred from the dev slice so that the pull request has one purpose. Each line 
 - **The platform deploy role in `heat-platform`.** Needed only when a pipeline applies Terraform (`docs/process/code-changes.md`, rule 18). Until then the owner's `Admin` session is the only identity `PlatformAdminRole` trusts, and widening that trust is a change in `dcg-platform` first.
 - **An artifact bucket.** None. Bundles are uploaded straight to the function; each is far under Lambda's 50 MB direct-upload limit (decision 0012).
 
-## Account ids and environment files
+## Values that stay out of git, and the environment files
 
-Two ids, never committed (`docs/README.md`, rule 9): `platform_account_id` and `workload_account_id`. Give them as `TF_VAR_*` environment variables regenerated from the GitHub repository variables, as shown below, or in a `terraform.tfvars` copied from `terraform.tfvars.example`, which git ignores.
+Three values are never committed: the two account ids (`docs/README.md`, rule 9) and the alert address. They live in `terraform.tfvars`, copied from `terraform.tfvars.example`, which git ignores. The ids can instead come from the GitHub repository variables as `TF_VAR_*`, the way the first apply did; the address has no repository variable, because no workflow needs it.
 
 Two committed files per environment, holding nothing private:
 
 | File | Holds | Used by |
 | --- | --- | --- |
 | `dev.s3.tfbackend` | the state key `bootstrap/dev/terraform.tfstate` | `terraform init -backend-config dev.s3.tfbackend` |
-| `dev.tfvars` | `environment` and `github_environment` | `terraform plan -var-file dev.tfvars` |
+| `dev.tfvars` | `environment`, `github_environment`, `monthly_budget_usd` | `terraform plan -var-file dev.tfvars` |
 
 Git ignores `terraform.tfvars` and `*.auto.tfvars`, the files Terraform loads unasked, and no other `.tfvars` file. The rule was narrowed from `*.tfvars` with this stack so that the per-environment file can be committed.
 
@@ -45,23 +45,16 @@ Git ignores `terraform.tfvars` and `*.auto.tfvars`, the files Terraform loads un
 
 The project owner, from PowerShell, with the `heat-platform` account's `Admin` credentials from the Identity Center access portal set as environment variables. The default provider refuses any other account. The stack reaches the workload account by assuming `PlatformAdminRole` there, which trusts that `Admin` role. The agent never applies anything (`docs/process/code-changes.md`, rules 18 and 19).
 
-## First apply, dev
+## Applying
 
-Three repository variables carry the ids and the role ARN (decision 0011): `HEAT_PLATFORM_ACCOUNT_ID`, `HEAT_DEV_ACCOUNT_ID` and `HEAT_DEV_DEPLOY_ROLE_ARN`. The first two are set before the apply, the third from its output. The ids are in `docs/private/dcg-platform-handoff.md`. The GitHub environment `dev` is what the role's trust names; the deploy workflow (issue #14) runs its jobs in it.
+Three repository variables carry the ids and the role ARN for the deploy workflow (decision 0011): `HEAT_PLATFORM_ACCOUNT_ID`, `HEAT_DEV_ACCOUNT_ID` and `HEAT_DEV_DEPLOY_ROLE_ARN`. All three are set. The GitHub environment `dev`, which the role's trust names and in which the deploy workflow (issue #14) runs its jobs, exists.
 
-```powershell
-cd C:\Users\chanc\IdeaProjects\HEAT
-gh variable set HEAT_PLATFORM_ACCOUNT_ID --body "<heat-platform account id>"
-gh variable set HEAT_DEV_ACCOUNT_ID --body "<heat-dev account id>"
-gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/dev --jq '{name, html_url}'
-```
+Once, create `terraform.tfvars` in this directory from the example with the two ids and the alert address. Then, for every apply:
 
 ```powershell
 Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
 # paste the heat-platform Admin block from the access portal, then:
 aws sts get-caller-identity --query Account --output text   # must print the heat-platform id
-$env:TF_VAR_platform_account_id = gh variable get HEAT_PLATFORM_ACCOUNT_ID
-$env:TF_VAR_workload_account_id = gh variable get HEAT_DEV_ACCOUNT_ID
 cd C:\Users\chanc\IdeaProjects\HEAT\terraform\bootstrap
 terraform init -backend-config dev.s3.tfbackend
 terraform plan -var-file dev.tfvars -out dev.tfplan
@@ -69,30 +62,18 @@ terraform plan -var-file dev.tfvars -out dev.tfplan
 
 The flags take a space, not `=`. PowerShell splits `-backend-config=dev.s3.tfbackend` at a dot in the value and Terraform then reports too many arguments; seen on the first run, 2026-10-15, and the space form checked in PowerShell the same day.
 
-Read the plan: `Plan: 3 to add, 0 to change, 0 to destroy.` The three are the OIDC provider, the role and its inline policy, all in the workload account. Anything else: stop and paste the plan into the session. Then:
+Read the plan. The pull request that changes the stack says what line to expect; for the budget it is `Plan: 1 to add, 0 to change, 0 to destroy.` Anything else: stop and paste the plan into the session. Then:
 
 ```powershell
 terraform apply dev.tfplan
-gh variable set HEAT_DEV_DEPLOY_ROLE_ARN --body (terraform output -raw deploy_role_arn)
 Remove-Item dev.tfplan
 ```
 
-The ARN goes in as an argument, not through a pipe. On the first run the piped value reached GitHub with a UTF-8 byte-order mark in front of the ARN, which the deploy workflow would have handed to AWS as part of the role name; seen 2026-10-15 and reset with the form above.
-
-## Every later apply
-
-The same credentials and `TF_VAR_*` as above, then from this directory:
-
-```powershell
-terraform init -backend-config dev.s3.tfbackend
-terraform plan -var-file dev.tfvars -out dev.tfplan
-terraform apply dev.tfplan
-Remove-Item dev.tfplan
-```
+If a repository variable ever has to be set from an output, pass the output as an argument, not through a pipe: `gh variable set NAME --body (terraform output -raw NAME)`. On the first run the piped value reached GitHub with a UTF-8 byte-order mark in front of the ARN, which the deploy workflow would have handed to AWS as part of the role name; seen 2026-10-15 and reset with the argument form.
 
 ## Verification by the agent
 
-After the owner's apply, with the `audit-heat-dev` profile: the provider exists with the URL and the one audience; the role exists with the trust document above and one inline policy with the six actions on the one resource pattern; nothing else was created. The status line at the top of this file then changes, in a commit on the same branch (`docs/process/code-changes.md`, rule 25). The agent cannot plan: the audit role can neither read the state nor assume `PlatformAdminRole`.
+After the owner's apply, with the `audit-heat-dev` profile, which may read IAM and budgets: the provider, the role, its trust document and its one inline policy as described above; the budget with its limit, period and three notifications. The status line at the top of this file then changes, in a commit on the same branch (`docs/process/code-changes.md`, rule 25). The agent cannot plan: the audit role can neither read the state nor assume `PlatformAdminRole`.
 
 ## Facts checked before the code was written
 
@@ -103,7 +84,9 @@ All read 2026-10-15.
 - **The waiter.** `aws lambda wait function-updated-v2` polls `GetFunction` once a second (AWS CLI reference), so the role needs `lambda:GetFunction`.
 - **Resource patterns.** A pattern ending in `*` matches a function's unqualified and qualified ARNs; one ending in the name matches the unqualified ARN only (Lambda developer guide, "Fine-tuning the Resources and Conditions sections of policies").
 - **Creating the environment.** `PUT /repos/{owner}/{repo}/environments/{name}` with an empty body creates or updates it (GitHub REST, "Deployment environments").
-- **`heat-dev` on 2026-10-15.** No OIDC provider; the only Lambda function is Control Tower's notification forwarder; `PlatformAdminRole` present; the account settings listed under "What it does not manage yet".
+- **Budgets.** Alerts go to up to ten addresses and one SNS topic each; actual alerts are sent once per budget per period; forecasts need about five weeks of data (AWS Cost Management user guide, "Best practices for AWS Budgets"). Budgets with notifications are free; only action-enabled budgets beyond the first two cost $0.10 a day (AWS Budgets pricing). The `aws_budgets_budget` resource takes `budget_type`, `limit_amount` as a string, `limit_unit`, `time_unit` and `notification` blocks with `comparison_operator`, `threshold`, `threshold_type`, `notification_type` and `subscriber_email_addresses` (provider documentation).
+- **Declarative policies.** AWS Organizations, "Amazon S3 policies": an S3 declarative policy sets all four Block Public Access settings for the accounts in scope, new accounts inherit it, and it overrides the account-level setting while attached. "EC2 policies" lists the supported attributes, and EBS encryption by default is not among them.
+- **`heat-dev` on 2026-10-15.** Before #12: no OIDC provider; the only Lambda function is Control Tower's notification forwarder; `PlatformAdminRole` present; the account settings listed under "What it does not manage". Before #19: no budget.
 
 ## Lock file
 

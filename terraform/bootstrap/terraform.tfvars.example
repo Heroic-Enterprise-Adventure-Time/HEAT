@@ -1,6 +1,6 @@
-# Either copy to terraform.tfvars (ignored by git) and put the real ids in, or
-# set TF_VAR_platform_account_id and TF_VAR_workload_account_id from the GitHub
-# repository variables as README.md shows. The ids are in docs/private/, never
-# in a committed file.
+# Copy to terraform.tfvars (ignored by git) and put the real values in. The ids
+# are in docs/private/, never in a committed file; the address is the owner's.
+# README.md shows the TF_VAR_* alternative for the ids.
 platform_account_id = "123456789012"
 workload_account_id = "210987654321"
+budget_alert_email  = "owner@example.com"
