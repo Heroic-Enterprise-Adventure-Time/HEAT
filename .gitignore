@@ -19,3 +19,11 @@ crash.log
 # Personal Claude Code files, never shared
 CLAUDE.local.md
 .claude/settings.local.json
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+.serverless/
+.env
+.env.*

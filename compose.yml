@@ -1,0 +1,8 @@
+# Local stand-ins for AWS services (decision 0009). Started by hand for a
+# local run; tests start their own containers through Testcontainers.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    command: ["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"]
+    ports:
+      - "8000:8000"

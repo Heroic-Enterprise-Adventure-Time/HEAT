@@ -1,0 +1,47 @@
+# Build and test
+#
+# The gate on every pull request and on main: does the repository build, do
+# its tests pass, is the committed GraphQL schema current, and does every
+# function bundle. It runs with no AWS credentials; the integration tests
+# start their own containers (decision 0009). It never deploys anything:
+# deployment workflows are separate and gated as decision 0011 describes.
+name: Build and test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v5
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install exactly what package-lock.json records
+        run: npm ci
+
+      - name: Typecheck every package
+        run: npm run typecheck
+
+      - name: Run every package's tests (integration tests start containers)
+        run: npm test
+
+      - name: Check that the committed GraphQL schema matches the code
+        run: |
+          npm run schema:print
+          git diff --exit-code -- packages/hub/schema.graphql
+
+      - name: Bundle every function for Lambda
+        run: npm run bundle:hub
