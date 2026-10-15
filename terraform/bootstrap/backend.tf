@@ -3,7 +3,7 @@
 # comes from the environment's backend file, so that one configuration serves
 # every environment with a state of its own.
 #
-#   terraform init -backend-config dev.s3.tfbackend
+#   terraform init -reconfigure -backend-config dev.s3.tfbackend
 terraform {
   backend "s3" {
     bucket       = "heat-platform-terraform-state"
