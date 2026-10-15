@@ -36,7 +36,7 @@ Two committed files per environment, holding nothing private:
 
 | File | Holds | Used by |
 | --- | --- | --- |
-| `dev.s3.tfbackend` | the state key `bootstrap/dev/terraform.tfstate` | `terraform init -backend-config dev.s3.tfbackend` |
+| `dev.s3.tfbackend` | the state key `bootstrap/dev/terraform.tfstate` | `terraform init -reconfigure -backend-config dev.s3.tfbackend` |
 | `dev.tfvars` | `environment`, `github_environment`, `monthly_budget_usd` | `terraform plan -var-file dev.tfvars` |
 
 Git ignores `terraform.tfvars` and `*.auto.tfvars`, the files Terraform loads unasked, and no other `.tfvars` file. The rule was narrowed from `*.tfvars` with this stack so that the per-environment file can be committed.
@@ -56,9 +56,11 @@ Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TO
 # paste the heat-platform Admin block from the access portal, then:
 aws sts get-caller-identity --query Account --output text   # must print the heat-platform id
 cd C:\Users\chanc\IdeaProjects\HEAT\terraform\bootstrap
-terraform init -backend-config dev.s3.tfbackend
+terraform init -reconfigure -backend-config dev.s3.tfbackend
 terraform plan -var-file dev.tfvars -out dev.tfplan
 ```
+
+`-reconfigure` every time, because one directory remembers one backend. Without it, an init that names a different environment's backend file stops with "backend configuration changed" and asks for `-migrate-state` or `-reconfigure`; `-migrate-state` would copy one environment's state under the other's key. `-reconfigure` disregards the remembered configuration and never migrates state (Terraform CLI documentation, `init`, read 2026-10-15). The variable file and the backend file must name the same environment; nothing checks that for you, so read the plan's resource names.
 
 The flags take a space, not `=`. PowerShell splits `-backend-config=dev.s3.tfbackend` at a dot in the value and Terraform then reports too many arguments; seen on the first run, 2026-10-15, and the space form checked in PowerShell the same day.
 

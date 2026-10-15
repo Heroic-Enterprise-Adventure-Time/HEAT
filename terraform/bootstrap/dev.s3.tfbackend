@@ -1,2 +1,2 @@
-# The dev environment's state key. Used as: terraform init -backend-config dev.s3.tfbackend
+# The dev environment's state key. Used as: terraform init -reconfigure -backend-config dev.s3.tfbackend
 key = "bootstrap/dev/terraform.tfstate"
