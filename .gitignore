@@ -2,12 +2,15 @@
 docs/private/
 
 # Terraform working files, state and variable files. State lives in the
-# backend, never in git; variable files hold the account id.
+# backend, never in git. Of the variable files, only the ones Terraform loads
+# unasked are ignored, because those hold the account ids; a named
+# per-environment file such as dev.tfvars holds nothing private and is
+# committed (terraform/bootstrap/README.md).
 .terraform/
 *.tfstate
 *.tfstate.*
-*.tfvars
-!*.tfvars.example
+terraform.tfvars
+*.auto.tfvars
 *.tfplan
 *_override.tf
 *_override.tf.json

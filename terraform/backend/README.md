@@ -13,7 +13,8 @@ State keys, one per stack:
 | Stack | Key |
 | --- | --- |
 | `terraform/backend` | `backend/terraform.tfstate` |
-| `terraform/bootstrap` (next) | `bootstrap/terraform.tfstate` |
+| `terraform/bootstrap`, dev | `bootstrap/dev/terraform.tfstate` |
+| `terraform/bootstrap`, prod (later) | `bootstrap/prod/terraform.tfstate` |
 
 ## The account id
 
