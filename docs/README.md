@@ -14,6 +14,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [architecture/overview.md](architecture/overview.md) | The system: services, data, flows, build order | When the agent reads it |
 | [decisions/](decisions/README.md) | One record per significant decision, including what was rejected | When the agent reads it |
 | [../terraform/backend/README.md](../terraform/backend/README.md) | The state bucket, who applies it, and the one-time bootstrap | When the agent reads it |
+| [../terraform/bootstrap/README.md](../terraform/bootstrap/README.md) | The GitHub OIDC provider and deploy role in a workload account, who applies, what is deferred | When the agent reads it |
 | [standards/typescript.md](standards/typescript.md) | Versions, dependencies, modules, testing, the hub's libraries, bundling | When the agent works under `packages/`, through that directory's `AGENTS.md` |
 | [../local/README.md](../local/README.md) | Running the system locally | When the agent reads it |
 
