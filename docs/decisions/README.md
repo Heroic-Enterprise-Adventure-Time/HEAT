@@ -33,3 +33,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0013](0013-dynamodb-and-s3-only.md) | DynamoDB and S3 only: no relational store, no VPC | Decided |
 | [0014](0014-verification-in-the-submit-request.md) | Verification and settlement happen in the submit request | Decided |
 | [0015](0015-domains-on-dcg-games-com.md) | Domains on dcg-games.com | Decided |
+| [0016](0016-one-root-per-environment.md) | One root directory per environment, shared local modules | Decided |
