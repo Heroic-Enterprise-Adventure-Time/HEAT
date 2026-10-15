@@ -36,8 +36,8 @@ Two committed files per environment, holding nothing private:
 
 | File | Holds | Used by |
 | --- | --- | --- |
-| `dev.s3.tfbackend` | the state key `bootstrap/dev/terraform.tfstate` | `terraform init -backend-config=dev.s3.tfbackend` |
-| `dev.tfvars` | `environment` and `github_environment` | `terraform plan -var-file=dev.tfvars` |
+| `dev.s3.tfbackend` | the state key `bootstrap/dev/terraform.tfstate` | `terraform init -backend-config dev.s3.tfbackend` |
+| `dev.tfvars` | `environment` and `github_environment` | `terraform plan -var-file dev.tfvars` |
 
 Git ignores `terraform.tfvars` and `*.auto.tfvars`, the files Terraform loads unasked, and no other `.tfvars` file. The rule was narrowed from `*.tfvars` with this stack so that the per-environment file can be committed.
 
@@ -63,9 +63,11 @@ aws sts get-caller-identity --query Account --output text   # must print the hea
 $env:TF_VAR_platform_account_id = gh variable get HEAT_PLATFORM_ACCOUNT_ID
 $env:TF_VAR_workload_account_id = gh variable get HEAT_DEV_ACCOUNT_ID
 cd C:\Users\chanc\IdeaProjects\HEAT\terraform\bootstrap
-terraform init -backend-config=dev.s3.tfbackend
-terraform plan -var-file=dev.tfvars -out dev.tfplan
+terraform init -backend-config dev.s3.tfbackend
+terraform plan -var-file dev.tfvars -out dev.tfplan
 ```
+
+The flags take a space, not `=`. PowerShell splits `-backend-config=dev.s3.tfbackend` at a dot in the value and Terraform then reports too many arguments; seen on the first run, 2026-10-15, and the space form checked in PowerShell the same day.
 
 Read the plan: `Plan: 3 to add, 0 to change, 0 to destroy.` The three are the OIDC provider, the role and its inline policy, all in the workload account. Anything else: stop and paste the plan into the session. Then:
 
@@ -80,8 +82,8 @@ Remove-Item dev.tfplan
 The same credentials and `TF_VAR_*` as above, then from this directory:
 
 ```powershell
-terraform init -backend-config=dev.s3.tfbackend
-terraform plan -var-file=dev.tfvars -out dev.tfplan
+terraform init -backend-config dev.s3.tfbackend
+terraform plan -var-file dev.tfvars -out dev.tfplan
 terraform apply dev.tfplan
 Remove-Item dev.tfplan
 ```
