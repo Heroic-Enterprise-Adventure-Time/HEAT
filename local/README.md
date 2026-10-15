@@ -1,6 +1,6 @@
 # Running HEAT locally
 
-Everything runs on the laptop with no AWS credentials (decision 0009). What is needed: Docker, Node 22 or newer, and a Serverless Framework sign-in or licence key for the emulator.
+Everything runs on the laptop with no AWS credentials (decision 0009). What is needed: Docker, Node 24 (the major in `.node-version`, which `fnm` reads), and a Serverless Framework sign-in or licence key for the emulator.
 
 ## What runs where
 

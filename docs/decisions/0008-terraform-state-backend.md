@@ -24,4 +24,4 @@ The alternatives weighed in dcg-platform's decision 0003 apply unchanged: Dynamo
 
 ## Where it is described
 
-`terraform/backend/README.md` for the bucket, the bootstrap and who applies it. `docs/architecture/overview.md`, "Platform".
+`terraform/backend/README.md` for the bucket, the bootstrap and who applies it. `docs/architecture/overview.md`, "Environments".

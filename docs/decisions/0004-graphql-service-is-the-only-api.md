@@ -1,6 +1,6 @@
 # 0004: The GraphQL service is the only API for core requests
 
-- **Status:** Working assumption
+- **Status:** Superseded by 0012
 - **Date:** 2026-10-08
 
 ## Decision
