@@ -1,7 +1,7 @@
-# The two values this repository never commits: AWS account ids. They are
-# given at plan time through terraform.tfvars (ignored by git; see
-# terraform.tfvars.example) or the environment variables
-# TF_VAR_platform_account_id and TF_VAR_workload_account_id.
+# The values this repository never commits: AWS account ids. They are given
+# through terraform.tfvars (ignored by git; see terraform.tfvars.example),
+# which Terraform loads on every run, or through TF_VAR_platform_account_id
+# and TF_VAR_workload_account_ids.
 
 variable "platform_account_id" {
   description = "The heat-platform AWS account, where this stack runs and keeps its state. The default provider refuses credentials for any other account."
@@ -13,13 +13,21 @@ variable "platform_account_id" {
   }
 }
 
-variable "workload_account_id" {
-  description = "The workload AWS account this apply targets, heat-dev or heat-prod, reached by assuming PlatformAdminRole there."
-  type        = string
+# A map rather than one id, because terraform.tfvars is loaded whatever
+# environment is being applied. The environment's own file selects the entry,
+# so the id can never disagree with the names.
+variable "workload_account_ids" {
+  description = "The workload AWS accounts by environment name, such as { dev = \"...\", prod = \"...\" }. The apply targets the one named by var.environment, reached by assuming PlatformAdminRole there."
+  type        = map(string)
 
   validation {
-    condition     = can(regex("^[0-9]{12}$", var.workload_account_id))
-    error_message = "workload_account_id must be a 12-digit AWS account id."
+    condition     = alltrue([for id in values(var.workload_account_ids) : can(regex("^[0-9]{12}$", id))])
+    error_message = "Every value in workload_account_ids must be a 12-digit AWS account id."
+  }
+
+  validation {
+    condition     = contains(keys(var.workload_account_ids), var.environment)
+    error_message = "workload_account_ids has no entry for the environment being applied."
   }
 }
 

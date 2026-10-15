@@ -6,7 +6,7 @@ Creates, in a workload account, what the account needs before anything runs in i
 
 ## What it manages
 
-In the workload account named by `workload_account_id`:
+In the workload account that `workload_account_ids` names for `environment`:
 
 - **The GitHub OIDC provider**: URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`, no thumbprint (see "Facts checked").
 - **The role `heat-<environment>-deploy`.** Trust: `sts:AssumeRoleWithWebIdentity` from that provider, with `aud` equal to `sts.amazonaws.com` and `sub` equal to exactly this repository's immutable subject for the GitHub environment: `repo:Heroic-Enterprise-Adventure-Time@339832417/HEAT@1410947079:environment:<github_environment>`. Permissions: update function code, publish versions, read the function and its configuration, read and move aliases, on functions named `heat-<environment>-*` in us-east-1 in that account. Nothing else. The functions, their roles, triggers and aliases are the environment stack's.
@@ -30,7 +30,7 @@ Each line says what is in force in `heat-dev` today, read through the `audit-hea
 
 ## Values that stay out of git, and the environment files
 
-Three values are never committed: the two account ids (`docs/README.md`, rule 9) and the alert address. They live in `terraform.tfvars`, copied from `terraform.tfvars.example`, which git ignores. The ids can instead come from the GitHub repository variables as `TF_VAR_*`, the way the first apply did; the address has no repository variable, because no workflow needs it.
+Three values are never committed: the platform account id and the workload account ids (`docs/README.md`, rule 9), and the alert address. They live in `terraform.tfvars`, copied from `terraform.tfvars.example`, which git ignores. Terraform loads that file on every run whatever environment is being applied, so the workload ids are a map keyed by environment name and the environment's own file selects the entry; one id in that file would be silently wrong for the other environment. The same three values can come from the environment as `TF_VAR_platform_account_id`, `TF_VAR_workload_account_ids` (a map, as HCL) and `TF_VAR_budget_alert_email`, which is how a pipeline will supply them from the GitHub repository variables; the first apply used that form for the ids.
 
 Two committed files per environment, holding nothing private:
 
@@ -49,7 +49,7 @@ The project owner, from PowerShell, with the `heat-platform` account's `Admin` c
 
 Three repository variables carry the ids and the role ARN for the deploy workflow (decision 0011): `HEAT_PLATFORM_ACCOUNT_ID`, `HEAT_DEV_ACCOUNT_ID` and `HEAT_DEV_DEPLOY_ROLE_ARN`. All three are set. The GitHub environment `dev`, which the role's trust names and in which the deploy workflow (issue #14) runs its jobs, exists.
 
-Once, create `terraform.tfvars` in this directory from the example with the two ids and the alert address. Then, for every apply:
+Once, create `terraform.tfvars` in this directory from the example with the platform id, the workload ids by environment and the alert address. Then, for every apply:
 
 ```powershell
 Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue

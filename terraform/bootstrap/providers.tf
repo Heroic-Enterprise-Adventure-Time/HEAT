@@ -1,4 +1,7 @@
 locals {
+  # The one workload account this apply targets, selected by the environment.
+  workload_account_id = var.workload_account_ids[var.environment]
+
   tags = {
     Project     = "heat"
     Environment = var.environment
@@ -29,10 +32,10 @@ data "aws_caller_identity" "platform" {}
 provider "aws" {
   alias               = "workload"
   region              = "us-east-1"
-  allowed_account_ids = [var.workload_account_id]
+  allowed_account_ids = [local.workload_account_id]
 
   assume_role {
-    role_arn     = "arn:aws:iam::${var.workload_account_id}:role/PlatformAdminRole"
+    role_arn     = "arn:aws:iam::${local.workload_account_id}:role/PlatformAdminRole"
     session_name = "terraform-bootstrap"
   }
 
