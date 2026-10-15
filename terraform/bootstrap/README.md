@@ -2,7 +2,7 @@
 
 Creates, in a workload account, what GitHub Actions needs in order to deploy code there: the GitHub OIDC identity provider and one narrow deploy role. One configuration, applied once per environment with that environment's backend file and variable file. Design: `docs/architecture/overview.md`, "Environments"; decisions 0008, 0011 and 0012. The dev slice is issue #12.
 
-**Status: not applied.** The dev slice is written and awaits the owner's apply into `heat-dev`. Nothing exists yet for `heat-prod`.
+**Status: dev slice applied by the owner on 2026-10-15 and verified.** State is at `bootstrap/dev/terraform.tfstate` in the platform bucket. Verified by the agent through the `audit-heat-dev` profile the same day: the provider exists with the URL and the single audience `sts.amazonaws.com`; the role `heat-dev-deploy` exists with the trust document exactly as written, a one-hour session, no managed policy and the one inline policy with the six actions on `function:heat-dev-*`; it is the only role created that day, and both carry the three tags. IAM recorded a thumbprint on the provider by itself; Terraform set none, and for GitHub it is not used (see "Facts checked"). Two snags on the first run, both fixed in the same pull request: PowerShell split the `-flag=value` arguments, and the piped role ARN reached GitHub with a byte-order mark. Nothing exists yet for `heat-prod`.
 
 ## What it manages
 
