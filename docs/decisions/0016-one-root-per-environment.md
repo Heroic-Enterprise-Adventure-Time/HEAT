@@ -1,6 +1,6 @@
 # 0016: One root directory per environment, shared local modules
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0018 on 2026-10-16: the per-issue sandbox stacks share one root parameterized by the issue number; permanent environments stay a directory each.
 - **Date:** 2026-10-15
 
 ## Decision

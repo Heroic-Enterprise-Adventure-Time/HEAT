@@ -1,6 +1,6 @@
 # 0009: Local development against containers, real AWS only through the pipeline
 
-- **Status:** Decided
+- **Status:** Decided; the stand-ins table and the local run of the system are superseded by 0018 on 2026-10-16. The rule that the hub's data-layer tests run against Testcontainers stays.
 - **Date:** 2026-10-14
 
 ## Decision

@@ -1,6 +1,6 @@
 # 0011: Deployments: code through the pipeline, infrastructure through Terraform, prod behind a tag
 
-- **Status:** Decided
+- **Status:** Decided; the "Two paths, never crossed" rule and the Lambda code path are superseded by 0017 on 2026-10-16. The prod gate and the OIDC identity stay. The artifact list was amended by 0012.
 - **Date:** 2026-10-14
 
 ## Decision
