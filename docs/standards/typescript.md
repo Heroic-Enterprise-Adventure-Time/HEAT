@@ -6,7 +6,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Versions and dependencies
 
-1. **Latest, preferring LTS where it exists.** Node is the current LTS line, pinned by major in `.node-version` at the repository root; `fnm`, CI, the bundler's target and the Lambda runtime identifier (`nodejs<major>.x`, in the emulator and in Terraform) all follow that one number. Libraries are kept at their latest release; a library with an LTS line is kept on that line. Falling behind is a defect to fix, not a state to maintain.
+1. **Latest, preferring LTS where it exists.** Node is the current LTS line, pinned by major in `.node-version` at the repository root; `fnm`, CI, the bundler's target and the Lambda runtime identifier (`nodejs<major>.x`, in the emulator and in Terraform) all follow that one number. Libraries are kept at their latest release; a library with an LTS line is kept on that line. Falling behind is a defect to fix, not a state to maintain. Dependabot opens the pull requests (`.github/dependabot.yml`); a major that cannot be taken yet is listed under "Held back" at the end of this document, with the reason and what releases it.
 2. **Exact pins, committed lock file.** `package.json` names exact versions, never ranges, and `package-lock.json` is committed. CI installs with `npm ci`, so what runs there is what ran on the laptop.
 3. **Install scripts are approved by name.** npm withholds packages' install scripts until they are listed under `allowScripts` in the root `package.json`. A new one is approved with `npm install-scripts approve <package>`, in the pull request that introduces the dependency, and the pull request description says what the script does.
 4. **One source of truth for functions and routes.** `local/manifest.json` lists every Lambda and its routes. The emulator, the bundler and Terraform read it; nothing declares a function or route anywhere else.
@@ -30,6 +30,14 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 ### Bundling
 
 12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild, targeting the Node major in `.node-version`, dependencies included. The workflow uploads the result; Terraform owns the function (decision 0011).
+
+## Held back
+
+Majors not taken, each with the reason and what releases it. Checked 2026-10-16.
+
+- **graphql 17.** Apollo Server 5 declares graphql `^16.11.0` as its peer dependency; Pothos accepts 16 or 17. Released when Apollo Server accepts 17.
+- **Node 26.** Node 24 is the LTS line and 26 is Current. Released when 26 enters LTS, as rule 1 says.
+- **TypeScript 7.** The latest tag; 5.9.3 is pinned. Released by a trial on a branch showing that Pothos, Vitest and the Angular tooling compile and test under it.
 
 ## Why
 

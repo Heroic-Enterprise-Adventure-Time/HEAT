@@ -1,0 +1,38 @@
+# Dependabot: the mechanism behind docs/standards/typescript.md rule 1,
+# "falling behind is a defect to fix, not a state to maintain". Weekly, with
+# minor and patch updates grouped per ecosystem so they arrive as one pull
+# request; a major arrives on its own, so it is reviewed on its own. A major
+# that cannot be taken is listed under "Held back" in the standards.
+version: 2
+updates:
+  # The root holds the workspaces' single lock file.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+
+  # One root per stack and environment (decision 0016); each has its own
+  # lock file.
+  - package-ecosystem: terraform
+    directories:
+      - /terraform/backend
+      - /terraform/bootstrap/dev
+    schedule:
+      interval: weekly
+    groups:
+      terraform-minor-and-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]

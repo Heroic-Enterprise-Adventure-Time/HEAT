@@ -1,10 +1,12 @@
 # Build and test
 #
 # The gate on every pull request and on main: does the repository build, do
-# its tests pass, is the committed GraphQL schema current, and does every
-# function bundle. It runs with no AWS credentials; the integration tests
-# start their own containers (decision 0009). It never deploys anything:
-# deployment workflows are separate and gated as decision 0011 describes.
+# its tests pass, is the committed GraphQL schema current, does every
+# function bundle, and is every Terraform root formatted and valid. It runs
+# with no AWS credentials; the integration tests start their own containers
+# (decision 0009) and the Terraform roots are initialised without a backend.
+# It never deploys anything: deployment workflows are separate and gated as
+# decision 0011 describes.
 name: Build and test
 
 on:
@@ -21,10 +23,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
           cache: npm
@@ -45,3 +47,34 @@ jobs:
 
       - name: Bundle every function for Lambda
         run: npm run bundle:hub
+
+  terraform:
+    name: Terraform format and validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # The latest release, on purpose: format and validate are stable across
+      # releases, each root states its own floor in required_version, and the
+      # owner's machine is expected to track the latest too (standards rule 1).
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive -diff
+        working-directory: terraform
+
+      # One root per stack and environment (decision 0016). Initialised with
+      # the backend off, so no state and no credentials are touched; the lock
+      # file pins the provider that validate loads.
+      - name: Validate every root
+        run: |
+          set -eu
+          for root in terraform/backend terraform/bootstrap/dev; do
+            echo "== $root"
+            terraform -chdir="$root" init -backend=false -input=false
+            terraform -chdir="$root" validate
+          done
