@@ -12,6 +12,17 @@ Read and follow these documents in every session:
 - How a change gets from an idea to `main`: @docs/process/code-changes.md
 - How decisions are made, especially about security and platform management: @docs/process/best-practices.md
 
+## Starting on an issue
+
+A session is one issue. Asked to work on issue N, in whatever words, read these in order before saying anything about the work:
+
+1. The issue, `gh issue view N`, and the open list, `gh issue list`. The issue body is the agreed shape of the checkpoint.
+2. `docs/private/heat-working-context.md`, if it exists. Git ignores it. It holds the AWS account ids, the standing rules summarized for a session without the repository, and the state of the work at the end of the last session, which the agent keeps current. Nothing in it is copied into a committed file.
+3. The sections of `docs/architecture/overview.md` and the records in `docs/decisions/` that the issue names.
+4. The README of each stack under `terraform/` and the `AGENTS.md` of each area under `packages/` that the issue touches.
+
+Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the shape in conversation, confirm the checkout is clean on `main`, branch, and go.
+
 ## Where to find things
 
 | Need | Read |
