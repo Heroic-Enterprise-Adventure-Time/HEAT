@@ -11,14 +11,19 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run build && npm run test --workspaces --if-present",
-    "typecheck": "npm run build && npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build && npm run typecheck --workspaces --if-present && tsc -p local",
     "bundle:hub": "node scripts/bundle.mjs hub",
     "schema:print": "npm run schema:print --workspace @heat/hub",
-    "local:api": "cd local && npx serverless offline"
+    "local:api": "cd local && serverless offline",
+    "local:table": "node --import tsx local/create-table.ts"
   },
   "devDependencies": {
+    "@serverless/typescript": "4.30.0",
     "@types/node": "24.19.2",
     "esbuild": "0.28.2",
+    "serverless": "4.44.0",
+    "serverless-offline": "14.8.3",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
     "vitest": "5.0.5"
   },
@@ -26,6 +31,7 @@
     "esbuild@0.28.2": true,
     "protobufjs@7.6.6": true,
     "@apollo/protobufjs@1.2.8": true,
-    "ssh2@1.17.0": true
+    "ssh2@1.17.0": true,
+    "serverless": false
   }
 }

@@ -6,8 +6,9 @@ import { Repository } from "./db/repository.js";
  * Per-request context. Identity comes from the API Gateway JWT authorizer,
  * which validated the Cognito token before the function ran; the function
  * trusts the claims it is handed and never sees the token. Locally,
- * serverless-offline passes claims through the same field (it does not
- * validate the signature, which is documented and acceptable for a laptop).
+ * serverless-offline decodes the token, checks its expiry, issuer and
+ * audience but never its signature, and passes the claims through the same
+ * field (decision 0017).
  * Tests synthesize the event with claims. Rule 2 of decision 0009: the
  * handler is a plain function of an event and does not know who called it.
  */

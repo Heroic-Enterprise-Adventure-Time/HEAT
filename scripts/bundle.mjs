@@ -8,10 +8,10 @@ import { mkdirSync, readFileSync } from "node:fs";
  * on the runtime's copy). The workflow uploads the result and calls
  * update-function-code; Terraform owns the function (decision 0011).
  *
- * Usage: node scripts/bundle.mjs <function-name>   (names from local/manifest.json)
+ * Usage: node scripts/bundle.mjs <function-name>   (names from manifest.json at the repository root)
  */
 const name = process.argv[2];
-const manifest = JSON.parse(readFileSync(new URL("../local/manifest.json", import.meta.url), "utf8"));
+const manifest = JSON.parse(readFileSync(new URL("../manifest.json", import.meta.url), "utf8"));
 const fn = manifest.functions[name];
 if (!fn) {
   console.error(`unknown function "${name}"; known: ${Object.keys(manifest.functions).join(", ")}`);

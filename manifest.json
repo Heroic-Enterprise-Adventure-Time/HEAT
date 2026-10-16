@@ -1,0 +1,15 @@
+{
+  "$comment": "The one list of functions and routes. Read by local/serverless.js for the emulator and by scripts/bundle.mjs for packaging; Terraform reads it for the real functions and routes (decision 0011: one source of truth, several consumers; docs/standards/typescript.md rule 4). `entry` is the handler module relative to the repository root; `export` is the exported handler name.",
+  "functions": {
+    "hub": {
+      "entry": "packages/hub/src/handler.ts",
+      "export": "handler",
+      "memoryMb": 512,
+      "timeoutSeconds": 29,
+      "http": [
+        { "method": "POST", "path": "/graphql", "authorizer": "cognito" },
+        { "method": "GET", "path": "/graphql", "authorizer": "cognito" }
+      ]
+    }
+  }
+}

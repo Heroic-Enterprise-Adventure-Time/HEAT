@@ -26,7 +26,7 @@ The design and architecture documents say what is true now. They are edited as t
 | [0006](0006-rds-postgres-not-aurora.md) | RDS Postgres, not Aurora | Superseded by 0013 |
 | [0007](0007-canned-actions-not-free-text.md) | Canned actions, not free-text chat | Decided |
 | [0008](0008-terraform-state-backend.md) | Terraform state in one S3 bucket in heat-platform, native locking, SSE-S3, account id as a variable | Decided |
-| [0009](0009-local-development-environment.md) | Local development against containers and serverless-offline; real AWS only through the pipeline | Decided |
+| [0009](0009-local-development-environment.md) | Local development against containers and serverless-offline; real AWS only through the pipeline | Decided; gateway row amended by 0017 |
 | [0010](0010-front-doors.md) | API Gateway fronts the API, CloudFront the client; no load balancer; domains per environment | Decided; domains amended by 0015, VPC link moot per 0012 |
 | [0011](0011-deployments-and-the-prod-gate.md) | Code through the pipeline, infrastructure through Terraform, prod behind a version tag | Decided; artifact list amended by 0012 |
 | [0012](0012-hub-is-typescript-on-lambda.md) | The hub is TypeScript on Lambda, with Apollo Server and Pothos | Decided |
@@ -34,3 +34,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0014](0014-verification-in-the-submit-request.md) | Verification and settlement happen in the submit request | Decided |
 | [0015](0015-domains-on-dcg-games-com.md) | Domains on dcg-games.com | Decided |
 | [0016](0016-one-root-per-environment.md) | One root directory per environment, shared local modules | Decided |
+| [0017](0017-serverless-offline-from-the-manifest.md) | serverless-offline stays as the local gateway, configured from the manifest and pinned | Decided |

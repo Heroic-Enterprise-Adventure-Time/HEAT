@@ -28,5 +28,9 @@ node_modules/
 dist/
 *.tsbuildinfo
 .serverless/
+# serverless-offline runs the handler in a worker thread whose environment
+# is only the function's, so it has no TEMP, and tsx's cache for the handler
+# lands under a literal "undefined	emp" path beside the config.
+local/undefined/
 .env
 .env.*

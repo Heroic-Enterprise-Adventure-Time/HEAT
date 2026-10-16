@@ -1,0 +1,6 @@
+{
+  "name": "heat-local",
+  "private": true,
+  "description": "The local emulator's configuration and scripts; not a workspace. Marks the directory as ES modules so tsx, the Serverless Framework's loader and the typechecker agree on the format.",
+  "type": "module"
+}

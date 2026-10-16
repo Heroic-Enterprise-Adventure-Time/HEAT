@@ -74,7 +74,7 @@ How one checkpoint moves through the rules above, from the start of a session to
 
 Most of this document is an agreement, not a mechanism. What is enforced today:
 
-- `.claude/settings.json` denies an agent the commands `git push origin main`, `git push origin HEAD:main` and `gh pr merge`. This is a guardrail against the obvious forms, not a guarantee: a command pattern can be worded around.
+- `.claude/settings.json` denies an agent the commands `git push origin main`, `git push origin HEAD:main`, `gh pr merge`, and `serverless deploy` in its `sls` and `npx` forms, since the local emulator's framework can deploy and nothing of HEAT's is ever deployed by it (decision 0017). This is a guardrail against the obvious forms, not a guarantee: a command pattern can be worded around.
 - The agent's AWS profiles carry read-only roles. An agent cannot apply Terraform or run a changing command, even by mistake.
 - The repository's merge settings allow merge commits only; the squash and rebase buttons are off.
 - The "Build and test" workflow runs on every pull request and on `main`: typecheck, tests, schema currency, bundling. The `main` ruleset below requires it to pass.

@@ -3,7 +3,11 @@
     "deny": [
       "Bash(git push origin main:*)",
       "Bash(git push origin HEAD:main*)",
-      "Bash(gh pr merge:*)"
+      "Bash(gh pr merge:*)",
+      "Bash(serverless deploy:*)",
+      "Bash(sls deploy:*)",
+      "Bash(npx serverless deploy:*)",
+      "Bash(npx sls deploy:*)"
     ]
   }
 }
