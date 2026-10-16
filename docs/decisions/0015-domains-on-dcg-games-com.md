@@ -1,6 +1,6 @@
 # 0015: Domains on dcg-games.com
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0018 on 2026-10-16: each hostname is a CloudFront distribution carrying the client and the APIs; the APIs have no hostname of their own.
 - **Date:** 2026-10-14, recorded 2026-10-15
 - **Amends:** 0010, the "Domains" paragraph
 

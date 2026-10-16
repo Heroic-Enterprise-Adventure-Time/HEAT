@@ -1,6 +1,6 @@
 # 0008: Terraform state backend
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0017 on 2026-10-16: an environment is applied by HEAT's own role in its workload account, not from `heat-platform`; the state stays in the `heat-platform` bucket.
 - **Date:** 2026-10-13
 
 ## Decision

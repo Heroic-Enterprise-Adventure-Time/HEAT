@@ -19,6 +19,7 @@ How the project owner and an agent work together. These rules apply in every ses
 - The owner wants one recommended shape with the reason, not a menu of options. Alternatives are mentioned only where the choice is genuinely the owner's to make.
 - Identity terms are used in full: AWS account, management account, root user, IAM user, Identity Center user, group, permission set, assignment, role. Nothing is called "the account" or "the user" when it matters which kind.
 - A missing tool, version or permission is asked for, not worked around. A substitute mechanism is not used, even when it would work, if it would make the agent's environment differ from CI or from the agreed design. When doing it the right way needs a detour or a discussion first, that comes first, and the detour is reported as what it is.
+- Pull requests and issues are named PR-n and Issue-n, in conversation and in documents, so that a bare number is never ambiguous. GitHub's own `#n` is used only where GitHub reads it, as in `Closes #n`.
 
 ## Why
 
@@ -31,3 +32,5 @@ Working things out in conversation also leaves a record. A gap that is closed si
 The two practices added on 2026-10-13 come from the AWS review that preceded the platform work, and match the same two in the `dcg-platform` repository. A menu of options pushed the identity decisions back onto the owner, who does not want to be the identity expert; a recommendation with its reason did not. And "account" and "user" each name several different things in AWS, so a sentence that does not say which kind is a sentence that can be misread.
 
 The practice added on 2026-10-14 comes from the first code: Docker was missing on the owner's machine while the agreed local design runs its stand-ins as containers, and the agent downloaded a jar instead of asking. It worked, and it would have made the laptop's tests differ from CI's, which is the kind of difference that surfaces weeks later as "it passed for me". A workaround that keeps the work moving is the wrong trade when the thing it works around is the environment itself.
+
+The naming practice added on 2026-10-16 comes from the cloud-first pivot of that day, when pull requests, issues and the numbered decision records were all in one conversation and "#34" could mean two things. GitHub renders `#n` as a link to whichever of the two it finds, so the prefix is the only thing that disambiguates a number in prose.

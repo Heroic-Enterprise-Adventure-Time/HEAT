@@ -1,6 +1,6 @@
 # 0010: Front doors: API Gateway for the API, CloudFront for the client
 
-- **Status:** Decided
+- **Status:** Decided. Domains amended by 0015; the VPC link moot per 0012; amended by 0018 on 2026-10-16: one hostname per environment, with the APIs on paths behind the CloudFront distribution instead of on their own custom domain.
 - **Date:** 2026-10-14
 
 ## Decision
