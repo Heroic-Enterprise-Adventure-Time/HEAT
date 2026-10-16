@@ -17,7 +17,7 @@ locals {
   # heat-<environment>-<name>. The trailing wildcard matches the function and
   # its versions and aliases; without it, only the unqualified ARN would match
   # and the alias actions would be refused.
-  function_arns = "arn:aws:lambda:us-east-1:${local.workload_account_id}:function:heat-${var.environment}-*"
+  function_arns = "arn:aws:lambda:us-east-1:${var.workload_account_id}:function:heat-${var.environment}-*"
 }
 
 data "aws_iam_policy_document" "deploy_trust" {
