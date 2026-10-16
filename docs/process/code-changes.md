@@ -45,7 +45,7 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 
 How one checkpoint moves through the rules above, from the start of a session to a clean `main`. Agreed 2026-10-15.
 
-20. **Agree the work.** The session opens by agreeing, in conversation, which issue comes next. Issues found in that conversation are created then, under their milestone.
+20. **Agree the work.** A session is one issue. It opens by agreeing, in conversation, the shape of that issue's work; issues found in that conversation are created then, under their milestone. When the issue's pull request is merged and the checkout is reset (rule 26), the next issue starts in a new session, so each session carries one issue's context. `AGENTS.md`, "Starting on an issue", says what a session reads first.
 21. **Start clean.** Before a branch is created, the checkout must be on `main` with nothing to commit (`git status --porcelain` prints nothing). If it is not, the agent stops and says so. It does not stash, reset or switch to make it so.
 22. **The agent branches.** It fetches, creates the branch from `origin/main` (`git switch -c <type>/<name> origin/main`) and stays on it. Branch switching is the agent's job, not the owner's IDE's.
 23. **Implement.** The agent commits and pushes as it sees fit, and opens the pull request when it believes the work is ready, which includes running the tests locally.
@@ -67,6 +67,8 @@ How one checkpoint moves through the rules above, from the start of a session to
 **The owner applies.** This project's Terraform runs with administrator access inside HEAT's AWS accounts, through a role the organization layer placed there. A mistake in an apply reaches a whole account. Review before apply is the control that exists today, so the apply stays with the person who reviewed. The same two rules hold in the `dcg-platform` repository, whose stack reaches every account in the organization.
 
 **The branch stays checked out.** The earlier practice returned the checkout to `main` as soon as the pull request was open, which kept `main` under the IDE but meant the owner could not run the change without switching branches by hand. One checkout shared by a person and an agent is also one working tree, which is why the cycle names a single writer and makes the agent look before every commit. Serial work follows from the same fact: a second checkpoint would need the branch the first one is being reviewed on. Added 2026-10-15, before the first platform checkpoint.
+
+**One issue per session.** A long session accumulates context the next issue does not need and loses the thread of the one it has. Starting each issue in a new session keeps the context the issue's, and it only works if a fresh session can find everything from the issue itself, the private working context and the documents `AGENTS.md` names, which is what that section is for. Added 2026-10-16.
 
 ## What enforces this
 

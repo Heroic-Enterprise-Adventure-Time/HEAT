@@ -42,7 +42,7 @@ These are part of the structure and are not written yet. Each is written when th
 
 ## Not documents
 
-`docs/private/` is ignored by git and holds working notes: account ids, inventories, runbooks in progress, and the hand-over notes from the `dcg-platform` repository. Nothing there is reviewed or kept true. Where a committed document and a private note disagree, the committed document wins, and the AWS APIs win over both.
+`docs/private/` is ignored by git and holds working notes: account ids, inventories, runbooks in progress, and the hand-over notes from the `dcg-platform` repository. Nothing there is reviewed or kept true. Where a committed document and a private note disagree, the committed document wins, and the AWS APIs win over both. One file there, `heat-working-context.md`, is read at the start of every session (`AGENTS.md`, "Starting on an issue"): it carries the account ids, the standing rules summarized for a session without the repository, and the state of the work, which the agent updates as it goes.
 
 ## Where documents live
 
