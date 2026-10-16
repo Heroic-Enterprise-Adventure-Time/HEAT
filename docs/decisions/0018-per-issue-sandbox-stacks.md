@@ -59,7 +59,7 @@ All read on 2026-10-16.
 ## What is owed, and by whom
 
 - **`dcg-platform`, in its own sessions:** the `heat-sandbox` account through the account factory under NonProd with the organization's roles placed; delegation of `heat-sb.dcg-games.com` to `heat-sandbox`, `heat-dev.dcg-games.com` to `heat-dev` and `heat.dcg-games.com` to `heat-prod`. No change to `AuditRole` or `PlatformAdminRole`.
-- **The owner, once:** the Google Auth Platform project and its OAuth client with the three pools' redirect URIs; the client id and secret into the GitHub environments; the GitHub environments `sandbox`, `dev` (branch `main`) and `prod` (tags `v*`).
+- **The owner, once:** the Google Auth Platform project and its OAuth client with the three pools' redirect URIs; the client id and secret into the GitHub environments; the GitHub environments `dev` (branch `main`) and `prod` (tags `v*`). The per-stack environments `sandbox-<issue>` need no step: the workflow creates each by referencing it (decision 0019).
 - **Deferred to later checkpoints, named above:** the cap on concurrent stacks (Issue-37); zip determinism and the cold start measurement (Issue-38); the WebSocket behavior's path and idle behavior (build order step 4).
 
 ## Where it is described

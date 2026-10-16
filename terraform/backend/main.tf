@@ -85,6 +85,22 @@ resource "aws_s3_bucket_lifecycle_configuration" "state" {
   }
 }
 
+locals {
+  # Each workload account's two roles (terraform/modules/bootstrap) and the
+  # prefix they may use: environment/<environment>/, which holds the permanent
+  # environment's key, and in the sandbox account the base's and every
+  # per-issue stack's keys (decisions 0018 and 0019). The bootstrap and
+  # backend stacks' own keys are outside every prefix: those stay the
+  # owner's.
+  environment_state = {
+    for name, account_id in var.workload_account_ids : name => {
+      plan_role_arn  = "arn:aws:iam::${account_id}:role/heat-${name}-plan"
+      apply_role_arn = "arn:aws:iam::${account_id}:role/heat-${name}-apply"
+      prefix         = "environment/${name}/"
+    }
+  }
+}
+
 data "aws_iam_policy_document" "state" {
   statement {
     sid    = "DenyInsecureTransport"
@@ -106,6 +122,71 @@ data "aws_iam_policy_document" "state" {
       test     = "Bool"
       variable = "aws:SecureTransport"
       values   = ["false"]
+    }
+  }
+
+  # Three statements per workload account. The S3 backend lists the bucket
+  # under the key's prefix, and under env:/ for workspaces, which this
+  # repository never uses and which lists nothing; reads the state object;
+  # and, with use_lockfile, writes and deletes <key>.tflock (Terraform's S3
+  # backend documentation, read 2026-10-16). The plan role lists and reads;
+  # the apply role lists, reads, writes and deletes. Cross-account access
+  # needs the identity side as well: the apply role has AdministratorAccess
+  # and the plan role ReadOnlyAccess with a carve-out for this prefix.
+  dynamic "statement" {
+    for_each = local.environment_state
+
+    content {
+      sid    = "${title(statement.key)}StateList"
+      effect = "Allow"
+
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value.plan_role_arn, statement.value.apply_role_arn]
+      }
+
+      actions   = ["s3:ListBucket"]
+      resources = [aws_s3_bucket.state.arn]
+
+      condition {
+        test     = "StringLike"
+        variable = "s3:prefix"
+        values   = ["${statement.value.prefix}*", "env:/*"]
+      }
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.environment_state
+
+    content {
+      sid    = "${title(statement.key)}StateRead"
+      effect = "Allow"
+
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value.plan_role_arn, statement.value.apply_role_arn]
+      }
+
+      actions   = ["s3:GetObject"]
+      resources = ["${aws_s3_bucket.state.arn}/${statement.value.prefix}*"]
+    }
+  }
+
+  dynamic "statement" {
+    for_each = local.environment_state
+
+    content {
+      sid    = "${title(statement.key)}StateWrite"
+      effect = "Allow"
+
+      principals {
+        type        = "AWS"
+        identifiers = [statement.value.apply_role_arn]
+      }
+
+      actions   = ["s3:PutObject", "s3:DeleteObject"]
+      resources = ["${aws_s3_bucket.state.arn}/${statement.value.prefix}*"]
     }
   }
 }

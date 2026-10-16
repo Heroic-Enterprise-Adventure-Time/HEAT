@@ -73,7 +73,7 @@ jobs:
       - name: Validate every root
         run: |
           set -eu
-          for root in terraform/backend terraform/bootstrap/dev; do
+          for root in terraform/backend terraform/bootstrap/sandbox terraform/bootstrap/dev terraform/bootstrap/prod; do
             echo "== $root"
             terraform -chdir="$root" init -backend=false -input=false
             terraform -chdir="$root" validate
