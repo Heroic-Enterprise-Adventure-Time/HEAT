@@ -14,6 +14,16 @@ updates:
       npm-minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    # The majors the standards hold back, each with its reason under
+    # "Held back" in docs/standards/typescript.md. A major leaves this list
+    # and that list in the same pull request.
+    ignore:
+      - dependency-name: graphql
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
