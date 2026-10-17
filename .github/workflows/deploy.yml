@@ -1,0 +1,294 @@
+# Deploy
+#
+# The pipeline's Terraform path for the permanent roots (decision 0017): a
+# plan on every pull request to main, posted on the pull request, and a plan
+# and apply on every merge to main. Nothing else applies an environment.
+#
+# Each permanent root is one row of the matrix, and its jobs run under that
+# root's own GitHub environment, which holds its secrets and admits only the
+# branch main (decision 0020). Today the one row is sandbox-base. Issue-40
+# adds dev. Issue-41 adds prod with its own triggers, pull_request_target to
+# release and push to release, because prod ships through the release branch
+# (decision 0021).
+#
+# Why pull_request_target and not pull_request: the pull request's plan must
+# run under the root's environment to see its real values, and the
+# environment's branch policy is matched against the run's ref. A
+# pull_request run has the ref refs/pull/<n>/merge, which no policy admits;
+# a pull_request_target run carries main's ref and executes main's copy of
+# this file. The price is that the job checks out and plans the pull
+# request's head with the environment's credentials, so Terraform from an
+# untrusted head would run as the plan role. Heads from other repositories
+# are therefore refused before anything runs; for heads of this repository
+# the risk is the one decision 0020 accepts, a repository whose every author
+# is trusted. Two consequences of the trigger worth knowing: a new or
+# changed copy of this file takes effect for pull requests only once it is
+# on main, and Dependabot's pull requests get no plan, since their runs see
+# no secrets; the apply on main plans anyway.
+#
+# The plan role is read only and plans with -lock=false. The apply role
+# plans again, checks the plan, and applies exactly the plan it checked.
+# Both jobs run the allow-list check of decision 0017, guardrail 2, and
+# write the plan into the job summary (guardrail 4). The account id is
+# replaced in every plan that leaves the runner, so that neither a comment
+# nor a summary carries it (docs/README.md, rule 9).
+name: Deploy
+
+on:
+  pull_request_target:
+    branches: [main]
+  push:
+    branches: [main]
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_REGION: us-east-1
+
+jobs:
+  plan:
+    name: Plan ${{ matrix.root }}
+    # Only pull requests from this repository, and not Dependabot's.
+    if: >-
+      github.event_name == 'pull_request_target'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # One row per permanent root. The role ARN is the account id
+          # variable plus the committed role name (terraform/bootstrap/README.md).
+          - root: sandbox-base
+            environment: sandbox-base
+            account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+            role: heat-sandbox-plan
+    env:
+      TF_VAR_workload_account_id: ${{ matrix.account_id }}
+    steps:
+      - name: Refuse to run without the account id
+        env:
+          ACCOUNT_ID: ${{ matrix.account_id }}
+        run: |
+          set -eu
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "The account id variable for ${{ matrix.root }} is not set." >&2
+            exit 1
+          fi
+          echo "::add-mask::$ACCOUNT_ID"
+
+      - name: Check out the pull request's head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Assume the plan role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ matrix.account_id }}:role/${{ matrix.role }}
+          role-session-name: deploy-plan-${{ matrix.root }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Plan
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/${{ matrix.root }}" init
+          terraform -chdir="terraform/environment/${{ matrix.root }}" plan -lock=false -out "$RUNNER_TEMP/plan.tfplan"
+
+      - name: Check the plan against the resource-type allow-list
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/${{ matrix.root }}" show -json "$RUNNER_TEMP/plan.tfplan" > "$RUNNER_TEMP/plan.json"
+          node scripts/check-plan-resource-types.mjs "$RUNNER_TEMP/plan.json"
+
+      - name: Write the plan to the job summary and the pull request
+        env:
+          ACCOUNT_ID: ${{ matrix.account_id }}
+          ROOT: ${{ matrix.root }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/$ROOT" show -no-color "$RUNNER_TEMP/plan.tfplan" \
+            | sed "s/$ACCOUNT_ID/<account id>/g" > "$RUNNER_TEMP/plan.txt"
+          summary="$(grep -E '^(Plan:|No changes\.)' "$RUNNER_TEMP/plan.txt" | head -n 1 || true)"
+          : "${summary:=Plan written below.}"
+
+          # A pull request comment holds at most 65536 characters; a plan
+          # that would not fit is cut, and the summary has the whole of it.
+          limit=60000
+          body_plan="$(head -c "$limit" "$RUNNER_TEMP/plan.txt")"
+          if [ "$(wc -c < "$RUNNER_TEMP/plan.txt")" -gt "$limit" ]; then
+            body_plan="$body_plan"$'\n\n'"... cut here; the whole plan is in the job summary."
+          fi
+
+          marker="<!-- heat-plan:$ROOT -->"
+          {
+            echo "$marker"
+            echo "### Terraform plan: \`$ROOT\`"
+            echo
+            echo "Commit $HEAD_SHA, planned under the \`${{ matrix.environment }}\` environment with the plan role. Allow-list check: passed. [Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
+            echo
+            echo "<details><summary>$summary</summary>"
+            echo
+            echo '```text'
+            echo "$body_plan"
+            echo '```'
+            echo
+            echo "</details>"
+          } > "$RUNNER_TEMP/comment.md"
+
+          {
+            echo "### Terraform plan: \`$ROOT\`"
+            echo
+            echo "Commit $HEAD_SHA, planned under the \`${{ matrix.environment }}\` environment with the plan role. Allow-list check: passed."
+            echo
+            echo "$summary"
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/plan.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # One comment per root, edited in place on every push, so the pull
+          # request shows the current plan and not a history of them.
+          existing="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
+            --jq "[.[] | select(.body | startswith(\"$marker\"))] | first | .id // empty")"
+          if [ -n "$existing" ]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
+            echo "updated the plan comment $existing"
+          else
+            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
+            echo "posted the plan comment"
+          fi
+
+  apply:
+    name: Apply ${{ matrix.root }}
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: ${{ matrix.environment }}
+    # One apply at a time per root, and never cancelled: a cancelled apply
+    # can leave the state lock behind, so applies queue (decision 0017).
+    concurrency:
+      group: deploy-${{ matrix.root }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The same rows as the plan job. test_users is true where the
+          # test-user step runs: the sandbox and dev, never prod (decision
+          # 0020). The step reads the environment's HEAT_TEST_USER_PASSWORD;
+          # the name is the same in every environment and the environment
+          # supplies the value.
+          - root: sandbox-base
+            environment: sandbox-base
+            account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+            role: heat-sandbox-apply
+            test_users: true
+    env:
+      TF_VAR_workload_account_id: ${{ matrix.account_id }}
+    steps:
+      - name: Refuse to run without the account id
+        env:
+          ACCOUNT_ID: ${{ matrix.account_id }}
+        run: |
+          set -eu
+          if [ -z "$ACCOUNT_ID" ]; then
+            echo "The account id variable for ${{ matrix.root }} is not set." >&2
+            exit 1
+          fi
+          echo "::add-mask::$ACCOUNT_ID"
+
+      - name: Check out main
+        uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Assume the apply role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ matrix.account_id }}:role/${{ matrix.role }}
+          role-session-name: deploy-apply-${{ matrix.root }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Plan
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/${{ matrix.root }}" init
+          terraform -chdir="terraform/environment/${{ matrix.root }}" plan -out "$RUNNER_TEMP/plan.tfplan"
+
+      - name: Check the plan against the resource-type allow-list
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/${{ matrix.root }}" show -json "$RUNNER_TEMP/plan.tfplan" > "$RUNNER_TEMP/plan.json"
+          node scripts/check-plan-resource-types.mjs "$RUNNER_TEMP/plan.json"
+
+      - name: Write the plan to the job summary
+        env:
+          ACCOUNT_ID: ${{ matrix.account_id }}
+          ROOT: ${{ matrix.root }}
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/$ROOT" show -no-color "$RUNNER_TEMP/plan.tfplan" \
+            | sed "s/$ACCOUNT_ID/<account id>/g" > "$RUNNER_TEMP/plan.txt"
+          summary="$(grep -E '^(Plan:|No changes\.)' "$RUNNER_TEMP/plan.txt" | head -n 1 || true)"
+          {
+            echo "### Terraform plan: \`$ROOT\`, applied by this run"
+            echo
+            echo "Commit $GITHUB_SHA, under the \`${{ matrix.environment }}\` environment with the apply role. Allow-list check: passed."
+            echo
+            echo "${summary:-Plan written below.}"
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/plan.txt"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Exactly the plan that was checked, not a fresh one.
+      - name: Apply
+        run: terraform -chdir="terraform/environment/${{ matrix.root }}" apply "$RUNNER_TEMP/plan.tfplan"
+
+      # Test users are data, created after the apply from the committed list
+      # beside the root and the environment's secret (decision 0020).
+      - name: Create the test users
+        if: matrix.test_users
+        env:
+          TEST_USER_PASSWORD: ${{ secrets.HEAT_TEST_USER_PASSWORD }}
+          ROOT: ${{ matrix.root }}
+        run: |
+          set -eu
+          if [ -z "$TEST_USER_PASSWORD" ]; then
+            echo "The secret HEAT_TEST_USER_PASSWORD is not set on the ${{ matrix.environment }} environment." >&2
+            exit 1
+          fi
+          pool_id="$(terraform -chdir="terraform/environment/$ROOT" output -raw user_pool_id)"
+          sh scripts/create-test-users.sh "$pool_id" "terraform/environment/$ROOT/test-users.txt"

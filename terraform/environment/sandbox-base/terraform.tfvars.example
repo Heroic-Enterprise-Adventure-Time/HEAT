@@ -1,0 +1,5 @@
+# For a plan on a laptop: copy to terraform.tfvars in this directory (ignored
+# by git) and put the real value in, or set TF_VAR_workload_account_id with
+# the private script in docs/private/. The pipeline sets it from the
+# repository variable HEAT_SANDBOX_ACCOUNT_ID. The id is never committed.
+workload_account_id = "000000000000"

@@ -11,10 +11,11 @@ module "bootstrap" {
     aws.workload = aws.workload
   }
 
-  environment           = local.environment
-  github_environment    = "sandbox-*"
-  monthly_budget_usd    = 20
-  workload_account_id   = var.workload_account_id
-  management_account_id = var.management_account_id
-  budget_alert_email    = var.budget_alert_email
+  environment             = local.environment
+  github_environment      = "sandbox-*"
+  plan_github_environment = "sandbox-base"
+  monthly_budget_usd      = 20
+  workload_account_id     = var.workload_account_id
+  management_account_id   = var.management_account_id
+  budget_alert_email      = var.budget_alert_email
 }

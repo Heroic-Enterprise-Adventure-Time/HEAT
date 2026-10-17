@@ -17,6 +17,16 @@ variable "github_environment" {
   type        = string
 }
 
+variable "plan_github_environment" {
+  description = "The GitHub Actions environment under which a pull request's plan of this account's permanent root runs, and whose jobs may therefore assume the plan role beside pull_request runs (decision 0020): sandbox-base, dev or prod, exactly."
+  type        = string
+
+  validation {
+    condition     = contains(["sandbox-base", "dev", "prod"], var.plan_github_environment)
+    error_message = "plan_github_environment must be sandbox-base, dev or prod."
+  }
+}
+
 variable "workload_account_id" {
   description = "The workload AWS account the aws.workload provider is configured for. Used to build ARNs; the provider itself is the root's."
   type        = string

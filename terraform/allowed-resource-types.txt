@@ -1,0 +1,12 @@
+# The resource types the pipeline may create or change in an environment
+# (decision 0017, guardrail 2). scripts/check-plan-resource-types.mjs fails a
+# run whose plan creates or updates a managed resource of any other type; a
+# delete is always allowed. One type per line; a line's text after # is a
+# comment. Adding a line is a reviewed change, made by the pull request that
+# introduces the resource.
+
+# The base (terraform/modules/base): the hosted zone and the shared user pool
+# with its CI app client (Issue-37).
+aws_route53_zone
+aws_cognito_user_pool
+aws_cognito_user_pool_client

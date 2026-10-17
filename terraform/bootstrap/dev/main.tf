@@ -9,12 +9,13 @@ module "bootstrap" {
     aws.workload = aws.workload
   }
 
-  environment           = local.environment
-  github_environment    = "dev"
-  monthly_budget_usd    = 10
-  workload_account_id   = var.workload_account_id
-  management_account_id = var.management_account_id
-  budget_alert_email    = var.budget_alert_email
+  environment             = local.environment
+  github_environment      = "dev"
+  plan_github_environment = "dev"
+  monthly_budget_usd      = 10
+  workload_account_id     = var.workload_account_id
+  management_account_id   = var.management_account_id
+  budget_alert_email      = var.budget_alert_email
 }
 
 # The four resources existed at this root before the module did (Issue-12,

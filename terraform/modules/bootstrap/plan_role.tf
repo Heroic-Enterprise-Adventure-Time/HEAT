@@ -1,16 +1,22 @@
-# The plan role: what a pull request's plan job, and the agent from its audit
-# chain, may see in the workload account. Read only, with the data plane
-# taken back: configuration, never contents (decision 0017). It is the only
-# new access the agent gets, and it cannot change anything.
+# The plan role: what a pull request's plan job, run under the root's GitHub
+# environment, and the agent from its audit chain, may see in the workload
+# account. Read only, with the data plane taken back: configuration, never
+# contents (decision 0017). It is the only new access the agent gets, and it
+# cannot change anything.
 
 data "aws_iam_policy_document" "plan_trust" {
-  # A pull request run has no GitHub environment, and GitHub then puts
-  # "pull_request" in the subject (GitHub, "OpenID Connect reference", read
-  # 2026-10-16). A job under an environment carries the environment name
-  # instead, so an apply job cannot satisfy this statement, and a pull
-  # request job cannot satisfy the apply role's.
+  # Two GitHub subjects, either of which satisfies the condition. A pull
+  # request run with no GitHub environment carries "pull_request" in the
+  # subject; a job under an environment carries the environment's name
+  # instead (GitHub, "OpenID Connect reference", read 2026-10-16). The
+  # pipeline plans a permanent root on its pull request under that root's
+  # own environment, through pull_request_target, so that the plan sees the
+  # environment's real values (decision 0020): that is the second subject,
+  # one exact environment name per account. The apply role trusts its own
+  # environment pattern and not pull_request, so a pull request job cannot
+  # satisfy the apply role's trust.
   statement {
-    sid     = "GitHubActionsPullRequestRuns"
+    sid     = "GitHubActionsPullRequestAndPlanEnvironmentRuns"
     effect  = "Allow"
     actions = ["sts:AssumeRoleWithWebIdentity"]
 
@@ -28,7 +34,10 @@ data "aws_iam_policy_document" "plan_trust" {
     condition {
       test     = "StringEquals"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["${local.github_subject_prefix}:pull_request"]
+      values = [
+        "${local.github_subject_prefix}:pull_request",
+        "${local.github_subject_prefix}:environment:${var.plan_github_environment}",
+      ]
     }
   }
 
@@ -143,28 +152,25 @@ data "aws_iam_policy_document" "plan" {
   }
 
   # ReadOnlyAccess grants cognito-idp:AdminGet* and List*: user records, which
-  # in dev and prod are players' records. Denied there. In the sandbox
-  # account every user is a test user that the sandbox base creates through
-  # Terraform, and refreshing an aws_cognito_user calls AdminGetUser, so the
-  # sandbox plan role keeps the read.
-  dynamic "statement" {
-    for_each = var.environment == "sandbox" ? [] : [1]
+  # in dev and prod are players' records. Denied in every account: the
+  # sandbox base's test users are created by the apply job with the CLI, not
+  # by Terraform, so no plan ever needs to read a user (decision 0020, which
+  # closed the sandbox carve-out of 0019). The pool's configuration stays
+  # readable.
+  statement {
+    sid    = "DenyUserRecords"
+    effect = "Deny"
 
-    content {
-      sid    = "DenyUserRecords"
-      effect = "Deny"
+    actions = [
+      "cognito-idp:AdminGetUser",
+      "cognito-idp:ListUsers",
+      "cognito-idp:ListUsersInGroup",
+      "cognito-idp:AdminListGroupsForUser",
+      "cognito-idp:AdminListUserAuthEvents",
+      "cognito-idp:AdminListDevices",
+    ]
 
-      actions = [
-        "cognito-idp:AdminGetUser",
-        "cognito-idp:ListUsers",
-        "cognito-idp:ListUsersInGroup",
-        "cognito-idp:AdminListGroupsForUser",
-        "cognito-idp:AdminListUserAuthEvents",
-        "cognito-idp:AdminListDevices",
-      ]
-
-      resources = ["*"]
-    }
+    resources = ["*"]
   }
 }
 
