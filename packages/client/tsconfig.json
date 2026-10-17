@@ -1,0 +1,29 @@
+// The repository's base settings (docs/standards/typescript.md, rules 5 and
+// 6), with the overrides the Angular build needs. Each override says why.
+{
+  "extends": "../../tsconfig.base.json",
+  "compileOnSave": false,
+  "compilerOptions": {
+    // The client is bundled by esbuild inside @angular/build, not run by
+    // Node: the bundler resolves modules and keeps import syntax as written.
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    // It runs in the browser.
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    // Nothing imports the client, so it emits no declarations.
+    "declaration": false,
+    // Angular's own settings, as `ng new` writes them.
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true
+  },
+  "files": [],
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.spec.json" }]
+}

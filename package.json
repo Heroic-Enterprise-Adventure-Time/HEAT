@@ -10,8 +10,8 @@
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run build && npm run test --workspaces --if-present",
-    "typecheck": "npm run build && npm run typecheck --workspaces --if-present",
+    "test": "npm run build --workspace @heat/engine && npm run test --workspaces --if-present",
+    "typecheck": "npm run build --workspace @heat/engine && npm run typecheck --workspaces --if-present",
     "bundle:hub": "node scripts/bundle.mjs hub",
     "schema:print": "npm run schema:print --workspace @heat/hub",
     "local:api": "cd local && npx serverless offline"
@@ -19,13 +19,16 @@
   "devDependencies": {
     "@types/node": "24.19.2",
     "esbuild": "0.28.2",
-    "typescript": "5.9.3",
+    "typescript": "6.0.3",
     "vitest": "5.0.5"
   },
   "allowScripts": {
     "esbuild@0.28.2": true,
     "protobufjs@7.6.6": true,
     "@apollo/protobufjs@1.2.8": true,
-    "ssh2@1.17.0": true
+    "ssh2@1.17.0": true,
+    "@parcel/watcher@2.6.0": true,
+    "lmdb@3.5.6": true,
+    "msgpackr-extract@3.0.4": true
   }
 }
