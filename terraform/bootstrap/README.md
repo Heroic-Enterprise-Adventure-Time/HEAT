@@ -2,7 +2,7 @@
 
 Creates, in a workload account, what the pipeline needs before it can run there: the GitHub OIDC identity provider; a read-only plan role; an administrator apply role under a permissions boundary; and a monthly cost budget with alerts and an action that freezes the apply role when the budget is passed. One root directory per account, `sandbox/`, `dev/` and `prod/`, each composing the module `terraform/modules/bootstrap` with that account's values as literals and keeping its own state key (decision 0016). Design: `docs/architecture/overview.md`, "Environments"; decisions 0017, 0018 and 0019. History: Issue-12 (the provider and a narrow deploy role), Issue-19 (the budget), Issue-21 (the root-per-environment layout), Issue-36 (this shape; the deploy role removed).
 
-**Status: `dev` applied through Issue-21 on 2026-10-16; the Issue-36 shape is written and not applied anywhere.** What is in `heat-dev` today, read through `audit-heat-dev` on 2026-10-16: the provider, the role `heat-dev-deploy` with its one inline policy, the budget `heat-dev-monthly-cost` at 10 USD with three notifications, and nothing else of HEAT's. `heat-prod` holds only `PlatformAdminRole`. `heat-sandbox` was created by the organization layer later the same day, enrolled, with `AuditRole` and `PlatformAdminRole` placed; nothing of HEAT's is in it. What each root waits on is under "Applying".
+**Status: all three roots applied by the owner on 2026-10-16, `dev`, `prod` then `sandbox`, each as the plan predicted, and verified by the agent the same evening.** State is at `bootstrap/<environment>/terraform.tfstate` for each. Read back through `audit-heat-<environment>`: in each account the provider; the plan role with `ReadOnlyAccess` and its inline policy, five denies in `dev` and `prod`, four in `sandbox`; the apply role under its boundary with `AdministratorAccess` and the environment's subject in its trust, `sandbox-*` in the sandbox account; the boundary with nine statements, used by one role and attached to none; the freeze policy, attached to nothing; the budget's role with the Budgets trust and its policy scoped to the apply role and the freeze policy; the budget at 10, 10 and 20 USD. In `heat-dev` the deploy role and its policy are gone. Each plan role was assumed from the management account's SecurityAudit session and its identity read, so the agent's plan path is open in all three accounts. The backend's bucket policy carries the three statements per account. Not read by the agent: the budget actions, which the audit role may not describe; the owner's applies created them and the re-plans were clean. Not yet exercised: assuming an apply role from GitHub, which the `Verify apply roles` workflow checks after the merge.
 
 ## Layout
 
@@ -51,11 +51,7 @@ The project owner, from PowerShell, with the `heat-platform` account's `Admin` c
 
 ## Applying
 
-For an account, in this order: its bootstrap root; then the `backend` stack with the account listed in `workload_account_ids`, because the bucket policy names roles that must exist; then its account id as a repository variable; then the checks under "Verification". What each root waits on, as of 2026-10-16:
-
-- `dev`: nothing. Apply from the Issue-36 branch.
-- `prod`: nothing technical; the owner's decision to apply it in the same session.
-- `sandbox`: nothing technical either. The account exists since the evening of 2026-10-16; its id goes into the root's `terraform.tfvars`, and the `audit-heat-sandbox` profile into `~/.aws/config` (the shape is in the private hand-over note from `dcg-platform`), before the agent can verify there.
+For an account, in this order: its bootstrap root; then the `backend` stack with the account listed in `workload_account_ids`, because the bucket policy names roles that must exist; then its account id as a repository variable; then the checks under "Verification". All three accounts went through this on 2026-10-16. A fourth account would follow the same order, plus an `audit-heat-<name>` profile for the agent before it can verify there.
 
 Either create `terraform.tfvars` in the root from its example, or set the values for the terminal with the private script. Then:
 
@@ -78,7 +74,15 @@ Remove-Item dev.tfplan
 
 Two things learned on the first applies, 2026-10-15. PowerShell splits a `-flag=value` argument at a dot in the value, so a flag that takes a value is written with a space, as `-out dev.tfplan` is. And a value piped into `gh variable set` arrived with a UTF-8 byte-order mark in front of it; pass values as arguments, `--body "<value>"`, never through a pipe.
 
-**On the GitHub side.** The workflows store no role ARNs: a role's ARN is the account id variable plus its committed name, `heat-<environment>-apply` or `-plan`. One repository variable per account: `HEAT_DEV_ACCOUNT_ID` exists, `HEAT_PROD_ACCOUNT_ID` and `HEAT_SANDBOX_ACCOUNT_ID` are set when their roots are applied (`gh variable set NAME --body "<id>"`), and `HEAT_DEV_DEPLOY_ROLE_ARN` is deleted with the deploy role (`gh variable delete HEAT_DEV_DEPLOY_ROLE_ARN`). The GitHub environment `dev` exists; `prod` is created by the first workflow that references it, or now with `gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/prod`. The per-stack environments `sandbox-<issue>` are created by the sandbox workflow. The deployment policies of decision 0017, `dev` to the branch `main` and `prod` to tags `v*`, are the owner's, set once the pipeline exists (Issue-37):
+**On the GitHub side.** The workflows store no role ARNs: a role's ARN is the account id variable plus its committed name, `heat-<environment>-apply` or `-plan`. One repository variable per account, set once that account's root is applied, and the deploy role's variable deleted with the role. From the worktree or the checkout, so that `gh` finds the repository:
+
+```powershell
+gh variable set HEAT_PROD_ACCOUNT_ID --body "<the heat-prod account id>"
+gh variable set HEAT_SANDBOX_ACCOUNT_ID --body "<the heat-sandbox account id>"
+gh variable delete HEAT_DEV_DEPLOY_ROLE_ARN
+```
+
+`HEAT_DEV_ACCOUNT_ID` exists since Issue-12. The GitHub environment `dev` exists; `prod` is created by the first workflow that references it, or now with `gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/prod`. The per-stack environments `sandbox-<issue>` are created by the sandbox workflow. The deployment policies of decision 0017, `dev` to the branch `main` and `prod` to tags `v*`, are the owner's, set once the pipeline exists (Issue-37):
 
 ```powershell
 gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/dev -F "deployment_branch_policy[protected_branches]=false" -F "deployment_branch_policy[custom_branch_policies]=true"
