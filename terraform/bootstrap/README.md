@@ -43,7 +43,7 @@ Each line says what is in force in `heat-dev`, read through the `audit-heat-dev`
 
 ## Values that stay out of git
 
-Four per root: the platform account id, the workload account id and the management account id (`docs/README.md`, rule 9), and the alert address. They live in the root's `terraform.tfvars`, which git ignores along with every `*.auto.tfvars`; Terraform loads it on every run. The same four can come from the environment as `TF_VAR_platform_account_id`, `TF_VAR_workload_account_id`, `TF_VAR_management_account_id` and `TF_VAR_budget_alert_email`. An ignored file belongs to one checkout: a worktree needs its own copy.
+Four per root: the platform account id, the workload account id and the management account id (`docs/README.md`, rule 9), and the alert address. They live in the root's `terraform.tfvars`, which git ignores along with every `*.auto.tfvars`; Terraform loads it on every run. The same four can come from the environment as `TF_VAR_platform_account_id`, `TF_VAR_workload_account_id`, `TF_VAR_management_account_id` and `TF_VAR_budget_alert_email`, which is the way that needs no file in a worktree: a private PowerShell script in `docs/private/`, ignored by git, sets them for the terminal when dot-sourced with the environment's name, and the owner runs it in the same terminal where the Admin block is pasted. A file in the root, if present, wins over the environment.
 
 ## Who applies it
 
@@ -57,12 +57,13 @@ For an account, in this order: its bootstrap root; then the `backend` stack with
 - `prod`: nothing technical; the owner's decision to apply it in the same session.
 - `sandbox`: nothing technical either. The account exists since the evening of 2026-10-16; its id goes into the root's `terraform.tfvars`, and the `audit-heat-sandbox` profile into `~/.aws/config` (the shape is in the private hand-over note from `dcg-platform`), before the agent can verify there.
 
-Once per root, create `terraform.tfvars` from its example. Then:
+Either create `terraform.tfvars` in the root from its example, or set the values for the terminal with the private script. Then:
 
 ```powershell
 Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
 # paste the heat-platform Admin block from the access portal, then:
 aws sts get-caller-identity --query Account --output text   # must print the heat-platform id
+. C:\Users\chanc\IdeaProjects\HEAT\docs\private\heat-tfvars.ps1 -Environment dev
 cd <the worktree>\terraform\bootstrap\dev
 terraform init
 terraform plan -out dev.tfplan

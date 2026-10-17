@@ -24,8 +24,8 @@ State keys, one per stack and environment. The bootstrap and backend keys are ou
 
 The provider refuses credentials for any account but `heat-platform`, and it learns that account's id from the variable `platform_account_id`. The workload accounts whose roles the policy grants come from `workload_account_ids`, a map keyed `sandbox`, `dev`, `prod`, holding only the accounts whose bootstrap root is applied. No id is in any committed file. Give them one of two ways, from this directory:
 
-- A file `terraform.tfvars` beside this README, copied from `terraform.tfvars.example` with the real ids. Git ignores it, so a worktree needs its own copy.
-- The environment variables `TF_VAR_platform_account_id` and `TF_VAR_workload_account_ids`.
+- A file `terraform.tfvars` beside this README, copied from `terraform.tfvars.example` with the real ids. Git ignores it, so a worktree would need its own copy.
+- The environment variables `TF_VAR_platform_account_id` and `TF_VAR_workload_account_ids`, the latter as an HCL map. The private script in `docs/private/` that `terraform/bootstrap/README.md` describes sets both, with the map listing the accounts whose bootstrap root is applied; this needs no file in any worktree. A file in the root, if present, wins over the environment.
 
 The ids themselves are in `docs/private/dcg-platform-handoff.md`.
 
