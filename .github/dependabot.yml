@@ -42,6 +42,7 @@ updates:
       - /terraform/bootstrap/sandbox
       - /terraform/bootstrap/dev
       - /terraform/bootstrap/prod
+      - /terraform/environment/sandbox-base
     schedule:
       interval: weekly
     groups:

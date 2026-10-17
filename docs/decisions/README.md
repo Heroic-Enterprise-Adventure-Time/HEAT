@@ -39,3 +39,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0019](0019-bootstrap-for-the-pipeline.md) | Bootstrap for the pipeline: the boundary is an allow-list with denies, a GitHub environment per stack, the agent's plan path, one state prefix per account | Decided; the plan role's trust and the user-record carve-out amended by 0020 |
 | [0020](0020-secrets-and-plans.md) | Secrets live in GitHub environments, enter AWS through a base root, and pull request plans run under the target environment | Decided |
 | [0021](0021-release-branch.md) | Production through a release branch; the tag is documentation; hotfixes from the start | Decided |
+| [0022](0022-shared-user-pool.md) | The shared user pool: Essentials tier, email as the username, administrator-created users, no MFA, administrator-only recovery, a password-flow CI client | Decided |

@@ -1,0 +1,8 @@
+# The test users of the sandbox base's user pool, one email address per line.
+# The apply job creates each with scripts/create-test-users.sh after
+# terraform apply, idempotently, with the password in the sandbox-base
+# environment's secret HEAT_TEST_USER_PASSWORD (decision 0020). Nothing
+# receives mail at these addresses; they are marked verified on creation.
+# Adding a user is adding a line.
+player1@heat-sb.dcg-games.com
+player2@heat-sb.dcg-games.com

@@ -15,6 +15,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [decisions/](decisions/README.md) | One record per significant decision, including what was rejected | When the agent reads it |
 | [../terraform/backend/README.md](../terraform/backend/README.md) | The state bucket, who applies it, and the one-time bootstrap | When the agent reads it |
 | [../terraform/bootstrap/README.md](../terraform/bootstrap/README.md) | The pipeline's plan and apply roles, their boundary and the budget action in each workload account, who applies, what waits on what | When the agent reads it |
+| [../terraform/environment/sandbox-base/README.md](../terraform/environment/sandbox-base/README.md) | The sandbox base: the zone, the shared user pool and its CI client, the test users, and how the pipeline plans and applies a permanent root | When the agent reads it |
 | [standards/typescript.md](standards/typescript.md) | Versions, dependencies, modules, testing, the hub's libraries, bundling | When the agent works under `packages/`, through that directory's `AGENTS.md` |
 | [../local/README.md](../local/README.md) | Running the system locally | When the agent reads it |
 

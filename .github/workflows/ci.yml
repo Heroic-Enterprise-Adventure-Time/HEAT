@@ -5,8 +5,8 @@
 # function bundle, and is every Terraform root formatted and valid. It runs
 # with no AWS credentials; the integration tests start their own containers
 # (decision 0009) and the Terraform roots are initialised without a backend.
-# It never deploys anything: deployment workflows are separate and gated as
-# decision 0011 describes.
+# It never deploys anything: deploy.yml plans and applies the permanent
+# roots, under their GitHub environments (decision 0017).
 name: Build and test
 
 on:
@@ -73,7 +73,7 @@ jobs:
       - name: Validate every root
         run: |
           set -eu
-          for root in terraform/backend terraform/bootstrap/sandbox terraform/bootstrap/dev terraform/bootstrap/prod; do
+          for root in terraform/backend terraform/bootstrap/sandbox terraform/bootstrap/dev terraform/bootstrap/prod terraform/environment/sandbox-base; do
             echo "== $root"
             terraform -chdir="$root" init -backend=false -input=false
             terraform -chdir="$root" validate
