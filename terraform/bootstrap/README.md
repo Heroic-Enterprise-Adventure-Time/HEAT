@@ -65,7 +65,7 @@ terraform init
 terraform plan -out dev.tfplan
 ```
 
-Read the plan. The pull request that changes the stack says what line to expect; for Issue-36, `dev` is `Plan: 10 to add, 0 to change, 2 to destroy.` (the two roles, their attachments and the plan role's inline policy, the boundary, the freeze policy, the budget's role with its inline policy, the budget action; the deploy role and its policy destroyed), and `sandbox` and `prod` are `Plan: 12 to add, 0 to change, 0 to destroy.` (the same ten plus the provider and the budget). Anything else: stop and paste the plan into the session. Then:
+Read the plan. The pull request that changes the stack says what line to expect. Anything else: stop and paste the plan into the session. Then:
 
 ```powershell
 terraform apply dev.tfplan
@@ -82,14 +82,19 @@ gh variable set HEAT_SANDBOX_ACCOUNT_ID --body "<the heat-sandbox account id>"
 gh variable delete HEAT_DEV_DEPLOY_ROLE_ARN
 ```
 
-`HEAT_DEV_ACCOUNT_ID` exists since Issue-12. The GitHub environment `dev` exists; `prod` is created by the first workflow that references it, or now with `gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/prod`. The per-stack environments `sandbox-<issue>` are created by the sandbox workflow. The deployment policies of decision 0017, `dev` to the branch `main` and `prod` to tags `v*`, are the owner's, set once the pipeline exists (Issue-37):
+`HEAT_DEV_ACCOUNT_ID` exists since Issue-12. The GitHub environment `dev` exists; `sandbox-base` and `prod` are created by the first workflow that references them. The per-stack environments `sandbox-<issue>` are created by the sandbox workflow. The deployment branch policies are the owner's, set once each environment exists: `dev` and `sandbox-base` to the branch `main`; `prod` to the branches `main` and `release`, because a pull request's `prod` plan runs on `main`'s ref and the apply on `release`'s (decisions 0020 and 0021). Each environment also holds its secrets: the test users' password on `sandbox-base`, and later `dev`'s and `prod`'s own, plus the Google client secrets from Issue-46 on.
 
 ```powershell
 gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/dev -F "deployment_branch_policy[protected_branches]=false" -F "deployment_branch_policy[custom_branch_policies]=true"
 gh api --method POST repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/dev/deployment-branch-policies -f name=main -f type=branch
+gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/sandbox-base -F "deployment_branch_policy[protected_branches]=false" -F "deployment_branch_policy[custom_branch_policies]=true"
+gh api --method POST repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/sandbox-base/deployment-branch-policies -f name=main -f type=branch
 gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/prod -F "deployment_branch_policy[protected_branches]=false" -F "deployment_branch_policy[custom_branch_policies]=true"
-gh api --method POST repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/prod/deployment-branch-policies -f name=v* -f type=tag
+gh api --method POST repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/prod/deployment-branch-policies -f name=main -f type=branch
+gh api --method POST repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/prod/deployment-branch-policies -f name=release -f type=branch
 ```
+
+**A trust change still owed.** The plan roles trust the `pull_request` subject only. Decision 0020 has a pull request's plan of a permanent root run under that root's environment, so each plan role's trust gains `environment:<name>` (`sandbox-base`, `dev`, `prod`). That is a change to this stack, planned and applied by the owner, and it ships with Issue-37's pull request, whose workflow is the first to need it.
 
 **The agent's profiles.** One per account in `~/.aws/config`, chained from the same SecurityAudit key as the `audit-*` profiles, appended by the owner:
 

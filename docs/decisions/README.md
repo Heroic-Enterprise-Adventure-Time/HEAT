@@ -25,15 +25,17 @@ The design and architecture documents say what is true now. They are edited as t
 | [0005](0005-adventure-records-outside-postgres.md) | Adventure records and replays live outside Postgres | Superseded by 0013 |
 | [0006](0006-rds-postgres-not-aurora.md) | RDS Postgres, not Aurora | Superseded by 0013 |
 | [0007](0007-canned-actions-not-free-text.md) | Canned actions, not free-text chat | Decided |
-| [0008](0008-terraform-state-backend.md) | Terraform state in one S3 bucket in heat-platform, native locking, SSE-S3, account id as a variable | Decided; the identity that applies amended by 0017 |
+| [0008](0008-terraform-state-backend.md) | Terraform state in one S3 bucket in heat-platform, native locking, SSE-S3, account id as a variable | Decided; the identity that applies amended by 0017; "no secrets in state" amended by 0020 |
 | [0009](0009-local-development-environment.md) | Local development against containers and serverless-offline; real AWS only through the pipeline | Decided; the local run of the system superseded by 0018, the Testcontainers rule stays |
 | [0010](0010-front-doors.md) | API Gateway fronts the API, CloudFront the client; no load balancer; domains per environment | Decided; domains amended by 0015, VPC link moot per 0012, one hostname per environment per 0018 |
-| [0011](0011-deployments-and-the-prod-gate.md) | Code through the pipeline, infrastructure through Terraform, prod behind a version tag | Decided; two-paths rule superseded by 0017, prod gate and OIDC stay; artifact list amended by 0012 |
+| [0011](0011-deployments-and-the-prod-gate.md) | Code through the pipeline, infrastructure through Terraform, prod behind a version tag | Decided; two-paths rule superseded by 0017, OIDC stays; prod gate amended by 0021; artifact list amended by 0012 |
 | [0012](0012-hub-is-typescript-on-lambda.md) | The hub is TypeScript on Lambda, with Apollo Server and Pothos | Decided |
 | [0013](0013-dynamodb-and-s3-only.md) | DynamoDB and S3 only: no relational store, no VPC | Decided |
 | [0014](0014-verification-in-the-submit-request.md) | Verification and settlement happen in the submit request | Decided |
 | [0015](0015-domains-on-dcg-games-com.md) | Domains on dcg-games.com | Decided; one hostname per environment per 0018 |
-| [0016](0016-one-root-per-environment.md) | One root directory per environment, shared local modules | Decided; ephemeral stacks share one root per 0018 |
-| [0017](0017-pipeline-applies-terraform-and-owns-the-code.md) | The pipeline applies Terraform, and Terraform owns the function code; bounded apply roles; the owner applies only bootstrap | Decided; boundary shape, sandbox environment and one fact amended by 0019 |
-| [0018](0018-per-issue-sandbox-stacks.md) | Per-issue sandbox stacks in heat-sandbox, one hostname per stack behind CloudFront, the local emulator retired | Decided; the sandbox GitHub environment per 0019 |
-| [0019](0019-bootstrap-for-the-pipeline.md) | Bootstrap for the pipeline: the boundary is an allow-list with denies, a GitHub environment per stack, the agent's plan path, one state prefix per account | Decided |
+| [0016](0016-one-root-per-environment.md) | One root directory per environment, shared local modules | Decided; ephemeral stacks share one root per 0018; dev and prod roots compose the base and environment modules (2026-10-17) |
+| [0017](0017-pipeline-applies-terraform-and-owns-the-code.md) | The pipeline applies Terraform, and Terraform owns the function code; bounded apply roles; the owner applies only bootstrap | Decided; boundary shape, sandbox environment and one fact amended by 0019; the plan job's identity by 0020; the prod trigger by 0021 |
+| [0018](0018-per-issue-sandbox-stacks.md) | Per-issue sandbox stacks in heat-sandbox, one hostname per stack behind CloudFront, the local emulator retired | Decided; the sandbox GitHub environment per 0019; the prod environment's policy per 0021; see its status line for the 2026-10-17 amendments |
+| [0019](0019-bootstrap-for-the-pipeline.md) | Bootstrap for the pipeline: the boundary is an allow-list with denies, a GitHub environment per stack, the agent's plan path, one state prefix per account | Decided; the plan role's trust and the user-record carve-out amended by 0020 |
+| [0020](0020-secrets-and-plans.md) | Secrets live in GitHub environments, enter AWS through a base root, and pull request plans run under the target environment | Decided |
+| [0021](0021-release-branch.md) | Production through a release branch; the tag is documentation; hotfixes from the start | Decided |

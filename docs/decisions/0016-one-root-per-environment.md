@@ -1,6 +1,6 @@
 # 0016: One root directory per environment, shared local modules
 
-- **Status:** Decided. Amended by 0018 on 2026-10-16: the per-issue sandbox stacks share one root parameterized by the issue number; permanent environments stay a directory each.
+- **Status:** Decided. Amended by 0018 on 2026-10-16: the per-issue sandbox stacks share one root parameterized by the issue number; permanent environments stay a directory each. Confirmed 2026-10-17: the `dev` and `prod` roots each compose the `base` and `environment` modules that the sandbox account uses in two roots; uniform modules, one root per permanent environment. The split exists in the sandbox only because many stacks share one base.
 - **Date:** 2026-10-15
 
 ## Decision

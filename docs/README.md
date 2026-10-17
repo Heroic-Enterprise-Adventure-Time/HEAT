@@ -24,7 +24,7 @@ These are part of the structure and are not written yet. Each is written when th
 
 | Document | Written when |
 | --- | --- |
-| `process/deployment.md` | There is a deployment |
+| `process/deployment.md` | The release path has run once (Issue-41): the release pull request, the tag, the hotfix lifecycle. Until then the workflow's own comments, `terraform/bootstrap/README.md` and the overview's "Environments" describe deployment. |
 | `standards/<language>.md` | The first code in that language lands; `standards/typescript.md` is the first |
 | `runbooks/` | A multi-step procedure has been done more than once |
 
@@ -37,7 +37,7 @@ These are part of the structure and are not written yet. Each is written when th
 5. **Keep documents true.** A change in behavior and the document that describes it go in the same pull request.
 6. **Say what is real.** Nothing is described as built, tested or enforced unless it is.
 7. **Mark the status of design items.** Each item in a design or architecture document is labeled Decided, Working assumption or Open. The labels are defined at the top of each of those documents.
-8. **Design documents say what is true now.** When a decision changes, edit the design document and add a decision record. The record keeps what was rejected.
+8. **Design and process documents say what is true now.** When a decision changes, edit the document and add a decision record. The record keeps what was rejected and the history; in the document, how a rule got there is one sentence pointing at the record. At the pauses that rule 9 of `process/best-practices.md` names, a checkpoint merged or a step of the build order begun, the documents are swept for history that has crept in, and it is moved to a record or cut.
 9. **AWS account ids do not appear in committed files.** Documents and code name accounts by name (`heat-dev`, `heat-platform`) and never by id. Credentials never appear anywhere. This repository is written to be safe to publish; the organization-level `dcg-platform` repository takes the opposite rule, for reasons recorded there as its decision 0001.
 
 ## Not documents

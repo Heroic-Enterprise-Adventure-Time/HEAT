@@ -3,6 +3,11 @@
     "deny": [
       "Bash(git push origin main:*)",
       "Bash(git push origin HEAD:main*)",
+      "Bash(git push origin release:*)",
+      "Bash(git push origin HEAD:release*)",
+      "Bash(git push origin v*)",
+      "Bash(git push origin refs/tags/*)",
+      "Bash(git push --tags*)",
       "Bash(gh pr merge:*)"
     ]
   }
