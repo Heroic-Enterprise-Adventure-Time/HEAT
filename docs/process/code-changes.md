@@ -34,7 +34,7 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 ### Commits
 
 16. The subject line is imperative and says what the commit does. The body says why.
-17. A commit written by an agent is authored as that agent.
+17. A commit written by an agent is authored as that agent: `Claude <noreply@anthropic.com>`, which GitHub shows under the login `claude`, with the `Co-Authored-By` trailer the agent's tooling adds. The owner's name never appears as the author of a commit the owner did not write.
 
 ### Applying infrastructure
 
@@ -56,23 +56,23 @@ How one checkpoint moves through the rules above, from the start of a session to
 
 ## Why
 
-**Checkpoints before code.** Agreeing the end of a piece of work before starting it is what keeps a pull request small. It also means review compares the change against something already agreed, instead of discovering the scope in the diff. The issue is where the agreed end is written down, next to the pull request that delivers it and where a new session finds it cold; a list kept in a note goes stale silently, an issue is closed by the merge. Added 2026-10-15 when the first platform checkpoints were agreed.
+**Checkpoints before code.** Agreeing the end of a piece of work before starting it keeps a pull request small and lets review compare the change against something already agreed. The issue is where the agreed end lives: next to the pull request that delivers it, closed by the merge, found cold by a new session.
 
-**Everything through a pull request.** In a session that runs in the cloud, the project owner cannot see the agent's working tree. The pull request is the review surface: a diff, a description and a merge button.
+**Everything through a pull request.** The owner cannot see an agent's working tree. The pull request is the review surface: a diff, a description and a merge button.
 
-**Merge commits, never squash.** The history then shows who wrote each commit and who merged it. Agents write nearly all of the code in this project and a person reviews and merges it; the commit log should say that without anyone having to explain it.
+**Merge commits, never squash.** The history then shows who wrote each commit and who merged it, which is the project's own story: agents write nearly all of the code and a person reviews and merges it.
 
 **Documents with the change.** A document that describes behavior is only useful while it is true. Changing both together is the only reliable way to keep them in step.
 
-**The owner applies bootstrap; the pipeline applies the rest.** Until 2026-10-16 the owner applied every stack, because the Terraform ran as the organization's administrator role and review before apply was the only control between a mistake and a whole account. That shape made every code change wait for the owner's apply, or split code from infrastructure into two paths (decision 0011). Decision 0017 moves the apply into the pipeline, under HEAT's own roles bounded by a permissions boundary, a resource-type allow-list, a budget action and a visible plan, so that a change ships as one plan from a reviewed commit. The `bootstrap` stack creates those roles, so it is the one stack the owner still applies, with the same review-then-apply discipline; the `dcg-platform` repository, whose stack reaches every account in the organization, keeps the owner's apply for everything.
+**The owner applies bootstrap; the pipeline applies the rest.** The pipeline applies under HEAT's own roles, bounded by a permissions boundary, a resource-type allow-list, a budget action and a visible plan (decision 0017). The `bootstrap` stack creates those roles, so it is the one stack the owner still applies, with review before apply.
 
-**The branch stays checked out** (2026-10-15 to 2026-10-16). The practice before that returned the checkout to `main` as soon as the pull request was open, which kept `main` under the IDE but meant the owner could not run the change without switching branches by hand. One checkout shared by a person and an agent is also one working tree, which is why the cycle names a single writer and makes the agent look before every commit. Serial work followed from the same fact: a second checkpoint would have needed the branch the first one was being reviewed on.
+**Review at the stack URL, work in worktrees.** Every branch has a running stack (decision 0018), so the owner reviews a change by using it and never needs its branch under the IDE. The branch lives in a worktree, the checkout stays on `main`, and more than one issue can be in flight. The branch name carries the issue number because the stack's name and state key derive from it. The single-writer rule applies to the worktree, where the owner may open the branch for display work.
 
-**Review at the stack URL, work in worktrees.** Once every branch has its own running stack (decision 0018), the owner reviews a change by using it at its URL and no longer needs its branch under the IDE. The branch therefore lives in a worktree, the checkout stays on `main`, and more than one issue can be in flight, each in its own worktree, session and stack. The single-writer rule moves to the worktree, where the owner may still open the branch for display work that needs a local dev server. The branch name carries the issue number because the stack's name and state key are derived from it, and a workflow run has nothing else to derive them from. Added 2026-10-16.
+**Production through a release branch.** The tag applied `prod` in the run that planned it, and a private repository on the Team plan has no required reviewers, so nobody could read the `prod` plan before the apply. A pull request from `main` to `release` is a review surface that already exists; the tag then records the release instead of causing it (decision 0021).
 
-**Production through a release branch.** The tag applied `prod` in the same run that planned it, and a private repository on the Team plan has no required reviewers, so nobody could read the `prod` plan before the apply. A pull request from `main` to `release` is a review surface that already exists: its diff is what ships and the plan is a comment on it. The tag then records the release instead of causing it, and a hotfix is one more pull request to `release`. Added 2026-10-17 (decision 0021).
+**One issue per session.** A long session accumulates context the next issue does not need. A fresh session finds everything from the issue, the private working context and the documents `AGENTS.md` names.
 
-**One issue per session.** A long session accumulates context the next issue does not need and loses the thread of the one it has. Starting each issue in a new session keeps the context the issue's, and it only works if a fresh session can find everything from the issue itself, the private working context and the documents `AGENTS.md` names, which is what that section is for. Added 2026-10-16.
+The earlier shapes of this cycle, the owner applying every stack and the branch staying checked out under the IDE, are recorded in decisions 0011, 0017 and 0018.
 
 ## What enforces this
 
@@ -82,7 +82,7 @@ Most of this document is an agreement, not a mechanism. What is enforced today:
 - The agent's AWS profiles carry read-only roles. An agent cannot apply Terraform or run a changing command, even by mistake. The plan role of decision 0017, when it exists, is read only as well.
 - The repository's merge settings allow merge commits only; the squash and rebase buttons are off.
 - The "Build and test" workflow runs on every pull request and on `main`: typecheck, tests, schema currency, bundling. The `main` ruleset below requires it to pass.
-- **Two rulesets, defined in `.github/rulesets/` and applied by the owner on 2026-10-15.** `main`: changes only through a pull request, merge commits only, "Build and test" passing on a branch that is current with `main`, review threads resolved, no force pushes, no deletion, and no bypass, so the owner's own changes go through the same door. `release-tags`: only an organization owner may create, move or delete a `v*` tag, which was the production gate of decision 0011; decision 0021 moves the gate to the `release` branch, so this ruleset is replaced by a `release` ruleset mirroring `main`'s when Issue-41 builds that path, and until then it stands. Verified by the agent after the apply: both read back as active with the rules the files define, and the first pull request under them was mergeable with the check green. GitHub added one field the file does not set, an extra approval for unattributed changes, which its documentation says has no effect when zero approvals are required. A change to a ruleset is a change to its file here, reviewed, then applied by the owner with `gh api --method PUT`.
+- **Two rulesets, defined in `.github/rulesets/` and applied by the owner on 2026-10-15.** `main`: changes only through a pull request, merge commits only, "Build and test" passing on a branch that is current with `main`, review threads resolved, no force pushes, no deletion, and no bypass, so the owner's own changes go through the same door. `release-tags`: only an organization owner may create, move or delete a `v*` tag, the production gate of decision 0011 until decision 0021 moves it to the `release` branch; a `release` ruleset mirroring `main`'s replaces it when Issue-41 builds that path. Both read back as active with the rules the files define. A change to a ruleset is a change to its file here, reviewed, then applied by the owner with `gh api --method PUT`.
 
 What is not enforced yet:
 

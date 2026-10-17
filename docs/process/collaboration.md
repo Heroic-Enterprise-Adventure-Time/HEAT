@@ -21,6 +21,7 @@ How the project owner and an agent work together. These rules apply in every ses
 - A missing tool, version or permission is asked for, not worked around. A substitute mechanism is not used, even when it would work, if it would make the agent's environment differ from CI or from the agreed design. When doing it the right way needs a detour or a discussion first, that comes first, and the detour is reported as what it is.
 - Pull requests and issues are named PR-n and Issue-n, in conversation and in documents, so that a bare number is never ambiguous. GitHub's own `#n` is used only where GitHub reads it, as in `Closes #n`.
 - A conflict between documents, issue bodies or code is resolved from the goal they serve and the cause of the conflict, not by counting which sources say what. When the goal itself is unclear, it is discussed before the conflict is resolved. One cause usually explains several conflicts.
+- A procedure handed to the owner is one numbered checklist with one command per step, in PowerShell, and before saying what is left the agent checks the real state rather than the last message.
 - Replies to the owner are laid out, not narrated: one heading per question asked, the answer on its own line, options and trade-offs as a table or a list, a reason as a clause. Nothing asked is skipped; exposition waits until the owner asks to drill deeper. Full detail belongs in documents, decision records and pull request descriptions.
 
 ## Why

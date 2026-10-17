@@ -61,7 +61,7 @@ The turn machinery (charge timers, action selection, abilities and tags, the see
 
 ## Environments
 
-Rewritten 2026-10-16 for the cloud-first shape (decisions 0017 and 0018). Of what follows, only the `backend` stack and the `bootstrap` stack's roots exist; `terraform/bootstrap/README.md` says which roots are applied. The pipeline, the sandbox account and every environment are to be built by Issue-37 to Issue-41, with the client skeleton (Issue-45) and sign-in (Issue-46) between them; the build order below has the sequence.
+What exists and what is still to be built is in the build order below; each stack's README says whether it is applied.
 
 - **Decided.** Four AWS accounts, owned by the Double Cobra Games organization and placed by it: `heat-platform` for Terraform state; `heat-sandbox` for the per-issue sandbox stacks; `heat-dev` and `heat-prod` for the two permanent environments. The organization layer, in the `dcg-platform` repository, enrolls them in Control Tower, applies the organization's controls to them, and places in each workload account a `PlatformAdminRole` that only `heat-platform` may assume. Everything inside the accounts beyond that role is HEAT's. There is no container registry (decision 0012). All four accounts exist; `heat-sandbox` was created by the organization layer on 2026-10-16.
 - **Decided.** Every stack keeps its state in `heat-platform`, in one S3 bucket with one key per stack and environment (decision 0008). The `backend` and `bootstrap` stacks run from `heat-platform` under the owner's session and reach the workload accounts through `PlatformAdminRole`. An environment is applied by HEAT's own apply role in its workload account, which the bucket's policy lets read and write its own keys (decision 0017).

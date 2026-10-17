@@ -65,7 +65,7 @@ terraform init
 terraform plan -out dev.tfplan
 ```
 
-Read the plan. The pull request that changes the stack says what line to expect; for Issue-36, `dev` is `Plan: 10 to add, 0 to change, 2 to destroy.` (the two roles, their attachments and the plan role's inline policy, the boundary, the freeze policy, the budget's role with its inline policy, the budget action; the deploy role and its policy destroyed), and `sandbox` and `prod` are `Plan: 12 to add, 0 to change, 0 to destroy.` (the same ten plus the provider and the budget). Anything else: stop and paste the plan into the session. Then:
+Read the plan. The pull request that changes the stack says what line to expect. Anything else: stop and paste the plan into the session. Then:
 
 ```powershell
 terraform apply dev.tfplan
