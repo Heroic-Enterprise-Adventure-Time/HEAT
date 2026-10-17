@@ -1,6 +1,6 @@
 # 0017: The pipeline applies Terraform, and Terraform owns the function code
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0019 on 2026-10-16: the boundary is an allow-list of services with explicit denies, not a deny-list; the sandbox GitHub environment is one per stack, `sandbox-<issue>`; and the managed policy named under "Facts checked" is for the person configuring budget actions, not for the service role.
 - **Date:** 2026-10-16
 - **Supersedes:** 0011, the "Two paths, never crossed" rule and the Lambda code path. 0011's prod gate (a `v*` tag only the owner creates) and its OIDC identity for workflows stay.
 - **Amends:** 0008, the sentence "every HEAT stack runs from `heat-platform`": the state stays there, the identity that applies an environment does not.

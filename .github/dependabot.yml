@@ -39,7 +39,9 @@ updates:
   - package-ecosystem: terraform
     directories:
       - /terraform/backend
+      - /terraform/bootstrap/sandbox
       - /terraform/bootstrap/dev
+      - /terraform/bootstrap/prod
     schedule:
       interval: weekly
     groups:

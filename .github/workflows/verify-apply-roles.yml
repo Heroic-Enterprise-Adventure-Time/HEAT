@@ -1,0 +1,69 @@
+# Verify apply roles
+#
+# Run by hand from the Actions tab: Issue-36's check that each apply role can
+# be assumed from its own GitHub environment and from no other. The job runs
+# under the environment named in the first input and assumes the apply role
+# of the environment named in the second, through GitHub's OIDC provider,
+# then prints the identity. With the inputs matching, the run succeeds and
+# prints the role in the right account. With them crossed, dev's job asking
+# for prod's role, the assume fails, because every apply role trusts the
+# environment in the token and nothing else (decision 0017). No AWS
+# credentials are stored anywhere; the token is minted per run.
+name: Verify apply roles
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "The GitHub environment to run under: dev, prod, or sandbox-<issue>"
+        required: true
+        type: string
+      role_environment:
+        description: "Whose apply role to assume: sandbox, dev or prod. Leave empty for the one that matches the environment above."
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  verify:
+    name: Assume the ${{ inputs.role_environment || inputs.environment }} apply role under ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      # The role ARNs are not stored: each is the account id variable plus
+      # the name the bootstrap module gives the role (terraform/bootstrap/README.md).
+      - name: Work out the role to ask for
+        id: role
+        env:
+          ENVIRONMENT: ${{ inputs.environment }}
+          ROLE_ENVIRONMENT: ${{ inputs.role_environment }}
+          SANDBOX_ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+          DEV_ACCOUNT_ID: ${{ vars.HEAT_DEV_ACCOUNT_ID }}
+          PROD_ACCOUNT_ID: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+        run: |
+          set -eu
+          target="${ROLE_ENVIRONMENT:-$ENVIRONMENT}"
+          case "$target" in
+            sandbox*) account="$SANDBOX_ACCOUNT_ID"; name=sandbox ;;
+            dev)      account="$DEV_ACCOUNT_ID"; name=dev ;;
+            prod)     account="$PROD_ACCOUNT_ID"; name=prod ;;
+            *) echo "No apply role for '$target'." >&2; exit 1 ;;
+          esac
+          if [ -z "$account" ]; then
+            echo "The account id variable for '$name' is not set." >&2
+            exit 1
+          fi
+          echo "arn=arn:aws:iam::${account}:role/heat-${name}-apply" >> "$GITHUB_OUTPUT"
+
+      - name: Assume the role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ steps.role.outputs.arn }}
+          role-session-name: verify-apply-roles
+          aws-region: us-east-1
+
+      - name: Print the identity
+        run: aws sts get-caller-identity

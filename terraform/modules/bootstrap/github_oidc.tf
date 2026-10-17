@@ -1,6 +1,7 @@
 # GitHub Actions as an identity provider in the workload account. A workflow
-# exchanges GitHub's OIDC token for credentials of the deploy role, so there
-# are no long-lived credentials anywhere (decision 0011).
+# exchanges GitHub's OIDC token for credentials of the plan role or the
+# apply role, so there are no long-lived credentials anywhere (decision
+# 0011, kept by 0017).
 #
 # No thumbprint_list, on purpose. For GitHub, AWS validates the token
 # endpoint's certificate against its own library of trusted root CAs and

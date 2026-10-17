@@ -2,28 +2,32 @@
 
 Creates the S3 bucket that holds the Terraform state of every stack in this repository, and stores its own state there. Design and the alternatives not chosen: `docs/decisions/0008-terraform-state-backend.md`. The stack is a copy of the one in the `dcg-platform` repository, with the one difference that the account id is a variable, because this repository does not commit account ids.
 
-**Status: applied 2026-10-14 and verified.** The bucket exists with every setting below, and this stack's state is in it at `backend/terraform.tfstate`. Verified by the agent through the `audit-heat-platform` profile after the owner's bootstrap: versioning enabled, AES256 with the bucket key on, all four public access block settings on, ownership `BucketOwnerEnforced`, the lifecycle rule at 90 and 7 days, the TLS-only policy attached and the bucket not public, the three tags, the state object present, and no other bucket in the account. The agent cannot read the object's contents; the owner's `terraform plan` after the migration is the check that the state is whole, and it reported no changes. The owner's report of the first run: the bootstrap apply was clean, the migration to the S3 backend was clean, and the final plan showed no changes. No snags; the sequence in "First apply" ran as written.
+**Status: applied 2026-10-14 and verified; the per-account statements of the bucket policy (Issue-36) applied by the owner on 2026-10-16 in two passes, `dev` first and `prod` with `sandbox` after their roots, each as one change, and verified.** The bucket exists with every setting below, and this stack's state is in it at `backend/terraform.tfstate`. Read through `audit-heat-platform` after the second pass: the policy carries the TLS-only deny and the three statements for each of the three accounts, the bucket is not public, and the keys present are the backend's and the three bootstrap roots'. Verified by the agent through the `audit-heat-platform` profile after the owner's bootstrap: versioning enabled, AES256 with the bucket key on, all four public access block settings on, ownership `BucketOwnerEnforced`, the lifecycle rule at 90 and 7 days, the TLS-only policy attached and the bucket not public, the three tags, the state object present, and no other bucket in the account. The agent cannot read the object's contents; the owner's `terraform plan` after the migration is the check that the state is whole, and it reported no changes. The owner's report of the first run: the bootstrap apply was clean, the migration to the S3 backend was clean, and the final plan showed no changes. No snags; the sequence in "First apply" ran as written.
 
 ## What it manages
 
-One bucket, `heat-platform-terraform-state`, in the `heat-platform` AWS account, us-east-1: versioning, SSE-S3 encryption, public access block, bucket-owner-enforced ownership, a policy denying requests that are not over TLS, and a lifecycle rule expiring old state versions after 90 days. Nothing else. Locking uses S3's own lock files; there is no DynamoDB table.
+One bucket, `heat-platform-terraform-state`, in the `heat-platform` AWS account, us-east-1: versioning, SSE-S3 encryption, public access block, bucket-owner-enforced ownership, a bucket policy, and a lifecycle rule expiring old state versions after 90 days. Nothing else. Locking uses S3's own lock files; there is no DynamoDB table.
 
-State keys, one per stack:
+The bucket policy denies every request that is not over TLS and, per workload account listed in `workload_account_ids`, grants that account's two roles from the `bootstrap` stack their environment's prefix: `heat-<environment>-plan` and `heat-<environment>-apply` may list the bucket under the prefix (and under `env:/`, the workspace prefix Terraform looks at and this repository never uses) and read objects under it; the apply role may also write and delete there, which the lock file needs (decisions 0017 and 0019). The statements name the roles by ARN, so an account's bootstrap root is applied before the account is listed here; IAM refuses a principal that does not exist. If a named role is ever deleted and recreated, IAM keeps the old role's unique id in the policy and the statement stops matching; the next plan of this stack shows the drift and the apply repairs it.
+
+State keys, one per stack and environment. The bootstrap and backend keys are outside every granted prefix and stay the owner's:
 
 | Stack | Key |
 | --- | --- |
 | `terraform/backend` | `backend/terraform.tfstate` |
-| `terraform/bootstrap`, dev | `bootstrap/dev/terraform.tfstate` |
-| `terraform/bootstrap`, prod (later) | `bootstrap/prod/terraform.tfstate` |
+| `terraform/bootstrap`, per account | `bootstrap/<environment>/terraform.tfstate` |
+| `terraform/environment`, dev and prod (Issue-40, Issue-41) | `environment/<environment>/terraform.tfstate` |
+| `terraform/environment/sandbox-base` (Issue-37) | `environment/sandbox/base/terraform.tfstate` |
+| `terraform/environment/sandbox`, per issue (Issue-38) | `environment/sandbox/<issue>/terraform.tfstate` |
 
-## The account id
+## The account ids
 
-The provider refuses credentials for any account but `heat-platform`, and it learns that account's id from the variable `platform_account_id`. The id is not in any committed file. Give it one of two ways, from this directory:
+The provider refuses credentials for any account but `heat-platform`, and it learns that account's id from the variable `platform_account_id`. The workload accounts whose roles the policy grants come from `workload_account_ids`, a map keyed `sandbox`, `dev`, `prod`, holding only the accounts whose bootstrap root is applied. No id is in any committed file. Give them one of two ways, from this directory:
 
-- A file `terraform.tfvars` beside this README, copied from `terraform.tfvars.example` with the real id. Git ignores it.
-- The environment variable `TF_VAR_platform_account_id`.
+- A file `terraform.tfvars` beside this README, copied from `terraform.tfvars.example` with the real ids. Git ignores it, so a worktree would need its own copy.
+- The environment variables `TF_VAR_platform_account_id` and `TF_VAR_workload_account_ids`, the latter as an HCL map. The private script in `docs/private/` that `terraform/bootstrap/README.md` describes sets both, with the map listing the accounts whose bootstrap root is applied; this needs no file in any worktree. A file in the root, if present, wins over the environment.
 
-The id itself is in `docs/private/dcg-platform-handoff.md`.
+The ids themselves are in `docs/private/dcg-platform-handoff.md`.
 
 ## Who applies it
 
@@ -73,15 +77,16 @@ The plan must say no changes. The local state files are deleted because the stat
 
 ```powershell
 # heat-platform Admin credentials in the environment, confirmed with get-caller-identity
-cd C:\Users\chanc\IdeaProjects\HEAT\terraform\backend
+cd <the checkout or worktree>\terraform\backend
 terraform init
-terraform plan
-terraform apply
+terraform plan -out backend.tfplan
 ```
+
+Read the plan. The pull request that changes the stack says what line to expect; adding an account to `workload_account_ids` is `Plan: 0 to add, 1 to change, 0 to destroy.`, the bucket policy and nothing else. Then `terraform apply backend.tfplan` and `Remove-Item backend.tfplan`.
 
 ## Verification by the agent
 
-With the `audit-heat-platform` profile: the bucket exists with versioning enabled, default encryption AES256 with the bucket key on, all four public access block settings on, ownership `BucketOwnerEnforced`, the lifecycle rule at 90 and 7 days, the TLS-only policy attached and the bucket not public, the three tags, and the object `backend/terraform.tfstate` present. The audit role cannot read the object's contents; `terraform plan` showing no changes is the check that the state is whole.
+With the `audit-heat-platform` profile: the bucket exists with versioning enabled, default encryption AES256 with the bucket key on, all four public access block settings on, ownership `BucketOwnerEnforced`, the lifecycle rule at 90 and 7 days, the policy attached with the TLS-only deny and the three statements per listed account, the bucket not public, the three tags, and the object `backend/terraform.tfstate` present. The audit role cannot read the object's contents; `terraform plan` showing no changes is the check that the state is whole.
 
 ## Lock file
 

@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars in this directory (ignored by git) and put the real
+# values in. The ids are in docs/private/, never in a committed file; the
+# address is the owner's. Each environment's root has its own copy.
+platform_account_id   = "000000000000"
+workload_account_id   = "000000000000"
+management_account_id = "000000000000"
+budget_alert_email    = "owner@example.com"

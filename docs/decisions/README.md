@@ -34,5 +34,6 @@ The design and architecture documents say what is true now. They are edited as t
 | [0014](0014-verification-in-the-submit-request.md) | Verification and settlement happen in the submit request | Decided |
 | [0015](0015-domains-on-dcg-games-com.md) | Domains on dcg-games.com | Decided; one hostname per environment per 0018 |
 | [0016](0016-one-root-per-environment.md) | One root directory per environment, shared local modules | Decided; ephemeral stacks share one root per 0018 |
-| [0017](0017-pipeline-applies-terraform-and-owns-the-code.md) | The pipeline applies Terraform, and Terraform owns the function code; bounded apply roles; the owner applies only bootstrap | Decided |
-| [0018](0018-per-issue-sandbox-stacks.md) | Per-issue sandbox stacks in heat-sandbox, one hostname per stack behind CloudFront, the local emulator retired | Decided |
+| [0017](0017-pipeline-applies-terraform-and-owns-the-code.md) | The pipeline applies Terraform, and Terraform owns the function code; bounded apply roles; the owner applies only bootstrap | Decided; boundary shape, sandbox environment and one fact amended by 0019 |
+| [0018](0018-per-issue-sandbox-stacks.md) | Per-issue sandbox stacks in heat-sandbox, one hostname per stack behind CloudFront, the local emulator retired | Decided; the sandbox GitHub environment per 0019 |
+| [0019](0019-bootstrap-for-the-pipeline.md) | Bootstrap for the pipeline: the boundary is an allow-list with denies, a GitHub environment per stack, the agent's plan path, one state prefix per account | Decided |

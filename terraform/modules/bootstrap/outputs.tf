@@ -1,10 +1,20 @@
-output "deploy_role_arn" {
-  description = "The deploy role's ARN. It contains the account id, so it is printed and never committed."
-  value       = aws_iam_role.deploy.arn
+# Every ARN here contains the account id, so they are printed and never
+# committed. The workflows store none of them: a role ARN is the account id
+# variable plus the committed name (README.md, "Applying").
+
+output "plan_role_arn" {
+  description = "The plan role's ARN: what the agent's plan-heat-<environment> profile and the pull request plan job assume."
+  value       = aws_iam_role.plan.arn
 }
 
-output "deploy_role_name" {
-  value = aws_iam_role.deploy.name
+output "apply_role_arn" {
+  description = "The apply role's ARN: what the apply jobs assume under their GitHub environment."
+  value       = aws_iam_role.apply.arn
+}
+
+output "permissions_boundary_arn" {
+  description = "The boundary every role the environment stacks create must carry."
+  value       = aws_iam_policy.boundary.arn
 }
 
 output "github_oidc_provider_arn" {
