@@ -2,7 +2,7 @@
 
 Creates, in a workload account, what the pipeline needs before it can run there: the GitHub OIDC identity provider; a read-only plan role; an administrator apply role under a permissions boundary; and a monthly cost budget with alerts and an action that freezes the apply role when the budget is passed. One root directory per account, `sandbox/`, `dev/` and `prod/`, each composing the module `terraform/modules/bootstrap` with that account's values as literals and keeping its own state key (decision 0016). Design: `docs/architecture/overview.md`, "Environments"; decisions 0017, 0018 and 0019. History: Issue-12 (the provider and a narrow deploy role), Issue-19 (the budget), Issue-21 (the root-per-environment layout), Issue-36 (this shape; the deploy role removed).
 
-**Status: `dev` applied through Issue-21 on 2026-10-16; the Issue-36 shape is written and not applied anywhere.** What is in `heat-dev` today, read through `audit-heat-dev` on 2026-10-16: the provider, the role `heat-dev-deploy` with its one inline policy, the budget `heat-dev-monthly-cost` at 10 USD with three notifications, and nothing else of HEAT's. `heat-prod` holds only `PlatformAdminRole`; `heat-sandbox` does not exist yet. What each root waits on is under "Applying".
+**Status: `dev` applied through Issue-21 on 2026-10-16; the Issue-36 shape is written and not applied anywhere.** What is in `heat-dev` today, read through `audit-heat-dev` on 2026-10-16: the provider, the role `heat-dev-deploy` with its one inline policy, the budget `heat-dev-monthly-cost` at 10 USD with three notifications, and nothing else of HEAT's. `heat-prod` holds only `PlatformAdminRole`. `heat-sandbox` was created by the organization layer later the same day, enrolled, with `AuditRole` and `PlatformAdminRole` placed; nothing of HEAT's is in it. What each root waits on is under "Applying".
 
 ## Layout
 
@@ -37,7 +37,7 @@ Each line says what is in force in `heat-dev`, read through the `audit-heat-dev`
 - **IAM Access Analyzer.** None in the account; the organization-level analyzer is `dcg-platform`'s.
 - **Log group retention.** The environment stack sets it on each group it creates.
 - **A role in `heat-platform`.** None. The workload accounts' roles reach the state bucket through its policy (decision 0017, amending 0008), and the owner's `Admin` session is still the only identity `PlatformAdminRole` trusts.
-- **The other half of the agent's plan path.** Cross-account assumption needs an allow on both sides. The SecurityAudit permission set's inline policy, in the `dcg-platform` repository, must list `arn:aws:iam::*:role/heat-*-plan` beside `AuditRole`; requested from that side on 2026-10-16. Until it does, the pipeline's plan path works and the agent's profile is refused.
+- **The other half of the agent's plan path.** Cross-account assumption needs an allow on both sides. The SecurityAudit permission set's inline policy, in the `dcg-platform` repository, lists the three plan roles by exact ARN beside `AuditRole` (its pull request 37, applied 2026-10-16, read back the same evening in the provisioned role in `heat-dev`). The path opens as soon as this stack creates the roles.
 - **A kill switch for running spend.** See the budget action above; Issue-38.
 - **An artifact bucket.** None. Bundles are passed to the function as zips (decisions 0012 and 0017).
 
@@ -55,7 +55,7 @@ For an account, in this order: its bootstrap root; then the `backend` stack with
 
 - `dev`: nothing. Apply from the Issue-36 branch.
 - `prod`: nothing technical; the owner's decision to apply it in the same session.
-- `sandbox`: the `heat-sandbox` account, created by the organization layer (`dcg-platform` pull requests 34 to 36, open on 2026-10-16). Once it exists, its id goes into the root's `terraform.tfvars` and the `audit-heat-sandbox` profile.
+- `sandbox`: nothing technical either. The account exists since the evening of 2026-10-16; its id goes into the root's `terraform.tfvars`, and the `audit-heat-sandbox` profile into `~/.aws/config` (the shape is in the private hand-over note from `dcg-platform`), before the agent can verify there.
 
 Once per root, create `terraform.tfvars` from its example. Then:
 
