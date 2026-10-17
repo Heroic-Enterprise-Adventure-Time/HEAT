@@ -24,7 +24,7 @@ These are part of the structure and are not written yet. Each is written when th
 
 | Document | Written when |
 | --- | --- |
-| `process/deployment.md` | There is a deployment |
+| `process/deployment.md` | The release path has run once (Issue-41): the release pull request, the tag, the hotfix lifecycle. Until then the workflow's own comments, `terraform/bootstrap/README.md` and the overview's "Environments" describe deployment. |
 | `standards/<language>.md` | The first code in that language lands; `standards/typescript.md` is the first |
 | `runbooks/` | A multi-step procedure has been done more than once |
 
