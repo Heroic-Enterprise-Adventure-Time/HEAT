@@ -28,10 +28,13 @@
 #
 # The plan role is read only and plans with -lock=false. The apply role
 # plans again, checks the plan, and applies exactly the plan it checked.
-# Both jobs run the allow-list check of decision 0017, guardrail 2, and
-# write the plan into the job summary (guardrail 4). The account id is
-# replaced in every plan that leaves the runner, so that neither a comment
-# nor a summary carries it (docs/README.md, rule 9).
+# Both jobs run the allow-list check of decision 0017, guardrail 2
+# (scripts/check-plan-resource-types.mjs), and write the plan into the job
+# summary, guardrail 4, through scripts/post-terraform-plan.sh, which also
+# keeps the pull request's one plan comment per root and replaces the
+# account id in everything it posts (docs/README.md, rule 9). Anything
+# longer than a few lines, or needed by both jobs, is a script under
+# scripts/; the workflow is the sequence of steps.
 name: Deploy
 
 on:
@@ -120,64 +123,9 @@ jobs:
       - name: Write the plan to the job summary and the pull request
         env:
           ACCOUNT_ID: ${{ matrix.account_id }}
-          ROOT: ${{ matrix.root }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          ENVIRONMENT: ${{ matrix.environment }}
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -eu
-          terraform -chdir="terraform/environment/$ROOT" show -no-color "$RUNNER_TEMP/plan.tfplan" \
-            | sed "s/$ACCOUNT_ID/<account id>/g" > "$RUNNER_TEMP/plan.txt"
-          summary="$(grep -E '^(Plan:|No changes\.)' "$RUNNER_TEMP/plan.txt" | head -n 1 || true)"
-          : "${summary:=Plan written below.}"
-
-          # A pull request comment holds at most 65536 characters; a plan
-          # that would not fit is cut, and the summary has the whole of it.
-          limit=60000
-          body_plan="$(head -c "$limit" "$RUNNER_TEMP/plan.txt")"
-          if [ "$(wc -c < "$RUNNER_TEMP/plan.txt")" -gt "$limit" ]; then
-            body_plan="$body_plan"$'\n\n'"... cut here; the whole plan is in the job summary."
-          fi
-
-          marker="<!-- heat-plan:$ROOT -->"
-          {
-            echo "$marker"
-            echo "### Terraform plan: \`$ROOT\`"
-            echo
-            echo "Commit $HEAD_SHA, planned under the \`${{ matrix.environment }}\` environment with the plan role. Allow-list check: passed. [Run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
-            echo
-            echo "<details><summary>$summary</summary>"
-            echo
-            echo '```text'
-            echo "$body_plan"
-            echo '```'
-            echo
-            echo "</details>"
-          } > "$RUNNER_TEMP/comment.md"
-
-          {
-            echo "### Terraform plan: \`$ROOT\`"
-            echo
-            echo "Commit $HEAD_SHA, planned under the \`${{ matrix.environment }}\` environment with the plan role. Allow-list check: passed."
-            echo
-            echo "$summary"
-            echo
-            echo '```text'
-            cat "$RUNNER_TEMP/plan.txt"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-
-          # One comment per root, edited in place on every push, so the pull
-          # request shows the current plan and not a history of them.
-          existing="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" --paginate \
-            --jq "[.[] | select(.body | startswith(\"$marker\"))] | first | .id // empty")"
-          if [ -n "$existing" ]; then
-            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
-            echo "updated the plan comment $existing"
-          else
-            gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$PR_NUMBER/comments" -F "body=@$RUNNER_TEMP/comment.md" > /dev/null
-            echo "posted the plan comment"
-          fi
+        run: sh scripts/post-terraform-plan.sh "${{ matrix.root }}" "$RUNNER_TEMP/plan.tfplan" "${{ github.event.pull_request.head.sha }}" "plan role" "${{ github.event.pull_request.number }}"
 
   apply:
     name: Apply ${{ matrix.root }}
@@ -255,23 +203,8 @@ jobs:
       - name: Write the plan to the job summary
         env:
           ACCOUNT_ID: ${{ matrix.account_id }}
-          ROOT: ${{ matrix.root }}
-        run: |
-          set -eu
-          terraform -chdir="terraform/environment/$ROOT" show -no-color "$RUNNER_TEMP/plan.tfplan" \
-            | sed "s/$ACCOUNT_ID/<account id>/g" > "$RUNNER_TEMP/plan.txt"
-          summary="$(grep -E '^(Plan:|No changes\.)' "$RUNNER_TEMP/plan.txt" | head -n 1 || true)"
-          {
-            echo "### Terraform plan: \`$ROOT\`, applied by this run"
-            echo
-            echo "Commit $GITHUB_SHA, under the \`${{ matrix.environment }}\` environment with the apply role. Allow-list check: passed."
-            echo
-            echo "${summary:-Plan written below.}"
-            echo
-            echo '```text'
-            cat "$RUNNER_TEMP/plan.txt"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: sh scripts/post-terraform-plan.sh "${{ matrix.root }}" "$RUNNER_TEMP/plan.tfplan" "$GITHUB_SHA" "apply role"
 
       # Exactly the plan that was checked, not a fresh one.
       - name: Apply
