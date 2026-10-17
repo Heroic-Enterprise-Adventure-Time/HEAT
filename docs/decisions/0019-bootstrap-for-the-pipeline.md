@@ -1,6 +1,6 @@
 # 0019: Bootstrap for the pipeline: the boundary is an allow-list, a GitHub environment per stack, the agent's plan path
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0020 on 2026-10-17: the plan roles also trust the `environment:<name>` subject, so a pull request's plan can run under the target environment; and the sandbox plan role's carve-out for user-pool records closes, because test users are created by the apply job rather than Terraform.
 - **Date:** 2026-10-16
 - **Amends:** 0017, the shape of the apply role's permissions boundary, the sandbox row of its table, and one line of its facts; 0018, the sandbox GitHub environment in "What is owed".
 
