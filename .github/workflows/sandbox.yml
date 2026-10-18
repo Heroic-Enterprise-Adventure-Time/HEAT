@@ -234,7 +234,9 @@ jobs:
           set -eu
           bucket="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw client_bucket)"
           pool_id="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw user_pool_id)"
-          sh scripts/publish-client.sh "$bucket" client "/graphql" "$pool_id"
+          client_id="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw browser_client_id)"
+          login_host="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw login_host)"
+          sh scripts/publish-client.sh "$bucket" client "/graphql" "$pool_id" "$client_id" "$login_host"
 
       - name: Write the stack's URL to the job summary
         id: summary
@@ -247,9 +249,9 @@ jobs:
           {
             echo "### Stack \`$STACK\`"
             echo
-            echo "Site: $site_url (the page at /, POST /graphql with a Bearer token from the base's ci client, /config.json for the client)."
+            echo "Site: $site_url (the page with Sign in with Google, POST /graphql with a Bearer token from the browser client or the base's ci client, /config.json for the client)."
             echo
-            echo "API behind it: \`$api_url\`. Parameters under \`$prefix\`: site_url, api_url, user_pool_id, app_client_id."
+            echo "API behind it: \`$api_url\`. Parameters under \`$prefix\`: site_url, api_url, user_pool_id, app_client_id, browser_client_id, login_host."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Comment the stack's URL on the branch's pull request, if one is open

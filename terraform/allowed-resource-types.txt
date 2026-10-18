@@ -47,3 +47,7 @@ aws_s3_bucket_policy
 aws_cloudfront_origin_access_control
 aws_cloudfront_function
 aws_cloudfront_distribution
+
+# A stack's browser app client is the aws_cognito_user_pool_client above; its
+# managed login branding style is this (Issue-46).
+aws_cognito_managed_login_branding

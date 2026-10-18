@@ -24,8 +24,18 @@ output "table_names" {
 }
 
 output "parameter_prefix" {
-  description = "Where the stack's parameters live: api_url, user_pool_id, app_client_id under this path."
+  description = "Where the stack's parameters live: site_url, api_url, user_pool_id, app_client_id, browser_client_id, login_host under this path."
   value       = local.parameter_prefix
+}
+
+output "browser_client_id" {
+  description = "The stack's browser app client, for config.json; public by design, the browser carries it."
+  value       = aws_cognito_user_pool_client.browser.id
+}
+
+output "login_host" {
+  description = "The pool's managed login host, for config.json."
+  value       = var.login_host
 }
 
 output "site_url" {

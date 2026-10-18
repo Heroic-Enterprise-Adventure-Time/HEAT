@@ -86,8 +86,22 @@ const { rewardsForSeed } = await import("@heat/engine");
 // authorizer refusing an anonymous call through the same hostname.
 const page = await fetch(`${siteUrl}/`);
 check(page.status === 200 && (await page.text()).includes("<heat-root>"), `GET ${siteUrl}/ serves the page`);
-const config = await fetch(`${siteUrl}/config.json`);
-check(config.status === 200 && (await config.json()).graphqlPath === "/graphql", `GET ${siteUrl}/config.json names the API path`);
+const configResponse = await fetch(`${siteUrl}/config.json`);
+const config = configResponse.status === 200 ? await configResponse.json() : {};
+check(config.graphqlPath === "/graphql", `GET ${siteUrl}/config.json names the API path`);
+check(typeof config.clientId === "string" && config.clientId.length > 0 && /^https:\/\/auth\./.test(config.loginHost ?? ""), `config.json names the browser client and the login host ${config.loginHost}`);
+
+// Sign-in as the browser does it, up to Google's door: the managed login
+// page renders for this stack's client and its callback, which proves the
+// client, its branding style and the domain together; and the authorize
+// endpoint with identity_provider=Google answers a redirect to Google, which
+// proves the provider and the owner's Google client id are wired up. Nothing
+// here signs in: that needs a Google account and a browser.
+const loginPage = await fetch(`${config.loginHost}/login?client_id=${config.clientId}&response_type=code&redirect_uri=${encodeURIComponent(siteUrl)}`);
+check(loginPage.status === 200, `the managed login page answers for the browser client at ${config.loginHost} (got ${loginPage.status})`);
+const authorize = await fetch(`${config.loginHost}/oauth2/authorize?client_id=${config.clientId}&response_type=code&scope=openid+email+profile&identity_provider=Google&redirect_uri=${encodeURIComponent(siteUrl)}`, { redirect: "manual" });
+const toGoogle = authorize.status === 302 && /^https:\/\/accounts\.google\.com\//.test(authorize.headers.get("location") ?? "");
+check(toGoogle, `the authorize endpoint sends the browser to Google (got ${authorize.status} ${authorize.headers.get("location")?.split("?")[0] ?? ""})`);
 const anonymous = await fetch(graphqlUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: "{ __typename }" }) });
 check(anonymous.status === 401, `POST ${graphqlUrl} without a token is refused with 401 (got ${anonymous.status})`);
 

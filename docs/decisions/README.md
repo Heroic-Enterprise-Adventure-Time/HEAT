@@ -41,3 +41,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0021](0021-release-branch.md) | Production through a release branch; the tag is documentation; hotfixes from the start | Decided |
 | [0022](0022-shared-user-pool.md) | The shared user pool: Essentials tier, email as the username, administrator-created users, no MFA, administrator-only recovery, a password-flow CI client | Decided |
 | [0023](0023-two-tables-by-partition-key.md) | Two tables named for their partition key, player and location, prefixed in every environment | Decided |
+| [0024](0024-browser-sign-in.md) | Browser sign-in: managed login on a custom domain, the code grant with PKCE through oidc-client-ts, one public client per stack with rotating refresh tokens | Decided |
