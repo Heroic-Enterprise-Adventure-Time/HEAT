@@ -87,3 +87,23 @@ variable "log_level" {
   type        = string
   default     = "INFO"
 }
+
+variable "hostname" {
+  description = "The environment's one hostname, a CloudFront distribution in front of the client bucket and the HTTP API: <issue>.heat-sb.dcg-games.com for a sandbox stack, heat-dev.dcg-games.com, heat.dcg-games.com (decisions 0015 and 0018). Under the base's zone and covered by its certificate."
+  type        = string
+}
+
+variable "zone_id" {
+  description = "The account's hosted zone (terraform/modules/base), where the hostname's records are written."
+  type        = string
+}
+
+variable "certificate_arn" {
+  description = "The account's certificate for the zone name and its wildcard, in us-east-1 (terraform/modules/base), which the distribution serves."
+  type        = string
+}
+
+variable "price_class" {
+  description = "The distribution's price class: PriceClass_100 in every environment today."
+  type        = string
+}

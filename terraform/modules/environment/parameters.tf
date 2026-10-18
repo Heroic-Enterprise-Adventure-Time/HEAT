@@ -29,3 +29,10 @@ resource "aws_ssm_parameter" "app_client_id" {
   type        = "String"
   value       = var.app_client_id
 }
+
+resource "aws_ssm_parameter" "site_url" {
+  name        = "${local.parameter_prefix}/site_url"
+  description = "The environment's hostname, serving the page and /graphql."
+  type        = "String"
+  value       = module.site.site_url
+}

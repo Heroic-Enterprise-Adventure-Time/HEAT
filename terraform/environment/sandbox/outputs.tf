@@ -30,3 +30,17 @@ output "ci_client_id" {
 output "user_pool_id" {
   value = one(data.aws_cognito_user_pools.base.ids)
 }
+
+output "site_url" {
+  description = "The stack's hostname: the page at /, POST /graphql with a Bearer token."
+  value       = module.environment.site_url
+}
+
+output "client_bucket" {
+  description = "Read by the apply job, which syncs the client build and writes config.json into it."
+  value       = module.environment.client_bucket
+}
+
+output "distribution_id" {
+  value = module.environment.distribution_id
+}

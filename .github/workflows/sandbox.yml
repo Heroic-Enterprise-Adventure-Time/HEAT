@@ -8,15 +8,22 @@
 # first reference and the sandbox apply role trusts by the pattern
 # sandbox-* (decision 0019). The stacks take no secret (decision 0020).
 #
-# Three triggers:
-#   push      checks, bundle, cap, plan with the allow-list, apply; the API
-#             URL in the job summary and on the deployment. The checks run
-#             here so that a stack always holds a commit that typechecks and
-#             passes the tests (0017); until Issue-53 they also run in Build
-#             and test while a pull request is open.
+# Four triggers:
+#   push      checks, bundle and client build, cap, plan with the
+#             allow-list, apply, the client published to the stack's
+#             bucket with config.json, the stack test through the stack's
+#             hostname; the URL in the job summary, on the deployment and,
+#             when the branch has an open pull request, in one comment on
+#             it. The checks run here so that a stack always holds a commit
+#             that typechecks and passes the tests (0017); until Issue-53
+#             they also run in Build and test while a pull request is open.
+#   pull_request (opened, reopened)   the URL comment alone, so the pull
+#             request carries it from its first minute; the hostname is
+#             known from the issue number, with no apply.
 #   delete    destroy the branch's stack from its state key, with main's
 #             copy of the root. The root evaluates the bundle's hash even to
-#             destroy, so the job bundles first.
+#             destroy, so the job bundles first. The distribution's destroy
+#             is minutes: CloudFront disables it, deploys that, then deletes.
 #   schedule, workflow_dispatch   the sweep: every stack whose branch is
 #             gone is destroyed; a dispatch with dry_run lists and destroys
 #             nothing.
@@ -45,6 +52,8 @@ on:
       - "infra/**"
       - "chore/**"
       - "hotfix/**"
+  pull_request:
+    types: [opened, reopened]
   delete:
   schedule:
     # Sundays 06:00 UTC.
@@ -118,6 +127,19 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
+      # What the stack's bucket serves (Issue-39); one build serves any
+      # stack, because config.json is written beside it at publish time.
+      - name: Build the client for production
+        run: npm run build --workspace @heat/client
+
+      - name: Upload the client for the apply job
+        uses: actions/upload-artifact@v6
+        with:
+          name: client
+          path: packages/client/dist/client/browser/
+          if-no-files-found: error
+          retention-days: 1
+
   apply:
     name: Apply the branch's stack
     if: github.event_name == 'push'
@@ -125,7 +147,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: sandbox-${{ needs.checks.outputs.issue }}
-      url: ${{ steps.summary.outputs.api_url }}
+      url: ${{ steps.summary.outputs.site_url }}
     # One apply at a time per stack, never cancelled (decision 0017).
     concurrency:
       group: sandbox-${{ github.ref }}
@@ -133,6 +155,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # The stack URL comment on the branch's pull request.
+      pull-requests: write
     env:
       TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
       ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
@@ -165,6 +189,12 @@ jobs:
           name: bundles
           path: dist/
 
+      - name: Download the client
+        uses: actions/download-artifact@v7
+        with:
+          name: client
+          path: client/
+
       - name: Assume the apply role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -196,20 +226,36 @@ jobs:
       - name: Apply
         run: node scripts/sandbox.mjs apply --issue "$ISSUE" -- "$RUNNER_TEMP/plan.tfplan"
 
+      # The content is the apply job's, not Terraform's: the client build
+      # from the checks job and config.json from the stack's outputs
+      # (terraform/modules/site/README.md, "What is not here").
+      - name: Publish the client and config.json to the stack's bucket
+        run: |
+          set -eu
+          bucket="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw client_bucket)"
+          pool_id="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw user_pool_id)"
+          sh scripts/publish-client.sh "$bucket" client "/graphql" "$pool_id"
+
       - name: Write the stack's URL to the job summary
         id: summary
         run: |
           set -eu
+          site_url="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw site_url)"
           api_url="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw api_url)"
           prefix="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw parameter_prefix)"
-          echo "api_url=$api_url" >> "$GITHUB_OUTPUT"
+          echo "site_url=$site_url" >> "$GITHUB_OUTPUT"
           {
             echo "### Stack \`$STACK\`"
             echo
-            echo "API: \`$api_url\` (POST /graphql with a Bearer token from the base's ci client)."
+            echo "Site: $site_url (the page at /, POST /graphql with a Bearer token from the base's ci client, /config.json for the client)."
             echo
-            echo "Parameters under \`$prefix\`: api_url, user_pool_id, app_client_id."
+            echo "API behind it: \`$api_url\`. Parameters under \`$prefix\`: site_url, api_url, user_pool_id, app_client_id."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment the stack's URL on the branch's pull request, if one is open
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/post-stack-url.sh "$ISSUE" "${{ steps.summary.outputs.site_url }}"
 
       # The stack test (decision 0018: the stack is the system). The engine
       # is built because the test compares the hub's answer with it.
@@ -237,6 +283,35 @@ jobs:
 
       - name: Report the cold start
         run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
+
+  # -------------------------------------------------------- pull request --
+  comment-url:
+    name: Comment the stack's URL on the pull request
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Check out the branch
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      # The hostname follows from the issue number in the branch name, so
+      # the comment needs no apply and no AWS credentials.
+      - name: Post the comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -eu
+          issue="$(node scripts/sandbox.mjs issue --branch "$HEAD_REF")"
+          sh scripts/post-stack-url.sh "$issue" "https://$issue.heat-sb.dcg-games.com" "$PR_NUMBER"
 
   # -------------------------------------------------------------- delete --
   name-deleted:
