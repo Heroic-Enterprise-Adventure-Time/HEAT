@@ -3,6 +3,11 @@
 # the account id never reaches this module, because nothing here builds an
 # ARN by hand.
 
+variable "ci_client" {
+  description = "Whether the pool gets the ci app client, the password flow the stack test and the test users sign in with (user_pool.tf). true in the sandbox and dev, whose pools hold test users; false in prod, whose pool holds players only and no password at all (Issue-41)."
+  type        = bool
+}
+
 variable "name_prefix" {
   description = "The prefix of every named resource the base creates: heat-sb-base in the sandbox account, heat-dev-base and heat-prod-base in the permanent ones. Inside the account's resource prefix that the bootstrap boundary allows."
   type        = string

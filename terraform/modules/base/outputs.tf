@@ -39,8 +39,8 @@ output "user_pool_endpoint" {
 }
 
 output "ci_client_id" {
-  description = "The id of the ci app client: what the end-to-end tests pass to InitiateAuth."
-  value       = aws_cognito_user_pool_client.ci.id
+  description = "The id of the ci app client: what the end-to-end tests pass to InitiateAuth. null where the root asked for no ci client (prod)."
+  value       = one(aws_cognito_user_pool_client.ci[*].id)
 }
 
 output "certificate_arn" {

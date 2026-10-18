@@ -10,6 +10,14 @@ import { execFileSync } from "node:child_process";
  *
  * Usage: E2E_PASSWORD=<password> node scripts/e2e.mjs --issue <n> --username <email>
  *        E2E_PASSWORD=<password> node scripts/e2e.mjs --stack heat-dev --username <email>
+ *        node scripts/e2e.mjs --stack heat-prod --anonymous
+ *
+ * With --anonymous the test stops after the checks that need no token: the
+ * page, config.json, the managed login page, the hand-off to Google and the
+ * authorizer's 401. That is prod's smoke test (Issue-41): prod has no
+ * password-flow client and no test user, so nothing signs in and nothing is
+ * written to its tables; the same commit ran the whole loop in dev, and the
+ * authenticated check on prod is the owner's own Google sign-in.
  *
  * The site URL and the app client id are read from the stack's parameters,
  * /heat/heat-sb<issue>/ for a sandbox stack and /heat/<stack>/ for a
@@ -35,8 +43,9 @@ const issue = opt("issue");
 const stack = opt("stack") ?? (issue ? `heat-sb${issue}` : undefined);
 const username = opt("username");
 const password = process.env.E2E_PASSWORD;
-if (!stack || !username || !password) {
-  console.error("usage: E2E_PASSWORD=<password> node scripts/e2e.mjs (--issue <n> | --stack <name>) --username <email>");
+const anonymousOnly = args.includes("--anonymous");
+if (!stack || (!anonymousOnly && (!username || !password))) {
+  console.error("usage: E2E_PASSWORD=<password> node scripts/e2e.mjs (--issue <n> | --stack <name>) (--username <email> | --anonymous)");
   process.exit(2);
 }
 
@@ -51,7 +60,8 @@ function parameter(name) {
 }
 
 const siteUrl = parameter("site_url");
-const clientId = parameter("app_client_id");
+// prod writes no app_client_id parameter, because it has no ci client.
+const clientId = anonymousOnly ? undefined : parameter("app_client_id");
 const graphqlUrl = `${siteUrl}/graphql`;
 
 async function signIn() {
@@ -84,8 +94,6 @@ const check = (condition, message) => {
   console.log(`ok: ${message}`);
 };
 
-const { rewardsForSeed } = await import("@heat/engine");
-
 // The site before the API: the page, the client's configuration, and the
 // authorizer refusing an anonymous call through the same hostname.
 const page = await fetch(`${siteUrl}/`);
@@ -108,6 +116,15 @@ const toGoogle = authorize.status === 302 && /^https:\/\/accounts\.google\.com\/
 check(toGoogle, `the authorize endpoint sends the browser to Google (got ${authorize.status} ${authorize.headers.get("location")?.split("?")[0] ?? ""})`);
 const anonymous = await fetch(graphqlUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: "{ __typename }" }) });
 check(anonymous.status === 401, `POST ${graphqlUrl} without a token is refused with 401 (got ${anonymous.status})`);
+
+if (anonymousOnly) {
+  console.log("anonymous checks passed; nothing signed in and nothing written (--anonymous)");
+  process.exit(0);
+}
+
+// The engine only from here on: the authenticated half compares the hub's
+// rewards with it, so the anonymous run needs no engine build.
+const { rewardsForSeed } = await import("@heat/engine");
 
 const token = await signIn();
 console.log(`signed in as ${username} through client ${clientId}`);

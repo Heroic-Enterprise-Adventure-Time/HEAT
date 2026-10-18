@@ -86,7 +86,15 @@ resource "aws_cognito_user_pool" "this" {
 # refused at once; and a wrong password and an unknown user produce the same
 # error, so the client cannot be used to enumerate users. Browser clients,
 # with the code grant and PKCE, are each stack's own (Issue-46).
+#
+# Only where the pool holds test users: the sandbox and dev. Prod's pool has
+# no password-flow client, because every one of its users arrives through
+# Google and nothing in prod should accept a password (Issue-41); its smoke
+# test stops at the authorizer's refusal. The moved block keeps the existing
+# clients where they are when the resource gained its count.
 resource "aws_cognito_user_pool_client" "ci" {
+  count = var.ci_client ? 1 : 0
+
   name         = "ci"
   user_pool_id = aws_cognito_user_pool.this.id
 
@@ -111,4 +119,9 @@ resource "aws_cognito_user_pool_client" "ci" {
 
   prevent_user_existence_errors = "ENABLED"
   enable_token_revocation       = true
+}
+
+moved {
+  from = aws_cognito_user_pool_client.ci
+  to   = aws_cognito_user_pool_client.ci[0]
 }
