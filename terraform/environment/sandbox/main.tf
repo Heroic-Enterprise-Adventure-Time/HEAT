@@ -12,7 +12,23 @@ data "aws_cognito_user_pool_clients" "base" {
   user_pool_id = one(data.aws_cognito_user_pools.base.ids)
 }
 
+# The zone and the certificate the base created (Issue-37 and Issue-39),
+# found by their names as the pool is. The certificate is the issued one for
+# the zone name, which carries the wildcard that covers this stack's hostname.
+data "aws_route53_zone" "base" {
+  name         = local.zone_name
+  private_zone = false
+}
+
+data "aws_acm_certificate" "base" {
+  domain      = local.zone_name
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
+
 locals {
+  zone_name = "heat-sb.dcg-games.com"
+
   # The ci client is the password-flow client the end-to-end tests and the
   # agent sign in with (decision 0018); the lists are aligned by index.
   ci_client_id = data.aws_cognito_user_pool_clients.base.client_ids[
@@ -31,6 +47,14 @@ module "environment" {
 
   user_pool_id  = one(data.aws_cognito_user_pools.base.ids)
   app_client_id = local.ci_client_id
+
+  # The stack's hostname, <issue>.heat-sb.dcg-games.com, on the base's zone
+  # and certificate (decision 0018). PriceClass_100, North America and
+  # Europe, where the viewers are; the same in every environment today.
+  hostname        = "${var.issue}.${local.zone_name}"
+  zone_id         = data.aws_route53_zone.base.zone_id
+  certificate_arn = data.aws_acm_certificate.base.arn
+  price_class     = "PriceClass_100"
 
   permissions_boundary_arn = "arn:aws:iam::${var.workload_account_id}:policy/heat-sandbox-boundary"
 

@@ -10,8 +10,11 @@ import { execFileSync } from "node:child_process";
  *
  * Usage: E2E_PASSWORD=<password> node scripts/e2e.mjs --issue <n> --username <email>
  *
- * The API URL and the app client id are read from the stack's parameters,
- * /heat/heat-sb<issue>/, with whatever AWS credentials are in the
+ * The site URL and the app client id are read from the stack's parameters,
+ * /heat/heat-sb<issue>/, and every call goes through the stack's hostname,
+ * as the browser's will: the page at /, config.json, and /graphql behind
+ * CloudFront, which proves that the Authorization header crosses it. The
+ * parameters are read with whatever AWS credentials are in the
  * environment: the apply role in the workflow, the plan role on a laptop.
  * The password comes from the environment, never from an argument, so it
  * is in no process list and no log. In the workflow the user is minted for
@@ -43,8 +46,9 @@ function parameter(name) {
   }).trim();
 }
 
-const apiUrl = parameter("api_url");
+const siteUrl = parameter("site_url");
 const clientId = parameter("app_client_id");
+const graphqlUrl = `${siteUrl}/graphql`;
 
 async function signIn() {
   const response = await fetch(`https://cognito-idp.${region}.amazonaws.com/`, {
@@ -61,13 +65,13 @@ async function signIn() {
 
 async function graphql(token, query, variables = {}) {
   const started = performance.now();
-  const response = await fetch(`${apiUrl}graphql`, {
+  const response = await fetch(graphqlUrl, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify({ query, variables }),
   });
   const ms = Math.round(performance.now() - started);
-  if (response.status !== 200) throw new Error(`HTTP ${response.status} from ${apiUrl}graphql: ${await response.text()}`);
+  if (response.status !== 200) throw new Error(`HTTP ${response.status} from ${graphqlUrl}: ${await response.text()}`);
   return { ...(await response.json()), ms };
 }
 
@@ -77,6 +81,15 @@ const check = (condition, message) => {
 };
 
 const { rewardsForSeed } = await import("@heat/engine");
+
+// The site before the API: the page, the client's configuration, and the
+// authorizer refusing an anonymous call through the same hostname.
+const page = await fetch(`${siteUrl}/`);
+check(page.status === 200 && (await page.text()).includes("<heat-root>"), `GET ${siteUrl}/ serves the page`);
+const config = await fetch(`${siteUrl}/config.json`);
+check(config.status === 200 && (await config.json()).graphqlPath === "/graphql", `GET ${siteUrl}/config.json names the API path`);
+const anonymous = await fetch(graphqlUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: "{ __typename }" }) });
+check(anonymous.status === 401, `POST ${graphqlUrl} without a token is refused with 401 (got ${anonymous.status})`);
 
 const token = await signIn();
 console.log(`signed in as ${username} through client ${clientId}`);

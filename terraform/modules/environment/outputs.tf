@@ -27,3 +27,17 @@ output "parameter_prefix" {
   description = "Where the stack's parameters live: api_url, user_pool_id, app_client_id under this path."
   value       = local.parameter_prefix
 }
+
+output "site_url" {
+  description = "https://<hostname>: the page, and /graphql through the same origin."
+  value       = module.site.site_url
+}
+
+output "client_bucket" {
+  description = "The bucket the apply job syncs the client build and config.json into."
+  value       = module.site.client_bucket
+}
+
+output "distribution_id" {
+  value = module.site.distribution_id
+}
