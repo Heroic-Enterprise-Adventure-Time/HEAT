@@ -62,6 +62,27 @@ variable "login_host" {
   }
 }
 
+variable "extra_callback_urls" {
+  description = "Callback and sign-out URLs of the browser client beside https://<hostname>: [\"http://localhost:4200\"] for a sandbox stack, so that the Angular dev server on a laptop signs in to a real stack (decision 0018); none for dev and prod, whose records are players' and are never reached from a laptop."
+  type        = list(string)
+
+  validation {
+    condition     = alltrue([for u in var.extra_callback_urls : can(regex("^https?://", u))])
+    error_message = "every extra callback URL must start with http:// or https://."
+  }
+}
+
+variable "alarm_email" {
+  description = "Where the environment's alarms notify (alarms.tf): an SNS topic with this address subscribed, one email per alarm state change. null, and no topic or alarm is created: a sandbox stack lives as long as its branch and nobody is on call for it. dev and prod pass the address from their GitHub environment's variable HEAT_ALARM_EMAIL, never from a committed file (decision 0016)."
+  type        = string
+  nullable    = true
+
+  validation {
+    condition     = var.alarm_email == null || can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.alarm_email))
+    error_message = "alarm_email must be null or an email address."
+  }
+}
+
 variable "permissions_boundary_arn" {
   description = "The bootstrap boundary of this account, which every role this module creates must carry (decision 0019)."
   type        = string

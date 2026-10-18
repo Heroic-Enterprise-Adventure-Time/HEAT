@@ -6,10 +6,15 @@
 #
 # Each permanent root is one row of the matrix, and its jobs run under that
 # root's own GitHub environment, which holds its secrets and admits only the
-# branch main (decision 0020). Today the one row is sandbox-base. Issue-40
-# adds dev. Issue-41 adds prod with its own triggers, pull_request_target to
-# release and push to release, because prod ships through the release branch
-# (decision 0021).
+# branch main (decision 0020). Two rows today: sandbox-base (Issue-37) and
+# dev (Issue-40). Issue-41 adds prod with its own triggers, pull_request_target
+# to release and push to release, because prod ships through the release
+# branch (decision 0021). A row with code (dev, later prod) bundles the
+# functions before planning, because the root hashes the bundle, and after
+# the apply publishes the client build with config.json, creates the test
+# users, runs the smoke test through the environment's hostname and reads the
+# cold start, as sandbox.yml does for a per-issue stack; sandbox-base has no
+# code and skips those steps.
 #
 # Why pull_request_target and not pull_request: the pull request's plan must
 # run under the root's environment to see its real values, and the
@@ -23,8 +28,9 @@
 # the risk is the one decision 0020 accepts, a repository whose every author
 # is trusted. Two consequences of the trigger worth knowing: a new or
 # changed copy of this file takes effect for pull requests only once it is
-# on main, and Dependabot's pull requests get no plan, since their runs see
-# no secrets; the apply on main plans anyway.
+# on main, so the pull request that adds a row gets no plan for it, and
+# Dependabot's pull requests get no plan, since their runs see no secrets;
+# the apply on main plans anyway.
 #
 # The plan role is read only and plans with -lock=false. The apply role
 # plans again, checks the plan, and applies exactly the plan it checked.
@@ -68,18 +74,27 @@ jobs:
         include:
           # One row per permanent root. The role ARN is the account id
           # variable plus the committed role name (terraform/bootstrap/README.md).
+          # code is true where the root hashes the function bundles.
           - root: sandbox-base
             environment: sandbox-base
             account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
             role: heat-sandbox-plan
+            code: false
+          - root: dev
+            environment: dev
+            account_id: ${{ vars.HEAT_DEV_ACCOUNT_ID }}
+            role: heat-dev-plan
+            code: true
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
-      # The base's Google OAuth client, from the environment this job runs
-      # under: one name in every environment, the environment supplies the
-      # value (decision 0020). An environment without them yields empty
-      # strings, which the root's variables refuse by name.
+      # The base's Google OAuth client and the alarms' address, from the
+      # environment this job runs under: one name in every environment, the
+      # environment supplies the value (decision 0020). An environment
+      # without them yields empty strings, which the root's variables refuse
+      # by name; a root without the variable ignores the TF_VAR.
       TF_VAR_google_client_id: ${{ vars.HEAT_GOOGLE_CLIENT_ID }}
       TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
+      TF_VAR_alarm_email: ${{ vars.HEAT_ALARM_EMAIL }}
     steps:
       - name: Refuse to run without the account id
         env:
@@ -106,6 +121,16 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
+          cache: npm
+
+      # The root zips dist/<name>/ and plans the function from its hash
+      # (decision 0017), so the bundle exists before the plan.
+      - name: Install and bundle the functions
+        if: matrix.code
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
 
       - name: Assume the plan role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
@@ -137,7 +162,9 @@ jobs:
     name: Apply ${{ matrix.root }}
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: ${{ matrix.environment }}
+    environment:
+      name: ${{ matrix.environment }}
+      url: ${{ steps.summary.outputs.site_url }}
     # One apply at a time per root, and never cancelled: a cancelled apply
     # can leave the state lock behind, so applies queue (decision 0017).
     concurrency:
@@ -154,20 +181,33 @@ jobs:
           # test-user step runs: the sandbox and dev, never prod (decision
           # 0020). The step reads the environment's HEAT_TEST_USER_PASSWORD;
           # the name is the same in every environment and the environment
-          # supplies the value.
+          # supplies the value. stack names the environment's resources,
+          # heat-<environment>, for the smoke test and the cold start.
           - root: sandbox-base
             environment: sandbox-base
             account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
             role: heat-sandbox-apply
             test_users: true
+            code: false
+          - root: dev
+            environment: dev
+            account_id: ${{ vars.HEAT_DEV_ACCOUNT_ID }}
+            role: heat-dev-apply
+            test_users: true
+            code: true
+            stack: heat-dev
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
-      # The base's Google OAuth client, from the environment this job runs
-      # under: one name in every environment, the environment supplies the
-      # value (decision 0020). An environment without them yields empty
-      # strings, which the root's variables refuse by name.
+      # The base's Google OAuth client and the alarms' address, from the
+      # environment this job runs under: one name in every environment, the
+      # environment supplies the value (decision 0020). An environment
+      # without them yields empty strings, which the root's variables refuse
+      # by name; a root without the variable ignores the TF_VAR.
       TF_VAR_google_client_id: ${{ vars.HEAT_GOOGLE_CLIENT_ID }}
       TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
+      TF_VAR_alarm_email: ${{ vars.HEAT_ALARM_EMAIL }}
+      ROOT: ${{ matrix.root }}
+      STACK: ${{ matrix.stack }}
     steps:
       - name: Refuse to run without the account id
         env:
@@ -192,6 +232,19 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
+          cache: npm
+
+      # The functions for the plan, which hashes them; the client for the
+      # publish step after the apply; the engine for the smoke test, which
+      # compares the hub's answer with it.
+      - name: Install, bundle the functions, build the client and the engine
+        if: matrix.code
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
+          npm run build --workspace @heat/client
+          npm run build --workspace @heat/engine
 
       - name: Assume the apply role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
@@ -228,7 +281,6 @@ jobs:
         if: matrix.test_users
         env:
           TEST_USER_PASSWORD: ${{ secrets.HEAT_TEST_USER_PASSWORD }}
-          ROOT: ${{ matrix.root }}
         run: |
           set -eu
           if [ -z "$TEST_USER_PASSWORD" ]; then
@@ -237,3 +289,60 @@ jobs:
           fi
           pool_id="$(terraform -chdir="terraform/environment/$ROOT" output -raw user_pool_id)"
           sh scripts/create-test-users.sh "$pool_id" "terraform/environment/$ROOT/test-users.txt"
+
+      # From here on, the environment's code: what sandbox.yml does for a
+      # per-issue stack after its apply. The content is the apply job's, not
+      # Terraform's (terraform/modules/site/README.md, "What is not here").
+      - name: Publish the client and config.json to the environment's bucket
+        if: matrix.code
+        run: |
+          set -eu
+          out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
+          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)"
+
+      - name: Write the environment's URL to the job summary
+        id: summary
+        if: matrix.code
+        run: |
+          set -eu
+          out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
+          site_url="$(out site_url)"
+          echo "site_url=$site_url" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Environment \`$STACK\`"
+            echo
+            echo "Site: $site_url (the page with Sign in with Google, POST /graphql with a Bearer token from the browser client or the ci client, /config.json for the client)."
+            echo
+            echo "API behind it: \`$(out api_url)\`. Parameters under \`$(out parameter_prefix)\`: site_url, api_url, user_pool_id, app_client_id, browser_client_id, login_host. Alarms notify \`$(out alarm_topic_arn)\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The smoke test (the issue's "one request through the authorizer and
+      # the function", grown to the stack test of decision 0018): its own
+      # user in the environment's pool, minted with a random password for
+      # this run and kept between runs, so no stored secret and no new
+      # player record per run.
+      - name: Mint the smoke test's user
+        if: matrix.code
+        run: |
+          set -eu
+          out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
+          sh scripts/e2e-user.sh ensure "$(out user_pool_name)" "e2e@$(out zone_name)"
+
+      - name: Call the environment as that user
+        id: e2e
+        if: matrix.code
+        run: |
+          set -eu
+          zone_name="$(terraform -chdir="terraform/environment/$ROOT" output -raw zone_name)"
+          echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
+          node scripts/e2e.mjs --stack "$STACK" --username "e2e@$zone_name" | tee -a "$RUNNER_TEMP/e2e.log"
+          {
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/e2e.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the cold start
+        if: matrix.code
+        run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"

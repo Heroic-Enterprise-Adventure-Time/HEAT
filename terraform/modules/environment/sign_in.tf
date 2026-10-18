@@ -8,8 +8,9 @@
 # packages/client). Google is its only provider, so managed login has no
 # password form to show; the client sends the browser straight to Google
 # with identity_provider=Google. The callback and sign-out URLs are the
-# stack's hostname and the Angular dev server, which is how display work
-# on a laptop signs in to a real stack (decision 0018).
+# stack's hostname and, in a sandbox stack, the Angular dev server, which is
+# how display work on a laptop signs in to a real stack (decision 0018); the
+# root says which extra URLs, and dev and prod pass none.
 #
 # Tokens: access and ID tokens of one hour, Cognito's default and the ci
 # client's; a refresh token of 30 days, Cognito's default, with refresh
@@ -36,14 +37,8 @@ resource "aws_cognito_user_pool_client" "browser" {
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
   supported_identity_providers         = ["Google"]
 
-  callback_urls = [
-    "https://${var.hostname}",
-    "http://localhost:4200",
-  ]
-  logout_urls = [
-    "https://${var.hostname}",
-    "http://localhost:4200",
-  ]
+  callback_urls = concat(["https://${var.hostname}"], var.extra_callback_urls)
+  logout_urls   = concat(["https://${var.hostname}"], var.extra_callback_urls)
 
   explicit_auth_flows = ["ALLOW_USER_SRP_AUTH"]
 

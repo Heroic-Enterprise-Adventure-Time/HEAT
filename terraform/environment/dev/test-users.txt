@@ -1,0 +1,9 @@
+# The test users of dev's user pool, one email address per line. The apply
+# job creates each with scripts/create-test-users.sh after terraform apply,
+# idempotently, with the password in the dev environment's secret
+# HEAT_TEST_USER_PASSWORD (decision 0020). Nothing receives mail at these
+# addresses; they are marked verified on creation. Adding a user is adding a
+# line. The smoke test's own user, e2e@heat-dev.dcg-games.com, is not here:
+# the apply job mints it with a random password for each run.
+player1@heat-dev.dcg-games.com
+player2@heat-dev.dcg-games.com

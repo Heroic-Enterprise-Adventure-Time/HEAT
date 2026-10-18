@@ -51,3 +51,8 @@ output "client_bucket" {
 output "distribution_id" {
   value = module.site.distribution_id
 }
+
+output "alarm_topic_arn" {
+  description = "The topic the environment's alarms notify, for reading back; null where the root named no address."
+  value       = local.alarms_enabled ? aws_sns_topic.alarms[0].arn : null
+}
