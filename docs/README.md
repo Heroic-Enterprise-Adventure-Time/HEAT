@@ -10,6 +10,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
 | [process/development.md](process/development.md) | Running and seeing a change: the branch's sandbox stack, the fast loop on the laptop, logs, the cap | When the agent reads it |
+| [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
 | [architecture/overview.md](architecture/overview.md) | The system: services, data, flows, build order | When the agent reads it |
@@ -28,7 +29,6 @@ These are part of the structure and are not written yet. Each is written when th
 
 | Document | Written when |
 | --- | --- |
-| `process/deployment.md` | The release path has run once (the first release after Issue-41): the release pull request, the tag, the hotfix lifecycle. Until then `terraform/environment/prod/README.md`, "Who applies it", the workflows' own comments and the overview's "Environments" describe deployment. |
 | `standards/<language>.md` | The first code in that language lands; `standards/typescript.md` is the first |
 | `runbooks/` | A multi-step procedure has been done more than once |
 
