@@ -301,7 +301,8 @@ jobs:
           set -eu
           node scripts/sandbox.mjs init --issue "$ISSUE"
           node scripts/sandbox.mjs destroy --issue "$ISSUE" -- -auto-approve
-          echo "Destroyed \`$STACK\`." >> "$GITHUB_STEP_SUMMARY"
+          node scripts/sandbox.mjs forget --issue "$ISSUE"
+          echo "Destroyed \`$STACK\` and removed its state." >> "$GITHUB_STEP_SUMMARY"
 
   # --------------------------------------------------------------- sweep --
   sweep:
@@ -380,7 +381,8 @@ jobs:
             echo "== destroying heat-sb$issue"
             node scripts/sandbox.mjs init --issue "$issue"
             node scripts/sandbox.mjs destroy --issue "$issue" -- -auto-approve
-            echo "Destroyed \`heat-sb$issue\`." >> "$GITHUB_STEP_SUMMARY"
+            node scripts/sandbox.mjs forget --issue "$issue"
+            echo "Destroyed \`heat-sb$issue\` and removed its state." >> "$GITHUB_STEP_SUMMARY"
           done
 
       - name: Dry run

@@ -33,7 +33,7 @@ The deletion and the schedule run `main`'s copy of the workflow, as GitHub does 
 
 The account id reaches Terraform as `TF_VAR_workload_account_id` from the repository variable `HEAT_SANDBOX_ACCOUNT_ID`, and is replaced by `<account id>` in every plan the workflow writes.
 
-**The cap.** `SANDBOX_STACK_CAP` in the workflow is 5. Before planning, the job counts the state keys under `environment/sandbox/` other than `base/` and this issue's own, and fails naming the stacks when the count is at the cap. A re-apply of an existing stack is never refused by it.
+**The cap.** `SANDBOX_STACK_CAP` in the workflow is 5. Before planning, the job counts the states under `environment/sandbox/` that hold resources, other than `base/` and this issue's own, and fails naming the stacks when the count is at the cap. A re-apply of an existing stack is never refused by it. A destroy leaves an empty state object behind, which the destroy paths remove with `forget`; the sweep lists every per-issue key without a branch, so an empty object left by an earlier run is forgotten too.
 
 ## Planning on a laptop
 

@@ -1,4 +1,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
+import { readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
@@ -19,6 +22,7 @@ import { fileURLToPath } from "node:url";
  *   plan         terraform plan (add -lock=false after -- for the plan role)
  *   apply        terraform apply; pass a saved plan after --
  *   destroy      terraform destroy
+ *   forget       delete the destroyed stack's empty state object
  *   output       terraform output; pass -raw <name> after --
  *   cap N        fail when N or more other stacks have state, naming them
  *   orphans      print the issue numbers that have state and no branch
@@ -94,7 +98,7 @@ function terraform(tfArgs) {
 }
 
 /** Issue numbers with a state object under the sandbox prefix; base/ is not a stack. */
-function issuesWithState() {
+function issuesWithStateKeys() {
   const out = execFileSync(
     "aws",
     ["s3api", "list-objects-v2", "--bucket", STATE_BUCKET, "--prefix", STATE_PREFIX, "--query", "Contents[].Key", "--output", "json"],
@@ -107,6 +111,37 @@ function issuesWithState() {
     if (m) issues.add(Number(m[1]));
   }
   return [...issues].sort((a, b) => a - b);
+}
+
+/** The number of resources a stack's state holds; through a temp file, since the CLI writes to a path. */
+function resourceCount(issue) {
+  const file = join(tmpdir(), `heat-sandbox-state-${issue}-${process.pid}.json`);
+  try {
+    execFileSync("aws", ["s3api", "get-object", "--bucket", STATE_BUCKET, "--key", stateKey(issue), file], { stdio: "ignore" });
+    return (JSON.parse(readFileSync(file, "utf8")).resources ?? []).length;
+  } finally {
+    rmSync(file, { force: true });
+  }
+}
+
+/**
+ * Issue numbers whose state holds resources: what the cap counts. A destroy
+ * leaves an empty state object behind (resources: []), which `forget`
+ * removes; reading each state means such an object never counts against
+ * the cap even if the removal did not happen.
+ */
+function issuesWithResources() {
+  return issuesWithStateKeys().filter((n) => resourceCount(n) > 0);
+}
+
+/** Removes a destroyed stack's state object; refuses anything but a per-issue key holding no resources. */
+function forget(issue) {
+  const key = stateKey(issue);
+  if (!new RegExp(`^${STATE_PREFIX}\\d+/terraform\\.tfstate$`).test(key)) fail(`refusing to delete ${key}`);
+  const count = resourceCount(issue);
+  if (count > 0) fail(`${key} still holds ${count} resource(s); destroy first`);
+  execFileSync("aws", ["s3api", "delete-object", "--bucket", STATE_BUCKET, "--key", key], { stdio: "ignore" });
+  console.log(`removed the empty state ${key}`);
 }
 
 /** Whether any branch on origin carries this issue number. */
@@ -143,6 +178,9 @@ switch (command) {
   case "output":
     terraform(["output", ...passthrough]);
     break;
+  case "forget":
+    forget(resolveIssue());
+    break;
   case "cap": {
     // The cap of decision 0018: this stack may be created or updated only
     // while fewer than N other stacks have state. base/ is not a stack and
@@ -151,7 +189,7 @@ switch (command) {
     const limit = Number(capLimit);
     if (!Number.isInteger(limit) || limit < 1) fail("cap needs a positive whole number");
     const issue = resolveIssue();
-    const others = issuesWithState().filter((n) => n !== issue);
+    const others = issuesWithResources().filter((n) => n !== issue);
     if (others.length >= limit) {
       fail(
         `sandbox stack cap: ${others.length} other stack(s) have state and the cap is ${limit}: ` +
@@ -163,12 +201,14 @@ switch (command) {
     break;
   }
   case "orphans": {
-    // Stacks whose branch is gone: the weekly sweep destroys these, in case
-    // a branch's delete event was missed (decision 0018).
-    const orphans = issuesWithState().filter((n) => !branchExists(n));
+    // State keys whose branch is gone: the weekly sweep destroys and forgets
+    // each, in case a branch's delete event was missed (decision 0018). Keys,
+    // not resources, so that an empty state left by an earlier destroy is
+    // forgotten too.
+    const orphans = issuesWithStateKeys().filter((n) => !branchExists(n));
     for (const n of orphans) console.log(n);
     break;
   }
   default:
-    fail("usage: node scripts/sandbox.mjs <issue|key|name|init|plan|apply|destroy|output|cap N|orphans> [--issue N | --branch NAME] [-- terraform args]");
+    fail("usage: node scripts/sandbox.mjs <issue|key|name|init|plan|apply|destroy|forget|output|cap N|orphans> [--issue N | --branch NAME] [-- terraform args]");
 }
