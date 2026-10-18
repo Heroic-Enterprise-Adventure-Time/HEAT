@@ -74,6 +74,12 @@ jobs:
             role: heat-sandbox-plan
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
+      # The base's Google OAuth client, from the environment this job runs
+      # under: one name in every environment, the environment supplies the
+      # value (decision 0020). An environment without them yields empty
+      # strings, which the root's variables refuse by name.
+      TF_VAR_google_client_id: ${{ vars.HEAT_GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
     steps:
       - name: Refuse to run without the account id
         env:
@@ -156,6 +162,12 @@ jobs:
             test_users: true
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
+      # The base's Google OAuth client, from the environment this job runs
+      # under: one name in every environment, the environment supplies the
+      # value (decision 0020). An environment without them yields empty
+      # strings, which the root's variables refuse by name.
+      TF_VAR_google_client_id: ${{ vars.HEAT_GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
     steps:
       - name: Refuse to run without the account id
         env:

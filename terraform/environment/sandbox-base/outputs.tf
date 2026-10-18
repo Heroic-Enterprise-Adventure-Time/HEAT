@@ -24,6 +24,11 @@ output "user_pool_endpoint" {
   value = module.base.user_pool_endpoint
 }
 
+output "login_host" {
+  description = "The pool's managed login host, https://auth.heat-sb.dcg-games.com; the per-issue stacks derive it from the zone name literal rather than reading this output."
+  value       = module.login_domain.login_host
+}
+
 output "ci_client_id" {
   value = module.base.ci_client_id
 }
