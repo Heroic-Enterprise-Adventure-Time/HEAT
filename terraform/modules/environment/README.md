@@ -1,6 +1,6 @@
 # The environment module
 
-One HEAT environment: the two tables, one function per entry in `manifest.json` with its code, role, alias and log group, the HTTP API with its JWT authorizer, routes, throttled stage and access log, the site on the environment's hostname (`terraform/modules/site`, composed here), and the stack's parameters. Composed by `terraform/environment/sandbox` for every per-issue stack (Issue-38) and, from Issue-40 and Issue-41, by the `dev` and `prod` roots beside the `base` module. Design: `docs/architecture/overview.md`, "Services and data" and "Environments"; decisions 0012, 0013, 0017, 0018, 0023.
+One HEAT environment: the two tables, one function per entry in `manifest.json` with its code, role, alias and log group, the HTTP API with its JWT authorizer, routes, throttled stage and access log, the site on the environment's hostname (`terraform/modules/site`, composed here), and the stack's parameters. Composed by `terraform/environment/sandbox` for every per-issue stack (Issue-38), by the `dev` root beside the `base` module (Issue-40, applied 2026-10-18) and, from Issue-41, by the `prod` root the same way. Design: `docs/architecture/overview.md`, "Services and data" and "Environments"; decisions 0012, 0013, 0017, 0018, 0023.
 
 ## What it creates
 
