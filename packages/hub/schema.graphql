@@ -16,7 +16,7 @@ type Mutation {
   settleAdventure(adventureId: String!): Player
 
   """
-  Issues the seed and opens the player's one adventure. Fails if one is already open.
+  Issues the seed and opens the player's one adventure. Fails if one is already open. A player who has no profile yet gets one, named from the token.
   """
   startAdventure: Adventure!
 }

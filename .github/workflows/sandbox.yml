@@ -152,6 +152,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
+          cache: npm
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
@@ -209,6 +210,33 @@ jobs:
             echo
             echo "Parameters under \`$prefix\`: api_url, user_pool_id, app_client_id."
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # The stack test (decision 0018: the stack is the system). The engine
+      # is built because the test compares the hub's answer with it.
+      - name: Install and build the engine for the stack test
+        run: |
+          set -eu
+          npm ci
+          npm run build --workspace @heat/engine
+
+      - name: Mint the stack's test user
+        run: sh scripts/e2e-user.sh ensure heat-sb-base-users "e2e-$ISSUE@heat-sb.dcg-games.com"
+
+      - name: Call the stack as that user
+        id: e2e
+        run: |
+          set -eu
+          echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
+          node scripts/e2e.mjs --issue "$ISSUE" --username "e2e-$ISSUE@heat-sb.dcg-games.com" | tee -a "$RUNNER_TEMP/e2e.log"
+          {
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/e2e.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Report the cold start
+        run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
 
   # -------------------------------------------------------------- delete --
   name-deleted:
@@ -302,7 +330,8 @@ jobs:
           node scripts/sandbox.mjs init --issue "$ISSUE"
           node scripts/sandbox.mjs destroy --issue "$ISSUE" -- -auto-approve
           node scripts/sandbox.mjs forget --issue "$ISSUE"
-          echo "Destroyed \`$STACK\` and removed its state." >> "$GITHUB_STEP_SUMMARY"
+          sh scripts/e2e-user.sh delete heat-sb-base-users "e2e-$ISSUE@heat-sb.dcg-games.com"
+          echo "Destroyed \`$STACK\`, removed its state and its test user." >> "$GITHUB_STEP_SUMMARY"
 
   # --------------------------------------------------------------- sweep --
   sweep:
@@ -382,7 +411,8 @@ jobs:
             node scripts/sandbox.mjs init --issue "$issue"
             node scripts/sandbox.mjs destroy --issue "$issue" -- -auto-approve
             node scripts/sandbox.mjs forget --issue "$issue"
-            echo "Destroyed \`heat-sb$issue\` and removed its state." >> "$GITHUB_STEP_SUMMARY"
+            sh scripts/e2e-user.sh delete heat-sb-base-users "e2e-$issue@heat-sb.dcg-games.com"
+            echo "Destroyed \`heat-sb$issue\`, removed its state and its test user." >> "$GITHUB_STEP_SUMMARY"
           done
 
       - name: Dry run

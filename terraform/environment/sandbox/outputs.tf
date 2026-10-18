@@ -26,3 +26,7 @@ output "ci_client_id" {
   description = "The app client to sign in with, read from the base."
   value       = local.ci_client_id
 }
+
+output "user_pool_id" {
+  value = one(data.aws_cognito_user_pools.base.ids)
+}

@@ -25,9 +25,9 @@ What it reads from the base, by name: the pool `heat-sb-base-users` and its `ci`
 
 The pipeline, and nothing else, in `.github/workflows/sandbox.yml`:
 
-- **On a push to a working branch** (`feat/**`, `fix/**`, `docs/**`, `infra/**`, `chore/**`, `hotfix/**`): the checks (typecheck, tests, schema currency), the bundle as an artifact; then, under the GitHub environment `sandbox-<issue>`, the apply role: the cap, `init` with the key, `plan`, the allow-list check, the plan in the job summary, `apply` of exactly that plan, and the stack's API URL in the summary and on the deployment.
-- **On the deletion of such a branch**: `main`'s copy of this root, the bundle (the root evaluates its hash even to destroy), and `destroy` from the key, under `sandbox-<issue>`.
-- **Weekly, and by hand with a dry run**: every stack whose branch is gone is destroyed, under `sandbox-sweep`.
+- **On a push to a working branch** (`feat/**`, `fix/**`, `docs/**`, `infra/**`, `chore/**`, `hotfix/**`): the checks (typecheck, tests, schema currency), the bundle as an artifact; then, under the GitHub environment `sandbox-<issue>`, the apply role: the cap, `init` with the key, `plan`, the allow-list check, the plan in the job summary, `apply` of exactly that plan, the stack's API URL in the summary and on the deployment; then the stack test: the stack's user `e2e-<issue>@heat-sb.dcg-games.com` minted in the base pool with a random password for that run (`scripts/e2e-user.sh`), `scripts/e2e.mjs` signing in through the `ci` client and running start, a refused second start, settle with the engine's rewards and a refused second settle, and the cold start read from the function's log into the summary (`scripts/report-cold-start.sh`).
+- **On the deletion of such a branch**: `main`'s copy of this root, the bundle (the root evaluates its hash even to destroy), `destroy` from the key, `forget` of the empty state, and the deletion of the stack's test user, under `sandbox-<issue>`.
+- **Weekly, and by hand with a dry run**: every stack whose branch is gone is destroyed, its state forgotten and its test user deleted, under `sandbox-sweep`.
 
 The deletion and the schedule run `main`'s copy of the workflow, as GitHub does for those events, so they took effect when Issue-38 merged; before that, the throwaway branch's stack `heat-sb53` was left behind by its deletion and destroyed by the sweep dispatched from the branch (2026-10-17).
 
@@ -51,7 +51,7 @@ node scripts/sandbox.mjs plan -- -lock=false
 
 ## Verification
 
-After a stack's first apply, the agent reads the account through `audit-heat-sandbox` and the stack's logs through `plan-heat-sandbox`: the two tables, the function with its alias and role, the API with its authorizer, routes and stage, the three parameters, and nothing else created. Then a token from the `ci` client (the owner holds the test password) calls `startAdventure` and `settleAdventure` through the API, and the function's log shows one JSON line per request. Then the cold start: the `Init Duration` of the first invocation after the deploy, recorded in `docs/architecture/overview.md`.
+Every push verifies its own stack: the run summary shows the plan, the stack test's output and the cold start. After a change to this root or the module, the agent also reads the account through `audit-heat-sandbox` and `plan-heat-sandbox` for what the test cannot see: the tables' settings, the role's statements, the stage's throttle, retention, and that nothing else was created.
 
 ## Lock file
 

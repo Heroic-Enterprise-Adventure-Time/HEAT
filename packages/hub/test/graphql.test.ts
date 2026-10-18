@@ -84,6 +84,17 @@ describe("authorization at the field level", () => {
   });
 });
 
+describe("first contact", () => {
+  it("creates the profile of a player who has none when they start an adventure", async () => {
+    const p = `p-${randomUUID()}`;
+    expect(await repo.getPlayer(p)).toBeUndefined();
+    const start = await gql(`mutation { startAdventure { id } }`, {}, p);
+    expect(start.errors).toBeUndefined();
+    // No email claim in the synthesized token, so the name falls back to the subject.
+    expect(await repo.getPlayer(p)).toEqual({ id: p, name: p });
+  });
+});
+
 describe("the adventure loop through the graph", () => {
   it("starts once, refuses a second start, settles with the engine's rewards, and refuses a second settle", async () => {
     const p = `p-${randomUUID()}`;
