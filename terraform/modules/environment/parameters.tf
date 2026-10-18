@@ -23,11 +23,22 @@ resource "aws_ssm_parameter" "user_pool_id" {
   value       = var.user_pool_id
 }
 
+# Only where the base has a ci client; prod has none and no parameter, so
+# that nothing reading the prefix is told of a password flow that does not
+# exist (Issue-41). The moved block keeps the sandbox's and dev's parameter
+# in place from when the resource gained its count.
 resource "aws_ssm_parameter" "app_client_id" {
+  count = var.app_client_id == null ? 0 : 1
+
   name        = "${local.parameter_prefix}/app_client_id"
   description = "The base's ci app client: the password flow, for the stack test and the agent."
   type        = "String"
   value       = var.app_client_id
+}
+
+moved {
+  from = aws_ssm_parameter.app_client_id
+  to   = aws_ssm_parameter.app_client_id[0]
 }
 
 resource "aws_ssm_parameter" "browser_client_id" {

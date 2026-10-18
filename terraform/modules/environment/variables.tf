@@ -48,8 +48,9 @@ variable "user_pool_id" {
 }
 
 variable "app_client_id" {
-  description = "The base's ci app client, the password-flow client the end-to-end tests sign in with: the first of the two audiences the JWT authorizer accepts, beside the stack's own browser client (sign_in.tf)."
+  description = "The base's ci app client, the password-flow client the end-to-end tests sign in with: an audience the JWT authorizer accepts beside the stack's own browser client (sign_in.tf), and the parameter app_client_id. null where the base has no ci client (prod, Issue-41): the browser client is then the only audience and the parameter is not written."
   type        = string
+  nullable    = true
 }
 
 variable "login_host" {

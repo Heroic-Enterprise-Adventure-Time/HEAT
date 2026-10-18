@@ -23,6 +23,9 @@ module "base" {
   name_prefix = "${local.name_prefix}-base"
   zone_name   = local.zone_name
 
+  # The password-flow client the smoke test and the test users sign in with.
+  ci_client = true
+
   # The pool's Google OAuth client, registered by the owner against
   # auth.heat-dev.dcg-games.com: this root's only secrets, from the dev
   # GitHub environment (decision 0020).
