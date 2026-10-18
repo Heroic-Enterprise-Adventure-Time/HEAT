@@ -379,4 +379,5 @@ jobs:
 
       - name: Dry run
         if: steps.orphans.outputs.orphans != '' && env.DRY_RUN == 'true'
-        run: echo "Dry run: nothing destroyed." | tee -a "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo "Dry run: nothing destroyed." | tee -a "$GITHUB_STEP_SUMMARY"
