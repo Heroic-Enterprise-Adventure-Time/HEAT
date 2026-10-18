@@ -28,6 +28,12 @@
 # small job names the stack first. base/ under the sandbox prefix is the
 # permanent base, never a stack: the script never counts, lists or destroys
 # it. Nothing here runs for main, release, tags or Dependabot's branches.
+#
+# GitHub runs the delete and schedule events, and a workflow_dispatch from
+# the Actions tab, from the copy of this file on the default branch; a push
+# runs the branch's copy. A change to the delete or sweep jobs therefore
+# takes effect once it is on main, and a branch whose workflow is not yet
+# on main leaves an orphan when deleted, which the sweep collects.
 name: Sandbox stacks
 
 on:
