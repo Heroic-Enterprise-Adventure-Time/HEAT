@@ -4,4 +4,4 @@ The TypeScript packages: the engine, the hub, the Angular client, and later the 
 
 Read and follow the standards for this area: @../docs/standards/typescript.md
 
-Function and route definitions for every Lambda live in `../local/manifest.json`, not in any package.
+Function and route definitions for every Lambda live in `../manifest.json` at the repository root, not in any package.

@@ -6,7 +6,8 @@ import {
   TransactWriteCommand,
   type DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
-import { keys } from "./table.js";
+import type { Tables } from "./client.js";
+import { locationKeys, playerKeys } from "./keys.js";
 
 /**
  * The three transactions the architecture names, as DynamoDB transactions:
@@ -14,6 +15,11 @@ import { keys } from "./table.js";
  * balance), settle (rewards once, keyed on the adventure id). Each is one
  * TransactWriteItems call with condition checks; a failed condition cancels
  * the whole write and the cancellation reasons say which item failed.
+ *
+ * Start and settle write to both tables in one transaction: the player's
+ * open item and ledger in the player table, the adventure record in the
+ * location table. TransactWriteItems spans tables in one account and
+ * region, so the split of decision 0023 costs the transactions nothing.
  */
 
 export class AdventureAlreadyOpen extends Error {}
@@ -45,28 +51,30 @@ export interface AdventureRecord {
   status: "OPEN" | "SETTLED";
 }
 
+type TransactItems = NonNullable<ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]>;
+
 export class Repository {
   constructor(
     private readonly db: DynamoDBDocumentClient,
-    private readonly table: string,
+    private readonly tables: Tables,
   ) {}
 
   async putPlayer(player: Player): Promise<void> {
     await this.db.send(
-      new PutCommand({ TableName: this.table, Item: { ...keys.player(player.id), ...player } }),
+      new PutCommand({ TableName: this.tables.player, Item: { ...playerKeys.profile(player.id), ...player } }),
     );
   }
 
   async getPlayer(id: string): Promise<Player | undefined> {
-    const r = await this.db.send(new GetCommand({ TableName: this.table, Key: keys.player(id) }));
+    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.profile(id) }));
     return r.Item ? { id: r.Item["id"], name: r.Item["name"] } : undefined;
   }
 
   async setBalance(playerId: string, material: string, balance: number): Promise<void> {
     await this.db.send(
       new PutCommand({
-        TableName: this.table,
-        Item: { ...keys.holding(playerId, material), material, balance },
+        TableName: this.tables.player,
+        Item: { ...playerKeys.holding(playerId, material), material, balance },
       }),
     );
   }
@@ -74,7 +82,7 @@ export class Repository {
   async holdings(playerId: string): Promise<Holding[]> {
     const r = await this.db.send(
       new QueryCommand({
-        TableName: this.table,
+        TableName: this.tables.player,
         KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
         ExpressionAttributeValues: { ":pk": `PLAYER#${playerId}`, ":sk": "HOLDING#" },
       }),
@@ -83,7 +91,7 @@ export class Repository {
   }
 
   async openAdventure(playerId: string): Promise<OpenAdventure | undefined> {
-    const r = await this.db.send(new GetCommand({ TableName: this.table, Key: keys.open(playerId) }));
+    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.open(playerId) }));
     return r.Item
       ? { adventureId: r.Item["adventureId"], seed: r.Item["seed"], startedAt: r.Item["startedAt"] }
       : undefined;
@@ -91,7 +99,7 @@ export class Repository {
 
   async getAdventure(adventureId: string): Promise<AdventureRecord | undefined> {
     const r = await this.db.send(
-      new GetCommand({ TableName: this.table, Key: keys.adventure(adventureId) }),
+      new GetCommand({ TableName: this.tables.location, Key: locationKeys.adventure(adventureId) }),
     );
     return r.Item
       ? {
@@ -104,24 +112,24 @@ export class Repository {
   }
 
   /**
-   * Start: write the open-adventure row only if the player has none, and the
-   * adventure record only if the id is new. Throws AdventureAlreadyOpen when
-   * the first condition fails.
+   * Start: write the open-adventure item only if the player has none, and
+   * the adventure record only if the id is new. Throws AdventureAlreadyOpen
+   * when the first condition fails.
    */
   async startAdventure(playerId: string, adventureId: string, seed: string, now = new Date()): Promise<OpenAdventure> {
     const open: OpenAdventure = { adventureId, seed, startedAt: now.toISOString() };
     await this.transact([
       {
         Put: {
-          TableName: this.table,
-          Item: { ...keys.open(playerId), ...open },
+          TableName: this.tables.player,
+          Item: { ...playerKeys.open(playerId), ...open },
           ConditionExpression: "attribute_not_exists(PK)",
         },
       },
       {
         Put: {
-          TableName: this.table,
-          Item: { ...keys.adventure(adventureId), adventureId, playerId, seed, status: "OPEN" },
+          TableName: this.tables.location,
+          Item: { ...locationKeys.adventure(adventureId), adventureId, playerId, seed, status: "OPEN" },
           ConditionExpression: "attribute_not_exists(PK)",
         },
       },
@@ -139,8 +147,8 @@ export class Repository {
     await this.transact([
       {
         Update: {
-          TableName: this.table,
-          Key: keys.holding(playerId, material),
+          TableName: this.tables.player,
+          Key: playerKeys.holding(playerId, material),
           UpdateExpression: "SET balance = balance - :amount",
           ConditionExpression: "balance >= :amount",
           ExpressionAttributeValues: { ":amount": amount },
@@ -148,8 +156,8 @@ export class Repository {
       },
       {
         Put: {
-          TableName: this.table,
-          Item: { ...keys.ledger(playerId, adventureId, `debit#${material}`), material, delta: -amount },
+          TableName: this.tables.player,
+          Item: { ...playerKeys.ledger(playerId, adventureId, `debit#${material}`), material, delta: -amount },
           ConditionExpression: "attribute_not_exists(PK)",
         },
       },
@@ -159,23 +167,23 @@ export class Repository {
   /**
    * Settle: close the open adventure only if it is this one, mark the record
    * settled, and credit each reward with a ledger entry that can exist once.
-   * A redelivery finds the open row gone and throws AlreadySettled; nothing
+   * A redelivery finds the open item gone and throws AlreadySettled; nothing
    * is paid twice.
    */
   async settle(playerId: string, adventureId: string, rewards: readonly { material: string; amount: number }[]): Promise<void> {
-    const items: NonNullable<ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]> = [
+    const items: TransactItems = [
       {
         Delete: {
-          TableName: this.table,
-          Key: keys.open(playerId),
+          TableName: this.tables.player,
+          Key: playerKeys.open(playerId),
           ConditionExpression: "adventureId = :id",
           ExpressionAttributeValues: { ":id": adventureId },
         },
       },
       {
         Update: {
-          TableName: this.table,
-          Key: keys.adventure(adventureId),
+          TableName: this.tables.location,
+          Key: locationKeys.adventure(adventureId),
           UpdateExpression: "SET #s = :settled",
           ConditionExpression: "attribute_exists(PK) AND #s = :open",
           ExpressionAttributeNames: { "#s": "status" },
@@ -186,16 +194,16 @@ export class Repository {
     for (const r of rewards) {
       items.push({
         Update: {
-          TableName: this.table,
-          Key: keys.holding(playerId, r.material),
+          TableName: this.tables.player,
+          Key: playerKeys.holding(playerId, r.material),
           UpdateExpression: "SET material = :m ADD balance :amount",
           ExpressionAttributeValues: { ":m": r.material, ":amount": r.amount },
         },
       });
       items.push({
         Put: {
-          TableName: this.table,
-          Item: { ...keys.ledger(playerId, adventureId, `credit#${r.material}`), material: r.material, delta: r.amount },
+          TableName: this.tables.player,
+          Item: { ...playerKeys.ledger(playerId, adventureId, `credit#${r.material}`), material: r.material, delta: r.amount },
           ConditionExpression: "attribute_not_exists(PK)",
         },
       });
@@ -216,7 +224,7 @@ export class Repository {
    * AlreadySettled, which the consumer treats as done).
    */
   private async transact(
-    items: NonNullable<ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]>,
+    items: TransactItems,
     failures: readonly (new (message: string) => Error)[],
   ): Promise<void> {
     try {

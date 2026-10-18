@@ -65,9 +65,14 @@ builder.mutationFields((t) => ({
   startAdventure: t.field({
     type: AdventureRef,
     authScopes: { authenticated: true },
-    description: "Issues the seed and opens the player's one adventure. Fails if one is already open.",
+    description: "Issues the seed and opens the player's one adventure. Fails if one is already open. A player who has no profile yet gets one, named from the token.",
     resolve: async (_root, _args, ctx) => {
       const playerId = ctx.playerId!;
+      // The signed-in player exists by virtue of signing in: the profile is
+      // written on first contact, until sign-in itself does it (Issue-46).
+      if (!(await ctx.repo.getPlayer(playerId))) {
+        await ctx.repo.putPlayer({ id: playerId, name: ctx.playerName ?? playerId });
+      }
       return ctx.repo.startAdventure(playerId, randomUUID(), randomUUID());
     },
   }),

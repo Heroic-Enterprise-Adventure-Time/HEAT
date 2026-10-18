@@ -1,0 +1,7 @@
+# For a plan on a laptop: either copy to terraform.tfvars in this directory
+# (ignored by git) with the real value, or set TF_VAR_workload_account_id
+# with the private script in docs/private/. The pipeline sets it from the
+# repository variable HEAT_SANDBOX_ACCOUNT_ID. The id is never committed.
+# The issue number is not here: scripts/sandbox.mjs passes it from the
+# branch name.
+workload_account_id = "000000000000"

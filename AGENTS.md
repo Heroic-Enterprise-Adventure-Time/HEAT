@@ -32,7 +32,7 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | The system: services, data and flows | `docs/architecture/overview.md` |
 | Why a choice was made, and what was rejected | `docs/decisions/` |
 | The Terraform state bucket, who applies, and the one-time bootstrap | `terraform/backend/README.md` |
-| Running and testing the code locally | `local/README.md` |
+| Running and seeing a change: the sandbox stacks and the fast loop | `docs/process/development.md` |
 | The index of every project document, and how documents are written | `docs/README.md` |
 
 Read the design and architecture documents before any work that touches them. Read `docs/README.md` before adding or changing a document.

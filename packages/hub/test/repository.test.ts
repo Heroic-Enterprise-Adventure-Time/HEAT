@@ -13,7 +13,7 @@ let repo: Repository;
 
 beforeAll(() => {
   const config = configFromEnv();
-  repo = new Repository(createDocumentClient(config), config.tableName);
+  repo = new Repository(createDocumentClient(config), config.tables);
 });
 
 const player = () => `p-${randomUUID()}`;

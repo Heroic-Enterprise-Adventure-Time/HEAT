@@ -1,0 +1,15 @@
+{
+  "$comment": "The one list of functions and routes (docs/standards/typescript.md, rule 4). Read by scripts/bundle.mjs for packaging and by terraform/modules/environment for the real functions and routes; nothing declares a function or route anywhere else. `entry` is the handler module relative to the repository root; `export` is the exported handler name; `memoryMb` and `timeoutSeconds` are the function's own and the same in every environment; `http` lists the routes, each behind the environment's JWT authorizer.",
+  "functions": {
+    "hub": {
+      "entry": "packages/hub/src/handler.ts",
+      "export": "handler",
+      "memoryMb": 1024,
+      "timeoutSeconds": 10,
+      "http": [
+        { "method": "POST", "path": "/graphql" },
+        { "method": "GET", "path": "/graphql" }
+      ]
+    }
+  }
+}
