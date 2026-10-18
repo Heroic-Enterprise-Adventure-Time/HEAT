@@ -38,6 +38,11 @@ output "ci_client_id" {
   value       = aws_cognito_user_pool_client.ci.id
 }
 
+output "login_host" {
+  description = "https://<prefix>.auth.<region>.amazoncognito.com: the managed login pages and the OAuth endpoints every browser client of this pool uses. What config.json carries to the client and what the owner's Google OAuth client names."
+  value       = "https://${aws_cognito_user_pool_domain.this.domain}.auth.${data.aws_region.current.region}.amazoncognito.com"
+}
+
 output "certificate_arn" {
   description = "The account's certificate for the zone name and its wildcard, in us-east-1, taken from the validation waiter so that it is issued by the time anything reads it: what every distribution under the zone serves."
   value       = aws_acm_certificate_validation.this.certificate_arn

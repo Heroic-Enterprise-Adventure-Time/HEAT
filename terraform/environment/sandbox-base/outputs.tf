@@ -24,6 +24,11 @@ output "user_pool_endpoint" {
   value = module.base.user_pool_endpoint
 }
 
+output "login_host" {
+  description = "The pool's managed login host, https://heat-sb.auth.us-east-1.amazoncognito.com; the per-issue stacks derive it from the same prefix literal rather than reading this output."
+  value       = module.base.login_host
+}
+
 output "ci_client_id" {
   value = module.base.ci_client_id
 }

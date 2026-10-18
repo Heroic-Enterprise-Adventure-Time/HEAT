@@ -1,11 +1,12 @@
 # The account's one user pool, shared by every stack in the account: each
 # stack adds its own browser app client to it (decision 0018), and Google is
-# registered in it once (Issue-46). The shape is decision 0022.
+# registered in it once, with the pool's managed login domain (sign_in.tf,
+# Issue-46). The shape is decision 0022.
 #
-# What is deliberately not here: a domain and managed login, which arrive
-# with the first browser client in Issue-46; an identity provider, the same;
-# any user, because test users are data the apply job creates with the CLI
-# (decision 0020), and players create themselves through sign-in.
+# What is deliberately not here: any user, because test users are data the
+# apply job creates with the CLI (decision 0020), and players create
+# themselves through Google sign-in; and any browser app client, which is
+# each stack's own.
 resource "aws_cognito_user_pool" "this" {
   name = "${var.name_prefix}-users"
 
@@ -83,7 +84,7 @@ resource "aws_cognito_user_pool" "this" {
 # which outlasts any test run and nothing else; a revoked refresh token is
 # refused at once; and a wrong password and an unknown user produce the same
 # error, so the client cannot be used to enumerate users. Browser clients,
-# with the code grant and PKCE, are each stack's own (Issue-38, Issue-46).
+# with the code grant and PKCE, are each stack's own (Issue-46).
 resource "aws_cognito_user_pool_client" "ci" {
   name         = "ci"
   user_pool_id = aws_cognito_user_pool.this.id

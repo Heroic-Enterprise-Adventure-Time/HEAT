@@ -1,6 +1,6 @@
 # 0022: The shared user pool: Essentials tier, email as the username, administrator-created users, no MFA, administrator-only recovery, a password-flow CI client
 
-- **Status:** Decided
+- **Status:** Decided. Amended on 2026-10-17 by Issue-46: the pool's domain is the prefix domain `<prefix>.auth.us-east-1.amazoncognito.com` with managed login version 2, `heat-sb` in the sandbox account, and Google is the pool's one identity provider, with the scopes `openid email profile` and `email`, `email_verified` and the subject as `username` mapped; both in the `base` module, from two sensitive variables of the root (decision 0020).
 - **Date:** 2026-10-17
 - **Settles:** the pool's shape, which Issue-13 (closed as superseded) carried as "a Cognito user pool and browser app client" and which 0018 placed in the sandbox base without settling. 0018's "one pool per account, an app client per stack" and 0020's "test users are data" are taken as given.
 
@@ -17,7 +17,8 @@ One user pool per account, created by the `base` module (`terraform/modules/base
 | Password policy | Cognito's default | Nothing here needs more; the test password meets it |
 | Account recovery | Administrator only | Test addresses receive no mail; players recover through Google |
 | Deletion protection | On, and `prevent_destroy` | The pool holds players' records and its id is in every stack's configuration |
-| Domain and managed login | None yet | They arrive with the first browser client (Issue-46) |
+| Domain and managed login | The prefix domain, managed login version 2 (Issue-46) | Cognito's own hostname, free, no certificate or record; the prefix domain "has little visible effect" when every sign-in is a third-party redirect (the Cognito guide). A custom domain would need a certificate and a record per pool |
+| Identity provider | Google, once per pool (Issue-46) | One OAuth client per pool, registered by the owner against the pool's domain (decision 0018 as amended); the client secret is the base root's one secret (decision 0020) |
 
 One app client in the base, `ci`: public, `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` only, access and ID tokens of one hour, a refresh token of one day, user-existence errors suppressed, token revocation on. It is what the end-to-end tests sign in with, and the agent when it needs a token. Browser clients, with the authorization code grant and PKCE, are each stack's own (Issue-38, Issue-46).
 
