@@ -10,3 +10,21 @@
 aws_route53_zone
 aws_cognito_user_pool
 aws_cognito_user_pool_client
+
+# An environment (terraform/modules/environment): the two tables, one
+# function per manifest entry with its role, alias and log group, the HTTP
+# API with its authorizer, routes, stage and access log, and the stack's
+# parameters (Issue-38).
+aws_dynamodb_table
+aws_iam_role
+aws_iam_role_policy
+aws_cloudwatch_log_group
+aws_lambda_function
+aws_lambda_alias
+aws_lambda_permission
+aws_apigatewayv2_api
+aws_apigatewayv2_authorizer
+aws_apigatewayv2_integration
+aws_apigatewayv2_route
+aws_apigatewayv2_stage
+aws_ssm_parameter

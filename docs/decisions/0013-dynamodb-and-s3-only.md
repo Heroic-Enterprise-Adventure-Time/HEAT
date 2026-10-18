@@ -1,6 +1,6 @@
 # 0013: DynamoDB and S3 only: no relational store, no VPC
 
-- **Status:** Decided
+- **Status:** Decided; the two tables' partition keys, names and reason are decision 0023 (2026-10-17).
 - **Date:** 2026-10-14, recorded 2026-10-15
 - **Supersedes:** 0005, 0006
 

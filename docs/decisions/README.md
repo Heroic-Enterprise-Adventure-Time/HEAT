@@ -40,3 +40,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0020](0020-secrets-and-plans.md) | Secrets live in GitHub environments, enter AWS through a base root, and pull request plans run under the target environment | Decided |
 | [0021](0021-release-branch.md) | Production through a release branch; the tag is documentation; hotfixes from the start | Decided |
 | [0022](0022-shared-user-pool.md) | The shared user pool: Essentials tier, email as the username, administrator-created users, no MFA, administrator-only recovery, a password-flow CI client | Decided |
+| [0023](0023-two-tables-by-partition-key.md) | Two tables named for their partition key, player and location, prefixed in every environment | Decided |

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
 import { beforeAll, describe, expect, it } from "vitest";
+import { rewardsForSeed } from "@heat/engine";
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 
@@ -23,7 +24,7 @@ beforeAll(async () => {
   // has set the environment, so it is imported here rather than at the top.
   handler = (await import("../src/handler.js")).handler as unknown as Handler;
   const config = configFromEnv();
-  repo = new Repository(createDocumentClient(config), config.tableName);
+  repo = new Repository(createDocumentClient(config), config.tables);
 });
 
 function event(query: string, variables: Record<string, unknown> = {}, playerId?: string): APIGatewayProxyEventV2WithJWTAuthorizer {
@@ -90,7 +91,7 @@ describe("the adventure loop through the graph", () => {
 
     const start = await gql<{ startAdventure: { id: string; seed: string } }>(`mutation { startAdventure { id seed } }`, {}, p);
     expect(start.errors).toBeUndefined();
-    const adventureId = start.data!.startAdventure.id;
+    const { id: adventureId, seed } = start.data!.startAdventure;
 
     const again = await gql(`mutation { startAdventure { id } }`, {}, p);
     expect(again.errors?.[0]?.message).toMatch(/condition failed/);
@@ -101,9 +102,13 @@ describe("the adventure loop through the graph", () => {
       p,
     );
     expect(settle.errors).toBeUndefined();
+    // A fresh player holds exactly what the engine pays for the seed the
+    // mutation returned: the same answer the client would compute.
     const holdings = settle.data!.settleAdventure.holdings;
-    expect(holdings.length).toBeGreaterThan(0);
-    for (const h of holdings) expect(h.balance).toBeGreaterThan(0);
+    const byMaterial = (a: { material: string }, b: { material: string }) => a.material.localeCompare(b.material);
+    expect([...holdings].sort(byMaterial)).toEqual(
+      rewardsForSeed(seed).map((r) => ({ material: r.material, balance: r.amount })).sort(byMaterial),
+    );
 
     const redelivered = await gql(
       `mutation($id: String!) { settleAdventure(adventureId: $id) { id } }`,

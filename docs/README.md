@@ -9,6 +9,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
+| [process/development.md](process/development.md) | Running and seeing a change: the branch's sandbox stack, the fast loop on the laptop, logs, the cap | When the agent reads it |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
 | [architecture/overview.md](architecture/overview.md) | The system: services, data, flows, build order | When the agent reads it |
@@ -16,8 +17,8 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [../terraform/backend/README.md](../terraform/backend/README.md) | The state bucket, who applies it, and the one-time bootstrap | When the agent reads it |
 | [../terraform/bootstrap/README.md](../terraform/bootstrap/README.md) | The pipeline's plan and apply roles, their boundary and the budget action in each workload account, who applies, what waits on what | When the agent reads it |
 | [../terraform/environment/sandbox-base/README.md](../terraform/environment/sandbox-base/README.md) | The sandbox base: the zone, the shared user pool and its CI client, the test users, and how the pipeline plans and applies a permanent root | When the agent reads it |
+| [../terraform/environment/sandbox/README.md](../terraform/environment/sandbox/README.md) | The per-issue sandbox stacks: the one root, the environment module, the workflow, the cap and the sweep | When the agent reads it |
 | [standards/typescript.md](standards/typescript.md) | Versions, dependencies, modules, testing, the hub's libraries, bundling, the client | When the agent works under `packages/`, through that directory's `AGENTS.md` |
-| [../local/README.md](../local/README.md) | Running the system locally | When the agent reads it |
 
 ## Planned
 

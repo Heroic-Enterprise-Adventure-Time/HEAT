@@ -26,7 +26,7 @@ What it does not manage: the test users. They are data (decision 0020). The appl
 
 ## Outputs
 
-`zone_id`, `zone_name_servers`, `user_pool_id`, `user_pool_arn`, `user_pool_endpoint`, `ci_client_id`. None is secret and none carries the account id. The apply job reads `user_pool_id` for the test-user step; the per-issue stacks will read the pool and the zone through their own data sources or outputs when Issue-38 writes them.
+`zone_id`, `zone_name_servers`, `user_pool_id`, `user_pool_arn`, `user_pool_endpoint`, `ci_client_id`. None is secret and none carries the account id. The apply job reads `user_pool_id` for the test-user step; the per-issue stacks read the pool and its `ci` client by name through data sources (`terraform/environment/sandbox/main.tf`), never through this root's state; the zone follows in Issue-39.
 
 ## Who applies it
 

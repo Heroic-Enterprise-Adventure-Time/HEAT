@@ -1,0 +1,382 @@
+# Sandbox stacks
+#
+# Every working branch has a stack in heat-sandbox, heat-sb<issue>, named
+# from the issue number in the branch name (decision 0018): created on the
+# first push, re-applied on every push, destroyed when the branch is
+# deleted, and swept weekly in case a deletion was missed. Each stack's jobs
+# run under the GitHub environment sandbox-<issue>, which GitHub creates on
+# first reference and the sandbox apply role trusts by the pattern
+# sandbox-* (decision 0019). The stacks take no secret (decision 0020).
+#
+# Three triggers:
+#   push      checks, bundle, cap, plan with the allow-list, apply; the API
+#             URL in the job summary and on the deployment. The checks run
+#             here so that a stack always holds a commit that typechecks and
+#             passes the tests (0017); until Issue-53 they also run in Build
+#             and test while a pull request is open.
+#   delete    destroy the branch's stack from its state key, with main's
+#             copy of the root. The root evaluates the bundle's hash even to
+#             destroy, so the job bundles first.
+#   schedule, workflow_dispatch   the sweep: every stack whose branch is
+#             gone is destroyed; a dispatch with dry_run lists and destroys
+#             nothing.
+#
+# Which stack a job acts on is decided by scripts/sandbox.mjs from the ref,
+# the same script a person or the agent runs on a laptop, so the key and
+# the name cannot be typed inconsistently. A job's environment can only be
+# named from `needs` and `github`, never from its own steps, which is why a
+# small job names the stack first. base/ under the sandbox prefix is the
+# permanent base, never a stack: the script never counts, lists or destroys
+# it. Nothing here runs for main, release, tags or Dependabot's branches.
+name: Sandbox stacks
+
+on:
+  push:
+    branches:
+      - "feat/**"
+      - "fix/**"
+      - "docs/**"
+      - "infra/**"
+      - "chore/**"
+      - "hotfix/**"
+  delete:
+  schedule:
+    # Sundays 06:00 UTC.
+    - cron: "0 6 * * 0"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List the orphaned stacks and destroy nothing"
+        type: boolean
+        default: true
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_REGION: us-east-1
+  # The cap on concurrent sandbox stacks (decision 0018, as amended): a push
+  # is refused while this many other stacks have state.
+  SANDBOX_STACK_CAP: "5"
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------- push --
+  checks:
+    name: Checks and bundle
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    outputs:
+      issue: ${{ steps.stack.outputs.issue }}
+      name: ${{ steps.stack.outputs.name }}
+    steps:
+      - name: Check out the branch
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Name the stack from the branch
+        id: stack
+        run: |
+          set -eu
+          echo "issue=$(node scripts/sandbox.mjs issue --branch "$GITHUB_REF_NAME")" >> "$GITHUB_OUTPUT"
+          echo "name=$(node scripts/sandbox.mjs name --branch "$GITHUB_REF_NAME")" >> "$GITHUB_OUTPUT"
+
+      - name: Install exactly what package-lock.json records
+        run: npm ci
+
+      - name: Typecheck every package
+        run: npm run typecheck
+
+      - name: Run every package's tests (integration tests start containers)
+        run: npm test
+
+      - name: Check that the committed GraphQL schema matches the code
+        run: |
+          npm run schema:print
+          git diff --exit-code -- packages/hub/schema.graphql
+
+      - name: Bundle every function for Lambda
+        run: npm run bundle
+
+      - name: Upload the bundles for the apply job
+        uses: actions/upload-artifact@v6
+        with:
+          name: bundles
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
+  apply:
+    name: Apply the branch's stack
+    if: github.event_name == 'push'
+    needs: checks
+    runs-on: ubuntu-latest
+    environment:
+      name: sandbox-${{ needs.checks.outputs.issue }}
+      url: ${{ steps.summary.outputs.api_url }}
+    # One apply at a time per stack, never cancelled (decision 0017).
+    concurrency:
+      group: sandbox-${{ github.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      ISSUE: ${{ needs.checks.outputs.issue }}
+      STACK: ${{ needs.checks.outputs.name }}
+    steps:
+      - name: Refuse to run without the account id
+        run: |
+          set -eu
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
+          echo "::add-mask::$ACCOUNT_ID"
+
+      - name: Check out the branch
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Download the bundles
+        uses: actions/download-artifact@v7
+        with:
+          name: bundles
+          path: dist/
+
+      - name: Assume the apply role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
+          role-session-name: sandbox-apply-${{ env.ISSUE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Refuse to exceed the cap on concurrent stacks
+        run: node scripts/sandbox.mjs cap "$SANDBOX_STACK_CAP" --issue "$ISSUE"
+
+      - name: Plan
+        run: |
+          set -eu
+          node scripts/sandbox.mjs init --issue "$ISSUE"
+          node scripts/sandbox.mjs plan --issue "$ISSUE" -- -out "$RUNNER_TEMP/plan.tfplan"
+
+      - name: Check the plan against the resource-type allow-list
+        run: |
+          set -eu
+          terraform -chdir=terraform/environment/sandbox show -json "$RUNNER_TEMP/plan.tfplan" > "$RUNNER_TEMP/plan.json"
+          node scripts/check-plan-resource-types.mjs "$RUNNER_TEMP/plan.json"
+
+      - name: Write the plan to the job summary
+        env:
+          ENVIRONMENT: sandbox-${{ env.ISSUE }}
+        run: sh scripts/post-terraform-plan.sh sandbox "$RUNNER_TEMP/plan.tfplan" "$GITHUB_SHA" "apply role"
+
+      # Exactly the plan that was checked, not a fresh one.
+      - name: Apply
+        run: node scripts/sandbox.mjs apply --issue "$ISSUE" -- "$RUNNER_TEMP/plan.tfplan"
+
+      - name: Write the stack's URL to the job summary
+        id: summary
+        run: |
+          set -eu
+          api_url="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw api_url)"
+          prefix="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw parameter_prefix)"
+          echo "api_url=$api_url" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Stack \`$STACK\`"
+            echo
+            echo "API: \`$api_url\` (POST /graphql with a Bearer token from the base's ci client)."
+            echo
+            echo "Parameters under \`$prefix\`: api_url, user_pool_id, app_client_id."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # -------------------------------------------------------------- delete --
+  name-deleted:
+    name: Name the deleted branch's stack
+    # Only a branch of the working shape has a stack; tags and other
+    # branches end here, silently.
+    if: >-
+      github.event_name == 'delete'
+      && github.event.ref_type == 'branch'
+      && (startsWith(github.event.ref, 'feat/') || startsWith(github.event.ref, 'fix/')
+          || startsWith(github.event.ref, 'docs/') || startsWith(github.event.ref, 'infra/')
+          || startsWith(github.event.ref, 'chore/') || startsWith(github.event.ref, 'hotfix/'))
+    runs-on: ubuntu-latest
+    outputs:
+      issue: ${{ steps.stack.outputs.issue }}
+      name: ${{ steps.stack.outputs.name }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+
+      - name: Name the stack from the deleted branch
+        id: stack
+        env:
+          DELETED_REF: ${{ github.event.ref }}
+        run: |
+          set -eu
+          echo "issue=$(node scripts/sandbox.mjs issue --branch "$DELETED_REF")" >> "$GITHUB_OUTPUT"
+          echo "name=$(node scripts/sandbox.mjs name --branch "$DELETED_REF")" >> "$GITHUB_OUTPUT"
+
+  destroy:
+    name: Destroy the deleted branch's stack
+    needs: name-deleted
+    runs-on: ubuntu-latest
+    environment:
+      name: sandbox-${{ needs.name-deleted.outputs.issue }}
+    concurrency:
+      group: sandbox-refs/heads/${{ github.event.ref }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      ISSUE: ${{ needs.name-deleted.outputs.issue }}
+      STACK: ${{ needs.name-deleted.outputs.name }}
+    steps:
+      - name: Refuse to run without the account id
+        run: |
+          set -eu
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
+          echo "::add-mask::$ACCOUNT_ID"
+
+      # The branch itself is gone; main's copy of the root destroys from the
+      # state key.
+      - name: Check out main
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Bundle, because the root evaluates the bundle's hash even to destroy
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
+
+      - name: Assume the apply role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
+          role-session-name: sandbox-destroy-${{ env.ISSUE }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Destroy
+        run: |
+          set -eu
+          node scripts/sandbox.mjs init --issue "$ISSUE"
+          node scripts/sandbox.mjs destroy --issue "$ISSUE" -- -auto-approve
+          echo "Destroyed \`$STACK\`." >> "$GITHUB_STEP_SUMMARY"
+
+  # --------------------------------------------------------------- sweep --
+  sweep:
+    name: Sweep orphaned stacks
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    # A fixed environment of its own, which the apply role's sandbox-*
+    # pattern admits, because the stacks it finds are only known once it
+    # has listed them.
+    environment:
+      name: sandbox-sweep
+    concurrency:
+      group: sandbox-sweep
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
+    steps:
+      - name: Refuse to run without the account id
+        run: |
+          set -eu
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
+          echo "::add-mask::$ACCOUNT_ID"
+
+      - name: Check out main
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Assume the apply role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
+          role-session-name: sandbox-sweep
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: List the stacks whose branch is gone
+        id: orphans
+        run: |
+          set -eu
+          orphans="$(node scripts/sandbox.mjs orphans | tr '\n' ' ' | sed 's/ *$//')"
+          echo "orphans=$orphans" >> "$GITHUB_OUTPUT"
+          if [ -z "$orphans" ]; then
+            echo "No orphaned sandbox stack." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Orphaned sandbox stacks (issue numbers): $orphans" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Bundle, because the root evaluates the bundle's hash even to destroy
+        if: steps.orphans.outputs.orphans != '' && env.DRY_RUN != 'true'
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
+
+      - name: Destroy each orphan
+        if: steps.orphans.outputs.orphans != '' && env.DRY_RUN != 'true'
+        env:
+          ORPHANS: ${{ steps.orphans.outputs.orphans }}
+        run: |
+          set -eu
+          for issue in $ORPHANS; do
+            echo "== destroying heat-sb$issue"
+            node scripts/sandbox.mjs init --issue "$issue"
+            node scripts/sandbox.mjs destroy --issue "$issue" -- -auto-approve
+            echo "Destroyed \`heat-sb$issue\`." >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Dry run
+        if: steps.orphans.outputs.orphans != '' && env.DRY_RUN == 'true'
+        run: echo "Dry run: nothing destroyed." | tee -a "$GITHUB_STEP_SUMMARY"

@@ -28,6 +28,5 @@ node_modules/
 dist/
 .angular/
 *.tsbuildinfo
-.serverless/
 .env
 .env.*

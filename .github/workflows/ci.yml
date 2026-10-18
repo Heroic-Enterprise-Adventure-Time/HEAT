@@ -7,7 +7,8 @@
 # with no AWS credentials; the integration tests start their own containers
 # (decision 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
-# roots, under their GitHub environments (decision 0017).
+# roots, under their GitHub environments, and sandbox.yml the per-issue
+# stacks (decision 0017).
 name: Build and test
 
 on:
@@ -52,7 +53,7 @@ jobs:
           git diff --exit-code -- packages/hub/schema.graphql
 
       - name: Bundle every function for Lambda
-        run: npm run bundle:hub
+        run: npm run bundle
 
   terraform:
     name: Terraform format and validate
@@ -79,7 +80,7 @@ jobs:
       - name: Validate every root
         run: |
           set -eu
-          for root in terraform/backend terraform/bootstrap/sandbox terraform/bootstrap/dev terraform/bootstrap/prod terraform/environment/sandbox-base; do
+          for root in terraform/backend terraform/bootstrap/sandbox terraform/bootstrap/dev terraform/bootstrap/prod terraform/environment/sandbox-base terraform/environment/sandbox; do
             echo "== $root"
             terraform -chdir="$root" init -backend=false -input=false
             terraform -chdir="$root" validate

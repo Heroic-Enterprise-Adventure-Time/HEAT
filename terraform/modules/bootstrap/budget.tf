@@ -138,7 +138,8 @@ resource "aws_iam_role_policy" "budget_action" {
 # on the budget's action history (Cost Management user guide, "Reviewing and
 # approving your budget action", read 2026-10-16). What the action cannot
 # do: stop what is already running. A function that keeps invoking keeps
-# spending; a kill switch for that is the environment stack's (Issue-38).
+# spending; the switch for that is the environment's HTTP API throttle
+# (terraform/modules/environment) under the account's Lambda concurrency.
 resource "aws_budgets_budget_action" "freeze_apply_role" {
   provider = aws.workload
 

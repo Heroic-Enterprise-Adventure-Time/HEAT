@@ -6,10 +6,10 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Versions and dependencies
 
-1. **Latest, preferring LTS where it exists.** Node is the current LTS line, pinned by major in `.node-version` at the repository root; `fnm`, CI, the bundler's target and the Lambda runtime identifier (`nodejs<major>.x`, in the emulator and in Terraform) all follow that one number. Libraries are kept at their latest release; a library with an LTS line is kept on that line. Falling behind is a defect to fix, not a state to maintain. Dependabot opens the pull requests (`.github/dependabot.yml`); a major that cannot be taken yet is listed under "Held back" at the end of this document, with the reason and what releases it, and is ignored in `.github/dependabot.yml` by the same pull request.
+1. **Latest, preferring LTS where it exists.** Node is the current LTS line, pinned by major in `.node-version` at the repository root; `fnm`, CI, the bundler's target and the Lambda runtime identifier (`nodejs<major>.x`, in Terraform) all follow that one number. Libraries are kept at their latest release; a library with an LTS line is kept on that line. Falling behind is a defect to fix, not a state to maintain. Dependabot opens the pull requests (`.github/dependabot.yml`); a major that cannot be taken yet is listed under "Held back" at the end of this document, with the reason and what releases it, and is ignored in `.github/dependabot.yml` by the same pull request.
 2. **Exact pins, committed lock file.** `package.json` names exact versions, never ranges, and `package-lock.json` is committed. CI installs with `npm ci`, so what runs there is what ran on the laptop.
 3. **Install scripts are approved by name.** npm withholds packages' install scripts until they are listed under `allowScripts` in the root `package.json`. A new one is approved with `npm install-scripts approve <package>`, in the pull request that introduces the dependency, and the pull request description says what the script does.
-4. **One source of truth for functions and routes.** `local/manifest.json` lists every Lambda and its routes. The emulator, the bundler and Terraform read it; nothing declares a function or route anywhere else.
+4. **One source of truth for functions and routes.** `manifest.json` at the repository root lists every Lambda with its handler, memory, timeout and routes. The bundler and Terraform read it; nothing declares a function or route anywhere else.
 
 ### Language and modules
 
@@ -29,7 +29,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Bundling
 
-12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild, targeting the Node major in `.node-version`, dependencies included. The workflow uploads the result; Terraform owns the function (decision 0011).
+12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild into `dist/<name>/`, targeting the Node major in `.node-version`, dependencies included, Powertools among them. Terraform zips that directory and passes it to the function with its hash, so a code change is a change in the plan (decision 0017). Logging goes through the Powertools logger as JSON lines and tracing through its tracer; both are configured by the environment variables Terraform sets on the function.
 
 ### The client
 
@@ -47,6 +47,6 @@ Majors not taken, each with the reason and what releases it. Checked 2026-10-17.
 
 ## Why
 
-Latest with LTS preferred is the owner's standing policy for every tool and library, stated 2026-10-14: a project that exists to show current practice should run on current versions, and the cost of staying current in small steps is far below the cost of a large jump later. Exact pins and the lock file make the laptop and CI identical, which decision 0009 depends on. The install-script approval is npm's own control since 11.19; recording approvals in the repository turns a per-machine prompt into a reviewed decision. The manifest exists because the emulator and Terraform would otherwise each hold a copy of the same three routes and drift. Committing the printed schema is how a code-first project keeps schema-first's one real advantage, a reviewable contract.
+Latest with LTS preferred is the owner's standing policy for every tool and library, stated 2026-10-14: a project that exists to show current practice should run on current versions, and the cost of staying current in small steps is far below the cost of a large jump later. Exact pins and the lock file make the laptop and CI identical, which decision 0009 depends on. The install-script approval is npm's own control since 11.19; recording approvals in the repository turns a per-machine prompt into a reviewed decision. The manifest exists because the bundler and Terraform would otherwise each hold a copy of the same routes and drift. Committing the printed schema is how a code-first project keeps schema-first's one real advantage, a reviewable contract.
 
 The client's rules were added on 2026-10-17 with the first Angular code (Issue-45). Angular releases its packages as one set and names the TypeScript versions it accepts, so the packages are pinned to one version and moved as one, and the TypeScript pin moved from 5.9.3 to 6.0.3 for Angular 22; the engine and the hub compiled and tested under 6.0.3 unchanged.
