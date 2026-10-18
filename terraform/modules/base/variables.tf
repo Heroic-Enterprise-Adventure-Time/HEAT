@@ -13,16 +13,6 @@ variable "name_prefix" {
   }
 }
 
-variable "domain_prefix" {
-  description = "The prefix of the pool's Cognito domain, <prefix>.auth.us-east-1.amazoncognito.com, which hosts the managed login pages and the OAuth endpoints: heat-sb in the sandbox account; dev's and prod's are settled by their issues (prod's cannot be heat, which another account holds). Unique across the region; the owner's Google OAuth client names this hostname (Issue-46)."
-  type        = string
-
-  validation {
-    condition     = can(regex("^[a-z0-9](-?[a-z0-9]){0,62}$", var.domain_prefix)) && !can(regex("aws|amazon|cognito", var.domain_prefix))
-    error_message = "domain_prefix must be 1 to 63 lower-case letters, digits and single hyphens, and may not contain aws, amazon or cognito, which Cognito reserves."
-  }
-}
-
 variable "google_client_id" {
   description = "The client id of the Google OAuth client registered for this pool's domain. From the root's GitHub environment variable HEAT_GOOGLE_CLIENT_ID, one name in every environment (decision 0020); not secret, but per environment."
   type        = string

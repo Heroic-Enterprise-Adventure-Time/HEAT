@@ -23,7 +23,7 @@ variable "workload_account_id" {
 }
 
 variable "google_client_id" {
-  description = "The Google OAuth client registered for heat-sb.auth.us-east-1.amazoncognito.com: its client id, from the sandbox-base environment's variable HEAT_GOOGLE_CLIENT_ID."
+  description = "The Google OAuth client registered for auth.heat-sb.dcg-games.com: its client id, from the sandbox-base environment's variable HEAT_GOOGLE_CLIENT_ID."
   type        = string
 }
 

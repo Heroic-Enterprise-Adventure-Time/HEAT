@@ -1,7 +1,8 @@
 # The account's one user pool, shared by every stack in the account: each
 # stack adds its own browser app client to it (decision 0018), and Google is
-# registered in it once, with the pool's managed login domain (sign_in.tf,
-# Issue-46). The shape is decision 0022.
+# registered in it once (sign_in.tf, Issue-46); its managed login domain,
+# auth.<zone name>, is terraform/modules/login-domain, which the root
+# composes after this module. The shape is decision 0022.
 #
 # What is deliberately not here: any user, because test users are data the
 # apply job creates with the CLI (decision 0020), and players create
