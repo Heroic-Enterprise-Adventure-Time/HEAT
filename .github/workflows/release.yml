@@ -64,12 +64,16 @@ jobs:
     permissions:
       contents: read
     steps:
-      # The whole history, for the merge base; the pull request's head is
-      # fetched by its sha, so nothing from it is executed.
-      - name: Check out release with its history
+      # The default branch's copy, which is the ref a pull_request_target run
+      # carries and the one this workflow file itself comes from, so the
+      # script is the workflow's companion; the whole history, for the merge
+      # base. Not release's copy: on the first release (Issue-64) release
+      # predated the script, and on any later one its copy could lag main's
+      # workflow. The pull request's head is fetched by its sha, so nothing
+      # from it is executed.
+      - name: Check out main with its history
         uses: actions/checkout@v7
         with:
-          ref: release
           fetch-depth: 0
 
       - name: Check the pull request's source
@@ -78,7 +82,7 @@ jobs:
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -eu
-          git fetch --no-tags origin "$HEAD_SHA"
+          git fetch --no-tags origin release "$HEAD_SHA"
           sh scripts/check-release-source.sh pull-request "$HEAD_REF" "$HEAD_SHA"
 
   plan:
