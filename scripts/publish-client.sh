@@ -7,11 +7,18 @@
 # are this script's, because the plan role may not read objects outside
 # the state prefix and Terraform could not refresh them.
 #
-# Usage: scripts/publish-client.sh <bucket> <build dir> <graphql path> <user pool id>
+# Usage: scripts/publish-client.sh <bucket> <build dir> <graphql path> <user pool id> <client id> <login host>
 #   bucket        the stack's client bucket, from the output client_bucket
 #   build dir     what ng build wrote: packages/client/dist/client/browser
 #   graphql path  the API's path on the stack's hostname, /graphql
 #   user pool id  the base pool, from the output user_pool_id
+#   client id     the stack's browser app client, from the output browser_client_id
+#   login host    the pool's managed login host, from the output login_host
+#
+# config.json is the client's whole knowledge of the stack it runs in
+# (packages/client/src/app/config.ts reads it before the application
+# starts): where the API is, which pool issues tokens, which client to sign
+# in as and where. None of it is secret; the browser carries all four.
 #
 # Lifetimes, which the distribution's cache policy honours between one
 # second and a year: the hashed assets are immutable for a year, since a
@@ -25,6 +32,8 @@ bucket="${1:?bucket}"
 build_dir="${2:?build dir}"
 graphql_path="${3:?graphql path}"
 user_pool_id="${4:?user pool id}"
+client_id="${5:?client id}"
+login_host="${6:?login host}"
 
 [ -f "$build_dir/index.html" ] || { echo "$build_dir holds no index.html; is the client built?" >&2; exit 1; }
 
@@ -45,7 +54,7 @@ fi
 
 config="$(mktemp)"
 trap 'rm -f "$config"' EXIT
-printf '{"graphqlPath":"%s","userPoolId":"%s"}\n' "$graphql_path" "$user_pool_id" > "$config"
+printf '{"graphqlPath":"%s","userPoolId":"%s","clientId":"%s","loginHost":"%s"}\n' "$graphql_path" "$user_pool_id" "$client_id" "$login_host" > "$config"
 aws s3 cp "$config" "s3://$bucket/config.json" --only-show-errors \
   --cache-control "$short" --content-type "application/json"
 

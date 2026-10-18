@@ -28,6 +28,18 @@ resource "aws_cognito_identity_provider" "google" {
     client_id        = var.google_client_id
     client_secret    = var.google_client_secret
     authorize_scopes = "openid email profile"
+
+    # Cognito fills these six in for a Google provider and returns them on
+    # every read; left out of the configuration they show as a change on
+    # every plan after the first apply (seen 2026-10-18). Written here as
+    # Cognito set them, so that the plan is clean and a change by Google or
+    # Cognito would show.
+    attributes_url                = "https://people.googleapis.com/v1/people/me?personFields="
+    attributes_url_add_attributes = "true"
+    authorize_url                 = "https://accounts.google.com/o/oauth2/v2/auth"
+    oidc_issuer                   = "https://accounts.google.com"
+    token_request_method          = "POST"
+    token_url                     = "https://www.googleapis.com/oauth2/v4/token"
   }
 
   attribute_mapping = {

@@ -13,9 +13,11 @@ One HEAT environment: the two tables, one function per entry in `manifest.json` 
 | Execution role | `<prefix>-<name>` | Under the account's boundary. Its own log group, the item operations on the two tables, X-Ray writes. Nothing else |
 | Log group | `/aws/lambda/<prefix>-<name>` | Created before the function, with retention |
 | HTTP API | `<prefix>-api` | The manifest's routes, each `JWT`-authorized; `$default` stage, auto-deployed, throttled; access log to `/aws/apigateway/<prefix>-api` |
-| Authorizer | `cognito` | Issuer `https://cognito-idp.<region>.amazonaws.com/<pool id>`, audience the app client id; `aud` or `client_id` must match (API Gateway developer guide, read 2026-10-17) |
+| Authorizer | `cognito` | Issuer `https://cognito-idp.<region>.amazonaws.com/<pool id>`, two audiences, the base's `ci` client and the browser client below; `aud` or `client_id` must match (API Gateway developer guide, read 2026-10-17) |
+| Browser app client | `<prefix>-browser` | In the shared pool (`sign_in.tf`, decision 0024): public, the code grant with PKCE, scopes `openid email profile`, Google as its only provider, callback and sign-out URLs `https://<hostname>` and `http://localhost:4200`, access and ID tokens of one hour, a refresh token of 30 days with rotation and a ten-second grace period, revocation on |
+| Managed login style | for that client | Cognito's provided values; a client created through the API has none until one is created |
 | Site | `<hostname>` | The site module: the client bucket, the distribution serving it and sending the manifest's route paths (`/graphql`) to the HTTP API above, the hostname's records in the base's zone (its README) |
-| Parameters | `/heat/<prefix>/site_url`, `api_url`, `user_pool_id`, `app_client_id` | The stack's public facts, for whatever calls it |
+| Parameters | `/heat/<prefix>/site_url`, `api_url`, `user_pool_id`, `app_client_id`, `browser_client_id`, `login_host` | The stack's public facts, for whatever calls it; the last four also reach the browser as `config.json` |
 
 Nothing here is provisioned capacity, a VPC, or a resource that costs money at rest.
 
@@ -37,4 +39,4 @@ The throttle, under the account's Lambda concurrency, is the environment's kill 
 
 ## What the root supplies
 
-`name_prefix`, `environment`, `functions` (from `manifest.json`), `dist_dir`, the base's `user_pool_id` and the `app_client_id` whose tokens the authorizer accepts, the `hostname` with the base's `zone_id` and `certificate_arn` and the distribution's `price_class` (`PriceClass_100` everywhere today), `permissions_boundary_arn` built from the account id, and the literals above. The module builds no ARN from an account id itself.
+`name_prefix`, `environment`, `functions` (from `manifest.json`), `dist_dir`, the base's `user_pool_id` and the `app_client_id` of its `ci` client, the `login_host` of the pool's managed login domain (`terraform/modules/login-domain`), the `hostname` with the base's `zone_id` and `certificate_arn` and the distribution's `price_class` (`PriceClass_100` everywhere today), `permissions_boundary_arn` built from the account id, and the literals above. The module builds no ARN from an account id itself.

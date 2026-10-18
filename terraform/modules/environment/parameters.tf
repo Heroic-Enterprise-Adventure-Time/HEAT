@@ -25,9 +25,23 @@ resource "aws_ssm_parameter" "user_pool_id" {
 
 resource "aws_ssm_parameter" "app_client_id" {
   name        = "${local.parameter_prefix}/app_client_id"
-  description = "The app client to sign in with."
+  description = "The base's ci app client: the password flow, for the stack test and the agent."
   type        = "String"
   value       = var.app_client_id
+}
+
+resource "aws_ssm_parameter" "browser_client_id" {
+  name        = "${local.parameter_prefix}/browser_client_id"
+  description = "The stack's browser app client: the code grant with PKCE through managed login."
+  type        = "String"
+  value       = aws_cognito_user_pool_client.browser.id
+}
+
+resource "aws_ssm_parameter" "login_host" {
+  name        = "${local.parameter_prefix}/login_host"
+  description = "The pool's managed login host, where the browser client signs in."
+  type        = "String"
+  value       = var.login_host
 }
 
 resource "aws_ssm_parameter" "site_url" {

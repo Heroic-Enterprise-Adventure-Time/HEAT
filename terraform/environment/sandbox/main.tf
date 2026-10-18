@@ -48,6 +48,11 @@ module "environment" {
   user_pool_id  = one(data.aws_cognito_user_pools.base.ids)
   app_client_id = local.ci_client_id
 
+  # The pool's managed login host (terraform/environment/sandbox-base), a
+  # name derived from the zone like the hostname below, so the root reads
+  # nothing from the base's state for it.
+  login_host = "https://auth.${local.zone_name}"
+
   # The stack's hostname, <issue>.heat-sb.dcg-games.com, on the base's zone
   # and certificate (decision 0018). PriceClass_100, North America and
   # Europe, where the viewers are; the same in every environment today.

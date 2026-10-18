@@ -48,8 +48,18 @@ variable "user_pool_id" {
 }
 
 variable "app_client_id" {
-  description = "The app client whose tokens the JWT authorizer accepts, and which the stack's parameters name for its clients: the base's ci client today; the stack's browser client joins it in Issue-46."
+  description = "The base's ci app client, the password-flow client the end-to-end tests sign in with: the first of the two audiences the JWT authorizer accepts, beside the stack's own browser client (sign_in.tf)."
   type        = string
+}
+
+variable "login_host" {
+  description = "The pool's managed login host, https://auth.<zone name> (terraform/modules/login-domain): where the browser client sends a player to sign in, and what config.json carries to the client."
+  type        = string
+
+  validation {
+    condition     = can(regex("^https://auth\\.([a-z0-9-]+\\.)+dcg-games\\.com$", var.login_host))
+    error_message = "login_host must be https://auth.<zone name> under dcg-games.com."
+  }
 }
 
 variable "permissions_boundary_arn" {

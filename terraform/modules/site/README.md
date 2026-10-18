@@ -20,7 +20,7 @@ Nothing here costs money at rest: the distribution and the bucket are pay as you
 
 - **The content.** The apply job syncs what `packages/client` builds into the bucket after `terraform apply` and writes `config.json` beside it from the stack's outputs (`scripts/publish-client.sh`): hashed assets with a one-year immutable lifetime, `index.html`, `favicon.ico` and `config.json` with one minute. No invalidations: a new build is a new set of hashed names, and the page is re-read within the minute. Terraform does not write `config.json` because the plan role may not read objects outside the state prefix (`DenyObjectsExceptThisAccountsState`), and refreshing an `aws_s3_object` needs to; the values are still Terraform's outputs.
 - **The WebSocket behavior** for the live channel's path, with the `Sec-WebSocket-*` headers forwarded: build order step 4 (decision 0018).
-- **A `Content-Security-Policy`.** A custom response headers policy, written when sign-in exists and the origins it must name are known (Issue-46).
+- **A `Content-Security-Policy`.** A custom response headers policy; the origins it must name are known since Issue-46 (the page's own and the pool's login host), and Angular's inline component styles need a nonce or a hash, which is Issue-58's question.
 - **API Gateway's own endpoint** stays enabled, because the distribution reaches the API there.
 
 ## What the environment module supplies

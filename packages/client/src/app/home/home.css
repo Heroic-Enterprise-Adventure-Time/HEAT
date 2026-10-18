@@ -9,3 +9,13 @@ h1 {
   letter-spacing: 0.1em;
   margin: 0 0 1rem;
 }
+
+button {
+  font: inherit;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+}
+
+.error {
+  color: light-dark(#a40000, #ff8a8a);
+}

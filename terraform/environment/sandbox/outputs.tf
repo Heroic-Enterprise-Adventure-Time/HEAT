@@ -23,8 +23,18 @@ output "parameter_prefix" {
 }
 
 output "ci_client_id" {
-  description = "The app client to sign in with, read from the base."
+  description = "The base's ci app client, the password flow for the stack test; read from the base."
   value       = local.ci_client_id
+}
+
+output "browser_client_id" {
+  description = "The stack's browser app client; read by the apply job for config.json."
+  value       = module.environment.browser_client_id
+}
+
+output "login_host" {
+  description = "https://auth.heat-sb.dcg-games.com; read by the apply job for config.json."
+  value       = module.environment.login_host
 }
 
 output "user_pool_id" {
