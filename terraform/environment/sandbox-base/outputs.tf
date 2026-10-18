@@ -27,3 +27,8 @@ output "user_pool_endpoint" {
 output "ci_client_id" {
   value = module.base.ci_client_id
 }
+
+output "certificate_arn" {
+  description = "The certificate for heat-sb.dcg-games.com and *.heat-sb.dcg-games.com; the per-issue stacks find it by its domain through a data source, never through this output."
+  value       = module.base.certificate_arn
+}

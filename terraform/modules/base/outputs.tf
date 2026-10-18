@@ -37,3 +37,8 @@ output "ci_client_id" {
   description = "The id of the ci app client: what the end-to-end tests pass to InitiateAuth."
   value       = aws_cognito_user_pool_client.ci.id
 }
+
+output "certificate_arn" {
+  description = "The account's certificate for the zone name and its wildcard, in us-east-1, taken from the validation waiter so that it is issued by the time anything reads it: what every distribution under the zone serves."
+  value       = aws_acm_certificate_validation.this.certificate_arn
+}
