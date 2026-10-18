@@ -1,0 +1,11 @@
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 3rem 1rem;
+}
+
+h1 {
+  font-size: 3rem;
+  letter-spacing: 0.1em;
+  margin: 0 0 1rem;
+}

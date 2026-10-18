@@ -1,8 +1,9 @@
 # Build and test
 #
 # The gate on every pull request and on main: does the repository build, do
-# its tests pass, is the committed GraphQL schema current, does every
-# function bundle, and is every Terraform root formatted and valid. It runs
+# its tests pass, does the client build for production, is the committed
+# GraphQL schema current, does every function bundle, and is every Terraform
+# root formatted and valid. It runs
 # with no AWS credentials; the integration tests start their own containers
 # (decision 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
@@ -39,6 +40,11 @@ jobs:
 
       - name: Run every package's tests (integration tests start containers)
         run: npm test
+
+      # The output a stack's bucket serves (Issue-39); the log shows the
+      # bundle sizes against the budgets in packages/client/angular.json.
+      - name: Build the client for production
+        run: npm run build --workspace @heat/client
 
       - name: Check that the committed GraphQL schema matches the code
         run: |

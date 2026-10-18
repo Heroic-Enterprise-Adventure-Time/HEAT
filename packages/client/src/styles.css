@@ -1,0 +1,10 @@
+/* Global styles. Component styles live beside their component. */
+:root {
+  color-scheme: light dark;
+  font-family: system-ui, sans-serif;
+  line-height: 1.5;
+}
+
+body {
+  margin: 0;
+}

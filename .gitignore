@@ -26,6 +26,7 @@ CLAUDE.local.md
 # Node
 node_modules/
 dist/
+.angular/
 *.tsbuildinfo
 .serverless/
 .env
