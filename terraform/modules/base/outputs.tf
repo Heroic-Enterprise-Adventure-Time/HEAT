@@ -23,6 +23,11 @@ output "user_pool_id" {
   value       = aws_cognito_user_pool.this.id
 }
 
+output "user_pool_name" {
+  description = "The shared user pool's name, <prefix>-users: what scripts/e2e-user.sh looks the pool up by."
+  value       = aws_cognito_user_pool.this.name
+}
+
 output "user_pool_arn" {
   description = "The shared user pool's ARN, for the authorizers' and functions' policies."
   value       = aws_cognito_user_pool.this.arn

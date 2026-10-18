@@ -9,9 +9,12 @@ import { execFileSync } from "node:child_process";
  * authorizer, IAM path and tables (decision 0018).
  *
  * Usage: E2E_PASSWORD=<password> node scripts/e2e.mjs --issue <n> --username <email>
+ *        E2E_PASSWORD=<password> node scripts/e2e.mjs --stack heat-dev --username <email>
  *
  * The site URL and the app client id are read from the stack's parameters,
- * /heat/heat-sb<issue>/, and every call goes through the stack's hostname,
+ * /heat/heat-sb<issue>/ for a sandbox stack and /heat/<stack>/ for a
+ * permanent environment (Issue-40's smoke test is this script against
+ * heat-dev), and every call goes through the stack's hostname,
  * as the browser's will: the page at /, config.json, and /graphql behind
  * CloudFront, which proves that the Authorization header crosses it. The
  * parameters are read with whatever AWS credentials are in the
@@ -29,15 +32,16 @@ const opt = (name) => {
   return i >= 0 ? args[i + 1] : undefined;
 };
 const issue = opt("issue");
+const stack = opt("stack") ?? (issue ? `heat-sb${issue}` : undefined);
 const username = opt("username");
 const password = process.env.E2E_PASSWORD;
-if (!issue || !username || !password) {
-  console.error("usage: E2E_PASSWORD=<password> node scripts/e2e.mjs --issue <n> --username <email>");
+if (!stack || !username || !password) {
+  console.error("usage: E2E_PASSWORD=<password> node scripts/e2e.mjs (--issue <n> | --stack <name>) --username <email>");
   process.exit(2);
 }
 
 const region = process.env.AWS_REGION ?? "us-east-1";
-const prefix = `/heat/heat-sb${issue}`;
+const prefix = `/heat/${stack}`;
 
 function parameter(name) {
   return execFileSync("aws", ["ssm", "get-parameter", "--name", `${prefix}/${name}`, "--region", region, "--query", "Parameter.Value", "--output", "text"], {
@@ -108,6 +112,18 @@ check(anonymous.status === 401, `POST ${graphqlUrl} without a token is refused w
 const token = await signIn();
 console.log(`signed in as ${username} through client ${clientId}`);
 
+// A permanent environment's test user keeps its records between runs, so an
+// adventure left open by a run that failed between its start and its settle
+// would refuse every later start. Settle whatever is open first; a sandbox
+// stack's user is new to each stack and has nothing open.
+const settleMutation = `mutation($id: String!) { settleAdventure(adventureId: $id) { id holdings { material balance } } }`;
+const before = await graphql(token, `{ me { openAdventure { id } } }`);
+const leftover = before.data?.me?.openAdventure?.id;
+if (leftover) {
+  const cleared = await graphql(token, settleMutation, { id: leftover });
+  check(!cleared.errors, `settled the adventure ${leftover} that an earlier run left open (${cleared.ms} ms)`);
+}
+
 const start = await graphql(token, `mutation { startAdventure { id seed } }`);
 check(!start.errors && start.data?.startAdventure?.id, `startAdventure opened an adventure (${start.ms} ms)`);
 const { id, seed } = start.data.startAdventure;
@@ -115,7 +131,7 @@ const { id, seed } = start.data.startAdventure;
 const again = await graphql(token, `mutation { startAdventure { id } }`);
 check(again.errors?.[0]?.message.includes("condition failed"), `a second start is refused while one is open (${again.ms} ms)`);
 
-const settle = await graphql(token, `mutation($id: String!) { settleAdventure(adventureId: $id) { id holdings { material balance } } }`, { id });
+const settle = await graphql(token, settleMutation, { id });
 check(!settle.errors && settle.data?.settleAdventure, `settleAdventure settled it (${settle.ms} ms)`);
 
 const byMaterial = (a, b) => a.material.localeCompare(b.material);

@@ -14,12 +14,14 @@ One HEAT environment: the two tables, one function per entry in `manifest.json` 
 | Log group | `/aws/lambda/<prefix>-<name>` | Created before the function, with retention |
 | HTTP API | `<prefix>-api` | The manifest's routes, each `JWT`-authorized; `$default` stage, auto-deployed, throttled; access log to `/aws/apigateway/<prefix>-api` |
 | Authorizer | `cognito` | Issuer `https://cognito-idp.<region>.amazonaws.com/<pool id>`, two audiences, the base's `ci` client and the browser client below; `aud` or `client_id` must match (API Gateway developer guide, read 2026-10-17) |
-| Browser app client | `<prefix>-browser` | In the shared pool (`sign_in.tf`, decision 0024): public, the code grant with PKCE, scopes `openid email profile`, Google as its only provider, callback and sign-out URLs `https://<hostname>` and `http://localhost:4200`, access and ID tokens of one hour, a refresh token of 30 days with rotation and a ten-second grace period, revocation on |
+| Browser app client | `<prefix>-browser` | In the shared pool (`sign_in.tf`, decision 0024): public, the code grant with PKCE, scopes `openid email profile`, Google as its only provider, callback and sign-out URLs `https://<hostname>` plus the root's `extra_callback_urls` (`http://localhost:4200` in a sandbox stack, none in `dev` and `prod`), access and ID tokens of one hour, a refresh token of 30 days with rotation and a ten-second grace period, revocation on |
 | Managed login style | for that client | Cognito's provided values; a client created through the API has none until one is created |
 | Site | `<hostname>` | The site module: the client bucket, the distribution serving it and sending the manifest's route paths (`/graphql`) to the HTTP API above, the hostname's records in the base's zone (its README) |
 | Parameters | `/heat/<prefix>/site_url`, `api_url`, `user_pool_id`, `app_client_id`, `browser_client_id`, `login_host` | The stack's public facts, for whatever calls it; the last four also reach the browser as `config.json` |
+| Topic, where `alarm_email` is set | `<prefix>-alarms` | SNS, with one `email` subscription to the root's address (`alarms.tf`, Issue-40). The owner confirms the subscription once from the mail SNS sends; the provider neither waits for that nor can delete an unconfirmed subscription |
+| Alarms, per function, where `alarm_email` is set | `<prefix>-<name>-errors`, `-throttles`, `-duration` | `AWS/Lambda` by `FunctionName`: `Errors` sum ≥ 1 in one five-minute period; `Throttles` sum ≥ 1 in one one-minute period; `Duration` p95 ≥ half the manifest's timeout in two of three five-minute periods. Missing data is not breaching; alarm and OK both notify the topic |
 
-Nothing here is provisioned capacity, a VPC, or a resource that costs money at rest.
+Nothing here is provisioned capacity, a VPC, or a resource that costs money at rest; three standard-resolution alarms are inside the ten alarm metrics CloudWatch's free tier lists (its pricing page, read 2026-10-18), and the topic's emails are priced per message sent.
 
 ## The code
 
@@ -27,15 +29,17 @@ The root passes `dist_dir`, where `scripts/bundle.mjs` wrote `dist/<name>/index.
 
 ## Per-environment literals
 
-| Variable | Sandbox stack | `dev`, `prod` (set by their issues) |
-| --- | --- | --- |
-| `log_retention_days` | 7 | longer |
-| `point_in_time_recovery` | false | true |
-| `deletion_protection` | false | true |
-| `throttling_rate_limit`, `throttling_burst_limit` | 10, 20 | theirs |
-| `log_level` | INFO | INFO |
+| Variable | Sandbox stack | `dev` (Issue-40) | `prod` (set by Issue-41) |
+| --- | --- | --- | --- |
+| `log_retention_days` | 7 | 30 | longer |
+| `point_in_time_recovery` | false | true | true |
+| `deletion_protection` | false | true | true |
+| `throttling_rate_limit`, `throttling_burst_limit` | 10, 20 | 10, 20 | theirs |
+| `extra_callback_urls` | `["http://localhost:4200"]` | none | none |
+| `alarm_email` | null | the `dev` environment's `HEAT_ALARM_EMAIL` | the `prod` environment's |
+| `log_level` | INFO | INFO | INFO |
 
-The throttle, under the account's Lambda concurrency, is the environment's kill switch for a runaway caller. Reserved concurrency per function is not used: Lambda keeps 100 unreserved executions per account, and `heat-sandbox` has the new-account quota of 10. No alarms: they arrive with `dev` (Issue-40), the first environment with somewhere to send them.
+The throttle, under the account's Lambda concurrency, is the environment's kill switch for a runaway caller. Reserved concurrency per function is not used: Lambda keeps 100 unreserved executions per account, and both `heat-sandbox` and `heat-dev` have the new-account quota of 10 (read 2026-10-18), which is why `dev`'s throttle is the sandbox's. The alarms (`alarms.tf`) are the permanent environments' only: an SNS topic the owner's address is subscribed to, and three alarms per function on errors, throttles and duration, with the thresholds in the table above, settled in Issue-40's shape conversation on 2026-10-18.
 
 ## What the root supplies
 

@@ -26,6 +26,10 @@ data "aws_iam_policy_document" "boundary" {
       "route53:*",
       "logs:*",
       "cloudwatch:*",
+      # Where a CloudWatch alarm sends its notification: a topic per
+      # permanent environment with the owner's address subscribed (Issue-40).
+      # Nothing else in the shape publishes or queues.
+      "sns:*",
       "ssm:*",
       "xray:*",
       "iam:*",

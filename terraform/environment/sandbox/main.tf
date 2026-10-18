@@ -63,12 +63,18 @@ module "environment" {
 
   permissions_boundary_arn = "arn:aws:iam::${var.workload_account_id}:policy/heat-sandbox-boundary"
 
+  # The Angular dev server on a laptop signs in to this stack through its
+  # browser client (decision 0018, docs/process/development.md rule 5).
+  extra_callback_urls = ["http://localhost:4200"]
+
   # A sandbox stack lives as long as its branch: short retention, no
-  # recovery, no deletion protection. The throttle, with the account's
-  # Lambda concurrency of 10 shared by every stack, is the kill switch.
+  # recovery, no deletion protection, no alarms. The throttle, with the
+  # account's Lambda concurrency of 10 shared by every stack, is the kill
+  # switch.
   log_retention_days     = 7
   point_in_time_recovery = false
   deletion_protection    = false
   throttling_rate_limit  = 10
   throttling_burst_limit = 20
+  alarm_email            = null
 }
