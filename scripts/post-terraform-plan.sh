@@ -4,7 +4,7 @@
 # request, edited in place on every push so the pull request shows the
 # current plan and not a history of them. The account id is replaced by
 # "<account id>" in everything that leaves the runner (docs/README.md, rule
-# 9). Called by both jobs of .github/workflows/deploy.yml.
+# 9). Called by both jobs of .github/workflows/deploy.yml and of release.yml.
 #
 # Usage: scripts/post-terraform-plan.sh <root> <plan file> <commit> <identity> [pull request number]
 #   root       the permanent root's name under terraform/environment/

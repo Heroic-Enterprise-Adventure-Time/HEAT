@@ -8,6 +8,9 @@ module "base" {
   name_prefix = "heat-sb-base"
   zone_name   = "heat-sb.dcg-games.com"
 
+  # The password-flow client the stack test and the test users sign in with.
+  ci_client = true
+
   # The pool's Google OAuth client (Issue-46): the two values are this root's
   # only secrets, from the sandbox-base GitHub environment (decision 0020).
   google_client_id     = var.google_client_id

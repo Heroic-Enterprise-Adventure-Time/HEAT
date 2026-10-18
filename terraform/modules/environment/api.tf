@@ -16,9 +16,10 @@ resource "aws_apigatewayv2_api" "this" {
 # The authorizer checks the signature against the pool's keys, the issuer,
 # the expiry, and that the token's aud (an ID token) or client_id (an access
 # token) is one of the audience entries (API Gateway developer guide, "Control
-# access to HTTP APIs with JWT authorizers", read 2026-10-17). Two audiences:
-# the base's ci client, whose tokens the stack test carries, and the stack's
-# own browser client (sign_in.tf), whose tokens a player's browser carries.
+# access to HTTP APIs with JWT authorizers", read 2026-10-17). The audiences:
+# the stack's own browser client (sign_in.tf), whose tokens a player's
+# browser carries, and, where the base has one, its ci client, whose tokens
+# the stack test carries; prod has no ci client and one audience (Issue-41).
 # The claims reach the function in requestContext.authorizer.jwt.claims.
 resource "aws_apigatewayv2_authorizer" "jwt" {
   api_id           = aws_apigatewayv2_api.this.id
@@ -28,7 +29,7 @@ resource "aws_apigatewayv2_authorizer" "jwt" {
 
   jwt_configuration {
     issuer   = "https://cognito-idp.${data.aws_region.current.region}.amazonaws.com/${var.user_pool_id}"
-    audience = [var.app_client_id, aws_cognito_user_pool_client.browser.id]
+    audience = compact([var.app_client_id, aws_cognito_user_pool_client.browser.id])
   }
 }
 

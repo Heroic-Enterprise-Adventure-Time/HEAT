@@ -19,6 +19,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [../terraform/environment/sandbox-base/README.md](../terraform/environment/sandbox-base/README.md) | The sandbox base: the zone, the shared user pool and its CI client, the test users, and how the pipeline plans and applies a permanent root | When the agent reads it |
 | [../terraform/environment/sandbox/README.md](../terraform/environment/sandbox/README.md) | The per-issue sandbox stacks: the one root, the environment module, the workflow, the cap and the sweep | When the agent reads it |
 | [../terraform/environment/dev/README.md](../terraform/environment/dev/README.md) | The dev environment: one root for the base, the environment and the login domain, applied on every merge to `main` with its smoke test; the first apply and the delegation | When the agent reads it |
+| [../terraform/environment/prod/README.md](../terraform/environment/prod/README.md) | The prod environment: the same root shape without a password-flow client or test users, applied on every merge to `release` through the release pull request, the guard, the token-free smoke test, the tag and the Release; the first release and the delegation | When the agent reads it |
 | [standards/typescript.md](standards/typescript.md) | Versions, dependencies, modules, testing, the hub's libraries, bundling, the client | When the agent works under `packages/`, through that directory's `AGENTS.md` |
 
 ## Planned
@@ -27,7 +28,7 @@ These are part of the structure and are not written yet. Each is written when th
 
 | Document | Written when |
 | --- | --- |
-| `process/deployment.md` | The release path has run once (Issue-41): the release pull request, the tag, the hotfix lifecycle. Until then the workflow's own comments, `terraform/bootstrap/README.md` and the overview's "Environments" describe deployment. |
+| `process/deployment.md` | The release path has run once (the first release after Issue-41): the release pull request, the tag, the hotfix lifecycle. Until then `terraform/environment/prod/README.md`, "Who applies it", the workflows' own comments and the overview's "Environments" describe deployment. |
 | `standards/<language>.md` | The first code in that language lands; `standards/typescript.md` is the first |
 | `runbooks/` | A multi-step procedure has been done more than once |
 

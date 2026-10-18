@@ -7,9 +7,9 @@
 # Each permanent root is one row of the matrix, and its jobs run under that
 # root's own GitHub environment, which holds its secrets and admits only the
 # branch main (decision 0020). Two rows today: sandbox-base (Issue-37) and
-# dev (Issue-40). Issue-41 adds prod with its own triggers, pull_request_target
-# to release and push to release, because prod ships through the release
-# branch (decision 0021). A row with code (dev, later prod) bundles the
+# dev (Issue-40). prod is not a row here: it ships through the release
+# branch (decision 0021), with its own triggers and its own jobs, in
+# release.yml (Issue-41). A row with code (dev) bundles the
 # functions before planning, because the root hashes the bundle, and after
 # the apply publishes the client build with config.json, creates the test
 # users, runs the smoke test through the environment's hostname and reads the

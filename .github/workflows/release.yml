@@ -1,0 +1,312 @@
+# Release
+#
+# The pipeline's path to prod (decision 0021): a pull request from main to
+# release is the release, its diff is what ships, and the merge applies. This
+# workflow is prod's alone; deploy.yml plans and applies the other permanent
+# roots on main, and sandbox.yml the per-issue stacks. A workflow of its own
+# rather than rows in deploy.yml, because a matrix leg cannot be skipped per
+# branch (a leg whose steps are all skipped still runs under its environment
+# and records a deployment there), and because prod has three jobs nothing
+# else has: the guard, the tag and the Release.
+#
+# On a pull request to release (pull_request_target, for the reasons
+# deploy.yml gives: the plan must run under the prod environment, whose
+# branch policy admits main's ref and never refs/pull/<n>/merge):
+#   guard   scripts/check-release-source.sh: the head is main or a hotfix
+#           branch, and release has not drifted from it. The release ruleset
+#           requires this check, so a pull request that fails it cannot be
+#           merged.
+#   plan    the prod plan with the plan role, the allow-list check, the plan
+#           in the job summary and in one comment on the pull request.
+#
+# On a push to release, which is the owner's merge of that pull request:
+#   guard   the same script, asking GitHub which pull request the merge
+#           commit came from, since the pull request's own check has no hold
+#           over a push.
+#   apply   plan, allow-list, apply exactly that plan with the apply role,
+#           publish the client with config.json, then the smoke test: the
+#           anonymous half of scripts/e2e.mjs, because prod has no
+#           password-flow client and no test user (Issue-41). No test users
+#           are created and no cold start is read, since nothing invokes the
+#           function.
+#   tag     after the smoke test: the date-based tag on the merge commit and
+#           the GitHub Release from the pull request (scripts/tag-release.sh).
+#           The tag is documentation; it triggers nothing.
+#
+# The release ruleset lets only a pull request change release, so a push
+# here is always a merge. The hotfix lifecycle, how a hotfix reaches main,
+# is settled when the first one is needed (decision 0021).
+name: Release
+
+on:
+  pull_request_target:
+    branches: [release]
+  push:
+    branches: [release]
+
+env:
+  TF_IN_AUTOMATION: "true"
+  TF_INPUT: "false"
+  AWS_REGION: us-east-1
+  ROOT: prod
+  STACK: heat-prod
+
+jobs:
+  # -------------------------------------------------------- pull request --
+  guard:
+    name: Release source
+    # Only pull requests from this repository, and not Dependabot's.
+    if: >-
+      github.event_name == 'pull_request_target'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      # The whole history, for the merge base; the pull request's head is
+      # fetched by its sha, so nothing from it is executed.
+      - name: Check out release with its history
+        uses: actions/checkout@v7
+        with:
+          ref: release
+          fetch-depth: 0
+
+      - name: Check the pull request's source
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -eu
+          git fetch --no-tags origin "$HEAD_SHA"
+          sh scripts/check-release-source.sh pull-request "$HEAD_REF" "$HEAD_SHA"
+
+  plan:
+    name: Plan prod
+    needs: guard
+    runs-on: ubuntu-latest
+    environment: prod
+    permissions:
+      contents: read
+      id-token: write
+      pull-requests: write
+    env:
+      ACCOUNT_ID: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+      TF_VAR_workload_account_id: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+      # The base's Google OAuth client and the alarms' address, from the
+      # prod environment: one name in every environment, the environment
+      # supplies the value (decision 0020).
+      TF_VAR_google_client_id: ${{ vars.HEAT_GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
+      TF_VAR_alarm_email: ${{ vars.HEAT_ALARM_EMAIL }}
+    steps:
+      - name: Refuse to run without the account id
+        run: |
+          set -eu
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
+          echo "::add-mask::$ACCOUNT_ID"
+
+      - name: Check out the pull request's head
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # The root zips dist/<name>/ and plans the function from its hash
+      # (decision 0017), so the bundle exists before the plan.
+      - name: Install and bundle the functions
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
+
+      - name: Assume the plan role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-prod-plan
+          role-session-name: release-plan-prod
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Plan
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/$ROOT" init
+          terraform -chdir="terraform/environment/$ROOT" plan -lock=false -out "$RUNNER_TEMP/plan.tfplan"
+
+      - name: Check the plan against the resource-type allow-list
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/$ROOT" show -json "$RUNNER_TEMP/plan.tfplan" > "$RUNNER_TEMP/plan.json"
+          node scripts/check-plan-resource-types.mjs "$RUNNER_TEMP/plan.json"
+
+      - name: Write the plan to the job summary and the pull request
+        env:
+          ENVIRONMENT: prod
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/post-terraform-plan.sh "$ROOT" "$RUNNER_TEMP/plan.tfplan" "${{ github.event.pull_request.head.sha }}" "plan role" "${{ github.event.pull_request.number }}"
+
+  # ---------------------------------------------------------------- push --
+  guard-merge:
+    name: Release source of the merge
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Check out release
+        uses: actions/checkout@v7
+
+      - name: Check which pull request the merge commit came from
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/check-release-source.sh push "$GITHUB_SHA"
+
+  apply:
+    name: Apply prod
+    needs: guard-merge
+    runs-on: ubuntu-latest
+    environment:
+      name: prod
+      url: ${{ steps.summary.outputs.site_url }}
+    # One apply at a time, never cancelled: a cancelled apply can leave the
+    # state lock behind, so applies queue (decision 0017).
+    concurrency:
+      group: deploy-prod
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      ACCOUNT_ID: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+      TF_VAR_workload_account_id: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+      TF_VAR_google_client_id: ${{ vars.HEAT_GOOGLE_CLIENT_ID }}
+      TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
+      TF_VAR_alarm_email: ${{ vars.HEAT_ALARM_EMAIL }}
+    steps:
+      - name: Refuse to run without the account id
+        run: |
+          set -eu
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
+          echo "::add-mask::$ACCOUNT_ID"
+
+      - name: Check out release
+        uses: actions/checkout@v7
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      # The functions for the plan, which hashes them, and the client for
+      # the publish step after the apply. No engine: the anonymous smoke test
+      # compares nothing with it.
+      - name: Install, bundle the functions and build the client
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
+          npm run build --workspace @heat/client
+
+      - name: Assume the apply role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-prod-apply
+          role-session-name: release-apply-prod
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Plan
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/$ROOT" init
+          terraform -chdir="terraform/environment/$ROOT" plan -out "$RUNNER_TEMP/plan.tfplan"
+
+      - name: Check the plan against the resource-type allow-list
+        run: |
+          set -eu
+          terraform -chdir="terraform/environment/$ROOT" show -json "$RUNNER_TEMP/plan.tfplan" > "$RUNNER_TEMP/plan.json"
+          node scripts/check-plan-resource-types.mjs "$RUNNER_TEMP/plan.json"
+
+      - name: Write the plan to the job summary
+        env:
+          ENVIRONMENT: prod
+        run: sh scripts/post-terraform-plan.sh "$ROOT" "$RUNNER_TEMP/plan.tfplan" "$GITHUB_SHA" "apply role"
+
+      # Exactly the plan that was checked, not a fresh one.
+      - name: Apply
+        run: terraform -chdir="terraform/environment/$ROOT" apply "$RUNNER_TEMP/plan.tfplan"
+
+      # No test users: prod's pool holds players only (decision 0020).
+      # The content is the apply job's, not Terraform's
+      # (terraform/modules/site/README.md, "What is not here").
+      - name: Publish the client and config.json to prod's bucket
+        run: |
+          set -eu
+          out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
+          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)"
+
+      - name: Write the environment's URL to the job summary
+        id: summary
+        run: |
+          set -eu
+          out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
+          site_url="$(out site_url)"
+          echo "site_url=$site_url" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Environment \`$STACK\`"
+            echo
+            echo "Site: $site_url (the page with Sign in with Google, POST /graphql with a Bearer token from the browser client, /config.json for the client)."
+            echo
+            echo "API behind it: \`$(out api_url)\`. Parameters under \`$(out parameter_prefix)\`: site_url, api_url, user_pool_id, browser_client_id, login_host. Alarms notify \`$(out alarm_topic_arn)\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The smoke test: the page, config.json, the managed login page, the
+      # hand-off to Google and the authorizer's 401, through
+      # https://heat.dcg-games.com. Nothing signs in and nothing is written;
+      # the authenticated check on prod is the owner's own Google sign-in.
+      - name: Call prod anonymously
+        run: |
+          set -eu
+          node scripts/e2e.mjs --stack "$STACK" --anonymous | tee -a "$RUNNER_TEMP/e2e.log"
+          {
+            echo
+            echo '```text'
+            cat "$RUNNER_TEMP/e2e.log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  tag:
+    name: Tag the release
+    needs: apply
+    runs-on: ubuntu-latest
+    permissions:
+      # The tag and the Release. Events raised by this token start no
+      # workflow, so the tag triggers nothing, as decision 0021 wants.
+      contents: write
+      pull-requests: read
+    steps:
+      - name: Check out release with its tags
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Write the tag and the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/tag-release.sh "$GITHUB_SHA"
