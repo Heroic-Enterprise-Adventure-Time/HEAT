@@ -17,7 +17,8 @@ attempt=0
 while [ "$attempt" -lt 12 ]; do
   lines="$(MSYS_NO_PATHCONV=1 aws logs filter-log-events --log-group-name "$log_group" --start-time "$since" --filter-pattern "REPORT" --query 'events[].message' --output text 2>/dev/null || true)"
   if [ -n "$lines" ]; then
-    cold="$(printf '%s\n' "$lines" | tr '\t' '\n' | grep -m1 'Init Duration' || true)"
+    # One REPORT per line, its fields tab-separated; the whole line is matched.
+    cold="$(printf '%s\n' "$lines" | tr '\t' ' ' | grep -m1 'Init Duration' || true)"
     if [ -n "$cold" ]; then
       init="$(printf '%s' "$cold" | sed -E 's/.*Init Duration: ([0-9.]+) ms.*/\1/')"
       duration="$(printf '%s' "$cold" | sed -E 's/.*REPORT.*[^d] Duration: ([0-9.]+) ms.*Billed.*/\1/')"
