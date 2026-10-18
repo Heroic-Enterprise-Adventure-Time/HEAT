@@ -6,10 +6,15 @@
 # introduces the resource.
 
 # The base (terraform/modules/base): the hosted zone and the shared user pool
-# with its CI app client (Issue-37).
+# with its CI app client (Issue-37); the certificate for the zone name and its
+# wildcard, its validation record in the zone and the validation waiter
+# (Issue-39).
 aws_route53_zone
 aws_cognito_user_pool
 aws_cognito_user_pool_client
+aws_acm_certificate
+aws_route53_record
+aws_acm_certificate_validation
 
 # An environment (terraform/modules/environment): the two tables, one
 # function per manifest entry with its role, alias and log group, the HTTP
