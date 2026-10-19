@@ -12,7 +12,7 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 4. **The committed files are the asset of record.** Assets live under `art/<kind>/<set>/`, for example `art/heroes/ranger-01/`. The game uses these files; it never needs the service to still hold them.
 5. **Every set carries its provenance.** `provenance.json` beside the files records what the service's own export does not: the service, the plan and the date of the terms the set was made under, the service's ids, every parameter of every generation call, whether it was made through the MCP or on the service's website, the generations it cost, and the act's hold frame. `art/heroes/ranger-01/provenance.json` is the shape to copy.
 6. **Committed files match the service's export.** Before a set is committed, its files are compared byte for byte with the same files in the service's download of it.
-7. **Sets are tagged in PixelLab.** Every kept character is tagged `heat`, its kind (`hero`) and its class, so that it can be found among the account's other characters. A PixelLab website project is not visible through the MCP.
+7. **Characters are tagged in PixelLab when they are made.** Every character made for HEAT is tagged `heat`, its kind (`hero`) and its class as soon as it is created, kept or not, so that it can be found among the account's other characters. One that is not kept, or a kept look that is later replaced, also gets `rejected`, so the rejects can be found together and deleted on PixelLab's website. The tag filter matches any of the tags given, so the kept sets are found in `art/heroes/`, each with its PixelLab id in its provenance. A PixelLab website project is not visible through the MCP.
 
 ### A hero sprite set
 
@@ -60,6 +60,8 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 ## Why
 
 **Generated once, committed, with its provenance.** A service's output cannot be reproduced on demand: the same call gives a different result, the service may change or close, and the terms the asset was made under can change after it was made. The committed file and a record of how it was made are what last. The provenance is also the licence evidence if a question ever comes up.
+
+**Tags on every character.** The first party's sets left 23 characters that were not kept and carried no tag, findable only by name (Issue-76).
 
 **Connectors on the account.** The agent needs the tools in every session and on every machine the owner uses; the account is the one place that is true. A token in a repository or a CI environment is a credential with no reason to be there.
 
