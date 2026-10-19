@@ -88,6 +88,13 @@
         {
           "directions": ["east"],
           "generations": 2
+        },
+        {
+          "directions": ["east"],
+          "via": "website",
+          "date": "2026-10-19",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, because the first act had a fragment detached from the fist. The website shows no receipt: the owner's website re-rolls of that evening, this one and Knight 06's, cost 17 generations together, read from the balance."
         }
       ],
       "generations": 2
