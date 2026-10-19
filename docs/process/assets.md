@@ -48,7 +48,7 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 ### Working with the service
 
 14. **Budget.** The plan gives 2,000 generations a cycle; `get_balance` reports what is left. A set costs about 22, a re-rolled direction 3.
-15. **Limits.** At most 8 jobs run at once, so a set is queued in batches. `wait_for_jobs` is called with a timeout under 300 seconds and called again: a wait of 540 seconds timed out on PixelLab's side although the job had finished. A job that fails with "heavy load" is retried once and is not charged. A skeleton animation is not made twice for the same template and direction: a direction is re-rolled by deleting its animation first, which is permanent and is the owner's call.
+15. **Limits.** At most 8 jobs run at once, so a set is queued in batches. `wait_for_jobs` is called with a timeout under 300 seconds and called again: a wait of 540 seconds timed out on PixelLab's side although the job had finished. A job that fails with "heavy load" is retried once and is not charged. A skeleton animation is not made twice for the same template and direction, and the MCP has no re-roll: the owner re-rolls one direction with the button on PixelLab's website, and the provenance records that call as made on the website.
 
 ### Audio
 
