@@ -34,6 +34,7 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | The Terraform state bucket, who applies, and the one-time bootstrap | `terraform/backend/README.md` |
 | Running and seeing a change: the sandbox stacks and the fast loop | `docs/process/development.md` |
 | Making art or audio: the services, the connectors, the hero sprite set | `docs/process/assets.md` |
+| Making a hero sprite set, step by step | `docs/runbooks/hero-sprite-set.md` |
 | The index of every project document, and how documents are written | `docs/README.md` |
 
 Read the design and architecture documents before any work that touches them. Read `docs/README.md` before adding or changing a document.
