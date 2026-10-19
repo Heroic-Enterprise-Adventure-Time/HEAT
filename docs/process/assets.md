@@ -30,8 +30,8 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
    | `proportions` | default |
 
 9. **The description** is `<appearance>, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors`. Only `<appearance>` changes from set to set. Characters hold nothing: an action's weapon or spell is a separate effect sprite.
-10. **Full colour.** No colour reduction and no shared palette.
-11. **The animations,** `animate_character` with `mode: skeleton-v3`, which costs 2 generations a direction through the MCP:
+10. **Full colour, touched up by hand.** No colour reduction and no shared palette. Before any animation, the owner may correct single pixels of the rotations in PixelLab's online editor rather than re-roll a look; the animations are built from the edited rotations, and the provenance records every changed pixel.
+11. **The animations,** `animate_character` with `mode: skeleton-v3`, which costs 3 generations a direction through the MCP, 2 for the three-frame act:
 
     | Name in HEAT | Template | Directions | Frames | Played as |
     | --- | --- | --- | --- | --- |
@@ -41,14 +41,15 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
     | hit | `taking-punch` | east | 6 | once |
     | down | `falling-back-death` | east | 7 | once, last frame held |
 
-    West is east mirrored. A hero standing outside battle is its still frame: there is no idle animation.
-12. **The cost** of a set is about 15 generations: 1 for the character and 14 for seven animated directions.
-13. **Checks before keeping a set.** The hands are empty in every frame. The figure's height varies by no more than 2 px across each animation. No stray pixels of a colour the character does not have. A set that fails is re-rolled, one direction at a time.
+    West is east mirrored. A hero standing outside battle is its still frame: there is no idle animation. The four still frames are the character's rotations; where the owner finds the west rotation bad, `still-west.png` is the east rotation mirrored, and the provenance says so.
+    **Frames are lined up by the figure's feet, not by the canvas.** Whatever draws a set puts the lowest opaque pixel of the south still on the spot where the hero stands, and moves each animation by one amount, so that its first frame's lowest pixel lands there too; `down` is moved frame by frame instead, each frame's lowest pixel onto that spot, so the body lands where the feet were. The files stay as PixelLab exports them.
+12. **The cost** of a set is about 22 generations: 1 for the character and 21 for seven animated directions.
+13. **Checks before keeping a set.** The hands are empty in every frame. The figure's height varies by no more than 2 px across each animation but `down`, where the figure falls. No stray pixels: none detached from the figure, and none of a colour far from the character's own. A set that fails is re-rolled by the owner, one direction at a time (rule 15), or the owner waives the check for that direction. `docs/runbooks/hero-sprite-set.md` is the order of work, and its script runs every check but the hands.
 
 ### Working with the service
 
-14. **Budget.** The plan gives 2,000 generations a cycle; `get_balance` reports what is left. A set costs about 15, a re-rolled direction 2.
-15. **Limits.** At most 8 jobs run at once, so a set is queued in batches. `wait_for_jobs` is called with a timeout under 300 seconds and called again: a wait of 540 seconds timed out on PixelLab's side although the job had finished. A job that fails with "heavy load" is retried once and is not charged.
+14. **Budget.** The plan gives 2,000 generations a cycle; `get_balance` reports what is left. A set costs about 22, a re-rolled direction 3.
+15. **Limits.** At most 8 jobs run at once, so a set is queued in batches. `wait_for_jobs` is called with a timeout under 300 seconds and called again: a wait of 540 seconds timed out on PixelLab's side although the job had finished. A job that fails with "heavy load" is retried once and is not charged. A skeleton animation is not made twice for the same template and direction, and the MCP has no re-roll. So the work is split: the agent queues a set's animations and checks the result; the owner reviews them and re-rolls any direction with the button on PixelLab's website, and the provenance records that call as made on the website.
 
 ### Audio
 
@@ -63,3 +64,7 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 **Connectors on the account.** The agent needs the tools in every session and on every machine the owner uses; the account is the one place that is true. A token in a repository or a CI environment is a credential with no reason to be there.
 
 **The hero sprite set.** Each rule in rules 8 to 13 was chosen by the owner after looking at the alternatives in the game's own scale and setting on 2026-10-18; decision 0025 lists what was tried. The set is the same for every class so that a class's pool of sprite sets can grow by adding sets, with no per-class art rules.
+
+**Hand edits and the mirrored west still.** Re-rolling a look for one bad pixel throws away a look the owner otherwise kept, and an edit made before animation carries into every frame. A west rotation can be bad where the east one is not, and the mirror is what the animations already use for west. Both were added with the first party's sets (Issue-73), with the cost read from their receipts.
+
+**Lining frames up by the feet.** PixelLab places the figure differently on each animation's canvas: in most sets the walk south stands about 8 px higher than the other directions, and every `down` ends with the body 9 to 11 px above where the feet stood. Measuring from the pixels fixes every set, present and future, without editing the exported files (Issue-73).

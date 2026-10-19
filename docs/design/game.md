@@ -14,6 +14,7 @@ Each item carries a status. **Decided** items are settled by the project owner. 
 - **Working assumption.** A job is an ordered list of stages (travel, fight, gather, arrive). An adventure runs them on one timeline, with health and cargo carried between stages. A cart is a party member with health and no actions. A tree is a resource that a chopping ability "damages" into lumber.
 - **Working assumption.** An outcome is richer than win or lose: how far the party got, what it gathered or delivered, who was lost.
 - **Open.** Unit types and abilities. A first cut to react to: a fighter who holds the front, a ranger who hits from behind, and a laborer who chops and carries but fights badly, with mana and status effects left out until the loop works.
+- **Decided.** The villager is the starting hire: cheap to hire, with no specialized skills. Specialized laborers, such as a miner or a lumberjack, come later as unit types of their own.
 
 ## The adventure loop
 

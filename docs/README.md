@@ -10,6 +10,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
 | [process/assets.md](process/assets.md) | Generated art and audio: the services, the connectors, the hero sprite set, the provenance beside each set | When the agent reads it |
+| [runbooks/hero-sprite-set.md](runbooks/hero-sprite-set.md) | Making a hero sprite set: the order of work, the script that writes and checks the files and the provenance; the skill `.claude/skills/hero-sprite-set/` points at it | When the agent makes art |
 | [process/development.md](process/development.md) | Running and seeing a change: the branch's sandbox stack, the fast loop on the laptop, logs, the cap | When the agent reads it |
 | [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
@@ -31,7 +32,7 @@ These are part of the structure and are not written yet. Each is written when th
 | Document | Written when |
 | --- | --- |
 | `standards/<language>.md` | The first code in that language lands; `standards/typescript.md` is the first |
-| `runbooks/` | A multi-step procedure has been done more than once |
+| More of `runbooks/` | A multi-step procedure has been done more than once; `runbooks/hero-sprite-set.md` is the first |
 
 ## How documents are written
 

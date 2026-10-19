@@ -1,0 +1,140 @@
+{
+  "set": "wizard-03",
+  "kind": "hero sprite set",
+  "classes": ["wizard"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "271691d8-b84c-4e20-aa83-45b65f7b0632",
+    "name": "Wizard 03",
+    "tags": ["heat", "hero", "wizard"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-10-19T07:04:31.957673+00:00",
+    "parameters": {
+      "description": "wizard in a deep plum robe and wide-brimmed pointed hat, grey beard, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "521f6379-7ea8-4389-826d-433a6d051662",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["south", "east", "north"],
+          "generations": 9
+        }
+      ],
+      "generations": 9
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "6b1c48bf-f982-49a5-904b-7deddaa7caeb",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "act": {
+      "template": "lead-jab",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "ce058104-1b65-4e25-8ab6-6537a61a26b6",
+      "directions": ["east"],
+      "framesPerDirection": 3,
+      "canvas": [64, 64],
+      "holdFrame": 1,
+      "files": "act-east-<0..2>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 2
+        }
+      ],
+      "generations": 2
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "06dc766b-89e4-4054-8257-dda16365810c",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "6e78f087-1c7d-4f16-be12-a5cbafde41e3",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    }
+  },
+  "animationGenerations": 20,
+  "waivedChecks": [
+    {
+      "failure": "hit east: height drifts 6 px",
+      "check": "hit east: height drifts",
+      "date": "2026-10-19",
+      "note": "The owner looked at the hit in the camp scene and kept it: the drift is the recoil of the pose, not the figure changing size."
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-19)."
+}
