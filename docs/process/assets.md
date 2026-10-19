@@ -42,6 +42,7 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
     | down | `falling-back-death` | east | 7 | once, last frame held |
 
     West is east mirrored. A hero standing outside battle is its still frame: there is no idle animation. The four still frames are the character's rotations; where the owner finds the west rotation bad, `still-west.png` is the east rotation mirrored, and the provenance says so.
+    PixelLab does not place the figure at the same spot on every animation's canvas: in most sets the walk south stands about 8 px higher on its 64×64 canvas than the walk north and east (Ranger 01's too), and in the wizards it does not. Whatever draws the frames lines them up by the figure's feet, not by the canvas.
 12. **The cost** of a set is about 22 generations: 1 for the character and 21 for seven animated directions.
 13. **Checks before keeping a set.** The hands are empty in every frame. The figure's height varies by no more than 2 px across each animation but `down`, where the figure falls. No stray pixels: none detached from the figure, and none of a colour far from the character's own. A set that fails is re-rolled by the owner, one direction at a time (rule 15), or the owner waives the check for that direction. `docs/runbooks/hero-sprite-set.md` is the order of work, and its script runs every check but the hands.
 

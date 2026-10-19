@@ -32,7 +32,7 @@
     "canvas": [48, 48],
     "generations": 1
   },
-  "handEdits": ["head moved in all four rotations by the owner on PixelLab's website, 2026-10-19, before any animation (48, 61, 36, 58 px changed in south, east, north, west)"],
+  "handEdits": ["Head moved in all four rotations by the owner on PixelLab's website, 2026-10-19, before any animation (48, 61, 36, 58 px changed in south, east, north, west).", "A second touch-up of the rotations by the owner, 2026-10-19 evening, while chasing the hair below: 3, 2, 2, 2 px changed in south, east, north, west."],
   "files": {
     "still": {
       "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
@@ -58,6 +58,13 @@
         {
           "directions": ["south", "north"],
           "generations": 6
+        },
+        {
+          "directions": ["south", "north"],
+          "via": "website",
+          "date": "2026-10-19",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, 2026-10-19 evening: the first walk south and north drew tufts of hair at the sides of the head that neither rotation has, 2 px wider each side; the kept re-roll's head is 8 px wide like the rotations. The website shows no receipt: the owner's website re-rolls of that evening, these and Priest 02's act, cost 17 generations together, read from the balance."
         }
       ],
       "generations": 9
@@ -110,6 +117,13 @@
         {
           "directions": ["east"],
           "generations": 3
+        },
+        {
+          "directions": ["east"],
+          "via": "website",
+          "date": "2026-10-19",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, 2026-10-19 evening, with the walks; counted in the same 17 generations."
         }
       ],
       "generations": 3
