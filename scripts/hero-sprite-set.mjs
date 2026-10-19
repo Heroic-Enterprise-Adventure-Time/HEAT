@@ -15,6 +15,7 @@
 // from the agent's record of the generation calls, which the export lacks:
 //   { "name": "Fighter 02", "classes": ["fighter"], "characterGenerations": 1,
 //     "characterNote"?: "...", "handEdits"?: ["..."],
+//     "waivers"?: [{ "check": "hit east: height drifts", "date": "...", "note": "..." }],
 //     "animations": { "walk": { "groupId": "...", "source"?: "<PixelLab name>",
 //                               "calls": [{ "directions": ["south"], "generations": 3, "date"?: "...", "note"?: "..." }] } } }
 
@@ -212,6 +213,7 @@ const report = {
   animations: {},
   failures,
   review,
+  waived: [],
 };
 mkdirSync(values.out, { recursive: true });
 const write = (file, bytes, from) => {
@@ -281,6 +283,14 @@ for (const [name, spec] of Object.entries(SET)) {
     // colours far from every rotation colour are listed, and they are looked at, not refused.
     if (farPixels) review.push(`${name} ${d}: ${farPixels} px in colours far from any the character's rotations have`);
   }
+}
+
+// A failure the owner has looked at and accepted (rule 13) is recorded as waived, not failed.
+for (const waiver of record?.waivers ?? []) {
+  const i = failures.findIndex((f) => f.startsWith(waiver.check));
+  if (i < 0) throw new Error(`the waiver "${waiver.check}" matches no failure`);
+  report.waived.push({ failure: failures[i], ...waiver });
+  failures.splice(i, 1);
 }
 
 // --- provenance ----------------------------------------------------------------
@@ -354,6 +364,7 @@ if (record) {
     },
     animations,
     animationGenerations: Object.values(animations).reduce((n, a) => n + a.generations, 0),
+    ...(report.waived.length ? { waivedChecks: report.waived } : {}),
     verified: values["mirror-west"]
       ? `Every PNG here except still-west.png is byte-identical to the same file in PixelLab's own export of the character (export version ${report.exportVersion}, ${report.exportDate.slice(0, 10)}).`
       : `Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version ${report.exportVersion}, ${report.exportDate.slice(0, 10)}).`,

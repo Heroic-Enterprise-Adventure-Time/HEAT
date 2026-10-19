@@ -128,5 +128,13 @@
     }
   },
   "animationGenerations": 20,
+  "waivedChecks": [
+    {
+      "failure": "hit east: height drifts 3 px",
+      "check": "hit east: height drifts",
+      "date": "2026-10-19",
+      "note": "The owner looked at the hit in the camp scene and kept it: the drift is the recoil of the pose, not the figure changing size."
+    }
+  ],
   "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-19)."
 }
