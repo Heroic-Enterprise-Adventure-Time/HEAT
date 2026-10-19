@@ -1,0 +1,98 @@
+{
+  "set": "ranger-01",
+  "kind": "hero sprite set",
+  "classes": ["ranger"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "fee0c6ae-df01-4afc-9c4b-a937d883d388",
+    "name": "Ranger 01",
+    "tags": ["heat", "hero", "ranger"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-10-19T00:16:17Z",
+    "parameters": {
+      "description": "ranger in a hooded traveling cloak, empty hands, no weapon, warm earthy browns and greens, NES-era retro pixel art, very few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1,
+    "note": "Made before the description template of docs/process/assets.md was settled; that template grew out of this character. It differs only in its wording."
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton",
+      "via": "website",
+      "groupId": "d27fcf53-b519-4362-af54-f46bff09b332",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png"
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton",
+      "via": "website",
+      "groupId": "42685537-34e1-4551-b852-666a219e165c",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png"
+    },
+    "act": {
+      "template": "lead-jab",
+      "mode": "skeleton",
+      "via": "website",
+      "groupId": "7c09a0a2-139d-43db-8964-79c4fba23066",
+      "directions": ["east"],
+      "framesPerDirection": 3,
+      "canvas": [64, 64],
+      "holdFrame": 1,
+      "files": "act-east-<0..2>.png"
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton",
+      "via": "website",
+      "groupId": "149bbb96-5017-482d-8e64-8bbae552aeec",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png"
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton",
+      "via": "website",
+      "groupId": "3c05018b-6c21-4d8d-9e5b-a8af98bc8480",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png"
+    }
+  },
+  "animationGenerations": "About 26 for the eight skeleton directions, read from the account balance, not itemised: the owner made these on PixelLab's website, which shows no receipt. The same template through the MCP cost 2 a direction (the wizard's lead jab, 2026-10-18).",
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1), downloaded 2026-10-18."
+}
