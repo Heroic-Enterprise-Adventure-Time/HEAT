@@ -1,44 +1,40 @@
 /*
- * The page's regions (Issue-89; page-layout.ts holds the arithmetic).
- * Narrow screens, the default here: the scene on top at the width's whole
- * number scale, the content area below it in the page's flow, and the menu
- * as a tab bar along the bottom. Landscape, from 4:3: the menu on the left,
- * the scene filling the rest, the content area docked over its right side.
+ * The page's regions (Issue-89; page-layout.ts holds the arithmetic). Nothing
+ * overlaps. Narrow screens, the default here: the scene on top, the page's
+ * width by the map's height, then the menu as a row, then the panel in the
+ * page's flow. Landscape, from 4:3: the menu on the left, the scene filling
+ * the middle, the panel on the right, always there.
  */
 :host {
-  --ink: #2b1d14;
-  --paper: #f3e6cf;
+  --night: #0b0806;
+  --ink: #140d08;
+  --bar: #1a120c;
+  --parchment: #94805c;
   --gold: #d9a441;
-  --tab-bar: 4rem;
+  --light: #e6d6b8;
 }
 
 .camp {
   display: flex;
   flex-direction: column;
   min-height: calc(100dvh - 2.25rem);
-  padding-bottom: var(--tab-bar);
-  box-sizing: border-box;
-  background: #1b130d;
+  background: var(--night);
 }
 
-/* A 16:9 box as wide as the page, so the scene's scale is set by the width. */
 .stage {
-  display: flex;
-  align-items: center;
-  justify-content: center;
   width: 100%;
-  aspect-ratio: 16 / 9;
   overflow: hidden;
+  background: var(--night);
 }
 
 .menu {
-  position: fixed;
-  z-index: 1;
-  inset: auto 0 0 0;
   display: flex;
   justify-content: space-around;
-  height: var(--tab-bar);
-  background: var(--ink);
+  height: 4rem;
+  flex: none;
+  background: var(--bar);
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
 }
 
 .entry {
@@ -48,23 +44,34 @@
   justify-content: center;
   gap: 0.125rem;
   flex: 1;
-  color: var(--paper);
-  font-size: 0.75rem;
+  min-width: 0;
+  color: var(--light);
+  font-size: 0.7rem;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .entry img {
   image-rendering: pixelated;
 }
 
+/* An unbuilt facility's entry is there to be chosen, but quieter. */
+.entry.unbuilt img {
+  opacity: 0.55;
+}
+
+.entry.unbuilt .label {
+  color: #a8987c;
+}
+
 .entry:hover,
 .entry:focus-visible {
-  background: #3d2a1d;
+  background: #2a1d13;
 }
 
 .entry.active {
-  background: #4a3423;
-  box-shadow: inset 0 3px 0 var(--gold);
+  background: #33241a;
+  box-shadow: inset 0 -3px 0 var(--gold);
 }
 
 .entry:focus-visible {
@@ -73,39 +80,38 @@
 }
 
 .panel {
-  position: relative;
   flex: 1;
   padding: 0.75rem 1rem;
-  background: var(--paper);
+  background: var(--parchment);
   color: var(--ink);
-  border-top: 3px solid var(--ink);
 }
 
 @media (min-aspect-ratio: 4 / 3) {
   .camp {
-    position: relative;
     display: grid;
-    grid-template-columns: 3.5rem 1fr;
+    grid-template-columns: 3.5rem minmax(0, 1fr) 24rem;
+    grid-template-areas: 'menu stage panel';
     height: calc(100dvh - 2.25rem);
     min-height: 0;
-    padding-bottom: 0;
   }
 
   .camp.labels {
-    grid-template-columns: 12.5rem 1fr;
+    grid-template-columns: 12.5rem minmax(0, 1fr) 24rem;
   }
 
   .stage {
+    grid-area: stage;
     height: 100%;
-    aspect-ratio: auto;
   }
 
   .menu {
-    position: static;
+    grid-area: menu;
     flex-direction: column;
     justify-content: flex-start;
     height: auto;
     padding-top: 0.5rem;
+    border: none;
+    border-right: 2px solid var(--ink);
   }
 
   .entry {
@@ -128,8 +134,7 @@
     left: calc(100% + 0.25rem);
     z-index: 2;
     padding: 0.125rem 0.5rem;
-    background: var(--ink);
-    white-space: nowrap;
+    background: var(--bar);
     pointer-events: none;
     visibility: hidden;
   }
@@ -140,36 +145,15 @@
   }
 
   .panel {
-    position: absolute;
-    inset: 0 0 0 auto;
-    width: min(24rem, 100%);
-    box-sizing: border-box;
+    grid-area: panel;
     overflow-y: auto;
-    border-top: none;
     border-left: 3px solid var(--ink);
-    box-shadow: -4px 0 0 #0008;
-  }
-
-  .error {
-    bottom: 0.5rem;
-    left: 4.5rem;
   }
 }
 
 h2 {
   margin: 0 0 0.5rem;
   font-size: 1.1rem;
-}
-
-.close {
-  position: absolute;
-  top: 0.25rem;
-  right: 0.5rem;
-  border: none;
-  background: none;
-  color: inherit;
-  font-size: 1.25rem;
-  cursor: pointer;
 }
 
 .back {
@@ -198,9 +182,13 @@ button {
   font: inherit;
 }
 
+.status {
+  font-weight: bold;
+}
+
 .dead,
 .note {
-  color: #7a3b2e;
+  color: #3d140c;
 }
 
 dl {
@@ -220,7 +208,7 @@ dd {
 
 .error {
   position: fixed;
-  bottom: calc(var(--tab-bar) + 0.5rem);
+  bottom: 0.5rem;
   left: 1rem;
   color: #ff8a8a;
 }

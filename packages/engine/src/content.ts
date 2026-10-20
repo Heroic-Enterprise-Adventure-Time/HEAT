@@ -14,7 +14,23 @@ export type UnitType = "villager" | "fighter" | "knight" | "ranger" | "wizard" |
 
 export const UNIT_TYPES: readonly UnitType[] = ["villager", "fighter", "knight", "ranger", "wizard", "priest"];
 
-export type FacilityKind = "heroes-hall" | "warehouse" | "job-board";
+export type FacilityKind = "heroes-hall" | "warehouse" | "job-board" | "mine" | "lumber-camp" | "caravan-hub";
+
+export interface Facility {
+  name: string;
+  /** What the facility does, shown in its panel built or not. */
+  description: string;
+}
+
+/** Every kind of facility, by name and purpose (game.md, "Locations and camps"). */
+export const FACILITIES: Readonly<Record<FacilityKind, Facility>> = {
+  "heroes-hall": { name: "Heroes hall", description: "Where heroes are recruited, and where you see and manage the heroes of this camp." },
+  "job-board": { name: "Job board", description: "General jobs posted for anyone at this location: the first way to set out." },
+  warehouse: { name: "Warehouse", description: "Holds this camp's resources. Its level sets how much of each it can hold." },
+  mine: { name: "Mine", description: "Sends heroes into the hill on mining runs for ore." },
+  "lumber-camp": { name: "Lumber camp", description: "Sends heroes into the woods on lumber runs for timber." },
+  "caravan-hub": { name: "Caravan hub", description: "Sends caravans to other locations, carrying resources and heroes as passengers." },
+};
 
 /** A cost in resources: there is no currency (game.md, "Resources"). */
 export type Cost = readonly { material: Material; amount: number }[];
@@ -34,6 +50,8 @@ export interface Location {
   sharedFacilities: readonly FacilityKind[];
   /** The facilities every camp here has at level 1 or above. */
   ownFacilities: readonly FacilityKind[];
+  /** The own facilities a camp here may build; until built they stand at level 0. */
+  buildableFacilities: readonly FacilityKind[];
   recruits: readonly Recruit[];
 }
 
@@ -43,6 +61,7 @@ export const LOCATIONS: readonly Location[] = [
     name: "Millbrook",
     sharedFacilities: ["job-board"],
     ownFacilities: ["heroes-hall", "warehouse"],
+    buildableFacilities: ["mine", "lumber-camp", "caravan-hub"],
     recruits: [
       // Working assumptions until Issue-82 sets the costs.
       { unitType: "villager", hallLevel: 1, cost: [{ material: "timber", amount: 5 }] },

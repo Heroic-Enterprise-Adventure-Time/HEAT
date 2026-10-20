@@ -45,7 +45,9 @@ function fakeScene() {
   const scene = {
     callbacks: null as SceneCallbacks | null,
     shown: [] as { heroes: readonly SceneHero[]; arriving: string | undefined }[],
-    factory: async (_host: HTMLElement, _layout: unknown, callbacks: SceneCallbacks) => {
+    levels: null as Readonly<Record<string, number>> | null,
+    factory: async (_host: HTMLElement, _layout: unknown, levels: Readonly<Record<string, number>>, callbacks: SceneCallbacks) => {
+      scene.levels = levels;
       scene.callbacks = callbacks;
       return {
         setHeroes: (heroes: readonly SceneHero[], arriving?: string) => scene.shown.push({ heroes, arriving }),
@@ -111,35 +113,43 @@ describe('Camp', () => {
     expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h1']);
   });
 
-  it('lists the facilities of the camp in the menu, each linking to its panel', async () => {
+  it('lists every facility of the camp in the menu, built or not, each linking to its panel', async () => {
     const { page } = await render(fakeGame([]));
     const entries = [...page.querySelectorAll<HTMLAnchorElement>('nav.menu a')];
-    expect(entries.map((a) => a.textContent?.trim())).toEqual(['Heroes hall', 'Job board', 'Warehouse']);
-    expect(entries.map((a) => a.getAttribute('href'))).toEqual(['/?open=heroes-hall', '/?open=job-board', '/?open=warehouse']);
+    expect(entries.map((a) => a.textContent?.trim())).toEqual(['Heroes hall', 'Job board', 'Warehouse', 'Lumber camp', 'Mine', 'Caravan hub']);
+    expect(entries[4]!.getAttribute('href')).toBe('/?open=mine');
+    expect(entries[4]!.classList).toContain('unbuilt');
+    expect(entries[0]!.classList).not.toContain('unbuilt');
     expect(entries[0]!.querySelector('img')?.getAttribute('src')).toBe('art/icons/heroes-hall.png');
   });
 
-  it('opens the panel the URL names, marks its menu entry, and closes in place', async () => {
-    const { router, settle, page } = await render(fakeGame([]), '/?open=job-board');
+  it('hands the scene each facility level: 0 for the ones not built', async () => {
+    const { scene } = await render(fakeGame([]));
+    expect(scene.levels).toEqual({ 'heroes-hall': 1, 'job-board': 1, warehouse: 1, 'lumber-camp': 0, mine: 0, 'caravan-hub': 0 });
+  });
+
+  it('always shows a panel: the heroes hall when the address names none', async () => {
+    const { page } = await render(fakeGame([]));
+    expect(page.querySelector('aside h2')?.textContent).toBe('Heroes hall');
+    expect(page.querySelector('nav.menu a[aria-current="page"]')?.textContent?.trim()).toBe('Heroes hall');
+    expect(page.querySelector('aside .close')).toBeNull();
+  });
+
+  it('opens the panel the URL names and marks its menu entry', async () => {
+    const { page } = await render(fakeGame([]), '/?open=job-board');
     expect(page.querySelector('aside h2')?.textContent).toBe('Job board');
     expect(page.querySelector('nav.menu a[aria-current="page"]')?.textContent?.trim()).toBe('Job board');
-
-    page.querySelector<HTMLButtonElement>('aside .close')!.click();
-    await vi.waitFor(() => expect(router.url).toBe('/'));
-    await settle();
-    expect(page.querySelector('aside')).toBeNull();
   });
 
-  it('closes the panel on Escape', async () => {
-    const { router, settle, page } = await render(fakeGame([]), '/?open=warehouse');
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-    await vi.waitFor(() => expect(router.url).toBe('/'));
-    await settle();
-    expect(page.querySelector('aside')).toBeNull();
+  it('says what an unbuilt facility does and that it is not built', async () => {
+    const { page } = await render(fakeGame([]), '/?open=mine');
+    expect(page.querySelector('aside h2')?.textContent).toBe('Mine');
+    expect(page.querySelector('aside')?.textContent).toContain('Not built yet.');
+    expect(page.querySelector('aside')?.textContent).toContain('mining runs');
   });
 
-  it('ignores a panel the camp does not have', async () => {
+  it('falls back to the hall for a panel the camp does not have', async () => {
     const { page } = await render(fakeGame([]), '/?open=forge');
-    expect(page.querySelector('aside')).toBeNull();
+    expect(page.querySelector('aside h2')?.textContent).toBe('Heroes hall');
   });
 });
