@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Config } from '../config';
 import { Session, type SessionUser } from '../session';
 import { CAMP_SCENE_FACTORY } from '../camp/camp';
@@ -26,6 +27,7 @@ async function render(session: ReturnType<typeof fakeSession>, configError: stri
   await TestBed.configureTestingModule({
     imports: [Home],
     providers: [
+      provideRouter([]),
       { provide: Session, useValue: session },
       { provide: Config, useValue: config },
       // The camp's own collaborators, standing in: no hub and no WebGL in a test.

@@ -2,6 +2,7 @@ import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyl
 import type { FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
 import { SCENE_HEIGHT, SCENE_WIDTH, TILE, type CampLayout } from './layout';
+import { sceneScale } from '../page-layout';
 import { newWalker, randomSpot, step, type Facing, type Walker } from './wander';
 
 /**
@@ -33,8 +34,6 @@ const WALK_DIRECTIONS: readonly WalkDirection[] = ['south', 'east', 'north'];
 const STILL_DIRECTIONS: readonly Facing[] = ['south', 'east', 'north', 'west'];
 const WALK_FRAMES = 6;
 const WALK_FRAME_MS = 100;
-/** The facilities a player can click; the job board waits for Issue-15. */
-const CLICKABLE: ReadonlySet<FacilityKind> = new Set(['heroes-hall']);
 
 interface HeroFrames {
   still: Record<Facing, Texture>;
@@ -110,7 +109,7 @@ export async function createCampScene(host: HTMLElement, layout: CampLayout, cal
   host.appendChild(app.canvas);
 
   const resize = () => {
-    const scale = Math.max(1, Math.floor(Math.min(host.clientWidth / SCENE_WIDTH, host.clientHeight / SCENE_HEIGHT)));
+    const scale = sceneScale(host.clientWidth, host.clientHeight);
     app.canvas.style.width = `${SCENE_WIDTH * scale}px`;
     app.canvas.style.height = `${SCENE_HEIGHT * scale}px`;
   };
@@ -139,11 +138,10 @@ export async function createCampScene(host: HTMLElement, layout: CampLayout, cal
     sprite.pivot.set(texture.width / 2, lowestOpaqueRow(texture) + 1);
     sprite.position.set(spot.at.x, spot.at.y);
     sprite.zIndex = spot.at.y;
-    if (CLICKABLE.has(spot.kind)) {
-      sprite.eventMode = 'static';
-      sprite.cursor = 'pointer';
-      sprite.on('pointertap', () => callbacks.onFacility(spot.kind));
-    }
+    // Every facility opens its panel, as its entry in the menu does (Issue-89).
+    sprite.eventMode = 'static';
+    sprite.cursor = 'pointer';
+    sprite.on('pointertap', () => callbacks.onFacility(spot.kind));
     world.addChild(sprite);
   }
 

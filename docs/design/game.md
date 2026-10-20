@@ -40,6 +40,16 @@ The rules for making a hero's sprite set are `docs/process/assets.md`, rules 8 t
 - **Decided.** A camp stands on a 16 px tiled ground with no outline, so that the outlined buildings and heroes stand off it. Each facility is one sprite at a three-quarter angle, front wall facing down-right, the same for every facility. A facility's level may change its picture, never its size or its angle (decision 0027).
 - **Decided.** The page's icons, such as a facility's entry in the menu, and the favicon, are 32 px pixel art in the same look, drawn at a whole-number scale. The favicon is a gold coin with a sword through it: money and a weapon, the business of adventuring (Issue-89).
 
+## The page
+
+How the page around the scene is laid out (Issue-89). The scene's own rules are in "Locations and camps" and decision 0028.
+
+- **Decided.** Four regions. The **header bar**: the title, the camp select, the open adventure and sign-in, nothing more; resources are not shown there, because a camp will hold many kinds. The **facility menu**: an entry with an icon for each facility the camp has, the same list the scene draws. The **stage**: the scene, at the largest whole-number scale that fits the space the other regions leave it. The **content area**: one panel at a time, such as the heroes hall, the job board, the warehouse or a hero's card.
+- **Decided.** Panels are not modal windows. On a landscape screen, from 4:3, the content area is docked on the right over the scene, which keeps its place and scale; the menu is on the left, an icon rail that shows its labels only where the wider menu costs the scene no scale step. On a narrower screen, a phone held upright, the scene sits under the header at the width's scale, the content area is below it in the page and scrolls, and the menu is a tab bar along the bottom.
+- **Decided.** The open panel is in the address, so the browser's back closes it, a reload keeps it, and a panel can be linked to. A panel moves from a list to a detail and back, as the hall's roster does to a hero's card.
+- **Decided.** Resources are shown where they matter, not in a bar: the warehouse lists the camp's stock against its cap, and every cost or reward shows the camp's balance beside it.
+- **Decided.** In battle the content area is reserved for the party and the controls instead of covering the scene, which scales into what is left; on a narrow screen they go below it.
+
 ## The adventure loop
 
 - **Decided.** An adventure runs deterministically in the browser on a timestamped timeline and is submitted in one piece for verification. The game is not offline-first; the aim is to avoid a request per click.
@@ -69,7 +79,7 @@ How an adventure plays out. Everything in this section is expected to change as 
 - **Decided.** A player unlocks a location and then has a camp there. A new player starts with one location unlocked and no heroes. **Open:** how further locations unlock; likely an explore or travel mission.
 - **Decided.** A camp is one player's view of a location, and it is the main view for a signed-in player. One camp is on screen at a time, and the player switches between their unlocked camps at will with a select in the page's header bar. The header bar is thin and also holds the title, sign-in and the open adventure, so the player can always find it.
 - **Decided.** A location has two kinds of facility. **Own facilities** belong to one player, who builds and upgrades them, so two players' camps at the same location can differ in which facilities they have and at what level. **Shared facilities** belong to the location and look the same to every player.
-- **Decided.** Facilities are where the player acts: they click a facility to use it. Most facilities offer missions, each its own kinds. A mine offers mining missions; a forest path, lumber runs; a caravan hub, caravans. The first is the **job board**, a shared facility offering general jobs, so a new player can set out without building anything.
+- **Decided.** Facilities are where the player acts: they open a facility by clicking it in the scene or by choosing it from the page's menu ("The page"). Most facilities offer missions, each its own kinds. A mine offers mining missions; a forest path, lumber runs; a caravan hub, caravans. The first is the **job board**, a shared facility offering general jobs, so a new player can set out without building anything.
 - **Decided.** Heroes walk about the camp for flavor: some of the player's heroes at that location and some of other players' heroes there, never all of either. Clicking a hero shows who it is. Nothing is done through them.
 - **Decided.** The scene is drawn at 320×180 and scaled up by whole numbers, below the header bar, which is part of the page and not of the scene (decision 0028).
 

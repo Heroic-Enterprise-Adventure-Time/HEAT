@@ -1,54 +1,81 @@
-<section class="camp">
+<section class="camp" [class.labels]="labels()">
+  <nav class="menu" aria-label="Facilities">
+    @for (facility of facilities(); track facility.kind) {
+      <a
+        class="entry"
+        [routerLink]="[]"
+        [queryParams]="{ open: facility.kind }"
+        [class.active]="open() === facility.kind"
+        [attr.aria-current]="open() === facility.kind ? 'page' : null"
+        [attr.title]="labels() ? null : facility.name"
+      >
+        <img [src]="'art/icons/' + facility.kind + '.png'" width="32" height="32" alt="" />
+        <span class="label">{{ facility.name }}</span>
+      </a>
+    }
+  </nav>
+
   <div #stage class="stage"></div>
 
-  @if (hallOpen()) {
-    <aside class="panel" aria-label="Heroes hall">
+  @if (open() || hero()) {
+    <aside class="panel" aria-labelledby="panel-title">
       <button type="button" class="close" (click)="close()" aria-label="Close">×</button>
-      <h2>Heroes hall</h2>
-      @if (game.camp(); as camp) {
-        <p>Level {{ camp.hallLevel }}: {{ camp.activeHeroes }} of {{ camp.heroCapacity }} heroes.</p>
-      }
 
-      @if (game.heroesHere().length > 0) {
-        <ul class="roster">
-          @for (hero of game.heroesHere(); track hero.id) {
-            <li>
-              <button type="button" class="link" (click)="hallOpen.set(false); heroId.set(hero.id)">{{ hero.name }}</button>
-              <span>{{ hero.unitType }}, level {{ hero.level }}</span>
-              @if (hero.status === 'DEAD') {
-                <span class="dead">dead</span>
-              }
-            </li>
+      @switch (open()) {
+        @case ('heroes-hall') {
+          <h2 id="panel-title">Heroes hall</h2>
+          @if (game.camp(); as camp) {
+            <p>Level {{ camp.hallLevel }}: {{ camp.activeHeroes }} of {{ camp.heroCapacity }} heroes.</p>
           }
-        </ul>
-      } @else {
-        <p>No heroes yet.</p>
-      }
 
-      @if (game.freeVillager(); as free) {
-        @if (free.offered) {
-          <button type="button" (click)="recruit()" [disabled]="game.busy()">Recruit a villager, free</button>
-        } @else if (free.reason) {
-          <p class="note">{{ free.reason }}</p>
+          @if (game.heroesHere().length > 0) {
+            <ul class="roster">
+              @for (hero of game.heroesHere(); track hero.id) {
+                <li>
+                  <a class="link" [routerLink]="[]" [queryParams]="{ hero: hero.id }">{{ hero.name }}</a>
+                  <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+                  @if (hero.status === 'DEAD') {
+                    <span class="dead">dead</span>
+                  }
+                </li>
+              }
+            </ul>
+          } @else {
+            <p>No heroes yet.</p>
+          }
+
+          @if (game.freeVillager(); as free) {
+            @if (free.offered) {
+              <button type="button" (click)="recruit()" [disabled]="game.busy()">Recruit a villager, free</button>
+            } @else if (free.reason) {
+              <p class="note">{{ free.reason }}</p>
+            }
+          }
+        }
+        @case ('job-board') {
+          <h2 id="panel-title">Job board</h2>
+          <p>No jobs are posted yet.</p>
+        }
+        @case ('warehouse') {
+          <h2 id="panel-title">Warehouse</h2>
+          <p>The warehouse is empty.</p>
         }
       }
-    </aside>
-  }
 
-  @if (hero(); as hero) {
-    <aside class="panel card" aria-label="Hero">
-      <button type="button" class="close" (click)="close()" aria-label="Close">×</button>
-      <h2>{{ hero.name }}</h2>
-      <dl>
-        <dt>Unit type</dt>
-        <dd>{{ hero.unitType }}</dd>
-        <dt>Level</dt>
-        <dd>{{ hero.level }} ({{ hero.xp }} XP)</dd>
-        <dt>Status</dt>
-        <dd>{{ hero.status === 'ALIVE' ? 'alive' : hero.status === 'DEAD' ? 'dead' : 'retired' }}</dd>
-        <dt>Recruited</dt>
-        <dd>{{ hero.recruitedAt | date: 'mediumDate' }}</dd>
-      </dl>
+      @if (hero(); as hero) {
+        <a class="back" [routerLink]="[]" [queryParams]="{ open: 'heroes-hall' }">← Heroes hall</a>
+        <h2 id="panel-title">{{ hero.name }}</h2>
+        <dl>
+          <dt>Unit type</dt>
+          <dd>{{ hero.unitType }}</dd>
+          <dt>Level</dt>
+          <dd>{{ hero.level }} ({{ hero.xp }} XP)</dd>
+          <dt>Status</dt>
+          <dd>{{ hero.status === 'ALIVE' ? 'alive' : hero.status === 'DEAD' ? 'dead' : 'retired' }}</dd>
+          <dt>Recruited</dt>
+          <dd>{{ hero.recruitedAt | date: 'mediumDate' }}</dd>
+        </dl>
+      }
     </aside>
   }
 
