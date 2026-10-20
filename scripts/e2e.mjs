@@ -102,6 +102,10 @@ const configResponse = await fetch(`${siteUrl}/config.json`);
 const config = configResponse.status === 200 ? await configResponse.json() : {};
 check(config.graphqlPath === "/graphql", `GET ${siteUrl}/config.json names the API path`);
 check(typeof config.clientId === "string" && config.clientId.length > 0 && /^https:\/\/auth\./.test(config.loginHost ?? ""), `config.json names the browser client and the login host ${config.loginHost}`);
+// Email and password beside Google in a sandbox stack only (Issue-86): dev
+// and prod are Google only.
+const passwordExpected = stack.startsWith("heat-sb");
+check(config.passwordSignIn === passwordExpected, `config.json says password sign-in is ${passwordExpected ? "offered" : "not offered"} (got ${config.passwordSignIn})`);
 
 // Sign-in as the browser does it, up to Google's door: the managed login
 // page renders for this stack's client and its callback, which proves the

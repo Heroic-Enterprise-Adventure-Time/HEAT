@@ -9,6 +9,7 @@ const config: StackConfig = {
   userPoolId: 'us-east-1_EXAMPLE',
   clientId: '1example23456789',
   loginHost: 'https://auth.heat-sb.dcg-games.com',
+  passwordSignIn: false,
 };
 
 describe('sessionSettings', () => {
@@ -24,6 +25,11 @@ describe('sessionSettings', () => {
     expect(settings.scope).toBe('openid email profile');
     expect(settings.extraQueryParams).toEqual({ identity_provider: 'Google' });
     expect(settings.automaticSilentRenew).toBe(true);
+  });
+
+  it('shows the managed login page, with email and password beside Google, where the stack offers a password', () => {
+    const settings = sessionSettings({ ...config, passwordSignIn: true }, 'https://86.heat-sb.dcg-games.com');
+    expect(settings.extraQueryParams).toBeUndefined();
   });
 });
 
@@ -106,6 +112,14 @@ describe('Session', () => {
     expect(manager.settings?.redirect_uri).toBe('https://46.heat-sb.dcg-games.com');
     await session.signIn();
     expect(manager.calls).toEqual(['signinRedirect']);
+  });
+
+  it('labels the sign-in button for Google, or plainly where the login page offers a password', async () => {
+    const google = await sessionWith(fakeManager(null), config, 'https://46.heat-sb.dcg-games.com/');
+    expect(google.session.signInLabel).toBe('Sign in with Google');
+    TestBed.resetTestingModule();
+    const password = await sessionWith(fakeManager(null), { ...config, passwordSignIn: true }, 'https://86.heat-sb.dcg-games.com/');
+    expect(password.session.signInLabel).toBe('Sign in');
   });
 
   it('exchanges the code of a redirect, removes the query, and knows the player', async () => {
