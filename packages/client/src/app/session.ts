@@ -21,9 +21,11 @@ export interface SessionUser {
  * what the API's JWT authorizer verifies against; the endpoints are the
  * pool's managed login host, so no discovery request is made. The grant is
  * the authorization code with PKCE, which the library performs; the token
- * endpoint allows the browser's cross-origin exchange. Google is the pool's
- * only provider, so `identity_provider=Google` skips a login page whose one
- * control would be a Google button. Tokens live in session storage, the
+ * endpoint allows the browser's cross-origin exchange. Where Google is the
+ * client's only provider, `identity_provider=Google` skips a login page whose
+ * one control would be a Google button; where the stack also offers email and
+ * password (`passwordSignIn`, a sandbox stack, Issue-86), the parameter is
+ * left out and the managed login page shows both. Tokens live in session storage, the
  * library's default: gone with the tab, never shared between origins. The
  * library renews them with the refresh token before they expire, and the
  * pool rotates the refresh token on every renewal.
@@ -47,7 +49,7 @@ export function sessionSettings(config: StackConfig, origin: string): UserManage
     post_logout_redirect_uri: origin,
     response_type: 'code',
     scope: 'openid email profile',
-    extraQueryParams: { identity_provider: 'Google' },
+    ...(config.passwordSignIn ? {} : { extraQueryParams: { identity_provider: 'Google' } }),
     automaticSilentRenew: true,
     loadUserInfo: false,
   };
@@ -102,6 +104,11 @@ export class Session {
   /** Why sign-in is unavailable, or the last sign-in error. */
   readonly error = signal<string | null>(null);
 
+  /** What the sign-in button says: Google, unless the login page offers a password too. */
+  get signInLabel(): string {
+    return this.config.value()?.passwordSignIn ? 'Sign in' : 'Sign in with Google';
+  }
+
   get origin(): string {
     return this.document.location.origin;
   }
@@ -137,7 +144,7 @@ export class Session {
     this.user.set(toSessionUser(await manager.getUser()));
   }
 
-  /** Sends the browser to Google through the pool's managed login. */
+  /** Sends the browser to the pool's managed login, or straight on to Google. */
   async signIn(): Promise<void> {
     if (!this.manager) return;
     this.error.set(null);

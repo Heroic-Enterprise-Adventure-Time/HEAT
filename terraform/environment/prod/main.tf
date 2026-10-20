@@ -64,6 +64,9 @@ module "environment" {
 
   permissions_boundary_arn = "arn:aws:iam::${var.workload_account_id}:policy/heat-prod-boundary"
 
+  # Google only: nothing in prod accepts a password (Issue-41, Issue-86).
+  password_sign_in = false
+
   # No laptop signs in to prod: its records are players'. Display work uses
   # a sandbox stack (docs/process/development.md, rule 5).
   extra_callback_urls = []

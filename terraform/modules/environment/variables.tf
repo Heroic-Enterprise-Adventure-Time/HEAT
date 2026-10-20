@@ -73,6 +73,11 @@ variable "extra_callback_urls" {
   }
 }
 
+variable "password_sign_in" {
+  description = "Whether the browser client also offers the pool's own email and password sign-in beside Google (Issue-86): true in a sandbox stack, so that the test users of the base can sign in from the agent's session browser without Google; false in dev and prod, where every player arrives through Google. The pool keeps administrator-only creation and recovery either way (decision 0022), so the form is a sign-in form and nothing else."
+  type        = bool
+}
+
 variable "alarm_email" {
   description = "Where the environment's alarms notify (alarms.tf): an SNS topic with this address subscribed, one email per alarm state change. null, and no topic or alarm is created: a sandbox stack lives as long as its branch and nobody is on call for it. dev and prod pass the address from their GitHub environment's variable HEAT_ALARM_EMAIL, never from a committed file (decision 0016)."
   type        = string

@@ -37,6 +37,11 @@ output "login_host" {
   value       = module.login_domain.login_host
 }
 
+output "password_sign_in" {
+  description = "Whether the browser client offers email and password beside Google; read by the apply job for config.json."
+  value       = module.environment.password_sign_in
+}
+
 output "browser_client_id" {
   description = "prod's browser app client; read by the apply job for config.json."
   value       = module.environment.browser_client_id

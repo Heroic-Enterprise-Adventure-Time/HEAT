@@ -10,6 +10,7 @@ import { Home } from './home';
 function fakeSession(user: SessionUser | null) {
   const fake = {
     user: signal(user),
+    signInLabel: 'Sign in with Google',
     error: signal<string | null>(null),
     signedIn: 0,
     signedOut: 0,

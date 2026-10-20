@@ -236,7 +236,8 @@ jobs:
           pool_id="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw user_pool_id)"
           client_id="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw browser_client_id)"
           login_host="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw login_host)"
-          sh scripts/publish-client.sh "$bucket" client "/graphql" "$pool_id" "$client_id" "$login_host"
+          password_sign_in="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw password_sign_in)"
+          sh scripts/publish-client.sh "$bucket" client "/graphql" "$pool_id" "$client_id" "$login_host" "$password_sign_in"
 
       - name: Write the stack's URL to the job summary
         id: summary

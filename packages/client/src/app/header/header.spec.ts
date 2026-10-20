@@ -12,7 +12,7 @@ const player: PlayerView = {
 };
 
 async function render(user: SessionUser | null, loaded: PlayerView | null) {
-  const session = { user: signal(user), signedIn: 0, signedOut: 0, signIn: async () => void session.signedIn++, signOut: async () => void session.signedOut++ };
+  const session = { user: signal(user), signInLabel: 'Sign in with Google', signedIn: 0, signedOut: 0, signIn: async () => void session.signedIn++, signOut: async () => void session.signedOut++ };
   const game = { player: signal(loaded), location: signal('millbrook') };
   await TestBed.configureTestingModule({
     imports: [Header],

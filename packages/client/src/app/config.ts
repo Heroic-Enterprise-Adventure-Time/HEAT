@@ -6,7 +6,7 @@ import { Injectable, signal } from '@angular/core';
  * build from the stack's Terraform outputs (`scripts/publish-client.sh`), so
  * one build serves any stack (decision 0018); on the dev server the proxy
  * fetches it from the branch's stack (`proxy.conf.mjs`). Nothing in it is
- * secret: the browser carries all four values.
+ * secret: the browser carries all of it.
  */
 export interface StackConfig {
   /** The API's path on this origin: `/graphql`. */
@@ -17,11 +17,17 @@ export interface StackConfig {
   readonly clientId: string;
   /** The pool's managed login host, `https://auth.<zone>`, with no trailing slash. */
   readonly loginHost: string;
+  /**
+   * Whether the login page offers email and password beside Google: true in
+   * a sandbox stack, for the base's test users (Issue-86), false in dev and
+   * prod. When false the client skips the login page and goes to Google.
+   */
+  readonly passwordSignIn: boolean;
 }
 
-const FIELDS: readonly (keyof StackConfig)[] = ['graphqlPath', 'userPoolId', 'clientId', 'loginHost'];
+const FIELDS = ['graphqlPath', 'userPoolId', 'clientId', 'loginHost'] as const;
 
-/** Reads the string fields out of the parsed file, or says which one is missing. */
+/** Reads the fields out of the parsed file, or says which one is missing. */
 export function parseStackConfig(value: unknown): StackConfig {
   if (typeof value !== 'object' || value === null) throw new Error('config.json is not an object');
   const record = value as Record<string, unknown>;
@@ -29,11 +35,13 @@ export function parseStackConfig(value: unknown): StackConfig {
     const v = record[field];
     if (typeof v !== 'string' || v.length === 0) throw new Error(`config.json lacks ${field}`);
   }
+  if (typeof record['passwordSignIn'] !== 'boolean') throw new Error('config.json lacks passwordSignIn');
   return {
     graphqlPath: record['graphqlPath'] as string,
     userPoolId: record['userPoolId'] as string,
     clientId: record['clientId'] as string,
     loginHost: record['loginHost'] as string,
+    passwordSignIn: record['passwordSignIn'],
   };
 }
 

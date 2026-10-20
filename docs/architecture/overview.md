@@ -13,7 +13,7 @@ Each item carries a status. **Decided** items are settled by the project owner. 
 - **Decided.** A reporting pipeline comes after the rest is further along, not first.
 - **Decided.** The hub is one TypeScript Lambda function behind the HTTP API: Apollo Server through its Lambda integration, a Pothos code-first schema, and the scope-auth plugin for field-level authorization. It is the only API for core requests and the one place authorization is enforced. It imports the engine as a library (decision 0012). Lambdas serve everything; there is no container anywhere.
 - **Decided.** No relational store. All data is in DynamoDB and S3, and no function runs inside a VPC (decision 0013).
-- **Decided.** The browser signs in with Google through the pool's managed login on `auth.<zone name>`, with the authorization code grant and PKCE performed by `oidc-client-ts` against the stack's own public app client, whose refresh tokens rotate; the API's JWT authorizer validates the tokens (decision 0024, Issue-46). The client learns the stack it runs in from `config.json`.
+- **Decided.** The browser signs in with Google through the pool's managed login on `auth.<zone name>`, with the authorization code grant and PKCE performed by `oidc-client-ts` against the stack's own public app client, whose refresh tokens rotate; the API's JWT authorizer validates the tokens (decision 0024, Issue-46). A sandbox stack's login page also offers email and password, for the base's test users, so that an agent signs in without Google (Issue-86); `dev` and `prod` are Google only. The client learns the stack it runs in from `config.json`.
 - **Working assumption.** Data ownership:
 
   | Data | Store | Written by |
