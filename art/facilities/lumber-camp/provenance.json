@@ -1,0 +1,105 @@
+{
+  "set": "lumber-camp",
+  "kind": "facility",
+  "facility": {
+    "kind": "lumber camp",
+    "owner": "player",
+    "buildable": true
+  },
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "levels": {
+    "1": {
+      "file": "level-1.png",
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "04f35a6e-32e7-465e-a289-c30b0c170ba1",
+        "tags": [
+          "heat",
+          "facility",
+          "lumber-camp"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20",
+      "parameters": {
+        "description": "small lumber camp: open wooden shed with a sloped roof over a saw bench, a stack of logs and a chopping stump beside it, no ground patch, no grass base, seen at a slight angle so its side wall shows, three-quarter view, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    },
+    "0": {
+      "file": "level-0.png",
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "3386b50b-52d3-4ac1-9439-99f77702fc6c",
+        "tags": [
+          "heat",
+          "facility",
+          "lumber-camp"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20",
+      "parameters": {
+        "description": "construction site: a rectangle of wooden foundation beams laid on the ground with two upright corner posts, no walls and no roof, a stack of logs and a saw on a sawhorse beside it, seen at a slight angle, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    }
+  },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
+  "rejected": [
+    {
+      "mapObjectId": "e47b6283-1980-47b1-b0a9-7725083763cc",
+      "why": "Level 1, first description: a wide patch of ground under it."
+    },
+    {
+      "mapObjectId": "d5447bb5-b474-486f-adca-b03f78a7f27a",
+      "why": "Level 1, first description: a patch of grass under it."
+    },
+    {
+      "mapObjectId": "faa9a406-3807-4f40-9733-83d459ffd2bb",
+      "why": "Level 1: open-fronted, with a grass patch and figures beside it."
+    },
+    {
+      "mapObjectId": "ffe30c7e-3171-4d70-8930-90406966edbf",
+      "why": "Level 0, first description: a finished shed, not an unfinished one."
+    },
+    {
+      "mapObjectId": "161fb766-dc6c-4340-86ba-a3eff1ea5900",
+      "why": "Level 0, first description: a finished open shed."
+    },
+    {
+      "mapObjectId": "4be6d2c5-068b-4872-bb07-8b52089e34a7",
+      "why": "Level 0: a sandbox of a site, cluttered and larger than level 1's footprint."
+    }
+  ],
+  "chosenBy": "Agent's picks, 2026-10-20 (Issue-89), shown to the owner in a mock-up of the 400×225 Millbrook at 3× (art/mockups/millbrook-400x225-3x.png) beside every candidate; the owner reviews them on PR-92 and may swap any.",
+  "verified": "Each level-<n>.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
+}

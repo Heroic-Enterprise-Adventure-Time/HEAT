@@ -1,0 +1,97 @@
+{
+  "set": "mine",
+  "kind": "facility",
+  "facility": {
+    "kind": "mine",
+    "owner": "player",
+    "buildable": true
+  },
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "levels": {
+    "1": {
+      "file": "level-1.png",
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "8fe1dd27-c910-4e3b-b5d3-f2381beaac5b",
+        "tags": [
+          "heat",
+          "facility",
+          "mine"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20",
+      "parameters": {
+        "description": "small grey rocky hill with a dark mine tunnel opening framed by timber beams in its front face, a wooden mine cart beside it, seen at a slight angle so the side of the hill shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    },
+    "0": {
+      "file": "level-0.png",
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "b16e0cbb-4713-4589-8739-a747db36f091",
+        "tags": [
+          "heat",
+          "facility",
+          "mine"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20",
+      "parameters": {
+        "description": "small grey rocky hill with no tunnel yet, a few loose timber beams, a pickaxe and wooden survey stakes leaning against it, seen at a slight angle, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    }
+  },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
+  "rejected": [
+    {
+      "mapObjectId": "ab004573-95ca-4479-af21-b688afc0db05",
+      "why": "Level 1, first description: a head-on timber frame with no hill, missing the three-quarter angle (rule 16)."
+    },
+    {
+      "mapObjectId": "6aaf5b4a-362e-435b-b8a2-7d3b2366ffb9",
+      "why": "Level 1, first description: the same, head-on."
+    },
+    {
+      "mapObjectId": "ea4a59dc-7412-4a1d-8fbb-b8caaa4efbe5",
+      "why": "Level 1: the darker of the two hills; the other read better beside the hall."
+    },
+    {
+      "mapObjectId": "aebb7021-ae34-4066-a82c-44d3ca5d78db",
+      "why": "Level 0: a mossy purple hill, off the hill of level 1."
+    }
+  ],
+  "chosenBy": "Agent's picks, 2026-10-20 (Issue-89), shown to the owner in a mock-up of the 400×225 Millbrook at 3× (art/mockups/millbrook-400x225-3x.png) beside every candidate; the owner reviews them on PR-92 and may swap any.",
+  "verified": "Each level-<n>.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
+}
