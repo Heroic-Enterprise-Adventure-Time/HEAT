@@ -1,0 +1,46 @@
+{
+  "set": "meadow-01",
+  "kind": "ground tileset",
+  "terrains": { "lower": "dirt", "upper": "grass" },
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "tilesetId": "d7b82471-4c10-4a2c-9cf2-022c01be7f70",
+    "baseTileIds": {
+      "lower": "b5837710-5020-44df-bd73-dfa42d8dbd3f",
+      "upper": "acc9dd70-9f2d-42a7-8853-7652ef4f2c26"
+    }
+  },
+  "generation": {
+    "tool": "create_topdown_tileset",
+    "via": "MCP",
+    "createdAt": "2026-10-20T05:06:10Z",
+    "parameters": {
+      "lower_description": "packed brown dirt path, warm earthy tones, NES-era retro pixel art, few colors",
+      "upper_description": "short green grass meadow, warm earthy tones, NES-era retro pixel art, few colors",
+      "transition_description": "grass tufts over dirt edge",
+      "transition_size": 0.25,
+      "mode": "standard",
+      "view": "low top-down",
+      "tile_size": { "width": 16, "height": 16 },
+      "outline": "lineless",
+      "shading": "flat shading",
+      "detail": "low detail"
+    },
+    "generations": "3 or 4: this tileset and the rejected one below were charged 7 together, read from the balance; the receipt does not split them."
+  },
+  "files": {
+    "tileset.png": "The 64×64 sheet of 16 tiles, 16×16 each.",
+    "tileset.json": "PixelLab's metadata for the sheet: each tile's corners (NW, NE, SW, SE as lower or upper) and its bounding_box on the sheet. Whatever draws the ground picks each tile by its four corners and cuts it out by its bounding_box, never by its wang_N name or original_position."
+  },
+  "rejected": [
+    { "tilesetId": "25ff63d1-1518-4c54-973c-18742b7edb80", "why": "The same descriptions with transition_size 0: lime grass and salmon dirt, brighter than the hero sets." }
+  ],
+  "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png).",
+  "verified": "tileset.png (/mcp/tilesets/<id>/image) and tileset.json (/mcp/tilesets/<id>/metadata) are byte-identical to a second download of each, 2026-10-20."
+}
