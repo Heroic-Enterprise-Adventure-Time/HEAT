@@ -1,0 +1,49 @@
+header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  background: #2b1d14;
+  color: #f3e6cf;
+  font-size: 0.9rem;
+}
+
+.title {
+  font-weight: bold;
+  letter-spacing: 0.15em;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.adventure {
+  padding: 0 0.5rem;
+  border: 1px solid #d9a441;
+  color: #f5cf7a;
+}
+
+.who {
+  opacity: 0.8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+select,
+button {
+  font: inherit;
+  padding: 0.125rem 0.5rem;
+}
+
+button {
+  cursor: pointer;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}

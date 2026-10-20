@@ -2,6 +2,8 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Config } from '../config';
 import { Session, type SessionUser } from '../session';
+import { CAMP_SCENE_FACTORY } from '../camp/camp';
+import { Game } from '../game';
 import { Home } from './home';
 
 /** A session with a settable user and recorded actions, in place of the real one. */
@@ -25,6 +27,9 @@ async function render(session: ReturnType<typeof fakeSession>, configError: stri
     providers: [
       { provide: Session, useValue: session },
       { provide: Config, useValue: config },
+      // The camp's own collaborators, standing in: no hub and no WebGL in a test.
+      { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), freeVillager: signal({ offered: false, reason: null }), busy: signal(false), error: signal(null) } },
+      { provide: CAMP_SCENE_FACTORY, useValue: async () => ({ setHeroes: () => undefined, destroy: () => undefined }) },
     ],
   }).compileComponents();
   const fixture = TestBed.createComponent(Home);
@@ -47,14 +52,11 @@ describe('Home', () => {
     expect(session.signedIn).toBe(1);
   });
 
-  it('shows the signed-in email and signs out on the click', async () => {
+  it('shows the camp to a signed-in player', async () => {
     const session = fakeSession({ email: 'player@example.com', name: 'Player', accessToken: 'token' });
     const { page } = await render(session);
-    expect(page.textContent).toContain('Signed in as player@example.com');
-    const button = page.querySelector('button');
-    expect(button?.textContent).toBe('Sign out');
-    button?.click();
-    expect(session.signedOut).toBe(1);
+    expect(page.querySelector('heat-camp')).not.toBeNull();
+    expect(page.querySelector('h1')).toBeNull();
   });
 
   it('says so when the stack configuration did not load', async () => {
