@@ -1,0 +1,39 @@
+{
+  "set": "heroes-hall",
+  "kind": "facility",
+  "facility": { "kind": "heroes hall", "owner": "player" },
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "levels": {
+    "1": {
+      "file": "level-1.png",
+      "canvas": [64, 64],
+      "pixellab": { "mapObjectId": "96347301-4725-4e8b-82b8-ab025ed9b3e1", "tags": ["heat", "facility", "heroes-hall"] },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20T05:09Z",
+      "parameters": {
+        "description": "small wooden adventurers' hall with a thatched roof, a front door and a hanging sign, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 64,
+        "height": 64,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    }
+  },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
+  "rejected": [
+    { "mapObjectId": "f0f9eae4-05cf-4381-acf0-f882d4362ba7", "why": "The same call: a log hall drawn on its own patch of ground, which clashed with the tileset." }
+  ],
+  "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png). Its three-quarter angle, the front wall facing down-right, is the angle every facility follows (docs/process/assets.md, rule 16).",
+  "verified": "level-1.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
+}

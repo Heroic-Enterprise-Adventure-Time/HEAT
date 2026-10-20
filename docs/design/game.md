@@ -30,13 +30,14 @@ What makes one hero different from another of the same unit type. Nothing here c
 
 ## How the game looks
 
-The rules for making a hero's sprite set are `docs/process/assets.md`, rules 8 to 13; this section says what the player sees.
+The rules for making a hero's sprite set are `docs/process/assets.md`, rules 8 to 13, and for a camp's ground and facilities rules 14 to 19; this section says what the player sees.
 
 - **Decided.** One view for camp and battle: low top-down, about 20 degrees, the classic 3/4 view of an RPG town. Battle arranges the same sprites so that it reads as side-on.
 - **Decided.** An NES-era look, with Final Fantasy 1 as the reference: warm, earthy colours, a black outline, few colours per sprite, characters 32 px tall.
 - **Decided.** Characters, monsters, environment and UI share one theme. Ranger 01 (`art/heroes/ranger-01/`) is the baseline.
 - **Decided.** Characters hold nothing. Every action, whatever the ability, is the hero's act animation, a three-frame lead jab whose middle frame is held for as long as the action lasts, played with two separate sprites: the weapon, which appears beside the hero, and the ability's effect, such as a slash, an arrow or a spell. A weapon's one sprite is also its icon in the inventory. Its motion is drawn as animation frames, not rotated in code, because rotated pixel art blurs at any angle but a right angle.
 - **Decided.** A sprite set's animations are walk, stance, act, hit and down. A hero standing outside battle is its still frame; there is no idle animation.
+- **Decided.** A camp stands on a 16 px tiled ground with no outline, so that the outlined buildings and heroes stand off it. Each facility is one sprite at a three-quarter angle, front wall facing down-right, the same for every facility. A facility's level may change its picture, never its size or its angle (decision 0027).
 
 ## The adventure loop
 
