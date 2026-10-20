@@ -78,7 +78,7 @@ How an adventure plays out. Everything in this section is expected to change as 
 - **Decided.** A hero belongs to one camp at a time. The hall's level sets the number of active heroes the camp can hold. Living and dead heroes are both active. A retired hero is not: retiring is permanent, and a retired hero stays on the record with its history, like a dead one.
 - **Decided.** Recruiting anyone needs a free slot. When no active hero at the location is alive, the next villager is free, so a player can never be locked out: a camp full of dead heroes retires one and recruits a villager for nothing.
 - **Decided.** Each location lists the unit types that can be recruited there, each with the hall level it needs and its cost in resources. Common unit types are on many lists; some are found in one place only, such as the templar at a temple or the witch in a swamp. Every location offers the villager at hall level 1, which is what makes the free villager work everywhere.
-- **Working assumption.** The first location recruits the villager and the fighter at hall level 1. The fighter's first level is easy to reach.
+- **Decided.** The first location is Millbrook, a quiet village. **Working assumption:** it recruits the villager and the fighter at hall level 1. The fighter's first level is easy to reach.
 - **Decided.** A hero moves to another camp only as a passenger on a caravan, like cargo, possibly as a non-combatant. Its slot is held at both camps for the whole trip: at the start the destination must have a free slot; at settlement the hero lands at the destination if delivered and stays at home if not, and the other slot is released. A passenger who dies on the way arrives dead and counts there.
 
 ## Resources

@@ -48,3 +48,4 @@ export function rewardsForSeed(seed: string): Reward[] {
     amount: 1 + Math.floor(next() * 5),
   })).filter((r) => r.amount > 1);
 }
+export * from "./content.js";

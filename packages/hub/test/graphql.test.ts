@@ -65,18 +65,19 @@ describe("authorization at the field level", () => {
     const owner = `p-${randomUUID()}`;
     const other = `p-${randomUUID()}`;
     await repo.putPlayer({ id: owner, name: "Owner" });
-    await repo.setBalance(owner, "timber", 5);
+    await repo.setBalance(owner, "millbrook", "timber", 5);
 
-    const q = `query($id: String!) { player(id: $id) { id name holdings { material balance } } }`;
+    const q = `query($id: String!) { player(id: $id) { id name camps { location holdings { material balance } } heroes { id } } }`;
 
-    const asOther = await gql<{ player: { name: string; holdings: unknown } }>(q, { id: owner }, other);
+    const asOther = await gql<{ player: { name: string; camps: unknown; heroes: unknown } }>(q, { id: owner }, other);
     expect(asOther.data?.player.name).toBe("Owner");
-    expect(asOther.data?.player.holdings).toBeNull();
-    expect(asOther.errors?.[0]?.path).toEqual(["player", "holdings"]);
+    expect(asOther.data?.player.camps).toBeNull();
+    expect(asOther.data?.player.heroes).toBeNull();
+    expect(asOther.errors?.map((e) => e.path)).toEqual(expect.arrayContaining([["player", "camps"], ["player", "heroes"]]));
 
-    const asOwner = await gql<{ player: { holdings: { material: string; balance: number }[] } }>(q, { id: owner }, owner);
+    const asOwner = await gql<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>(q, { id: owner }, owner);
     expect(asOwner.errors).toBeUndefined();
-    expect(asOwner.data?.player.holdings).toEqual([{ material: "timber", balance: 5 }]);
+    expect(asOwner.data?.player.camps).toEqual([{ location: "millbrook", holdings: [{ material: "timber", balance: 5 }] }]);
 
     const anonymous = await gql<{ me: unknown }>(`{ me { id } }`);
     expect(anonymous.data?.me).toBeNull();
@@ -84,14 +85,47 @@ describe("authorization at the field level", () => {
   });
 });
 
-describe("first contact", () => {
-  it("creates the profile of a player who has none when they start an adventure", async () => {
+describe("first sign-in", () => {
+  it("makes the profile once, with joinGame, and starting an adventure no longer does", async () => {
     const p = `p-${randomUUID()}`;
+    await gql(`mutation { startAdventure { id } }`, {}, p);
     expect(await repo.getPlayer(p)).toBeUndefined();
-    const start = await gql(`mutation { startAdventure { id } }`, {}, p);
-    expect(start.errors).toBeUndefined();
+
+    const joined = await gql<{ joinGame: { id: string; name: string } }>(`mutation { joinGame { id name } }`, {}, p);
+    expect(joined.errors).toBeUndefined();
     // No email claim in the synthesized token, so the name falls back to the subject.
-    expect(await repo.getPlayer(p)).toEqual({ id: p, name: p });
+    expect(joined.data?.joinGame).toEqual({ id: p, name: p });
+
+    await repo.putPlayer({ id: p, name: "Renamed in the table" });
+    const again = await gql<{ joinGame: { name: string } }>(`mutation { joinGame { name } }`, {}, p);
+    expect(again.data?.joinGame.name).toBe("Renamed in the table");
+  });
+});
+
+describe("the camp through the graph", () => {
+  it("shows a new player the starting camp, recruits the free villager, and refuses a second", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(`mutation { joinGame { id } }`, {}, p);
+    const camp = `{ me { camps { location name hallLevel heroCapacity resourceCapacity activeHeroes livingHeroes } heroes { id name unitType spriteSet status } } }`;
+
+    const before = await gql<{ me: { camps: unknown[]; heroes: unknown[] } }>(camp, {}, p);
+    expect(before.data?.me).toEqual({
+      camps: [{ location: "millbrook", name: "Millbrook", hallLevel: 1, heroCapacity: 4, resourceCapacity: 100, activeHeroes: 0, livingHeroes: 0 }],
+      heroes: [],
+    });
+
+    const requestId = randomUUID();
+    const recruit = `mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id name unitType spriteSet status } }`;
+    const made = await gql<{ recruitHero: { id: string; unitType: string; status: string } }>(recruit, { id: requestId }, p);
+    expect(made.errors).toBeUndefined();
+    expect(made.data?.recruitHero).toMatchObject({ id: requestId, unitType: "villager", status: "ALIVE" });
+
+    const after = await gql<{ me: { camps: { activeHeroes: number }[]; heroes: unknown[] } }>(camp, {}, p);
+    expect(after.data?.me.camps[0]?.activeHeroes).toBe(1);
+    expect(after.data?.me.heroes).toEqual([made.data?.recruitHero]);
+
+    const second = await gql(recruit, { id: randomUUID() }, p);
+    expect((second.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("NOT_FREE");
   });
 });
 
@@ -107,15 +141,15 @@ describe("the adventure loop through the graph", () => {
     const again = await gql(`mutation { startAdventure { id } }`, {}, p);
     expect(again.errors?.[0]?.message).toMatch(/condition failed/);
 
-    const settle = await gql<{ settleAdventure: { holdings: { material: string; balance: number }[] } }>(
-      `mutation($id: String!) { settleAdventure(adventureId: $id) { holdings { material balance } } }`,
+    const settle = await gql<{ settleAdventure: { camps: { holdings: { material: string; balance: number }[] }[] } }>(
+      `mutation($id: String!) { settleAdventure(adventureId: $id) { camps { holdings { material balance } } } }`,
       { id: adventureId },
       p,
     );
     expect(settle.errors).toBeUndefined();
     // A fresh player holds exactly what the engine pays for the seed the
     // mutation returned: the same answer the client would compute.
-    const holdings = settle.data!.settleAdventure.holdings;
+    const holdings = settle.data!.settleAdventure.camps[0]!.holdings;
     const byMaterial = (a: { material: string }, b: { material: string }) => a.material.localeCompare(b.material);
     expect([...holdings].sort(byMaterial)).toEqual(
       rewardsForSeed(seed).map((r) => ({ material: r.material, balance: r.amount })).sort(byMaterial),
@@ -127,6 +161,6 @@ describe("the adventure loop through the graph", () => {
       p,
     );
     expect(redelivered.errors?.[0]?.message).toMatch(/condition failed/);
-    expect(await repo.holdings(p)).toEqual(expect.arrayContaining(holdings));
+    expect(await repo.holdings(p, "millbrook")).toEqual(expect.arrayContaining(holdings));
   });
 });

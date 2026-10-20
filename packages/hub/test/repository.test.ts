@@ -17,6 +17,7 @@ beforeAll(() => {
 });
 
 const player = () => `p-${randomUUID()}`;
+const at = "millbrook";
 
 describe("start: one open adventure per player", () => {
   it("opens one and refuses a second", async () => {
@@ -47,31 +48,31 @@ describe("start: one open adventure per player", () => {
 describe("debit: the ledger never goes negative", () => {
   it("debits within the balance and refuses beyond it", async () => {
     const p = player();
-    await repo.setBalance(p, "timber", 10);
-    await repo.debit(p, "adv-1", "timber", 7);
-    expect(await repo.holdings(p)).toEqual([{ material: "timber", balance: 3 }]);
-    await expect(repo.debit(p, "adv-2", "timber", 4)).rejects.toBeInstanceOf(InsufficientBalance);
-    expect(await repo.holdings(p)).toEqual([{ material: "timber", balance: 3 }]);
+    await repo.setBalance(p, at, "timber", 10);
+    await repo.debit(p, at, "adv-1", "timber", 7);
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 3 }]);
+    await expect(repo.debit(p, at, "adv-2", "timber", 4)).rejects.toBeInstanceOf(InsufficientBalance);
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 3 }]);
   });
 
   it("applies the same debit only once", async () => {
     const p = player();
-    await repo.setBalance(p, "ore", 10);
-    await repo.debit(p, "adv-1", "ore", 2);
-    await expect(repo.debit(p, "adv-1", "ore", 2)).rejects.toBeInstanceOf(AlreadyApplied);
-    expect(await repo.holdings(p)).toEqual([{ material: "ore", balance: 8 }]);
+    await repo.setBalance(p, at, "ore", 10);
+    await repo.debit(p, at, "adv-1", "ore", 2);
+    await expect(repo.debit(p, at, "adv-1", "ore", 2)).rejects.toBeInstanceOf(AlreadyApplied);
+    expect(await repo.holdings(p, at)).toEqual([{ material: "ore", balance: 8 }]);
   });
 
   it("lets exactly one of two concurrent debits that together exceed the balance succeed", async () => {
     const p = player();
-    await repo.setBalance(p, "cloth", 10);
+    await repo.setBalance(p, at, "cloth", 10);
     const results = await Promise.allSettled([
-      repo.debit(p, "adv-a", "cloth", 7),
-      repo.debit(p, "adv-b", "cloth", 7),
+      repo.debit(p, at, "adv-a", "cloth", 7),
+      repo.debit(p, at, "adv-b", "cloth", 7),
     ]);
     const fulfilled = results.filter((r) => r.status === "fulfilled").length;
     expect(fulfilled).toBe(1);
-    expect(await repo.holdings(p)).toEqual([{ material: "cloth", balance: 3 }]);
+    expect(await repo.holdings(p, at)).toEqual([{ material: "cloth", balance: 3 }]);
   });
 });
 
@@ -85,25 +86,25 @@ describe("settle: rewards once, keyed on the adventure", () => {
       { material: "timber", amount: 3 },
       { material: "ore", amount: 2 },
     ];
-    await repo.settle(p, adv, rewards);
+    await repo.settle(p, adv, at, rewards);
     expect(await repo.openAdventure(p)).toBeUndefined();
     expect((await repo.getAdventure(adv))?.status).toBe("SETTLED");
-    const holdings = await repo.holdings(p);
+    const holdings = await repo.holdings(p, at);
     expect(holdings).toEqual(
       expect.arrayContaining([
         { material: "timber", balance: 3 },
         { material: "ore", balance: 2 },
       ]),
     );
-    await expect(repo.settle(p, adv, rewards)).rejects.toBeInstanceOf(AlreadySettled);
-    expect(await repo.holdings(p)).toEqual(holdings);
+    await expect(repo.settle(p, adv, at, rewards)).rejects.toBeInstanceOf(AlreadySettled);
+    expect(await repo.holdings(p, at)).toEqual(holdings);
   });
 
   it("will not settle an adventure that is not the open one", async () => {
     const p = player();
     await repo.putPlayer({ id: p, name: "Di" });
     await repo.startAdventure(p, "open-one", "s");
-    await expect(repo.settle(p, "some-other", [])).rejects.toBeInstanceOf(AlreadySettled);
+    await expect(repo.settle(p, "some-other", at, [])).rejects.toBeInstanceOf(AlreadySettled);
     expect((await repo.openAdventure(p))?.adventureId).toBe("open-one");
   });
 });

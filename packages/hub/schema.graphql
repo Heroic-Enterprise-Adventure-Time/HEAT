@@ -4,6 +4,51 @@ type Adventure {
   startedAt: String!
 }
 
+"""
+One player's view of one location: their facilities, resources and heroes there.
+"""
+type Camp {
+  """Living and dead heroes; retired ones are not active."""
+  activeHeroes: Int!
+  hallLevel: Int!
+
+  """Active heroes the heroes hall holds at its level."""
+  heroCapacity: Int!
+  holdings: [Holding!]!
+  livingHeroes: Int!
+
+  """The location's id in the static content."""
+  location: String!
+  name: String!
+
+  """Stock of each resource the warehouse holds at its level."""
+  resourceCapacity: Int!
+  warehouseLevel: Int!
+}
+
+"""
+A hero, drawn by the hub at recruitment: its sprite set and name are never the client's choice.
+"""
+type Hero {
+  id: String!
+  level: Int!
+  location: String!
+  name: String!
+  recruitedAt: String!
+
+  """The set's directory under art/heroes/."""
+  spriteSet: String!
+  status: HeroStatus!
+  unitType: String!
+  xp: Int!
+}
+
+enum HeroStatus {
+  ALIVE
+  DEAD
+  RETIRED
+}
+
 type Holding {
   balance: Int!
   material: String!
@@ -11,27 +56,41 @@ type Holding {
 
 type Mutation {
   """
-  Spike only: settles the caller's open adventure with the engine's rewards for its seed.
+  Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing.
+  """
+  joinGame: Player!
+
+  """
+  Recruits a hero of the unit type at the heroes hall of the starting camp. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Only the free villager for now: a camp with no living hero and a free slot.
+  """
+  recruitHero(requestId: String!, unitType: String!): Hero!
+
+  """
+  Spike only: settles the caller's open adventure with the engine's rewards for its seed, credited at the starting camp.
   """
   settleAdventure(adventureId: String!): Player
 
   """
-  Issues the seed and opens the player's one adventure. Fails if one is already open. A player who has no profile yet gets one, named from the token.
+  Issues the seed and opens the player's one adventure. Fails if one is already open.
   """
   startAdventure: Adventure!
 }
 
 type Player {
   """
-  Private: only the player may read their own holdings. Null, with an error on this field, for anyone else.
+  Private: only the player may read their own camps. Null, with an error on this field, for anyone else.
   """
-  holdings: [Holding!]
+  camps: [Camp!]
+
+  """Private: only the player may read their own heroes."""
+  heroes: [Hero!]
   id: String!
   name: String!
   openAdventure: Adventure
 }
 
 type Query {
+  """The signed-in player, or null before joinGame has made their profile."""
   me: Player
 
   """Public: any caller may look a player up by id."""
