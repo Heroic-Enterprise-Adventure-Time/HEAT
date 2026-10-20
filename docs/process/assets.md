@@ -12,7 +12,7 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 4. **The committed files are the asset of record.** Assets live under `art/<kind>/<set>/`, for example `art/heroes/ranger-01/`. The game uses these files; it never needs the service to still hold them.
 5. **Every set carries its provenance.** `provenance.json` beside the files records what the service's own export does not: the service, the plan and the date of the terms the set was made under, the service's ids, every parameter of every generation call, whether it was made through the MCP or on the service's website, the generations it cost, and the act's hold frame. `art/heroes/ranger-01/provenance.json` is the shape to copy.
 6. **Committed files match the service's export.** Before a set is committed, its files are compared byte for byte with the same files in the service's download of it.
-7. **Characters and objects are tagged in PixelLab when they are made.** Every character made for HEAT is tagged `heat`, its kind (`hero`) and its class as soon as it is created, kept or not, so that it can be found among the account's other characters; every object, such as a facility sprite, is tagged `heat`, `facility` and its kind (`heroes-hall`, `job-board`, `warehouse`) with `update_object_tags`. One that is not kept, or a kept one that is later replaced, also gets `rejected`, so the rejects can be found together and deleted on PixelLab's website. Tilesets cannot be tagged; their rejects are found by the ids in the kept set's provenance. The tag filter matches any of the tags given, so the kept pieces are found under `art/`, each with its PixelLab id in its provenance. A PixelLab website project is not visible through the MCP.
+7. **Characters and objects are tagged in PixelLab when they are made.** Every character made for HEAT is tagged `heat`, its kind (`hero`) and its class as soon as it is created, kept or not, so that it can be found among the account's other characters; every object, such as a facility sprite, is tagged `heat`, `facility` and its kind (`heroes-hall`, `job-board`, `warehouse`) with `update_object_tags`, and every interface icon `heat`, `ui-icon` and what it stands for. One that is not kept, or a kept one that is later replaced, also gets `rejected`, so the rejects can be found together and deleted on PixelLab's website. Tilesets cannot be tagged; their rejects are found by the ids in the kept set's provenance. The tag filter matches any of the tags given, so the kept pieces are found under `art/`, each with its PixelLab id in its provenance. A PixelLab website project is not visible through the MCP.
 
 ### A hero sprite set
 
@@ -57,7 +57,7 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 
 ### Working with the service
 
-20. **Budget.** The plan gives 2,000 generations a cycle; `get_balance` reports what is left. A hero set costs about 22, a re-rolled direction 3, a facility sprite 1 and a tileset 3 or 4.
+20. **Budget.** The plan gives 2,000 generations a cycle; `get_balance` reports what is left. A hero set costs about 22, a re-rolled direction 3, a facility sprite 1, a tileset 3 or 4 and a pack of 64 icon candidates 10.
 21. **Limits.** At most 8 jobs run at once, so a set is queued in batches. `wait_for_jobs` is called with a timeout under 300 seconds and called again: a wait of 540 seconds timed out on PixelLab's side although the job had finished. A job that fails with "heavy load" is retried once and is not charged. A skeleton animation is not made twice for the same template and direction, and the MCP has no re-roll. So the work is split: the agent queues a set's animations and checks the result; the owner reviews them and re-rolls any direction with the button on PixelLab's website, and the provenance records that call as made on the website.
 
 ### Audio
@@ -65,6 +65,12 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 22. **Sound effects** may be made and used commercially on the owner's paid ElevenLabs plan, with no attribution.
 23. **Music is not made for release** until ElevenLabs has answered in writing whether a single-member company qualifies for a plan marked "For Individual Use Only" (decision 0025).
 24. **The ElevenLabs connector waits.** Its hosted MCP manages agents only, and its creative tools are announced but not live; it is connected when they are.
+
+### Interface icons
+
+25. **Icons are 32 px and drawn at a whole-number scale.** An icon of the page, such as a facility's entry in the menu, and the favicon, are 32×32 PixelLab objects, shown at 1× (32 CSS px) or a whole multiple with `image-rendering: pixelated`, so each art pixel stays square, as the scene's are. They share the scene's look: black outline, warm earthy tones, few colours.
+26. **Rolled as one pack.** `create_1_direction_object` with `view: top-down`, the description `small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors`, one `item_descriptions` entry per idea (several ideas for each icon), and a 32×32 piece of kept art as the one style image; the style image sets the size, so `size` is not passed. One call returns 64 candidates in one style for 10 generations; ideas beyond those described are filled in by the service.
+27. **Chosen from a numbered sheet.** The owner picks from all the candidates side by side at 3×. The picks are promoted with `select_object_frames` and tagged (rule 7); the review object that holds the rest is tagged `rejected`. The icons live in `art/icons/`, one file per icon named for what it stands for, with one `provenance.json` for the pack.
 
 ## Why
 
@@ -81,3 +87,5 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 **Lining frames up by the feet.** PixelLab places the figure differently on each animation's canvas: in most sets the walk south stands about 8 px higher than the other directions, and every `down` ends with the body 9 to 11 px above where the feet stood. Measuring from the pixels fixes every set, present and future, without editing the exported files (Issue-73).
 
 **A camp's art.** Rules 14 to 19 were chosen by the owner in a mock-up of the first camp (Issue-80, decision 0027). A tileset gives every location the same ground in the same style, laid out by the scene; a painted background would have to be redrawn whenever a camp's facilities change, and two players' camps at one location can have different ones. A facility is one sprite because a building assembled from 16 px wall pieces is boxy at this scale. A level keeps its canvas and angle so that an upgrade swaps the picture in place.
+
+**Interface icons.** Rules 25 to 27 come from the first pack (Issue-89): the page's menu needed an icon per facility and the client still had Angular's default favicon. One call for every icon keeps them in one style and costs less than one call per icon; PixelLab's own panel tool (`create_ui_asset`) draws panels of 192 px and up, not icons. 32 px is the favicon's own size and reads at 1× in a menu.

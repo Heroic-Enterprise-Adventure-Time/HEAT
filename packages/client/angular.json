@@ -22,12 +22,13 @@
             "assets": [
               {
                 "glob": "**/*",
-                "input": "public"
-              },
-              {
-                "glob": "**/*",
                 "input": "generated/art",
                 "output": "art"
+              },
+              {
+                "glob": "favicon.png",
+                "input": "generated/art/icons",
+                "output": "/"
               }
             ],
             "styles": [

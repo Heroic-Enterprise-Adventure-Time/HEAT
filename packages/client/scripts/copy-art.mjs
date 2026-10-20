@@ -1,5 +1,5 @@
-// Copies the art the client draws, art/heroes, art/facilities and
-// art/ground, into generated/art beside this package, which angular.json
+// Copies the art the client draws, art/heroes, art/facilities, art/ground
+// and art/icons, into generated/art beside this package, which angular.json
 // serves at /art. Angular takes assets only from inside its workspace root
 // (packages/client), and the art's one home is art/ at the repository root
 // with its provenance, so the build copies it rather than the repository
@@ -10,10 +10,10 @@ const from = new URL("../../../art/", import.meta.url);
 const to = new URL("../generated/art/", import.meta.url);
 
 rmSync(to, { recursive: true, force: true });
-for (const dir of ["heroes", "facilities", "ground"]) {
+for (const dir of ["heroes", "facilities", "ground", "icons"]) {
   cpSync(new URL(`${dir}/`, from), new URL(`${dir}/`, to), {
     recursive: true,
     filter: (source) => !/\.[a-z]+$/i.test(source) || /\.(png|json)$/i.test(source),
   });
 }
-console.log("copied art/heroes, art/facilities and art/ground into packages/client/generated/art");
+console.log("copied art/heroes, art/facilities, art/ground and art/icons into packages/client/generated/art");
