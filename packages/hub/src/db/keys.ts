@@ -8,10 +8,16 @@
  * one item collection, read in one Query. Private: read only through the
  * hub, under the `self` scope.
  *
- *   PLAYER#<id>    | PROFILE                        the player
- *   PLAYER#<id>    | HOLDING#<material>             a balance; becomes AT#<location>#HOLDING#<material> once locations exist
- *   PLAYER#<id>    | OPEN                           the one open adventure
- *   PLAYER#<id>    | LEDGER#<adventureId>#<entry>   append-only; the entry can exist once, which is what makes settle pay once
+ *   PLAYER#<id>    | PROFILE                           the player
+ *   PLAYER#<id>    | AT#<location>#CAMP                hall and warehouse levels, the counts of active and living heroes
+ *   PLAYER#<id>    | AT#<location>#HOLDING#<material>  a resource balance at that location
+ *   PLAYER#<id>    | HERO#<heroId>                     a hero, its location an attribute, since a hero can move
+ *   PLAYER#<id>    | OPEN                              the one open adventure
+ *   PLAYER#<id>    | LEDGER#<causeId>#<entry>          append-only; the cause is an adventure or a hero id, and the
+ *                                                       entry can exist once, which is what makes settle pay once
+ *
+ * The keys and their reasons are decision 0026. The spike's HOLDING#<material>
+ * items in dev and prod are no longer read and are left in place.
  *
  * The location table, partitioned by location, and by adventure for the one
  * record settle looks up by id. Public: what every player may see.
@@ -23,11 +29,16 @@ export const KEY = { pk: "PK", sk: "SK" } as const;
 
 export const playerKeys = {
   profile: (id: string) => ({ PK: `PLAYER#${id}`, SK: "PROFILE" }),
-  holding: (id: string, material: string) => ({ PK: `PLAYER#${id}`, SK: `HOLDING#${material}` }),
-  open: (id: string) => ({ PK: `PLAYER#${id}`, SK: "OPEN" }),
-  ledger: (id: string, adventureId: string, entry: string) => ({
+  camp: (id: string, location: string) => ({ PK: `PLAYER#${id}`, SK: `AT#${location}#CAMP` }),
+  holding: (id: string, location: string, material: string) => ({
     PK: `PLAYER#${id}`,
-    SK: `LEDGER#${adventureId}#${entry}`,
+    SK: `AT#${location}#HOLDING#${material}`,
+  }),
+  hero: (id: string, heroId: string) => ({ PK: `PLAYER#${id}`, SK: `HERO#${heroId}` }),
+  open: (id: string) => ({ PK: `PLAYER#${id}`, SK: "OPEN" }),
+  ledger: (id: string, causeId: string, entry: string) => ({
+    PK: `PLAYER#${id}`,
+    SK: `LEDGER#${causeId}#${entry}`,
   }),
 };
 
