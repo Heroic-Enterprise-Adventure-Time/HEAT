@@ -13,7 +13,7 @@
     "1": {
       "file": "level-1.png",
       "canvas": [32, 32],
-      "pixellab": { "mapObjectId": "d33c8b00-d392-41b7-aaa4-fee7dc7b70f8" },
+      "pixellab": { "mapObjectId": "d33c8b00-d392-41b7-aaa4-fee7dc7b70f8", "tags": ["heat", "facility", "job-board"] },
       "tool": "create_map_object",
       "via": "MCP",
       "createdAt": "2026-10-20T05:09Z",
@@ -30,6 +30,7 @@
       "generations": 1
     }
   },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
   "rejected": [
     { "mapObjectId": "a5b74fec-13a0-4bb6-b82e-9b624368212b", "why": "The same call: a wooden board with grass patches at its feet, which clashed with the tileset." }
   ],

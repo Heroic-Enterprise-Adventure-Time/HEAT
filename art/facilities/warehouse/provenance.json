@@ -13,7 +13,7 @@
     "1": {
       "file": "level-1.png",
       "canvas": [48, 48],
-      "pixellab": { "mapObjectId": "f104f6aa-0866-48fa-82f6-30655befbcbb" },
+      "pixellab": { "mapObjectId": "f104f6aa-0866-48fa-82f6-30655befbcbb", "tags": ["heat", "facility", "warehouse"] },
       "tool": "create_map_object",
       "via": "MCP",
       "createdAt": "2026-10-20T05:37Z",
@@ -30,10 +30,11 @@
       "generations": 1
     }
   },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
   "rejected": [
     { "mapObjectId": "7180ac62-65b6-4440-92cb-7d124b9ebe05", "why": "First call, without the angle in the description: a log storehouse drawn head-on; the owner liked it but wanted a little depth." },
     { "mapObjectId": "3df4b251-93b8-4dd2-bc0b-bb6a26ad413a", "why": "First call: a plank barn, head-on." },
-    { "imageJobId": "d7fd8053-5fd9-4a78-8cdc-2503bd3716eb", "why": "create_image_pixflux over 7180ac62 (init_image_strength 150) asking for a side wall: barely changed, still head-on." },
+    { "imageJobId": "d7fd8053-5fd9-4a78-8cdc-2503bd3716eb", "why": "An image, not an object, so it carries no tags. create_image_pixflux over 7180ac62 (init_image_strength 150) asking for a side wall: barely changed, still head-on." },
     { "mapObjectId": "f614b75b-6a85-4c90-8594-b0485bd7709b", "why": "The kept call's twin: angled, but busier and more orange than the hall." }
   ],
   "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png).",

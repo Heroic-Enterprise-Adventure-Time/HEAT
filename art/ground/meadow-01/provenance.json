@@ -38,6 +38,7 @@
     "tileset.png": "The 64×64 sheet of 16 tiles, 16×16 each.",
     "tileset.json": "PixelLab's metadata for the sheet: each tile's corners (NW, NE, SW, SE as lower or upper) and its bounding_box on the sheet. Whatever draws the ground picks each tile by its four corners and cuts it out by its bounding_box, never by its wang_N name or original_position."
   },
+  "rejectedTags": "Tilesets cannot be tagged in PixelLab; this list is how the rejects are found.",
   "rejected": [
     { "tilesetId": "25ff63d1-1518-4c54-973c-18742b7edb80", "why": "The same descriptions with transition_size 0: lime grass and salmon dirt, brighter than the hero sets." }
   ],

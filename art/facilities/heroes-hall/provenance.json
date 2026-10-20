@@ -13,7 +13,7 @@
     "1": {
       "file": "level-1.png",
       "canvas": [64, 64],
-      "pixellab": { "mapObjectId": "96347301-4725-4e8b-82b8-ab025ed9b3e1" },
+      "pixellab": { "mapObjectId": "96347301-4725-4e8b-82b8-ab025ed9b3e1", "tags": ["heat", "facility", "heroes-hall"] },
       "tool": "create_map_object",
       "via": "MCP",
       "createdAt": "2026-10-20T05:09Z",
@@ -30,6 +30,7 @@
       "generations": 1
     }
   },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
   "rejected": [
     { "mapObjectId": "f0f9eae4-05cf-4381-acf0-f882d4362ba7", "why": "The same call: a log hall drawn on its own patch of ground, which clashed with the tileset." }
   ],
