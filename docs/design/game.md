@@ -70,7 +70,7 @@ How an adventure plays out. Everything in this section is expected to change as 
 - **Decided.** A location has two kinds of facility. **Own facilities** belong to one player, who builds and upgrades them, so two players' camps at the same location can differ in which facilities they have and at what level. **Shared facilities** belong to the location and look the same to every player.
 - **Decided.** Facilities are where the player acts: they click a facility to use it. Most facilities offer missions, each its own kinds. A mine offers mining missions; a forest path, lumber runs; a caravan hub, caravans. The first is the **job board**, a shared facility offering general jobs, so a new player can set out without building anything.
 - **Decided.** Heroes walk about the camp for flavor: some of the player's heroes at that location and some of other players' heroes there, never all of either. Clicking a hero shows who it is. Nothing is done through them.
-- **Working assumption.** The scene is drawn at 320×180 and scaled up by whole numbers, below the header bar, which is part of the page and not of the scene.
+- **Decided.** The scene is drawn at 320×180 and scaled up by whole numbers, below the header bar, which is part of the page and not of the scene (decision 0028).
 
 ## The heroes hall
 
