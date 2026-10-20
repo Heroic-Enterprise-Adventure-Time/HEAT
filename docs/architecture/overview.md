@@ -7,7 +7,7 @@ Each item carries a status. **Decided** items are settled by the project owner. 
 ## Services and data
 
 - **Decided.** GraphQL with field-level authorization.
-- **Decided.** Search and browse: which heroes of other players are at my location; which adventures other players recently completed here; view a replay.
+- **Decided.** Search and browse: a sample of other players' heroes at my location, walking about my camp; which adventures other players recently completed here; view a replay.
 - **Decided.** Amazon Cognito for sign-in.
 - **Decided.** Player-private data and public game data are kept apart: separate tables with separate access roles, and every request for private data goes through the GraphQL hub, which is where authorization is answered. (Restated 2026-10-14 from "nothing private goes into DynamoDB or S3": the intent was always the separation, not the choice of store.)
 - **Decided.** A reporting pipeline comes after the rest is further along, not first.
@@ -18,10 +18,10 @@ Each item carries a status. **Decided** items are settled by the project owner. 
 
   | Data | Store | Written by |
   | --- | --- | --- |
-  | Players, heroes, holdings and facilities per location, the materials ledger, the open-adventure item | DynamoDB, the player table | the hub |
-  | Adventure records: status, seed, frozen snapshot, result, location, time; later the location feed, presence, offers and shared projects | DynamoDB, the location table | the hub at start and at submit |
+  | Players; per location, the camp, own facilities and resources; heroes; the materials ledger; the open-adventure item | DynamoDB, the player table | the hub |
+  | Adventure records: status, seed, frozen snapshot, result, location, time; later the location feed, the heroes seen there, offers and shared projects | DynamoDB, the location table | the hub at start and at submit |
   | Replay timelines | S3 | the hub at submit |
-  | Static content: unit types, jobs, abilities, locations | the engine package, as TypeScript data | the repository; imported by the client and the hub |
+  | Static content: unit types, jobs, abilities, locations with their shared facilities and recruitment lists, facility levels and caps, hero names, the sprite sets each unit type allows | the engine package, as TypeScript data | the repository; imported by the client and the hub |
 
   Two tables, each named for its partition key (decision 0023): the player table, one item collection per player, private and read only through the hub; the location table, one collection per location and the adventure records by id, public. Both exist from the first sandbox stack, and start and settle write to both in one transaction. The location view (step 3) adds the location collections and one index for replays by job. Every new access pattern is designed as a key or an index before its feature is built; an entity growing richer or a new item type costs no table change, a new partition key would.
 
@@ -47,9 +47,29 @@ Each item carries a status. **Decided** items are settled by the project owner. 
 
 The client holds the seed, so a modified client can try override sequences offline and submit the best one. Verification proves that the outcome is reachable under the rules with that seed. It does not prove that a person played it live. Closing that gap would mean the server revealing randomness stage by stage, which is the per-step traffic this design avoids.
 
-## Private holdings
+## Camps, heroes and resources
 
-- **Working assumption.** Materials move through an append-only ledger keyed on the adventure id. Building a facility debits materials in one transaction whose condition rejects a negative balance; the debit is proven in the spike under concurrent attempts. Facilities gate which jobs can be started, checked by the hub at start. A cart job moves goods between two locations' holdings.
+The design is `docs/design/game.md`, "Locations and camps", "The heroes hall" and "Resources"; the key shapes and their reasons are decision 0026.
+
+- **Decided.** The player table's keys, all in the player's one item collection, so the camp loads with one Query of `PLAYER#<id>`:
+
+  | Sort key | Item |
+  | --- | --- |
+  | `PROFILE` | the player |
+  | `AT#<location>#CAMP` | the camp: hall and warehouse levels, the counts of active and of living heroes, kept by every transaction that changes them; no item means the starting location at level 1 with no heroes |
+  | `AT#<location>#FACILITY#<kind>` | an own facility and its level |
+  | `AT#<location>#HOLDING#<resource>` | a resource balance at that location |
+  | `HERO#<heroId>` | a hero, with its location as an attribute |
+  | `LEDGER#<causeId>#<entry>` | append-only; the cause is an adventure id or a hero id, and the entry can exist once |
+  | `OPEN` | the one open adventure |
+
+- **Decided.** A hero's item: unit type, sprite set and name, chosen by the hub at recruitment and never by the client; location; recruited at; level, XP and the stat-boost picks (the choices, not the resulting numbers, so they survive a change to the stat tables); weapon and its fights left; status, alive, dead or retired; history counters. Fields a later feature adds default in code.
+- **Decided.** Recruiting is one mutation, `recruitHero(unitType, requestId)`, and one transaction: the camp's active count below the hall's cap, then incremented; one conditional debit and one ledger entry per resource in the cost, or none for a villager when the camp's count of living heroes is zero, which the condition checks; the hero item put if absent. The request id becomes the hero id, so a repeated request fails its condition and returns the hero already made. The hub draws the sprite set and the name from the static content with a cryptographic random source, avoiding names on the camp's living roster.
+- **Decided.** Retiring a hero is one transaction: the status set to retired, the camp's counts decremented.
+- **Working assumption.** A caravan with passengers takes a slot at the destination in the start transaction, conditional on a free slot there, and settlement releases one of the two slots by the outcome. A party is validated at start from the camp's living heroes.
+- **Working assumption.** Building or upgrading a facility debits resources in one transaction whose condition rejects a negative balance; the debit is proven in the spike under concurrent attempts. Facilities gate which jobs can be started, checked by the hub at start.
+- **Working assumption.** A credit past the warehouse cap stops at the cap. DynamoDB cannot take a minimum inside an update, so settlement reads the balances, computes the capped credits and writes them on the condition that each balance is unchanged, retrying on a conflict; the ledger records the amount lost.
+- **Working assumption.** The heroes of other players shown in a camp are a bounded sample, read from the location table: a hero seen at a location is written there under `LOCATION#<id>` with a short TTL and its public fields only (name, unit type, sprite set, level). The exact key, and what counts as being seen, are designed before step 3.
 
 ## Live location channel
 
@@ -81,12 +101,12 @@ What exists and what is still to be built is in the build order below; each stac
 **Working assumption:**
 
 1. Platform, in this order: the pipeline's plan and apply roles per account with their guardrails (Issue-36, done); the sandbox base, the zone and the pool with its test users, and the workflow's plan-and-apply path (Issue-37); the environment module proven on a per-issue sandbox stack, with the emulator removed and the cold start measured (Issue-38), beside the Angular client skeleton with a home page (Issue-45); a site per stack with the wildcard certificate (Issue-39); sign-in with Google from the home page (Issue-46); `dev` through the pipeline (Issue-40); `prod` through the release branch (Issue-41).
-2. Core loop: start, play, submit, replay.
-3. Location view: heroes here, recent adventures, private holdings and facilities.
+2. Camp and core loop, in this order (decision 0026): the camp's art; the camp scene with the heroes hall and the free villager; start, play, submit and replay from the job board, which brings in the first resources; then paid recruitment, the roster and retirement.
+3. The shared camp: other players' heroes walking about, recent adventures, replays, own facilities beyond the hall and the warehouse, and more locations.
 4. Live feed and canned actions.
 5. Cooperation.
 6. Reporting pipeline.
 
 ## Open
 
-- The access patterns and indexes for the location view, designed before step 3 (decision 0013).
+- The location table's keys for step 3, designed before it is built (decision 0013): the sample of heroes seen at a location, recent adventures, and the index for replays by job (decision 0023). The camp's and the heroes' keys are designed (decision 0026).

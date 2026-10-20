@@ -61,9 +61,32 @@ How an adventure plays out. Everything in this section is expected to change as 
 - **Decided.** Retreat. Each job states its own retreat penalty. Retreating from a lumber run leaves with what was gathered and misses the better lumber further on; retreating from a caravan abandons the cargo.
 - **Working assumption.** A retreat is attempted every so often until it succeeds, each attempt rolled with the adventure's seeded random number generator. Bonuses and items raise the chance, and the chance rises with each failed attempt, so bad luck alone cannot trap a party.
 
-## Private holdings
+## Locations and camps
 
-- **Decided.** Each player has a per-location asset store: acquired materials, and facilities built or acquired that grant a bonus or access. All of it is private. This is the owner-only data that field-level authorization protects.
+- **Decided.** A location is one of a fixed set of places the game defines: villages, cities, strongholds and the like. Every player visits the same locations.
+- **Decided.** A player unlocks a location and then has a camp there. A new player starts with one location unlocked and no heroes. **Open:** how further locations unlock; likely an explore or travel mission.
+- **Decided.** A camp is one player's view of a location, and it is the main view for a signed-in player. One camp is on screen at a time, and the player switches between their unlocked camps at will with a select in the page's header bar. The header bar is thin and also holds the title, sign-in and the open adventure, so the player can always find it.
+- **Decided.** A location has two kinds of facility. **Own facilities** belong to one player, who builds and upgrades them, so two players' camps at the same location can differ in which facilities they have and at what level. **Shared facilities** belong to the location and look the same to every player.
+- **Decided.** Facilities are where the player acts: they click a facility to use it. Most facilities offer missions, each its own kinds. A mine offers mining missions; a forest path, lumber runs; a caravan hub, caravans. The first is the **job board**, a shared facility offering general jobs, so a new player can set out without building anything.
+- **Decided.** Heroes walk about the camp for flavor: some of the player's heroes at that location and some of other players' heroes there, never all of either. Clicking a hero shows who it is. Nothing is done through them.
+- **Working assumption.** The scene is drawn at 320×180 and scaled up by whole numbers, below the header bar, which is part of the page and not of the scene.
+
+## The heroes hall
+
+- **Decided.** Every unlocked location has the player's own heroes hall, at level 1 or above. The hall is where heroes are recruited, and where the player views and manages their heroes at that location.
+- **Decided.** A hero belongs to one camp at a time. The hall's level sets the number of active heroes the camp can hold. Living and dead heroes are both active. A retired hero is not: retiring is permanent, and a retired hero stays on the record with its history, like a dead one.
+- **Decided.** Recruiting anyone needs a free slot. When no active hero at the location is alive, the next villager is free, so a player can never be locked out: a camp full of dead heroes retires one and recruits a villager for nothing.
+- **Decided.** Each location lists the unit types that can be recruited there, each with the hall level it needs and its cost in resources. Common unit types are on many lists; some are found in one place only, such as the templar at a temple or the witch in a swamp. Every location offers the villager at hall level 1, which is what makes the free villager work everywhere.
+- **Working assumption.** The first location recruits the villager and the fighter at hall level 1. The fighter's first level is easy to reach.
+- **Decided.** A hero moves to another camp only as a passenger on a caravan, like cargo, possibly as a non-combatant. Its slot is held at both camps for the whole trip: at the start the destination must have a free slot; at settlement the hero lands at the destination if delivered and stays at home if not, and the other slot is released. A passenger who dies on the way arrives dead and counts there.
+
+## Resources
+
+- **Decided.** There is no currency. Everything is paid in resources, such as wood, iron and ore: a miner may cost iron, an archer wood. If gold exists, it is one more resource.
+- **Decided.** Resources are held per location: each camp has its own stock. They move between locations only by caravan, which is what makes supplying a remote camp a job of its own.
+- **Decided.** Each camp's warehouse caps the stock of each resource by its level. Every unlocked location has one at level 1 or above, like the heroes hall. A credit that would pass the cap stops at it and the rest is lost; the result says how much. Before setting out, the player is shown how much room the destination has.
+- **Decided.** A player's own facilities, their levels, their resources and their heroes' private details are owner-only data, which field-level authorization protects.
+- **Open.** The hall's and the warehouse's caps per level, recruitment costs, and which unit types each location offers. The numbers live in the game's static content and start as working assumptions: a level-1 hall holds 4 heroes, a level-1 warehouse 100 of each resource.
 
 ## Live location channel
 
@@ -78,6 +101,6 @@ How an adventure plays out. Everything in this section is expected to change as 
 
 - Whether to keep mana and status effects, and whether the party is a marching order instead of a grid.
 - Discrete stages (assumed) versus one continuous track with positions.
-- Locations: how many, and what "at a location" means for a player and a hero.
+- Which locations exist, and how each is unlocked.
 - Rewards, and what settlement credits besides XP and returned consumables.
 - The names job and adventure.
