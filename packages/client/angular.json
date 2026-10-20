@@ -22,10 +22,6 @@
             "assets": [
               {
                 "glob": "**/*",
-                "input": "public"
-              },
-              {
-                "glob": "**/*",
                 "input": "generated/art",
                 "output": "art"
               }
