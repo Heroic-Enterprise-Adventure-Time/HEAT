@@ -53,15 +53,16 @@ export class Camp {
 
   protected readonly location = computed(() => this.params()?.get('location') ?? STARTING_LOCATION);
 
-  private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight });
+  private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
   protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height));
   protected readonly labels = computed(() => menuLabels(this.viewport().width, this.viewport().height));
   protected readonly iconPx = computed(() => 32 * iconScale(this.viewport().width, this.viewport().height));
   /** Stacked, the scene's box is the page's width by the map's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() =>
-    this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height),
+    this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
   );
 
+  private readonly ratioWatch = new AbortController();
   private scene: CampSceneHandle | null = null;
   private rendered = false;
   /** Counts the scenes asked for, so one that finishes loading after a newer one was asked for is thrown away. */
@@ -88,14 +89,29 @@ export class Camp {
       });
     });
     effect(() => this.showHeroes(this.game.heroesHere(), this.state.arriving(), this.state.leaving()));
+    this.watchRatio();
     inject(DestroyRef).onDestroy(() => {
+      this.ratioWatch.abort();
       this.mounts++;
       this.scene?.destroy();
     });
   }
 
   protected measure(): void {
-    this.viewport.set({ width: window.innerWidth, height: window.innerHeight });
+    this.viewport.set({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
+  }
+
+  /** Measures again when the device pixel ratio changes, browser zoom or another screen, which a resize alone may not report. */
+  private watchRatio(): void {
+    const query = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`);
+    query?.addEventListener(
+      'change',
+      () => {
+        this.measure();
+        this.watchRatio();
+      },
+      { once: true, signal: this.ratioWatch.signal },
+    );
   }
 
   private async mount(): Promise<void> {

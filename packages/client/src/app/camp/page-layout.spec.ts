@@ -74,11 +74,29 @@ describe('stackedStageHeight', () => {
     // Wide but short: the height allows scale 1 only.
     expect(stackedStageHeight(1000, 500)).toBe(225);
   });
+
+  it('counts the scale in device pixels and gives the height back in CSS pixels', () => {
+    // A tablet at 125%: 1280 device px across and 835 down hold the map at 3, 540 CSS px.
+    expect(stackedStageHeight(...TABLET, 1.25)).toBe(540);
+    expect(stackedStageHeight(...TABLET, 1.5)).toBe(600);
+    expect(stackedStageHeight(...TABLET, 2)).toBe(562.5);
+    // A phone at ratio 3: the map at 3 device px, one CSS px, as at ratio 1.
+    expect(stackedStageHeight(...PHONE, 3)).toBe(225);
+  });
 });
 
 describe('heroScale', () => {
   it('is half the scene scale, rounded up to a whole number', () => {
-    expect([1, 2, 3, 4, 5, 6].map(heroScale)).toEqual([1, 1, 2, 2, 3, 3]);
+    expect([1, 2, 3, 4, 5, 6].map((s) => heroScale(s))).toEqual([1, 1, 2, 2, 3, 3]);
+  });
+
+  it('never falls below one CSS pixel per art pixel, nor rises above the scene', () => {
+    expect([2, 3, 4, 5, 6].map((s) => heroScale(s, 1.25))).toEqual([1, 2, 2, 3, 3]);
+    expect([2, 3, 4, 5, 6].map((s) => heroScale(s, 1.5))).toEqual([2, 2, 2, 3, 3]);
+    expect([2, 3, 4, 5, 6].map((s) => heroScale(s, 2))).toEqual([2, 2, 2, 3, 3]);
+    // A phone at ratio 3 with the scene at 3 device px: the heroes at the scene's scale, as at scene scale 1.
+    expect(heroScale(3, 3)).toBe(3);
+    expect(heroScale(2, 3)).toBe(2);
   });
 });
 
@@ -92,6 +110,21 @@ describe('sceneView', () => {
     const view = sceneView(1001, 745);
     expect(view.width * view.scale).toBeGreaterThanOrEqual(1001);
     expect(view.height * view.scale).toBeGreaterThanOrEqual(745);
+  });
+
+  it('counts device pixels, so every art pixel is the same whole number of them at any ratio', () => {
+    // The box of a 1366×650 laptop's scene, 955×614 CSS px, at each ratio.
+    const at = (ratio: number) => sceneView(Math.round(955 * ratio), Math.round(614 * ratio), ratio);
+    expect(at(1)).toMatchObject({ scale: 2, heroScale: 1 });
+    // 1194×768 device px: 3 per art pixel, not 2.5.
+    expect(at(1.25)).toMatchObject({ scale: 3, heroScale: 2, width: 398, height: 256 });
+    expect(at(1.5)).toMatchObject({ scale: 4, heroScale: 2 });
+    expect(at(2)).toMatchObject({ scale: 5, heroScale: 3 });
+    for (const ratio of [1, 1.25, 1.5, 2]) {
+      const view = at(ratio);
+      expect(view.width * view.scale).toBeGreaterThanOrEqual(Math.round(955 * ratio));
+      expect(view.height * view.scale).toBeGreaterThanOrEqual(Math.round(614 * ratio));
+    }
   });
 
   it('crops the edges of the map evenly in a box narrower than it', () => {
