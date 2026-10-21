@@ -1,15 +1,18 @@
 /**
  * The game's static content: the locations, what each recruits, the caps of
- * the hall and the warehouse per level, the hero names and the sprite sets
- * each unit type allows. TypeScript data, imported by the hub and the client
- * alike (decision 0013); a change here is a change to the rules, reviewed
- * like code. The design is docs/design/game.md, "Locations and camps", "The
- * heroes hall" and "Resources"; the numbers are its working assumptions.
+ * the hall and the warehouse per level, the hero names, the sprite sets each
+ * unit type allows, and the battle's abilities, unit types, monsters and
+ * resource nodes. TypeScript data, imported by the hub and the client alike
+ * (decision 0013); a change here is a change to the rules, reviewed like
+ * code. The design is docs/design/game.md, "Locations and camps", "The heroes
+ * hall", "Resources" and "The battle"; the numbers are its working
+ * assumptions.
  */
 
+import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
 import type { Material } from "./index.js";
 
-/** The unit types that have a sprite set. Their stats and abilities come with the turn machinery. */
+/** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. */
 export type UnitType = "villager" | "fighter" | "knight" | "ranger" | "wizard" | "priest";
 
 export const UNIT_TYPES: readonly UnitType[] = ["villager", "fighter", "knight", "ranger", "wizard", "priest"];
@@ -168,3 +171,133 @@ export function heroNames(presentation: Presentation, taken: ReadonlySet<string>
   const free = allowed.filter((n) => !taken.has(n));
   return free.length > 0 ? free : allowed;
 }
+
+// ── The battle ─────────────────────────────────────────────────────
+
+/** The monsters, by the type a fight stage names. Their sprite sets are mapped beside them (Issue-111). */
+export type MonsterType = "wolf" | "bandit";
+
+export const MONSTER_TYPES: readonly MonsterType[] = ["wolf", "bandit"];
+
+/** The resource nodes a gather stage names. */
+export type ResourceType = "tree" | "ore-vein";
+
+export const RESOURCE_TYPES: readonly ResourceType[] = ["tree", "ore-vein"];
+
+export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "move-up";
+
+const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
+
+const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as const).map((actorLine) => ({
+  actorLine,
+  targetLines: ["front", "near", "far", "back"],
+}));
+
+/** Every ability a unit type or monster's list names (game.md, "The battle"). */
+export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
+  strike: {
+    abilityId: "strike",
+    name: "Strike",
+    tags: ["melee-attack", "physical", "slashing"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 300,
+    effect: { kind: "damage" },
+  },
+  "strike-weakest": {
+    abilityId: "strike-weakest",
+    name: "Strike the weakest",
+    tags: ["melee-attack", "physical", "slashing"],
+    targeting: { side: "enemy", reach: [{ actorLine: "front", targetLines: ["front", "near"] }], selection: "weakest" },
+    warmupMs: 300,
+    effect: { kind: "damage" },
+  },
+  bite: {
+    abilityId: "bite",
+    name: "Bite",
+    tags: ["melee-attack", "physical", "piercing"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 200,
+    effect: { kind: "damage" },
+  },
+  guard: {
+    abilityId: "guard",
+    name: "Guard",
+    tags: ["support"],
+    targeting: { side: "ally", reach: ANY_LINE, selection: "below-half" },
+    warmupMs: 0,
+    effect: { kind: "guard", durationMs: 4000 },
+  },
+  chop: {
+    abilityId: "chop",
+    name: "Chop",
+    tags: ["gather", "physical"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 500,
+    effect: { kind: "gather", material: "timber" },
+  },
+  mine: {
+    abilityId: "mine",
+    name: "Mine",
+    tags: ["gather", "physical"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 500,
+    effect: { kind: "gather", material: "ore" },
+  },
+  "move-up": {
+    abilityId: "move-up",
+    name: "Move up",
+    tags: ["movement"],
+    targeting: { side: "self" },
+    warmupMs: 400,
+    effect: { kind: "move-up" },
+  },
+};
+
+/**
+ * Each unit type's home line, base stats and one action list, the first
+ * usable action winning. A unit type without one cannot join a battle yet.
+ * A villager gathers both timber and ore, and a specialized gatherer later
+ * does one of them better with a higher `gathering`.
+ */
+export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
+  villager: {
+    homeLine: "near",
+    stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 },
+    actions: ["strike", "chop", "mine", "move-up"],
+  },
+  fighter: {
+    homeLine: "front",
+    stats: { maxHealth: 50, speed: 10, damage: 6, gathering: 0 },
+    actions: ["guard", "strike"],
+  },
+};
+
+export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
+  wolf: {
+    name: "Wolf",
+    homeLine: "front",
+    stats: { maxHealth: 24, speed: 12, damage: 3, gathering: 0 },
+    actions: ["bite", "move-up"],
+  },
+  bandit: {
+    name: "Bandit",
+    homeLine: "near",
+    stats: { maxHealth: 30, speed: 9, damage: 5, gathering: 0 },
+    actions: ["strike-weakest", "move-up"],
+  },
+};
+
+/** A node's amount is its health: the material it holds. */
+export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>> = {
+  tree: { name: "Tree", homeLine: "front", material: "timber", amount: 40 },
+  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", amount: 40 },
+};
+
+/** The content a battle reads by default. A regular attack on a node does half its damage as work and keeps half of that. */
+export const BATTLE_CONTENT: BattleContent = {
+  abilities: ABILITIES,
+  heroes: UNIT_PROFILES,
+  monsters: MONSTERS,
+  resources: RESOURCE_NODES,
+  resourceHit: { workPercent: 50, yieldPercent: 50 },
+};

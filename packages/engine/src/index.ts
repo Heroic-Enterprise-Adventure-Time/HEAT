@@ -49,3 +49,4 @@ export function rewardsForSeed(seed: string): Reward[] {
   })).filter((r) => r.amount > 1);
 }
 export * from "./content.js";
+export * from "./battle/index.js";

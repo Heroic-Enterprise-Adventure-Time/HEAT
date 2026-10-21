@@ -70,7 +70,7 @@ How the page around the scene is laid out (Issue-89). The scene's own rules are 
 
 How an adventure plays out: the first cut, agreed 2026-10-21 (decision 0030). The shape is decided; the numbers are working assumptions in the engine's static content and are expected to change as the game is played.
 
-- **Decided.** A job is an ordered list of stages: travel, fight, gather and arrive. An adventure runs them on one timeline, with health and cargo carried between stages. A tree is a resource that a chopping ability "damages" into timber. A cart is a party member with health and no actions, for caravans later.
+- **Decided.** A job is an ordered list of stages: travel, fight, gather and arrive. An adventure runs them on one timeline, with health and cargo carried between stages. A tree is a resource node that a chopping ability "damages" into timber, and an ore vein one that mining turns into ore. A cart is a party member with health and no actions, for caravans later.
 - **Decided.** Active time. Each unit has a charge timer that fills at its speed. When it fills, the unit picks the first usable action from its unit type's list, with the target the ability's rule chooses, warms up, resolves, and the timer resets. Nothing waits for the player: the battle plays itself, and the player watches, pauses, fast-forwards and interjects.
 - **Decided.** One action list per unit type, fixed. The list is the unit's whole intelligence, and a better unit type is a better list, which is how progression automates what the player used to do by hand ("The business"). The player never edits a list.
 - **Decided.** A marching order, not a grid. Each side has four lines, front, near, far and back; a line holds any number of units, with no order within it. A unit type has a home line, where it starts; the party pick places nobody. Reach is by line: an ability says which enemy lines it reaches from which of its own. When a side's front line empties, every unit on that side moves up a line, so the nearest occupied line is always the front. Stepping up is also an action, for the unit types whose list says so.
@@ -78,12 +78,15 @@ How an adventure plays out: the first cut, agreed 2026-10-21 (decision 0030). Th
 
   | Unit | Home line | Its list, first usable action wins |
   | --- | --- | --- |
-  | Villager | near | strike the closest in reach; chop a tree if one is there; move up |
-  | Fighter | front | guard an ally below half health; strike the closest |
+  | Villager | near | strike the closest in reach; chop a tree if one is there; mine an ore vein if one is there; move up |
+  | Fighter | front | guard an ally below half health, if not already guarding; strike the closest |
   | Wolf | front | bite the closest; move up |
   | Bandit | near | strike the weakest in reach; move up |
 
-- **Decided.** Two kinds of override: forcing a unit's next action, which applies at its next turn if it is usable then and is dropped silently if not; and party orders, press on and retreat.
+- **Decided.** A guard lasts a few seconds. While it holds, hits aimed at the guarded ally land on the guard instead, and the guard does not start another until it expires (2026-10-21, Issue-110).
+- **Decided.** Resource nodes, trees and ore veins, stand on the other side's lines and never act. A gathering ability reaches only its own kind of node and works by the unit's gathering stat. A regular attack can also hit a node, doing poor work for a poor yield, and is chosen only when nothing else in the unit's list is usable. A fighter alone with a tree therefore fells it, slowly, for little timber. A villager gathers both timber and ore, and a specialized gatherer does one of them better (2026-10-21, Issue-110).
+- **Working assumption.** A unit's stats are health, speed (turns per ten seconds), damage and gathering. The numbers are in the engine's static content.
+- **Decided.** Two kinds of override: forcing a unit's next action, which applies at its next turn if it is usable then and is dropped silently if not; and party orders, press on and retreat. Press on is the default. Retreat can be selected at any time and stays selected. During a fight it is attempted; when a stage completes with it selected, the party retreats for certain (2026-10-21, Issue-110; built in Issue-112).
 - **Decided.** Retreat. Each job states its own retreat penalty. Retreating from a lumber run leaves with what was gathered and misses the better lumber further on; retreating from a caravan abandons the cargo.
 - **Working assumption.** A retreat is attempted every so often until it succeeds, each attempt rolled with the adventure's seeded random number generator. Bonuses and items raise the chance, and the chance rises with each failed attempt, so bad luck alone cannot trap a party.
 - **Decided.** Every fight and gather stage carries its own time limit, on the adventure's own clock, because some are expected to resolve faster than others. Reaching it ends the adventure as a retreat with the job's penalty. It is a deadlock kill switch, not a mechanic: the timer is shown only in its last stretch, and nothing is designed to be beaten against it.
