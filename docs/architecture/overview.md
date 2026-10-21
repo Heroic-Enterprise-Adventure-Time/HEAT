@@ -72,7 +72,14 @@ The design is `docs/design/game.md`, "Locations and camps", "The heroes hall" an
 - **Working assumption.** A caravan with passengers takes a slot at the destination in the start transaction, conditional on a free slot there, and settlement releases one of the two slots by the outcome. A party is validated at start from the camp's living heroes.
 - **Working assumption.** Building or upgrading a facility debits resources in one transaction whose condition rejects a negative balance; the debit is proven in the spike under concurrent attempts. Facilities gate which jobs can be started, checked by the hub at start.
 - **Working assumption.** A credit past the warehouse cap stops at the cap. DynamoDB cannot take a minimum inside an update, so settlement reads the balances, computes the capped credits and writes them on the condition that each balance is unchanged, retrying on a conflict; the ledger records the amount lost.
-- **Working assumption.** The heroes of other players shown in a camp are a bounded sample, read from the location table: a hero seen at a location is written there under `LOCATION#<id>` with a short TTL and its public fields only (name, unit type, sprite set, level). The exact key, and what counts as being seen, are designed before step 3.
+- **Decided.** The heroes of other players shown in a camp are a bounded sample, read from the location table (decision 0029):
+
+  | PK | SK | Item |
+  | --- | --- | --- |
+  | `LOCATION#<location>` | `SEEN#<heroId>` | a hero seen there: name, unit type, sprite set and level, never its owner; `expiresAt`, the table's TTL attribute, a week after it was seen |
+
+  A hero is seen when it does something: recruiting puts its sighting and retiring deletes it, each in the hero's own transaction; a mission completed will refresh it and a death delete it (Issue-15). Opening or switching camps is not a sighting. `heroesSeenAt(location)` reads at most 20 items from a random point among the sightings, wrapping round once, drops the expired, which DynamoDB deletes only within days, and the caller's own heroes, and returns up to 6 at random.
+- **Built (Issue-100).** The sighting in the recruit and retire transactions, the TTL on the location table, and `heroesSeenAt` in `packages/hub/src/seen.ts`, proven by data-layer tests of the bound, the expiry and the exclusion of the caller's heroes.
 
 ## Live location channel
 
@@ -112,4 +119,4 @@ What exists and what is still to be built is in the build order below; each stac
 
 ## Open
 
-- The location table's keys for step 3, designed before it is built (decision 0013): the sample of heroes seen at a location, recent adventures, and the index for replays by job (decision 0023). The camp's and the heroes' keys are designed (decision 0026).
+- The location table's keys for the rest of step 3, designed before they are built (decision 0013): recent adventures, and the index for replays by job (decision 0023). The camp's and the heroes' keys are designed (decision 0026), and so are the heroes seen at a location (decision 0029).
