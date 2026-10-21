@@ -67,8 +67,19 @@ export function stackedStageHeight(width: number, height: number): number {
   return MAP_HEIGHT * Math.max(1, Math.min(Math.floor(width / MAP_CORE_WIDTH), byHeight));
 }
 
+/**
+ * The scale heroes are drawn at in the camp: half the scene's, rounded up, so
+ * a whole number that never falls below 1 (Issue-99). At the scene's own
+ * scale a hero stood half as tall as the hall.
+ */
+export function heroScale(sceneScale: number): number {
+  return Math.ceil(sceneScale / 2);
+}
+
 export interface SceneView {
   readonly scale: number;
+  /** The heroes' own whole-number scale, from `heroScale`. */
+  readonly heroScale: number;
   /** The window of the world the canvas shows, in art pixels: the map and the ground around it. */
   readonly width: number;
   readonly height: number;
@@ -88,5 +99,5 @@ export function sceneView(boxWidth: number, boxHeight: number): SceneView {
   const scale = sceneScale(boxWidth, boxHeight);
   const width = Math.max(1, Math.ceil(boxWidth / scale));
   const height = Math.max(1, Math.ceil(boxHeight / scale));
-  return { scale, width, height, mapX: Math.floor((width - MAP_WIDTH) / 2), mapY: Math.floor((height - MAP_HEIGHT) / 2) };
+  return { scale, heroScale: heroScale(scale), width, height, mapX: Math.floor((width - MAP_WIDTH) / 2), mapY: Math.floor((height - MAP_HEIGHT) / 2) };
 }

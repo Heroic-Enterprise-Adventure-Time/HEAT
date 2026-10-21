@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box)
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box) and 2026-10-21 by Issue-99 (heroes at half the scene's scale)
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -32,6 +32,12 @@
 **Why.** With the content area beside the scene rather than over it (`docs/design/game.md`, "The page"), a fixed 320×180 left bars around the scene on most screens. The owner asked for the scene to fill its area. Stretching it by a fraction was considered and not chosen: it blurs pixel art or makes its pixels uneven. Filling with more of the world keeps the pixels square and leaves no bars.
 
 **Not solved by this.** On a screen whose device pixel ratio is not a whole number, such as Windows at 125%, the scale counts CSS pixels, so an art pixel is 1.25 device pixels and the pixels come out uneven. That was true before the amendment too.
+
+## Amendment: heroes at half the scene's scale (Issue-99, 2026-10-21)
+
+**Heroes in the camp are drawn at half the scene's scale, rounded up:** 1 at scene scale 1 and 2, 2 at 3 and 4, 3 at 5. The scale stays a whole number, so a hero's art pixels stay square; the ground and the facilities keep the scene's scale. The canvas therefore renders at the scene's scale, one canvas pixel per CSS pixel, instead of at the map's pixels enlarged by CSS, and each hero is placed on a whole canvas pixel. A hero still stands by its feet (`docs/process/assets.md`, rule 11), its click area shrinks with it, and it walks 18 of its own art pixels a second, so its stride stays in step with its frames. Battle keeps its own scale, and the sprite files do not change. `heroScale` in `page-layout.ts` holds the rule.
+
+**Why.** At the scene's scale a hero stood half as tall as the hall, and the owner found the heroes too large for the camp. In a mock-up of Millbrook at scene scales 3 and 4, half rounded up read as people in a village; at scene scale 3, heroes at 1, half rounded down, were too small to tell apart or click.
 
 ## Considered and not chosen
 

@@ -20,7 +20,12 @@ export interface Walker {
   leaving: boolean;
 }
 
-/** Pixels a second: a stroll. */
+/**
+ * A stroll, in the hero's own art pixels a second, which keeps the stride in
+ * step with the walk's frames at any size. A hero drawn smaller than the map
+ * (Issue-99) covers fewer map pixels: the scene passes `step` the speed in
+ * map pixels.
+ */
 export const WALK_SPEED = 18;
 const REST_MIN_MS = 1500;
 const REST_MAX_MS = 6000;
@@ -73,8 +78,8 @@ export function gone(walker: Walker): boolean {
   return walker.leaving && walker.target === null;
 }
 
-/** Advances a walker by dtMs. Answers whether it is walking. */
-export function step(walker: Walker, dtMs: number, areas: readonly Rect[], random: Random): boolean {
+/** Advances a walker by dtMs at `speed` map pixels a second. Answers whether it is walking. */
+export function step(walker: Walker, dtMs: number, areas: readonly Rect[], random: Random, speed = WALK_SPEED): boolean {
   if (gone(walker)) return false;
   if (!walker.target) {
     walker.restMs -= dtMs;
@@ -84,7 +89,7 @@ export function step(walker: Walker, dtMs: number, areas: readonly Rect[], rando
   const dx = walker.target.x - walker.x;
   const dy = walker.target.y - walker.y;
   const distance = Math.hypot(dx, dy);
-  const travel = (WALK_SPEED * dtMs) / 1000;
+  const travel = (speed * dtMs) / 1000;
   if (distance <= travel) {
     walker.x = walker.target.x;
     walker.y = walker.target.y;

@@ -118,6 +118,12 @@ describe('wandering', () => {
     expect(walker.restMs).toBeGreaterThan(0);
   });
 
+  it('walks at the speed it is given, as a hero drawn at half the scene scale does', () => {
+    const walker = newWalker({ x: 0, y: 0 }, sequence(0.5), { x: 100, y: 0 });
+    step(walker, 1000, area, sequence(0.5), WALK_SPEED / 2);
+    expect(walker.x).toBe(WALK_SPEED / 2);
+  });
+
   it('sets out again once its rest is over', () => {
     const walker = newWalker({ x: 50, y: 50 }, sequence(0));
     expect(step(walker, 1000, area, sequence(0.5))).toBe(false);
