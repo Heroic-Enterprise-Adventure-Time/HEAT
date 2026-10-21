@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { STARTING_LOCATION } from '@heat/engine';
 import { Api, ApiError } from './api';
 import { Session } from './session';
@@ -14,6 +14,15 @@ export interface HeroView {
   readonly xp: number;
   readonly status: 'ALIVE' | 'DEAD' | 'RETIRED';
   readonly retiredAt: string | null;
+}
+
+/** Another player's hero seen at the location: its public fields only, never whose it is (decision 0029). */
+export interface SeenHeroView {
+  readonly id: string;
+  readonly name: string;
+  readonly unitType: string;
+  readonly spriteSet: string;
+  readonly level: number;
 }
 
 export interface CampView {
@@ -33,6 +42,7 @@ export interface PlayerView {
 }
 
 const HERO_FIELDS = 'id name unitType spriteSet location recruitedAt level xp status retiredAt';
+const SEEN = `query($at: String!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
 const ME = `{ me { id camps { location name hallLevel heroCapacity activeHeroes livingHeroes } heroes { ${HERO_FIELDS} } openAdventure { id startedAt } } }`;
 
 /**
@@ -40,6 +50,9 @@ const ME = `{ me { id camps { location name hallLevel heroCapacity activeHeroes 
  * adventure, loaded from the hub after every sign-in, and the two things they
  * can do yet, recruit the free villager and retire a hero. Joining comes
  * first, because the profile is made on first sign-in (joinGame, Issue-81).
+ * Beside them, a few of other players' heroes seen at the camp's location,
+ * read again when the player signs in or changes camps, not after each
+ * change of their own, so the passers-by do not shuffle on every recruit.
  */
 @Injectable({ providedIn: 'root' })
 export class Game {
@@ -61,6 +74,8 @@ export class Game {
   readonly retiredHere = computed(() =>
     (this.player()?.heroes ?? []).filter((h) => h.location === this.location() && h.status === 'RETIRED'),
   );
+  /** A few of other players' heroes seen at the camp's location, who walk about it for flavor. */
+  readonly seenHere = signal<readonly SeenHeroView[]>([]);
   /** Whether the hall offers the free villager now, and if not, why not. */
   readonly freeVillager = computed((): { offered: boolean; reason: string | null } => {
     const camp = this.camp();
@@ -75,6 +90,24 @@ export class Game {
       if (this.session.user()) void this.join();
       else this.player.set(null);
     });
+    effect(() => {
+      const signedIn = this.session.user() !== null;
+      const location = this.location();
+      untracked(() => {
+        this.seenHere.set([]);
+        if (signedIn) void this.loadSeen(location);
+      });
+    });
+  }
+
+  /** The sample is flavor: if it cannot be read, the camp shows no passers-by and says nothing. */
+  async loadSeen(location: string): Promise<void> {
+    try {
+      const data = await this.api.request<{ heroesSeenAt: SeenHeroView[] }>(SEEN, { at: location });
+      if (this.location() === location) this.seenHere.set(data.heroesSeenAt);
+    } catch {
+      // Left empty.
+    }
   }
 
   async join(): Promise<void> {

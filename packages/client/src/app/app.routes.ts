@@ -4,6 +4,7 @@ import { Camp } from './camp/camp';
 import { FacilityPanel } from './camp/panels/facility-panel';
 import { HallPanel } from './camp/panels/hall-panel';
 import { HeroCard } from './camp/panels/hero-card';
+import { SeenHeroCard } from './camp/panels/seen-hero-card';
 import { Home } from './home/home';
 import { Session } from './session';
 
@@ -13,7 +14,8 @@ const signedIn: CanActivateFn = () => (inject(Session).user() ? true : inject(Ro
 /**
  * The addresses (Issue-89): the home page, and a camp with its panel as a
  * path, `/camp/<location>/<facility>` or `/camp/<location>/heroes-hall/heroes/<id>`,
- * so a hero's card sits under the hall. Anything else goes home, which sends
+ * so a hero's card sits under the hall; another player's hero seen about the
+ * camp is `/camp/<location>/seen/<id>`, under no facility. Anything else goes home, which sends
  * a signed-in player on to their camp.
  */
 export const routes: Routes = [
@@ -26,6 +28,7 @@ export const routes: Routes = [
       { path: '', redirectTo: 'heroes-hall', pathMatch: 'full' },
       { path: 'heroes-hall', component: HallPanel },
       { path: 'heroes-hall/heroes/:hero', component: HeroCard },
+      { path: 'seen/:hero', component: SeenHeroCard },
       { path: ':facility', component: FacilityPanel },
     ],
   },

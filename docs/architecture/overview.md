@@ -79,7 +79,7 @@ The design is `docs/design/game.md`, "Locations and camps", "The heroes hall" an
   | `LOCATION#<location>` | `SEEN#<heroId>` | a hero seen there: name, unit type, sprite set and level, never its owner; `expiresAt`, the table's TTL attribute, a week after it was seen |
 
   A hero is seen when it does something: recruiting puts its sighting and retiring deletes it, each in the hero's own transaction; a mission completed will refresh it and a death delete it (Issue-15). Opening or switching camps is not a sighting. `heroesSeenAt(location)` reads at most 20 items from a random point among the sightings, wrapping round once, drops the expired, which DynamoDB deletes only within days, and the caller's own heroes, and returns up to 6 at random.
-- **Built (Issue-100).** The sighting in the recruit and retire transactions, the TTL on the location table, and `heroesSeenAt` in `packages/hub/src/seen.ts`, proven by data-layer tests of the bound, the expiry and the exclusion of the caller's heroes.
+- **Built (Issue-100).** The sighting in the recruit and retire transactions, the TTL on the location table, and `heroesSeenAt` in `packages/hub/src/seen.ts`, proven by data-layer tests of the bound, the expiry and the exclusion of the caller's heroes. The client reads the sample when the player signs in or changes camps, not after each recruit, walks it about the scene beside the player's own heroes, and opens one on a read-only card, `/camp/<location>/seen/<id>`, with its name, unit type and level.
 
 ## Live location channel
 

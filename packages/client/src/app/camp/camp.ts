@@ -2,7 +2,7 @@ import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, com
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { STARTING_LOCATION, type FacilityKind } from '@heat/engine';
-import { Game, type HeroView } from '../game';
+import { Game, type HeroView, type SeenHeroView } from '../game';
 import { CampState } from './camp-state';
 import { iconScale, isSideBySide, menuLabels, stackedStageHeight } from './page-layout';
 import { LAYOUTS } from './scene/layout';
@@ -30,6 +30,8 @@ export const CAMP_SCENE_FACTORY = new InjectionToken<CampSceneFactory>('heat.cam
  * hall by default, `/<facility>` for another, `/heroes-hall/heroes/<id>` for
  * a hero's card, so the address says where the player is, back returns to
  * the last panel, and the menu marks the hall while one of its heroes is open.
+ * Other players' heroes seen at the location walk about beside the player's
+ * own, and a click on one opens its read-only card, `/seen/<id>`.
  * Every facility the camp has or may build is listed and drawn; one not yet
  * built stands as an unfinished building.
  */
@@ -87,7 +89,7 @@ export class Camp {
         if (this.rendered) void this.mount();
       });
     });
-    effect(() => this.showHeroes(this.game.heroesHere(), this.state.arriving(), this.state.leaving()));
+    effect(() => this.showHeroes(this.game.heroesHere(), this.game.seenHere(), this.state.arriving(), this.state.leaving()));
     inject(DestroyRef).onDestroy(() => {
       this.mounts++;
       this.scene?.destroy();
@@ -107,20 +109,30 @@ export class Camp {
     const levels = Object.fromEntries(this.state.facilities().map((f) => [f.kind, f.level]));
     const scene = await this.createScene(this.stage().nativeElement, layout, levels, {
       onFacility: (kind) => void this.router.navigate(['/camp', this.location(), kind]),
-      onHero: (id) => void this.router.navigate(['/camp', this.location(), 'heroes-hall', 'heroes', id]),
+      onHero: (id) =>
+        void this.router.navigate(
+          this.game.seenHere().some((h) => h.id === id)
+            ? ['/camp', this.location(), 'seen', id]
+            : ['/camp', this.location(), 'heroes-hall', 'heroes', id],
+        ),
     });
     if (mount !== this.mounts) {
       scene.destroy();
       return;
     }
     this.scene = scene;
-    this.showHeroes(this.game.heroesHere(), this.state.arriving(), this.state.leaving());
+    this.showHeroes(this.game.heroesHere(), this.game.seenHere(), this.state.arriving(), this.state.leaving());
   }
 
-  /** The living heroes walk about; the dead and the retired are on the roster, not in the camp. */
-  private showHeroes(heroes: readonly HeroView[], arriving: string | undefined, leaving: string | undefined): void {
+  /** The living heroes walk about, with the few of other players' seen here; the dead and the retired are on the roster, not in the camp. */
+  private showHeroes(
+    heroes: readonly HeroView[],
+    seen: readonly SeenHeroView[],
+    arriving: string | undefined,
+    leaving: string | undefined,
+  ): void {
     this.scene?.setHeroes(
-      heroes.filter((h) => h.status === 'ALIVE').map((h) => ({ id: h.id, spriteSet: h.spriteSet })),
+      [...heroes.filter((h) => h.status === 'ALIVE'), ...seen].map((h) => ({ id: h.id, spriteSet: h.spriteSet })),
       arriving,
       leaving,
     );

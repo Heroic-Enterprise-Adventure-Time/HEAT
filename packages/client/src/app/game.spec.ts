@@ -1,7 +1,7 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Api, ApiError } from './api';
-import { Game, type HeroView, type PlayerView } from './game';
+import { Game, type HeroView, type PlayerView, type SeenHeroView } from './game';
 import { Session, type SessionUser } from './session';
 
 const villager: HeroView = {
@@ -26,6 +26,8 @@ function playerWith(heroes: HeroView[], activeHeroes = heroes.length, livingHero
   };
 }
 
+const moss: SeenHeroView = { id: 's1', name: 'Moss', unitType: 'villager', spriteSet: 'villager-07', level: 2 };
+
 /** An API that answers each operation from the player held here, and records what it was asked. */
 function fakeApi(start: PlayerView) {
   let player = start;
@@ -35,6 +37,7 @@ function fakeApi(start: PlayerView) {
     request: async (query: string, variables: Record<string, unknown> = {}) => {
       calls.push({ query, variables });
       if (query.includes('joinGame')) return { joinGame: { id: player.id } };
+      if (query.includes('heroesSeenAt')) return { heroesSeenAt: variables['at'] === 'millbrook' ? [moss] : [] };
       if (query.includes('recruitHero')) {
         if (player.camps[0]!.livingHeroes > 0) throw new ApiError('the villager is free only when no hero at the camp is alive', 'NOT_FREE');
         const hero = { ...villager, id: variables['id'] as string };
@@ -68,8 +71,23 @@ describe('Game', () => {
     const { api, game } = setup(playerWith([]));
     TestBed.tick();
     await vi.waitFor(() => expect(game.player()).not.toBeNull());
-    expect(api.calls.map((c) => c.query.includes('joinGame'))).toEqual([true, false]);
+    const own = api.calls.filter((c) => !c.query.includes('heroesSeenAt'));
+    expect(own.map((c) => c.query.includes('joinGame'))).toEqual([true, false]);
     expect(game.camp()?.name).toBe('Millbrook');
+  });
+
+  it("reads the heroes seen at the camp's location after sign-in and again when the camp changes, not after a recruit", async () => {
+    const { api, game } = setup(playerWith([]));
+    TestBed.tick();
+    await vi.waitFor(() => expect(game.seenHere()).toEqual([moss]));
+    await game.recruitVillager();
+    expect(api.calls.filter((c) => c.query.includes('heroesSeenAt')).map((c) => c.variables['at'])).toEqual(['millbrook']);
+
+    game.location.set('elsewhere');
+    TestBed.tick();
+    expect(game.seenHere()).toEqual([]);
+    await vi.waitFor(() => expect(api.calls.filter((c) => c.query.includes('heroesSeenAt'))).toHaveLength(2));
+    expect(game.seenHere()).toEqual([]);
   });
 
   it('loads nothing while nobody is signed in', async () => {
