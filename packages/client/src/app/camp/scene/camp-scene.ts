@@ -2,14 +2,16 @@ import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyl
 import type { FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
 import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
-import { sceneView } from '../page-layout';
-import { gone, leave, newWalker, randomSpot, step, type Facing, type Walker } from './wander';
+import { sceneView, type SceneView } from '../page-layout';
+import { WALK_SPEED, gone, leave, newWalker, randomSpot, step, type Facing, type Walker } from './wander';
 
 /**
  * The camp scene, drawn with PixiJS (decision 0028): the camp's whole map,
  * scaled up by the largest whole number that fits its box, so every art pixel
  * is a square of screen pixels, with the ground running on around the map to
- * fill the rest of the box (Issue-89). Ground
+ * fill the rest of the box (Issue-89). The heroes are drawn at their own,
+ * smaller whole-number scale (Issue-99), so the canvas renders at the scene's
+ * scale rather than at the map's pixels enlarged by CSS. Ground
  * tiles, then the facilities and the heroes in one container sorted by the
  * line they stand on (assets.md, rule 18), which is what puts a hero walking
  * behind the hall behind it. The scene knows nothing of the hub: the camp
@@ -95,11 +97,15 @@ function loadHeroFrames(set: string): Promise<HeroFrames> {
   return frames;
 }
 
-/** Shows a frame with its foot row on the sprite's position and its canvas centred there. */
-function show(sprite: Sprite, texture: Texture, foot: number, mirrored: boolean): void {
+/**
+ * Shows a frame with its foot row on the sprite's position and its canvas
+ * centred there, at `size` of the map's scale; the click area, in the frame's
+ * own pixels, shrinks with it.
+ */
+function show(sprite: Sprite, texture: Texture, foot: number, mirrored: boolean, size: number): void {
   sprite.texture = texture;
   sprite.pivot.set(texture.width / 2, foot + 1);
-  sprite.scale.x = mirrored ? -1 : 1;
+  sprite.scale.set(mirrored ? -size : size, size);
   sprite.hitArea = new Rectangle(texture.width / 2 - 8, foot - 27, 16, 28);
 }
 
@@ -150,14 +156,17 @@ export async function createCampScene(
   };
 
   let shown = '';
+  let view: SceneView = sceneView(host.clientWidth, host.clientHeight);
   const resize = () => {
-    const view = sceneView(host.clientWidth, host.clientHeight);
-    const key = `${view.width}x${view.height}`;
+    view = sceneView(host.clientWidth, host.clientHeight);
+    const key = `${view.width}x${view.height}@${view.scale}`;
     app.canvas.style.width = `${view.width * view.scale}px`;
     app.canvas.style.height = `${view.height * view.scale}px`;
     if (key === shown) return;
     shown = key;
-    app.renderer.resize(view.width, view.height);
+    // One canvas pixel per CSS pixel: the map's art pixels are scale × scale
+    // squares, and a hero's, at its own smaller scale, are still whole squares.
+    app.renderer.resize(view.width, view.height, view.scale);
     world.position.set(view.mapX, view.mapY);
     layWindow(-view.mapX, -view.mapY, view.width, view.height);
   };
@@ -182,8 +191,11 @@ export async function createCampScene(
   let destroyed = false;
 
   app.ticker.add((ticker) => {
+    // A hero's size against the map, and its stroll in map pixels, which keeps
+    // its stride in step with its frames at that size.
+    const size = view.heroScale / view.scale;
     for (const [id, hero] of heroes) {
-      const walking = step(hero.walker, ticker.deltaMS, layout.walkable, Math.random);
+      const walking = step(hero.walker, ticker.deltaMS, layout.walkable, Math.random, WALK_SPEED * size);
       if (gone(hero.walker)) {
         hero.sprite.destroy();
         heroes.delete(id);
@@ -194,12 +206,13 @@ export async function createCampScene(
         hero.clockMs += ticker.deltaMS;
         const direction: WalkDirection = facing === 'west' ? 'east' : facing;
         const frame = Math.floor(hero.clockMs / WALK_FRAME_MS) % WALK_FRAMES;
-        show(hero.sprite, hero.frames.walk[direction][frame]!, hero.frames.walkFoot[direction], facing === 'west');
+        show(hero.sprite, hero.frames.walk[direction][frame]!, hero.frames.walkFoot[direction], facing === 'west', size);
       } else {
         hero.clockMs = 0;
-        show(hero.sprite, hero.frames.still[facing], hero.frames.stillFoot, false);
+        show(hero.sprite, hero.frames.still[facing], hero.frames.stillFoot, false, size);
       }
-      hero.sprite.position.set(Math.round(hero.walker.x), Math.round(hero.walker.y));
+      // On a whole canvas pixel, so every art pixel of the hero covers whole ones.
+      hero.sprite.position.set(Math.round(hero.walker.x * view.scale) / view.scale, Math.round(hero.walker.y * view.scale) / view.scale);
       hero.sprite.zIndex = hero.walker.y;
     }
   });

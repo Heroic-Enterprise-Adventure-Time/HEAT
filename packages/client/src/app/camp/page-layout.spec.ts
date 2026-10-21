@@ -1,4 +1,4 @@
-import { HEADER_PX, iconScale, isSideBySide, menuLabels, panelPx, sceneScale, sceneView, stackedStageHeight } from './page-layout';
+import { HEADER_PX, heroScale, iconScale, isSideBySide, menuLabels, panelPx, sceneScale, sceneView, stackedStageHeight } from './page-layout';
 
 // Typical browser viewports, the header's height included in the height.
 const LAPTOP = [1366, 614 + HEADER_PX] as const;
@@ -76,10 +76,16 @@ describe('stackedStageHeight', () => {
   });
 });
 
+describe('heroScale', () => {
+  it('is half the scene scale, rounded up to a whole number', () => {
+    expect([1, 2, 3, 4, 5, 6].map(heroScale)).toEqual([1, 1, 2, 2, 3, 3]);
+  });
+});
+
 describe('sceneView', () => {
   it('fills the box with ground around the map, centred, at a whole-number scale', () => {
     // 1000×744 CSS px at scale 2 shows 500×372 art pixels: 50 to each side of the map, 73 above.
-    expect(sceneView(1000, 744)).toEqual({ scale: 2, width: 500, height: 372, mapX: 50, mapY: 73 });
+    expect(sceneView(1000, 744)).toEqual({ scale: 2, heroScale: 1, width: 500, height: 372, mapX: 50, mapY: 73 });
   });
 
   it('covers an odd box by rounding the window up, never leaving a bar', () => {
@@ -89,8 +95,8 @@ describe('sceneView', () => {
   });
 
   it('crops the edges of the map evenly in a box narrower than it', () => {
-    expect(sceneView(375, 225)).toEqual({ scale: 1, width: 375, height: 225, mapX: -13, mapY: 0 });
+    expect(sceneView(375, 225)).toEqual({ scale: 1, heroScale: 1, width: 375, height: 225, mapX: -13, mapY: 0 });
     // An upright tablet at scale 2 shows 384 of the 400 px: 8 cropped from each side.
-    expect(sceneView(768, 450)).toEqual({ scale: 2, width: 384, height: 225, mapX: -8, mapY: 0 });
+    expect(sceneView(768, 450)).toEqual({ scale: 2, heroScale: 1, width: 384, height: 225, mapX: -8, mapY: 0 });
   });
 });

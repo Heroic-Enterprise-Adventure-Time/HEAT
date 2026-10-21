@@ -84,6 +84,7 @@ How an adventure plays out. Everything in this section is expected to change as 
 - **Decided.** Facilities are where the player acts: they open a facility by clicking it in the scene or by choosing it from the page's menu ("The page"). Most facilities offer missions, each its own kinds. A mine offers mining missions; a forest path, lumber runs; a caravan hub, caravans. The first is the **job board**, a shared facility offering general jobs, so a new player can set out without building anything.
 - **Decided.** Heroes walk about the camp for flavor: some of the player's heroes at that location and some of other players' heroes there, never all of either. Clicking a hero shows who it is. Nothing is done through them.
 - **Decided.** A camp is a map of whole 16 px tiles, Millbrook's 400×225. The scene shows the map scaled up by the largest whole number at which its height and its middle, where every facility stands, fit the box; it fills the rest of the box with more ground around the map, or crops the map's bare edges where the box is a little narrow, so there are no bars and no stretching. It never scrolls. It sits below the header bar, which is part of the page and not of the scene (decision 0028, as amended by Issue-89).
+- **Decided.** Heroes in the camp are drawn at half the scene's scale, rounded up to a whole number, so they stand about a third of the hall's height rather than half, and their pixels stay square. Battle keeps its own scale (decision 0028, as amended by Issue-99).
 
 ## The heroes hall
 
