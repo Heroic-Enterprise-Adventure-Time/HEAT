@@ -23,7 +23,9 @@
  * record settle looks up by id. Public: what every player may see.
  *
  *   ADVENTURE#<id> | RECORD                         status, seed, result
- *   LOCATION#<id>  | ...                            the feed, presence, offers: build order step 3
+ *   LOCATION#<id>  | SEEN#<heroId>                  a hero seen there: public fields only, no owner, and
+ *                                                   expiresAt, the table's TTL attribute (decision 0029)
+ *   LOCATION#<id>  | ...                            the feed, offers: the rest of build order step 3
  */
 export const KEY = { pk: "PK", sk: "SK" } as const;
 
@@ -44,4 +46,5 @@ export const playerKeys = {
 
 export const locationKeys = {
   adventure: (adventureId: string) => ({ PK: `ADVENTURE#${adventureId}`, SK: "RECORD" }),
+  seen: (location: string, heroId: string) => ({ PK: `LOCATION#${location}`, SK: `SEEN#${heroId}` }),
 };
