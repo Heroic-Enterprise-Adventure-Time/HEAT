@@ -1,4 +1,11 @@
-import { HEADER_PX, isLandscape, menuLabels, narrowStageHeight, sceneScale, sceneView } from './page-layout';
+import { HEADER_PX, iconScale, isSideBySide, menuLabels, panelPx, sceneScale, sceneView, stackedStageHeight } from './page-layout';
+
+// Typical browser viewports, the header's height included in the height.
+const LAPTOP = [1366, 614 + HEADER_PX] as const;
+const MACBOOK = [1440, 744 + HEADER_PX] as const;
+const DESKTOP = [1920, 914 + HEADER_PX] as const;
+const TABLET = [1024, 768] as const;
+const PHONE = [375, 812] as const;
 
 describe('sceneScale', () => {
   it('takes the largest whole number at which the whole 400×225 map fits', () => {
@@ -9,6 +16,59 @@ describe('sceneScale', () => {
 
   it('never goes below 1, so a narrow phone still draws the scene', () => {
     expect(sceneScale(300, 100)).toBe(1);
+  });
+});
+
+describe('panelPx', () => {
+  it('is 26% of the window, held between 17rem and 28rem', () => {
+    expect(panelPx(1366)).toBeCloseTo(355.16);
+    expect(panelPx(1920)).toBe(448);
+    expect(panelPx(900)).toBe(272);
+  });
+});
+
+describe('isSideBySide', () => {
+  it('stands the regions side by side where the scene still gets scale 2', () => {
+    expect(isSideBySide(...LAPTOP)).toBe(true);
+    expect(isSideBySide(...MACBOOK)).toBe(true);
+    expect(isSideBySide(...DESKTOP)).toBe(true);
+  });
+
+  it('stacks them on a tablet, a small window and a phone', () => {
+    // 1024×768 side by side would leave the scene 696 px wide: scale 1.
+    expect(isSideBySide(...TABLET)).toBe(false);
+    expect(isSideBySide(1100, 500)).toBe(false);
+    expect(isSideBySide(...PHONE)).toBe(false);
+  });
+});
+
+describe('menuLabels and iconScale', () => {
+  it('labels the menu where that costs the scene no scale step', () => {
+    // 1440×780: the rail leaves 1010 px and labels 850 px, scale 2 either way.
+    expect(menuLabels(...MACBOOK)).toBe(true);
+    expect(menuLabels(...DESKTOP)).toBe(true);
+  });
+
+  it('keeps the icon rail where labels would cost a step, and never labels a stacked menu', () => {
+    // 1366×650: the rail leaves 955 px, scale 2; labels leave 795 px, scale 1.
+    expect(menuLabels(...LAPTOP)).toBe(false);
+    expect(menuLabels(...TABLET)).toBe(false);
+    expect(menuLabels(...PHONE)).toBe(false);
+  });
+
+  it('draws the icons at 2× beside a scene at scale 3 or more', () => {
+    expect(iconScale(...DESKTOP)).toBe(2);
+    expect(iconScale(...MACBOOK)).toBe(1);
+    expect(iconScale(...LAPTOP)).toBe(1);
+  });
+});
+
+describe('stackedStageHeight', () => {
+  it('is the map height at the scale that fits both the width and the height under the header and menu row', () => {
+    expect(stackedStageHeight(...PHONE)).toBe(225);
+    expect(stackedStageHeight(...TABLET)).toBe(450);
+    // Wide but short: the height allows scale 1 only.
+    expect(stackedStageHeight(1100, 500)).toBe(225);
   });
 });
 
@@ -26,40 +86,5 @@ describe('sceneView', () => {
 
   it('crops the edges of the map evenly in a box narrower than it', () => {
     expect(sceneView(375, 225)).toEqual({ scale: 1, width: 375, height: 225, mapX: -13, mapY: 0 });
-  });
-});
-
-describe('narrowStageHeight', () => {
-  it('is the map height at the width scale', () => {
-    expect(narrowStageHeight(375)).toBe(225);
-    expect(narrowStageHeight(820)).toBe(450);
-  });
-});
-
-describe('isLandscape', () => {
-  it('starts at 4:3', () => {
-    expect(isLandscape(1024, 768)).toBe(true);
-    expect(isLandscape(1023, 768)).toBe(false);
-    expect(isLandscape(375, 812)).toBe(false);
-  });
-});
-
-describe('menuLabels', () => {
-  // Typical browser viewports, the header's height included; the 24rem panel always beside the scene.
-  it('shows the labels where they cost the scene no scale step', () => {
-    // 1920×950: the rail leaves 1480 px and labels 1336 px, scale 3 either way.
-    expect(menuLabels(1920, 914 + HEADER_PX)).toBe(true);
-  });
-
-  it('keeps the icon rail where the labels would cost a step', () => {
-    // 2560×1310: the rail leaves 2120 px, scale 5; labels leave 1976 px, scale 4.
-    expect(menuLabels(2560, 1274 + HEADER_PX)).toBe(false);
-    // 1366×650: the rail leaves 926 px, scale 2; labels leave 782 px, scale 1.
-    expect(menuLabels(1366, 614 + HEADER_PX)).toBe(false);
-  });
-
-  it('never labels the side menu on a portrait screen, where it is a row', () => {
-    expect(menuLabels(375, 812)).toBe(false);
-    expect(menuLabels(768, 1024)).toBe(false);
   });
 });

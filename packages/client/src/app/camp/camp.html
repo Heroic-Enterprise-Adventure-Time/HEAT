@@ -1,4 +1,4 @@
-<section class="camp" [class.labels]="labels()">
+<section class="camp" [class.side]="side()" [class.labels]="labels()">
   <div #stage class="stage" [style.height.px]="stageHeight()"></div>
 
   <nav class="menu" aria-label="Facilities">
@@ -12,7 +12,7 @@
         [attr.aria-current]="open()?.kind === facility.kind ? 'page' : null"
         [attr.title]="labels() ? null : facility.name"
       >
-        <img [src]="'art/icons/' + facility.kind + '.png'" width="32" height="32" alt="" />
+        <img [src]="'art/icons/' + facility.kind + '.png'" [width]="iconPx()" [height]="iconPx()" alt="" />
         <span class="label">{{ facility.name }}</span>
       </a>
     }

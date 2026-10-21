@@ -5,7 +5,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { FACILITIES, location, type FacilityKind } from '@heat/engine';
 import { Game, type HeroView } from '../game';
 import { LAYOUTS } from './scene/layout';
-import { isLandscape, menuLabels, narrowStageHeight } from './page-layout';
+import { iconScale, isSideBySide, menuLabels, stackedStageHeight } from './page-layout';
 import type { CampSceneHandle, SceneCallbacks } from './scene/camp-scene';
 import type { CampLayout } from './scene/layout';
 
@@ -75,10 +75,12 @@ export class Camp {
   });
 
   private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight });
+  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height));
   protected readonly labels = computed(() => menuLabels(this.viewport().width, this.viewport().height));
-  /** On a narrow screen the scene's box is the page's width by the map's height at that width's scale; landscape leaves it to the grid. */
+  protected readonly iconPx = computed(() => 32 * iconScale(this.viewport().width, this.viewport().height));
+  /** Stacked, the scene's box is the page's width by the map's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() =>
-    isLandscape(this.viewport().width, this.viewport().height) ? null : narrowStageHeight(this.viewport().width),
+    this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height),
   );
 
   private scene: CampSceneHandle | null = null;
