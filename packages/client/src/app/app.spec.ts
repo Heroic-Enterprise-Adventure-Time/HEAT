@@ -1,12 +1,12 @@
-import { ApplicationInitStatus } from '@angular/core';
+import { ApplicationInitStatus, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { type ActivatedRouteSnapshot, type RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { App } from './app';
 import { appConfig } from './app.config';
-import { routes } from './app.routes';
+import { routes, signedIn } from './app.routes';
 import { Config } from './config';
-import { Session } from './session';
+import { Session, type SessionUser } from './session';
 
 describe('App', () => {
   it('routes the empty path to the home page', async () => {
@@ -30,5 +30,28 @@ describe('App', () => {
     expect(TestBed.inject(Config).value()).toBeNull();
     expect(TestBed.inject(Config).error()).toBeTruthy();
     expect(TestBed.inject(Session).error()).toContain('configuration did not load');
+  });
+});
+
+describe('signedIn', () => {
+  /** Runs the guard for a URL against a session that is or is not signed in, and what it kept. */
+  function guard(user: SessionUser | null, url: string) {
+    const kept: string[] = [];
+    const session = { user: signal(user), keep: (path: string) => void kept.push(path) };
+    TestBed.configureTestingModule({ providers: [provideRouter([]), { provide: Session, useValue: session }] });
+    const result = TestBed.runInInjectionContext(() => signedIn({} as ActivatedRouteSnapshot, { url } as RouterStateSnapshot));
+    return { result, kept };
+  }
+
+  it('lets a signed-in player into the camp and keeps nothing', () => {
+    const { result, kept } = guard({ email: null, name: null, accessToken: 'access' }, '/camp/millbrook/mine');
+    expect(result).toBe(true);
+    expect(kept).toEqual([]);
+  });
+
+  it('sends a signed-out player home and keeps the path refused', () => {
+    const { result, kept } = guard(null, '/camp/millbrook/heroes-hall/heroes/h1');
+    expect(result instanceof UrlTree && result.toString()).toBe('/');
+    expect(kept).toEqual(['/camp/millbrook/heroes-hall/heroes/h1']);
   });
 });

@@ -1,0 +1,181 @@
+/*
+ * The page's regions (Issue-89; page-layout.ts holds the arithmetic). Nothing
+ * overlaps. Narrow screens, the default here: the scene on top, the page's
+ * width by the map's height, then the menu as a row, then the panel in the
+ * page's flow. Landscape, from 4:3: the menu on the left, the scene filling
+ * the middle, the panel on the right, always there.
+ */
+:host {
+  --night: #0b0806;
+  --ink: #140d08;
+  --bar: #1a120c;
+  --parchment: #94805c;
+  --gold: #d9a441;
+  --light: #e6d6b8;
+}
+
+.camp {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 2.25rem);
+  background: var(--night);
+}
+
+.stage {
+  width: 100%;
+  overflow: hidden;
+  background: var(--night);
+}
+
+.menu {
+  display: flex;
+  justify-content: space-around;
+  height: 4rem;
+  flex: none;
+  background: var(--bar);
+  border-top: 2px solid var(--ink);
+  border-bottom: 2px solid var(--ink);
+}
+
+.entry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.125rem;
+  flex: 1;
+  min-width: 0;
+  color: var(--light);
+  font-size: 0.7rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.entry img {
+  image-rendering: pixelated;
+}
+
+/* An unbuilt facility's entry is there to be chosen, but quieter. */
+.entry.unbuilt img {
+  opacity: 0.55;
+}
+
+.entry.unbuilt .label {
+  color: #a8987c;
+}
+
+.entry:hover,
+.entry:focus-visible {
+  background: #2a1d13;
+}
+
+.entry.active {
+  background: #33241a;
+  box-shadow: inset 0 -3px 0 var(--gold);
+}
+
+.entry:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: -2px;
+}
+
+.panel {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: var(--parchment);
+  color: var(--ink);
+}
+
+/*
+ * A phone's menu row has no room for six labels: icons only, the label kept
+ * for screen readers, and shown on the entry whose panel is open, which takes
+ * the room of two.
+ */
+@media (max-width: 37.5rem) {
+  .camp:not(.side) .entry {
+    position: relative;
+  }
+
+  .camp:not(.side) .entry.active {
+    flex: 2;
+  }
+
+  .camp:not(.side) .entry:not(.active) .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
+/* Side by side, where that leaves the scene scale 2 (page-layout.ts, isSideBySide): the menu, the scene and the panel in columns. */
+.camp.side {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) clamp(17rem, 26vw, 28rem);
+  grid-template-areas: 'menu stage panel';
+  height: calc(100dvh - 2.25rem);
+  min-height: 0;
+}
+
+.camp.side.labels {
+  grid-template-columns: 13.5rem minmax(0, 1fr) clamp(17rem, 26vw, 28rem);
+}
+
+.side .stage {
+  grid-area: stage;
+  height: 100%;
+}
+
+.side .menu {
+  grid-area: menu;
+  flex-direction: column;
+  justify-content: flex-start;
+  height: auto;
+  padding-top: 0.5rem;
+  border: none;
+  border-right: 2px solid var(--ink);
+}
+
+.side .entry {
+  position: relative;
+  flex: none;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.9rem;
+}
+
+.side .entry.active {
+  box-shadow: inset 3px 0 0 var(--gold);
+}
+
+/* The rail shows each label beside it on hover and on focus. */
+.camp.side:not(.labels) .label {
+  position: absolute;
+  left: calc(100% + 0.25rem);
+  z-index: 2;
+  padding: 0.125rem 0.5rem;
+  background: var(--bar);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.camp.side:not(.labels) .entry:hover .label,
+.camp.side:not(.labels) .entry:focus-visible .label {
+  visibility: visible;
+}
+
+.side .panel {
+  grid-area: panel;
+  overflow-y: auto;
+  border-left: 3px solid var(--ink);
+}
+
+.error {
+  position: fixed;
+  bottom: 0.5rem;
+  left: 1rem;
+  color: #ff8a8a;
+}

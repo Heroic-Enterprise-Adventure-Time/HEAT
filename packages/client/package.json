@@ -5,8 +5,12 @@
   "description": "The Angular client: the browser game, served from each stack's bucket through CloudFront.",
   "type": "module",
   "scripts": {
+    "art": "node scripts/copy-art.mjs",
+    "prestart": "npm run art",
     "start": "ng serve",
+    "prebuild": "npm run art",
     "build": "ng build",
+    "pretest": "npm run art",
     "test": "ng test --watch=false"
   },
   "dependencies": {
@@ -15,7 +19,9 @@
     "@angular/core": "22.2.3",
     "@angular/platform-browser": "22.2.3",
     "@angular/router": "22.2.3",
+    "@heat/engine": "0.0.0",
     "oidc-client-ts": "3.5.0",
+    "pixi.js": "8.22.0",
     "rxjs": "7.8.2",
     "tslib": "2.8.1"
   },

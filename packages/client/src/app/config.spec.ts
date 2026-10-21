@@ -5,16 +5,18 @@ const sample = {
   userPoolId: 'us-east-1_EXAMPLE',
   clientId: '1example23456789',
   loginHost: 'https://auth.heat-sb.dcg-games.com',
+  passwordSignIn: true,
 };
 
 describe('parseStackConfig', () => {
-  it('accepts the four fields', () => {
+  it('accepts the five fields', () => {
     expect(parseStackConfig(sample)).toEqual(sample);
   });
 
   it('names the missing field', () => {
     const { loginHost: _loginHost, ...without } = sample;
     expect(() => parseStackConfig(without)).toThrow('config.json lacks loginHost');
+    expect(() => parseStackConfig({ ...sample, passwordSignIn: 'true' })).toThrow('config.json lacks passwordSignIn');
     expect(() => parseStackConfig(null)).toThrow('config.json is not an object');
   });
 });

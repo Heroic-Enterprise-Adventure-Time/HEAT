@@ -1,0 +1,79 @@
+/* What every panel in the content area shares; the area itself is the camp's (camp.css). */
+h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.back {
+  display: inline-block;
+  margin-bottom: 0.5rem;
+  color: inherit;
+}
+
+.roster {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+}
+
+.roster li {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.link {
+  color: inherit;
+  font-weight: bold;
+}
+
+button {
+  font: inherit;
+}
+
+.status {
+  font-weight: bold;
+}
+
+.dead,
+.note {
+  color: #3d140c;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.125rem 0.75rem;
+  margin: 0;
+}
+
+dt {
+  font-weight: bold;
+}
+
+dd {
+  margin: 0;
+}
+
+.confirm {
+  margin-top: 0.75rem;
+}
+
+.confirm p {
+  margin: 0 0 0.5rem;
+}
+
+.confirm button + button {
+  margin-left: 0.5rem;
+}
+
+.retire {
+  margin-top: 0.75rem;
+}
+
+.retired {
+  margin-bottom: 0.75rem;
+}
+
+.retired summary {
+  cursor: pointer;
+}

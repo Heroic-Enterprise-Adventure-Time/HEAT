@@ -26,7 +26,7 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 ### Review and merging
 
 11. The project owner reviews every pull request and is the only one who merges. An agent never merges.
-12. Merge with a merge commit. Do not squash and do not rebase.
+12. Merge with a merge commit. Do not squash and do not rebase. A branch is brought up to date with `main` the same way, by merging `main` into it, never by rebasing.
 13. Changes requested in review are added as new commits on the same branch.
 14. The branch is deleted after the merge.
 15. The cycle stays tight: small pull requests, reviewed and merged promptly, so that the next piece of work starts from a current `main`.
@@ -86,5 +86,5 @@ Most of this document is an agreement, not a mechanism. What is enforced today:
 
 What is not enforced yet:
 
-- **The pipeline's applies and their guardrails.** Rules 18, 22 to 24 and 26 describe the shape decided on 2026-10-16 and 2026-10-17 (decisions 0017, 0018, 0020 and 0021). The roles exist (Issue-36, applied 2026-10-16), and `deploy.yml` plans a permanent root on its pull request and applies it on the merge (Issue-37); since Issue-40 `dev` is one of those roots, with a smoke test after its apply. Since Issue-38 every working branch has a stack, applied by `sandbox.yml` on every push, with its API URL in the run summary and, since Issue-39, its hostname. Since Issue-41 `release.yml` plans `prod` on the pull request to `release`, applies it on the merge behind the guard, runs the token-free smoke test and writes the tag and the Release; `terraform/environment/prod/README.md` says whether the first release has run. The rules are written for the shape being built so that the issues building it have one text to build to.
+- **The pipeline's applies and their guardrails.** Rules 18, 22 to 24 and 26 describe the shape decided on 2026-10-16 and 2026-10-17 (decisions 0017, 0018, 0020 and 0021). The roles exist (Issue-36, applied 2026-10-16), and `deploy.yml` plans a permanent root on its pull request and applies it on the merge (Issue-37); since Issue-40 `dev` is one of those roots, with a smoke test after its apply. Since Issue-38 every working branch has a stack, applied by `sandbox.yml` on every push, with its API URL in the run summary and, since Issue-39, its hostname. Since Issue-41 `release.yml` plans `prod` on the pull request to `release`, applies it on the merge behind the guard, runs the token-free smoke test and writes the tag and the Release; the first release ran on 2026-10-18 (Issue-64), and the procedure as it has run is `docs/process/deployment.md`. The rules are written for the shape being built so that the issues building it have one text to build to.
 - **Signed commits.** The agent's commits are unsigned, and the `main` ruleset does not require signatures. Deferred until the agent has a signing key; what it leaves open is that authorship in the log is asserted, not proven.

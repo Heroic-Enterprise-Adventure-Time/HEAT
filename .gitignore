@@ -30,3 +30,6 @@ dist/
 *.tsbuildinfo
 .env
 .env.*
+
+# The client's copy of art/, made by packages/client/scripts/copy-art.mjs
+packages/client/generated/

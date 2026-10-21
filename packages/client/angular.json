@@ -17,11 +17,18 @@
           "builder": "@angular/build:application",
           "options": {
             "browser": "src/main.ts",
+            "allowedCommonJsDependencies": ["@xmldom/xmldom"],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               {
                 "glob": "**/*",
-                "input": "public"
+                "input": "generated/art",
+                "output": "art"
+              },
+              {
+                "glob": "favicon.png",
+                "input": "generated/art/icons",
+                "output": "/"
               }
             ],
             "styles": [

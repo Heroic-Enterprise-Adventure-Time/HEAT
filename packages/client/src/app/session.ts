@@ -21,9 +21,11 @@ export interface SessionUser {
  * what the API's JWT authorizer verifies against; the endpoints are the
  * pool's managed login host, so no discovery request is made. The grant is
  * the authorization code with PKCE, which the library performs; the token
- * endpoint allows the browser's cross-origin exchange. Google is the pool's
- * only provider, so `identity_provider=Google` skips a login page whose one
- * control would be a Google button. Tokens live in session storage, the
+ * endpoint allows the browser's cross-origin exchange. Where Google is the
+ * client's only provider, `identity_provider=Google` skips a login page whose
+ * one control would be a Google button; where the stack also offers email and
+ * password (`passwordSignIn`, a sandbox stack, Issue-86), the parameter is
+ * left out and the managed login page shows both. Tokens live in session storage, the
  * library's default: gone with the tab, never shared between origins. The
  * library renews them with the refresh token before they expire, and the
  * pool rotates the refresh token on every renewal.
@@ -47,7 +49,7 @@ export function sessionSettings(config: StackConfig, origin: string): UserManage
     post_logout_redirect_uri: origin,
     response_type: 'code',
     scope: 'openid email profile',
-    extraQueryParams: { identity_provider: 'Google' },
+    ...(config.passwordSignIn ? {} : { extraQueryParams: { identity_provider: 'Google' } }),
     automaticSilentRenew: true,
     loadUserInfo: false,
   };
@@ -73,6 +75,23 @@ export const SESSION_MANAGER_FACTORY = new InjectionToken<(settings: UserManager
   factory: () => (settings) => new UserManager(settings),
 });
 
+/**
+ * The value as a path of this page, with its query and fragment, or null if
+ * it is anything else: not a string, not starting with one `/` (`//host` and
+ * `/\host` name another host to a browser), or resolving to another origin.
+ * Sign-in returns only to what this lets through (Issue-96).
+ */
+export function inAppPath(value: unknown, origin: string): string | null {
+  if (typeof value !== 'string' || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) return null;
+  let url: URL;
+  try {
+    url = new URL(value, origin);
+  } catch {
+    return null;
+  }
+  return url.origin === origin ? `${url.pathname}${url.search}${url.hash}` : null;
+}
+
 function toSessionUser(user: User | null): SessionUser | null {
   if (!user || user.expired) return null;
   const email = user.profile['email'];
@@ -88,7 +107,8 @@ function toSessionUser(user: User | null): SessionUser | null {
  * The signed-in state of the page, as a signal, and the two actions. Started
  * once by the application initializer after the configuration is loaded:
  * if the page was opened by the managed login's redirect, the code in the
- * query is exchanged for tokens and the query removed; then whoever the
+ * query is exchanged for tokens and the address replaced by the path kept
+ * at sign-in, or by the bare path; then whoever the
  * stored tokens belong to is the user.
  */
 @Injectable({ providedIn: 'root' })
@@ -97,10 +117,16 @@ export class Session {
   private readonly document = inject(DOCUMENT);
   private readonly createManager = inject(SESSION_MANAGER_FACTORY);
   private manager: SessionManager | null = null;
+  private kept: string | null = null;
 
   readonly user = signal<SessionUser | null>(null);
   /** Why sign-in is unavailable, or the last sign-in error. */
   readonly error = signal<string | null>(null);
+
+  /** What the sign-in button says: Google, unless the login page offers a password too. */
+  get signInLabel(): string {
+    return this.config.value()?.passwordSignIn ? 'Sign in' : 'Sign in with Google';
+  }
 
   get origin(): string {
     return this.document.location.origin;
@@ -123,12 +149,16 @@ export class Session {
 
     const query = new URLSearchParams(this.document.location.search);
     if (query.has('code') && query.has('state')) {
+      let returnTo: string | null = null;
       try {
-        await manager.signinCallback(this.document.location.href);
+        const user = await manager.signinCallback(this.document.location.href);
+        returnTo = inAppPath(user?.state, this.origin);
       } catch (e) {
         this.error.set(`sign-in failed: ${e instanceof Error ? e.message : String(e)}`);
       }
-      this.document.defaultView?.history.replaceState({}, '', this.document.location.pathname);
+      // The router's first navigation follows the initializer, so it reads
+      // the kept path from the address bar.
+      this.document.defaultView?.history.replaceState({}, '', returnTo ?? this.document.location.pathname);
     } else if (query.has('error')) {
       this.error.set(`sign-in failed: ${query.get('error_description') ?? query.get('error')}`);
       this.document.defaultView?.history.replaceState({}, '', this.document.location.pathname);
@@ -137,11 +167,21 @@ export class Session {
     this.user.set(toSessionUser(await manager.getUser()));
   }
 
-  /** Sends the browser to Google through the pool's managed login. */
+  /** Keeps a path that a signed-out player opened, for sign-in to return to. */
+  keep(path: string): void {
+    this.kept = inAppPath(path, this.origin);
+  }
+
+  /**
+   * Sends the browser to the pool's managed login, or straight on to Google.
+   * A kept path goes as the library's custom state, which it holds in
+   * session storage beside the PKCE verifier and gives back with the user,
+   * so it is never in a URL and the redirect URI stays the origin.
+   */
   async signIn(): Promise<void> {
     if (!this.manager) return;
     this.error.set(null);
-    await this.manager.signinRedirect();
+    await this.manager.signinRedirect(this.kept ? { state: this.kept } : undefined);
   }
 
   /** Forgets the tokens and sends the browser through the pool's logout endpoint. */

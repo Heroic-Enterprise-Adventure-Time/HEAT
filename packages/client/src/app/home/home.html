@@ -1,17 +1,16 @@
-<main>
-  <h1>HEAT</h1>
-  <p>Heroic Enterprise Adventure Time: a browser game about running an adventuring business.</p>
+@if (!session.user()) {
+  <main>
+    <h1>HEAT</h1>
+    <p>Heroic Enterprise Adventure Time: a browser game about running an adventuring business.</p>
 
-  @if (session.user(); as user) {
-    <p>Signed in as <strong>{{ user.email ?? user.name ?? 'a player' }}</strong>.</p>
-    <button type="button" (click)="session.signOut()">Sign out</button>
-  } @else if (config.error(); as error) {
-    <p class="error">The page could not load its stack configuration: {{ error }}.</p>
-  } @else {
-    <button type="button" (click)="session.signIn()">Sign in with Google</button>
-  }
+    @if (config.error(); as error) {
+      <p class="error">The page could not load its stack configuration: {{ error }}.</p>
+    } @else {
+      <button type="button" (click)="session.signIn()">{{ session.signInLabel }}</button>
+    }
 
-  @if (session.error(); as error) {
-    <p class="error">{{ error }}</p>
-  }
-</main>
+    @if (session.error(); as error) {
+      <p class="error">{{ error }}</p>
+    }
+  </main>
+}

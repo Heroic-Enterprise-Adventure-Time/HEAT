@@ -1,0 +1,235 @@
+{
+  "set": "icons",
+  "kind": "ui-icon",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "call": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-10-20",
+    "reviewObjectId": "251e2a4f-72ff-46d8-bef1-42d423985479",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 01",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "heroes hall icon: small timber guild hall with a banner over the door",
+        "heroes hall icon: wooden longhouse with a shield emblem above the door",
+        "heroes hall icon: helmet in front of a small wooden hall",
+        "heroes hall icon: round shield with a crest, guild sign",
+        "job board icon: wooden notice board with pinned paper notes",
+        "job board icon: parchment scroll with a red wax seal",
+        "job board icon: notice board with a quest paper and an exclamation mark",
+        "job board icon: rolled quest scroll tied with string",
+        "warehouse icon: stack of wooden crates",
+        "warehouse icon: wooden barrel beside a crate",
+        "warehouse icon: small wooden storehouse with a big door",
+        "warehouse icon: sack of goods and a crate",
+        "adventure icon: two crossed swords",
+        "adventure icon: crossed sword and axe",
+        "adventure icon: folded treasure map with a red X",
+        "adventure icon: open road with a signpost",
+        "game logo: gold coin with a sword stuck through it",
+        "game logo: leather coin purse with a sword crossed behind it",
+        "game logo: pile of gold coins with a sword standing in it",
+        "game logo: round shield with a gold coin emblem and a sword behind",
+        "game logo: sword crossed with a money bag marked with a coin",
+        "game logo: gold coin stamped with a crossed sword",
+        "game logo: treasure chest of gold with a sword leaning on it",
+        "game logo: battle axe crossed with a gold coin"
+      ]
+    },
+    "candidates": 64,
+    "candidatesNote": "Indices 0 to 23 follow itemDescriptions; 24 to 63 were drawn by the service from the description alone.",
+    "generations": 10
+  },
+  "icons": {
+    "heroes-hall": {
+      "file": "heroes-hall.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "candidate": 0,
+      "pixellab": {
+        "objectId": "499d1a9b-3b7d-462d-bd03-8e1e8e7d5517",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "heroes-hall"
+        ]
+      }
+    },
+    "job-board": {
+      "file": "job-board.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "candidate": 4,
+      "pixellab": {
+        "objectId": "1231988a-f5f8-429f-a388-9fd71d43c455",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "job-board"
+        ]
+      }
+    },
+    "warehouse": {
+      "file": "warehouse.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "candidate": 8,
+      "pixellab": {
+        "objectId": "6c4cf483-0c60-4902-b0a5-95286505e86e",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "warehouse"
+        ]
+      }
+    },
+    "adventure": {
+      "file": "adventure.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "candidate": 12,
+      "pixellab": {
+        "objectId": "adb1ff29-7023-4761-b1e1-e121cf1704d5",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "adventure"
+        ]
+      }
+    },
+    "favicon": {
+      "file": "favicon.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "candidate": 16,
+      "pixellab": {
+        "objectId": "82c494c6-6fa4-4a08-bb60-3d82233f947f",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "favicon"
+        ]
+      }
+    },
+    "mine": {
+      "file": "mine.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "secondPack",
+      "candidate": 2,
+      "pixellab": {
+        "objectId": "9159423e-2a95-4426-8fbc-fee8abdddbf5",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "mine"
+        ]
+      }
+    },
+    "lumber-camp": {
+      "file": "lumber-camp.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "secondPack",
+      "candidate": 6,
+      "pixellab": {
+        "objectId": "396984b7-cefc-4317-b53c-0b0ee2619385",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "lumber-camp"
+        ]
+      }
+    },
+    "caravan-hub": {
+      "file": "caravan-hub.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "secondPack",
+      "candidate": 10,
+      "pixellab": {
+        "objectId": "9aa84233-13ec-4471-a7a3-4d0d8ccd6330",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "caravan-hub"
+        ]
+      }
+    }
+  },
+  "rejectedTags": "The 59 candidates not kept stay in the review object 251e2a4f-72ff-46d8-bef1-42d423985479, tagged heat, ui-icon and rejected.",
+  "chosenBy": "The owner, 2026-10-20, from a numbered sheet of the 64 candidates at 3×, taking the agent's recommendation for each slot (Issue-89). The second pack's three (mine 2, lumber camp 6, caravan hub 10) are the agent's picks, 2026-10-20, for the owner to review on PR-92.",
+  "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20.",
+  "secondPack": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-10-20",
+    "reviewObjectId": "e5f78cf5-6d73-4be5-98da-ef94d365e89b",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 02",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "mine icon: crossed pickaxe and shovel",
+        "mine icon: pickaxe over a lump of grey ore",
+        "mine icon: mine cart full of ore",
+        "mine icon: timber-framed mine tunnel entrance",
+        "mine icon: pickaxe and a lantern",
+        "mine icon: pile of grey ore rocks with a pickaxe",
+        "lumber camp icon: axe stuck in a log",
+        "lumber camp icon: stack of cut logs",
+        "lumber camp icon: crosscut saw over a log",
+        "lumber camp icon: tree stump with an axe",
+        "caravan hub icon: covered wagon",
+        "caravan hub icon: wooden cart loaded with crates",
+        "caravan hub icon: horse head and a wagon wheel",
+        "caravan hub icon: wagon wheel",
+        "forge icon: anvil and hammer",
+        "farm icon: wheat sheaf",
+        "stable icon: horseshoe",
+        "tavern icon: wooden mug of ale",
+        "temple icon: small stone shrine",
+        "market icon: striped market stall awning",
+        "library icon: stack of books",
+        "watchtower icon: wooden watchtower",
+        "dock icon: wooden rowboat",
+        "herbalist icon: green herb bundle"
+      ]
+    },
+    "candidates": 64,
+    "generations": 10,
+    "note": "Ideas for later facilities were rolled in the same pack; the ones not kept stay in the review object, tagged rejected, and can be promoted when their facility is added."
+  }
+}

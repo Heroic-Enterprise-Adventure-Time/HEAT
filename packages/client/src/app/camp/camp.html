@@ -1,0 +1,27 @@
+<section class="camp" [class.side]="side()" [class.labels]="labels()">
+  <div #stage class="stage" [style.height.px]="stageHeight()"></div>
+
+  <nav class="menu" aria-label="Facilities">
+    @for (facility of state.facilities(); track facility.kind) {
+      <a
+        class="entry"
+        [class.unbuilt]="facility.level === 0"
+        [routerLink]="['/camp', location(), facility.kind]"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        [attr.title]="labels() ? null : facility.name"
+      >
+        <img [src]="'art/icons/' + facility.kind + '.png'" [width]="iconPx()" [height]="iconPx()" alt="" />
+        <span class="label">{{ facility.name }}</span>
+      </a>
+    }
+  </nav>
+
+  <aside class="panel" aria-labelledby="panel-title">
+    <router-outlet />
+  </aside>
+
+  @if (game.error(); as error) {
+    <p class="error">{{ error }}</p>
+  }
+</section>

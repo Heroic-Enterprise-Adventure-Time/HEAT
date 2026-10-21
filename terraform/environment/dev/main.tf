@@ -59,6 +59,10 @@ module "environment" {
 
   permissions_boundary_arn = "arn:aws:iam::${var.workload_account_id}:policy/heat-dev-boundary"
 
+  # Google only: dev's test users sign in through the ci client's API, never
+  # through a login form (Issue-86, decision 0024 as amended).
+  password_sign_in = false
+
   # No laptop signs in to dev: its records are players'. Display work uses a
   # sandbox stack (docs/process/development.md, rule 5).
   extra_callback_urls = []

@@ -5,9 +5,15 @@
 # A public client, since a browser cannot keep a secret, with the one grant
 # the Cognito guide recommends for public clients: the authorization code
 # grant, which the client completes with PKCE (the browser's code is in
-# packages/client). Google is its only provider, so managed login has no
-# password form to show; the client sends the browser straight to Google
-# with identity_provider=Google. The callback and sign-out URLs are the
+# packages/client). In dev and prod Google is its only provider, so managed
+# login has no password form to show; the client sends the browser straight
+# to Google with identity_provider=Google. In a sandbox stack the root sets
+# password_sign_in and the pool's own users (COGNITO) are a second provider:
+# managed login shows an email and password form beside the Google button,
+# and the client shows that page instead of skipping it, so that the base's
+# test users sign in from a browser without Google (Issue-86). The pool
+# allows no sign-up and no self-service recovery (decision 0022), so the
+# form signs in and does nothing else. The callback and sign-out URLs are the
 # stack's hostname and, in a sandbox stack, the Angular dev server, which is
 # how display work on a laptop signs in to a real stack (decision 0018); the
 # root says which extra URLs, and dev and prod pass none.
@@ -35,7 +41,7 @@ resource "aws_cognito_user_pool_client" "browser" {
   allowed_oauth_flows_user_pool_client = true
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_scopes                 = ["openid", "email", "profile"]
-  supported_identity_providers         = ["Google"]
+  supported_identity_providers         = var.password_sign_in ? ["Google", "COGNITO"] : ["Google"]
 
   callback_urls = concat(["https://${var.hostname}"], var.extra_callback_urls)
   logout_urls   = concat(["https://${var.hostname}"], var.extra_callback_urls)

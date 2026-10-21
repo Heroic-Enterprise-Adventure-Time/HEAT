@@ -63,6 +63,11 @@ module "environment" {
 
   permissions_boundary_arn = "arn:aws:iam::${var.workload_account_id}:policy/heat-sandbox-boundary"
 
+  # The test users of the base sign in with email and password beside
+  # Google, so that the agent's session browser signs in without Google
+  # (Issue-86, decision 0024 as amended).
+  password_sign_in = true
+
   # The Angular dev server on a laptop signs in to this stack through its
   # browser client (decision 0018, docs/process/development.md rule 5).
   extra_callback_urls = ["http://localhost:4200"]

@@ -33,6 +33,11 @@ output "browser_client_id" {
   value       = aws_cognito_user_pool_client.browser.id
 }
 
+output "password_sign_in" {
+  description = "Whether the browser client offers email and password beside Google, for config.json."
+  value       = var.password_sign_in
+}
+
 output "login_host" {
   description = "The pool's managed login host, for config.json."
   value       = var.login_host

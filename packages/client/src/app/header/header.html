@@ -1,0 +1,27 @@
+<header>
+  <span class="title">HEAT</span>
+
+  @if (game.player(); as player) {
+    <label>
+      <span class="visually-hidden">Camp</span>
+      <select [value]="game.location()" (change)="selectLocation($event)">
+        @for (camp of player.camps; track camp.location) {
+          <option [value]="camp.location">{{ camp.name }}</option>
+        }
+      </select>
+    </label>
+
+    @if (player.openAdventure) {
+      <span class="adventure">Adventure in progress</span>
+    }
+  }
+
+  <span class="spacer"></span>
+
+  @if (session.user(); as user) {
+    <span class="who">{{ user.email ?? user.name ?? 'Signed in' }}</span>
+    <button type="button" (click)="session.signOut()">Sign out</button>
+  } @else {
+    <button type="button" (click)="session.signIn()">{{ session.signInLabel }}</button>
+  }
+</header>

@@ -102,6 +102,10 @@ const configResponse = await fetch(`${siteUrl}/config.json`);
 const config = configResponse.status === 200 ? await configResponse.json() : {};
 check(config.graphqlPath === "/graphql", `GET ${siteUrl}/config.json names the API path`);
 check(typeof config.clientId === "string" && config.clientId.length > 0 && /^https:\/\/auth\./.test(config.loginHost ?? ""), `config.json names the browser client and the login host ${config.loginHost}`);
+// Email and password beside Google in a sandbox stack only (Issue-86): dev
+// and prod are Google only.
+const passwordExpected = stack.startsWith("heat-sb");
+check(config.passwordSignIn === passwordExpected, `config.json says password sign-in is ${passwordExpected ? "offered" : "not offered"} (got ${config.passwordSignIn})`);
 
 // Sign-in as the browser does it, up to Google's door: the managed login
 // page renders for this stack's client and its callback, which proves the
@@ -129,11 +133,58 @@ const { rewardsForSeed } = await import("@heat/engine");
 const token = await signIn();
 console.log(`signed in as ${username} through client ${clientId}`);
 
+// First sign-in makes the profile, and a repeat changes nothing; the
+// client calls joinGame after every sign-in in the same way.
+const joined = await graphql(token, `mutation { joinGame { id name } }`);
+check(!joined.errors && joined.data?.joinGame?.id, `joinGame answered the profile (${joined.ms} ms)`);
+
+// The free villager (Issue-81). A sandbox stack's user meets a new camp
+// and recruits; a test user that kept its villager from an earlier run
+// (dev's, or a stack's after an earlier push) goes straight to the refusal.
+const campQuery = `{ me { camps { location livingHeroes activeHeroes } heroes { id unitType status } } }`;
+const camp = await graphql(token, campQuery);
+const millbrook = camp.data?.me?.camps?.find((c) => c.location === "millbrook");
+check(!camp.errors && millbrook, `me shows the starting camp: ${JSON.stringify(millbrook)} (${camp.ms} ms)`);
+const recruitMutation = `mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id unitType spriteSet name status } }`;
+if (millbrook.livingHeroes === 0) {
+  const requestId = crypto.randomUUID();
+  const recruited = await graphql(token, recruitMutation, { id: requestId });
+  const hero = recruited.data?.recruitHero;
+  check(!recruited.errors && hero?.id === requestId && hero.unitType === "villager", `recruitHero gave the free villager ${hero?.name} in ${hero?.spriteSet} (${recruited.ms} ms)`);
+  const repeated = await graphql(token, recruitMutation, { id: requestId });
+  check(repeated.data?.recruitHero?.id === requestId, `a repeat of the request answers the same hero (${repeated.ms} ms)`);
+  const after = await graphql(token, campQuery);
+  const counted = after.data?.me?.camps?.find((c) => c.location === "millbrook");
+  check(counted?.livingHeroes === 1 && counted.activeHeroes === millbrook.activeHeroes + 1, `the camp counts one living hero (${after.ms} ms)`);
+} else {
+  console.log(`the test user already has ${millbrook.livingHeroes} living hero(es) at millbrook; checking the refusal only`);
+}
+const second = await graphql(token, recruitMutation, { id: crypto.randomUUID() });
+check(second.errors?.[0]?.extensions?.code === "NOT_FREE", `a second free villager is refused while a hero lives (${second.ms} ms)`);
+
+// Retirement (Issue-98), on a sandbox stack only: retire the living villager,
+// which frees the next one, and recruit it. Dev's test user keeps its one
+// villager, so its records do not gain a retired hero on every merge.
+if (stack.startsWith("heat-sb")) {
+  const living = await graphql(token, campQuery);
+  const villager = living.data?.me?.heroes?.find((h) => h.status === "ALIVE");
+  check(villager, `the camp has a living hero to retire (${living.ms} ms)`);
+  const retireMutation = `mutation($id: String!) { retireHero(heroId: $id) { id status retiredAt } }`;
+  const retired = await graphql(token, retireMutation, { id: villager.id });
+  check(!retired.errors && retired.data?.retireHero?.status === "RETIRED", `retireHero retired ${villager.id} (${retired.ms} ms)`);
+  const again = await graphql(token, retireMutation, { id: villager.id });
+  check(again.data?.retireHero?.retiredAt === retired.data.retireHero.retiredAt, `a repeat of the retire answers the hero as it is (${again.ms} ms)`);
+  const counts = (await graphql(token, campQuery)).data?.me?.camps?.find((c) => c.location === "millbrook");
+  check(counts?.livingHeroes === 0, `the camp counts no living hero after the retire: ${JSON.stringify(counts)}`);
+  const next = await graphql(token, recruitMutation, { id: crypto.randomUUID() });
+  check(!next.errors && next.data?.recruitHero?.status === "ALIVE", `the free villager is offered again and recruited: ${next.data?.recruitHero?.name} (${next.ms} ms)`);
+}
+
 // A permanent environment's test user keeps its records between runs, so an
 // adventure left open by a run that failed between its start and its settle
 // would refuse every later start. Settle whatever is open first; a sandbox
 // stack's user is new to each stack and has nothing open.
-const settleMutation = `mutation($id: String!) { settleAdventure(adventureId: $id) { id holdings { material balance } } }`;
+const settleMutation = `mutation($id: String!) { settleAdventure(adventureId: $id) { id camps { location holdings { material balance } } } }`;
 const before = await graphql(token, `{ me { openAdventure { id } } }`);
 const leftover = before.data?.me?.openAdventure?.id;
 if (leftover) {
@@ -153,7 +204,7 @@ check(!settle.errors && settle.data?.settleAdventure, `settleAdventure settled i
 
 const byMaterial = (a, b) => a.material.localeCompare(b.material);
 const expected = rewardsForSeed(seed).map((r) => ({ material: r.material, balance: r.amount })).sort(byMaterial);
-const got = [...settle.data.settleAdventure.holdings].sort(byMaterial);
+const got = [...(settle.data.settleAdventure.camps.find((c) => c.location === "millbrook")?.holdings ?? [])].sort(byMaterial);
 const previous = JSON.stringify(got) === JSON.stringify(expected);
 // A test user that has played before holds earlier rewards too: every
 // expected material must have at least the expected balance.

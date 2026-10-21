@@ -1,0 +1,152 @@
+{
+  "set": "knight-06",
+  "kind": "hero sprite set",
+  "classes": ["knight"],
+  "presentation": "either",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "6002cc20-cb00-4bfd-bc0d-2feb244720e5",
+    "name": "Knight 06",
+    "tags": ["heat", "hero", "knight"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-10-19T07:19:52.092569+00:00",
+    "parameters": {
+      "description": "knight in dull bronze plate armour with a tan tabard, bare head, short brown hair, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "handEdits": ["Head moved in all four rotations by the owner on PixelLab's website, 2026-10-19, before any animation (48, 61, 36, 58 px changed in south, east, north, west).", "A second touch-up of the rotations by the owner, 2026-10-19 evening, while chasing the hair below: 3, 2, 2, 2 px changed in south, east, north, west."],
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "58045241-3cc3-44fb-bfd8-35f50cf61b9d",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        },
+        {
+          "directions": ["south", "north"],
+          "generations": 6
+        },
+        {
+          "directions": ["south", "north"],
+          "via": "website",
+          "date": "2026-10-19",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, 2026-10-19 evening: the first walk south and north drew tufts of hair at the sides of the head that neither rotation has, 2 px wider each side; the kept re-roll's head is 8 px wide like the rotations. The website shows no receipt: the owner's website re-rolls of that evening, these and Priest 02's act, cost 17 generations together, read from the balance."
+        }
+      ],
+      "generations": 9
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "e7f106c5-fbf8-4283-b912-85735f7142d7",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "act": {
+      "template": "lead-jab",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "0110a5d5-44ba-4334-9ae3-c22f7153f24e",
+      "directions": ["east"],
+      "framesPerDirection": 3,
+      "canvas": [64, 64],
+      "holdFrame": 1,
+      "files": "act-east-<0..2>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 2
+        }
+      ],
+      "generations": 2
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "ffcaa7ba-5ff5-46d1-948a-345aa9650f48",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        },
+        {
+          "directions": ["east"],
+          "via": "website",
+          "date": "2026-10-19",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, 2026-10-19 evening, with the walks; counted in the same 17 generations."
+        }
+      ],
+      "generations": 3
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "4d7c90d2-1a3a-4135-bb3b-8877482bb81f",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    }
+  },
+  "animationGenerations": 20,
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-19)."
+}

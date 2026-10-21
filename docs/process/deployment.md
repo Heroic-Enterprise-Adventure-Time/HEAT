@@ -1,0 +1,27 @@
+# Deployment
+
+How a change reaches each environment, and how a release is made. `docs/process/code-changes.md`, rule 18, says who applies; this document is the procedure as it has run. The shape is decided in decisions 0017, 0018, 0020 and 0021; the mechanics are in the workflows' own comments and in each root's README.
+
+## Rules
+
+1. **Three paths, all the pipeline's.** A push to a working branch applies that branch's sandbox stack (`sandbox.yml`, decision 0018), and deleting the branch destroys it. A merge to `main` applies `dev` (`deploy.yml`), after the plan posted on the pull request. A merge to `release` applies `prod` (`release.yml`), after the plan posted on the release pull request. Nothing else applies an environment, and an agent's AWS access is read only.
+2. **A release is a pull request from `main` to `release`.** The agent opens it (`gh pr create --base release --head main`). It closes no issue. Its body says what ships, which is every pull request merged to `main` since the tip of `release`, and names the issue that drives the release; anything the owner owes before the merge is a task item in the body. The body becomes the GitHub Release's notes, so it is written as notes.
+3. **Two things are read before the merge.** The guard's verdict, "Release source": the head is `main` or a `hotfix/<issue>-*` branch, and `release` carries nothing beyond its merge base with the head. And the `prod` plan the workflow posts as a comment, run under the `prod` environment with the plan role, with the allow-list check passed. The owner merges with a merge commit; the agent never merges.
+4. **The merge is the release.** The run checks the source again, plans and applies exactly that plan with the apply role, publishes the client and `config.json`, runs the token-free smoke test through the site, and then writes the tag `v<YYYY>.<MM>.<DD>` (`.<n>` for a second release on a day) on the merge commit and the GitHub Release from the pull request. The tag triggers nothing; it records what was released.
+5. **A hotfix** is a branch `hotfix/<issue>-<name>` from `release`, carrying only the fix, merged to `release` by the same pull request path, then merged to `main` through a pull request before `main` is released again; until it is, the guard refuses the next release pull request, because `release` would carry content that is not on `main`. The rest of the lifecycle, including how the hotfix's sandbox stack is handled, is settled with the first hotfix (decision 0021).
+6. **A run that fails at a waiter is re-run, not re-merged.** The apply's concurrency group queues applies and never cancels one. If the apply stops at a wait, such as a certificate validation on a first apply, the owner re-runs the failed job from the run's page, and it finishes from the state the first run left.
+7. **Documentation follows the apply.** A root's README cannot be true at merge time about an apply that the merge causes, so its status is recorded afterwards, in a documentation pull request, with what the agent read back through its audit and plan profiles.
+
+## The first release
+
+Run on 2026-10-18 (Issue-64), after Issue-41 built the path.
+
+- PR-67, `main` to `release`, shipped PR-65 (the prod root, `release.yml`, the guard, the tag script, the `release` ruleset) and PR-68.
+- The guard failed on its first run: the job checked out `release` to run `scripts/check-release-source.sh`, and `release`, cut before Issue-41's merge, did not have the script. PR-68 made the guard run `main`'s copy, which is the ref a `pull_request_target` run carries and the one the workflow file itself comes from. The second run passed, and the plan was 45 to add, 0 to change, 0 to destroy.
+- The merge at 636218e ran 22 minutes 35 seconds, 12:42 to 13:04 UTC, most of it the apply's wait at the certificate validation while the `heat.dcg-games.com` delegation was written in `dcg-platform` (its PR-41) and applied by the owner. The smoke test passed, and the tag `v2026.10.18` and its Release were written by the workflow's token.
+- Two facts decision 0021 had left open were found: the token creates the tag with no tag ruleset in force, and the `prod` environment's policy admits the `pull_request_target` run on `main`'s ref.
+- The "Sandbox stacks" workflow's URL comment job fails on a release pull request, whose head carries no issue number; it is not a required check. Since Issue-66 the job is skipped when the head is `main`.
+
+## Why
+
+A release pull request shows the exact diff that ships and takes the plan as a comment, where the owner reads both before anything is applied; the alternatives, a tag that applied in the run that planned it or a plan in a run summary, had no such place (decision 0021). The tag is written afterwards because a tag that triggers an apply is a gate nobody can read first. Hotfixes are allowed from the start because the moment they are disallowed, one is needed with feature changes already on `main`.

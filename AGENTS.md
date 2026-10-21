@@ -2,7 +2,7 @@
 
 HEAT (Heroic Enterprise Adventure Time) is a browser game about running an adventuring business, built as a technical showcase. The game is deliberately simple. The interest is in the data services behind it and the pipeline that delivers them.
 
-The design is under `docs/design/` and `docs/architecture/`. Application code is under `packages/`, one npm workspace per package, with its standards in `docs/standards/typescript.md`; what exists today is the spike described in `docs/architecture/overview.md`, not the game. Infrastructure is under `terraform/`, one stack per directory, each with a README that says what it manages and whether it is applied. `local/` runs the system on a laptop.
+The design is under `docs/design/` and `docs/architecture/`. Application code is under `packages/`, one npm workspace per package, with its standards in `docs/standards/typescript.md`; what exists today is the spike described in `docs/architecture/overview.md`, not the game. Generated art is under `art/`, each set with its provenance. Infrastructure is under `terraform/`, one stack per directory, each with a README that says what it manages and whether it is applied. `local/` runs the system on a laptop.
 
 ## How to work here
 
@@ -33,6 +33,8 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | Why a choice was made, and what was rejected | `docs/decisions/` |
 | The Terraform state bucket, who applies, and the one-time bootstrap | `terraform/backend/README.md` |
 | Running and seeing a change: the sandbox stacks and the fast loop | `docs/process/development.md` |
+| Making art or audio: the services, the connectors, the hero sprite set, a camp's ground and facilities, the page's icons | `docs/process/assets.md` |
+| Making a hero sprite set, step by step | `docs/runbooks/hero-sprite-set.md` |
 | The index of every project document, and how documents are written | `docs/README.md` |
 
 Read the design and architecture documents before any work that touches them. Read `docs/README.md` before adding or changing a document.

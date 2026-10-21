@@ -1,0 +1,39 @@
+{
+  "set": "job-board",
+  "kind": "facility",
+  "facility": { "kind": "job board", "owner": "location" },
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "levels": {
+    "1": {
+      "file": "level-1.png",
+      "canvas": [32, 32],
+      "pixellab": { "mapObjectId": "d33c8b00-d392-41b7-aaa4-fee7dc7b70f8", "tags": ["heat", "facility", "job-board"] },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20T05:09Z",
+      "parameters": {
+        "description": "wooden notice board on two posts with paper job notices pinned to it, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 32,
+        "height": 32,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    }
+  },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
+  "rejected": [
+    { "mapObjectId": "a5b74fec-13a0-4bb6-b82e-9b624368212b", "why": "The same call: a wooden board with grass patches at its feet, which clashed with the tileset." }
+  ],
+  "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png). A shared facility: the same sprite at every location.",
+  "verified": "level-1.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
+}
