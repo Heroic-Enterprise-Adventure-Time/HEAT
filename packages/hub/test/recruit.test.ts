@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
-import { HERO_NAMES, SPRITE_SETS } from "@heat/engine";
+import { SPRITE_SETS, SPRITE_SET_PRESENTATION, heroNames } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
 import { RecruitRefused, Repository, type Hero } from "../src/db/repository.js";
@@ -49,7 +49,7 @@ describe("recruitHero: the free villager", () => {
     const hero = await recruitHero(repo, p, "villager", requestId);
     expect(hero).toMatchObject({ id: requestId, location: at, unitType: "villager", level: 1, xp: 0, status: "ALIVE" });
     expect(SPRITE_SETS.villager).toContain(hero.spriteSet);
-    expect(HERO_NAMES).toContain(hero.name);
+    expect(heroNames(SPRITE_SET_PRESENTATION[hero.spriteSet] ?? "either")).toContain(hero.name);
     expect(await repo.heroes(p)).toEqual([hero]);
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1, hallLevel: 1, stored: true });
   });
@@ -85,6 +85,18 @@ describe("recruitHero: the free villager", () => {
     expect(new Set(results.map((h) => h.id))).toEqual(new Set([requestId]));
     expect((await repo.heroes(p)).length).toBe(1);
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+  });
+
+  it("draws the name to suit the sprite set it drew", async () => {
+    // The first draw picks the set, the second the name.
+    const draws = (set: string) => {
+      const values = [SPRITE_SETS.villager.indexOf(set), 0];
+      return (max: number) => Math.min(values.shift() ?? 0, max - 1);
+    };
+    const man = await recruitHero(repo, player(), "villager", randomUUID(), draws("villager-08"));
+    expect(man).toMatchObject({ spriteSet: "villager-08", name: heroNames("masculine")[0] });
+    const woman = await recruitHero(repo, player(), "villager", randomUUID(), draws("villager-07"));
+    expect(woman).toMatchObject({ spriteSet: "villager-07", name: heroNames("feminine")[0] });
   });
 
   it("is free again in a camp of dead heroes with a free slot", async () => {

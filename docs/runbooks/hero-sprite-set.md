@@ -4,7 +4,7 @@ How one hero sprite set is made with PixelLab, from an appearance and a class to
 
 ## Rules
 
-1. **Inputs.** The class, for example `fighter`; the set's name, `<class>-<nn>`, numbered like the PixelLab character it comes from; and the appearance, the part of the description that changes (assets.md, rule 9), for example `fighter in a brown leather jerkin over chain mail, short dark hair`. Or a PixelLab character the owner has already kept.
+1. **Inputs.** The class, for example `fighter`; its presentation, masculine, feminine or either, which the owner decides when the look is kept and which names a hero with the set may take (game.md, "Heroes"); the set's name, `<class>-<nn>`, numbered like the PixelLab character it comes from; and the appearance, the part of the description that changes (assets.md, rule 9), for example `fighter in a brown leather jerkin over chain mail, short dark hair`. Or a PixelLab character the owner has already kept.
 2. **The look first, two candidates at a time.** `create_character` with rule 8's parameters and rule 9's description, 1 generation each. Every candidate is shown to the owner in a camp scene at 320×180, scaled 4×, beside a set already kept, with all four rotations visible: a defect often shows in one direction only. A description cannot be changed after creation, so a change of wording is a new character. Each candidate is tagged `heat`, `hero` and its class as soon as it is created (rule 7). Re-roll until the owner keeps one.
 3. **Tag what is not kept** `rejected` as well (rule 7): every candidate the owner does not keep, and any look the kept one replaces. Rejected characters are left for the owner to delete on PixelLab's website, because deleting is permanent.
 4. **Hand edits come before animation.** If the owner touches up the rotations in PixelLab's online editor (rule 10), fetch the four rotations before and after and diff them pixel by pixel. The diff goes into the provenance.
@@ -31,6 +31,7 @@ The record is the agent's note of what the export does not hold, from which the 
 {
   "name": "Fighter 02",
   "classes": ["fighter"],
+  "presentation": "masculine",
   "characterGenerations": 1,
   "handEdits": ["2 px at the eye of the east rotation ..."],
   "animations": {

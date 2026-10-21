@@ -1,11 +1,12 @@
 import { randomInt } from "node:crypto";
 import { GraphQLError } from "graphql";
 import {
-  HERO_NAMES,
   SPRITE_SETS,
+  SPRITE_SET_PRESENTATION,
   STARTING_LOCATION,
   UNIT_TYPES,
   hallCapacity,
+  heroNames,
   location,
   type UnitType,
 } from "@heat/engine";
@@ -62,17 +63,16 @@ export async function recruitHero(
   if (camp.activeHeroes >= capacity) refuse("the heroes hall is full", "HALL_FULL");
   if (camp.hallLevel < recruit.hallLevel) refuse(`${unitType} needs a level ${recruit.hallLevel} hall`, "HALL_LEVEL");
 
-  // Avoid the names on the camp's living roster; with more names than the
-  // hall holds, there is always one left.
+  // The name suits the sprite set and avoids the camp's living roster.
+  const spriteSet = pick(SPRITE_SETS[recruit.unitType], random);
   const living = new Set((await repo.heroes(playerId)).filter((h) => h.location === at.id && h.status === "ALIVE").map((h) => h.name));
-  const names = HERO_NAMES.filter((n) => !living.has(n));
 
   const hero: Hero = {
     id: heroId,
     location: at.id,
     unitType: recruit.unitType,
-    spriteSet: pick(SPRITE_SETS[recruit.unitType], random),
-    name: pick(names.length > 0 ? names : HERO_NAMES, random),
+    spriteSet,
+    name: pick(heroNames(SPRITE_SET_PRESENTATION[spriteSet] ?? "either", living), random),
     recruitedAt: now.toISOString(),
     level: 1,
     xp: 0,

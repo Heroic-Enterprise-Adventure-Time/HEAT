@@ -2,6 +2,7 @@
   "set": "priest-02",
   "kind": "hero sprite set",
   "classes": ["priest"],
+  "presentation": "either",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

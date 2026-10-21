@@ -1,12 +1,16 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  HALL_CAPACITY,
   HERO_NAMES,
   LOCATIONS,
+  PRESENTATIONS,
   SPRITE_SETS,
+  SPRITE_SET_PRESENTATION,
   STARTING_LOCATION,
   UNIT_TYPES,
   hallCapacity,
+  heroNames,
   location,
   warehouseCapacity,
 } from "../src/index.js";
@@ -14,15 +18,21 @@ import {
 const heroes = new URL("../../../art/heroes/", import.meta.url);
 
 describe("static content", () => {
+  const provenances = readdirSync(heroes)
+    .sort()
+    .map((set) => ({ set, ...(JSON.parse(readFileSync(new URL(`${set}/provenance.json`, heroes), "utf8")) as { classes: string[]; presentation: string }) }));
+
   it("lists the sprite sets each unit type allows exactly as the sets' provenance says", () => {
     const fromArt: Record<string, string[]> = {};
-    for (const set of readdirSync(heroes).sort()) {
-      const provenance = JSON.parse(readFileSync(new URL(`${set}/provenance.json`, heroes), "utf8")) as { classes: string[] };
-      for (const unitType of provenance.classes) (fromArt[unitType] ??= []).push(set);
-    }
+    for (const { set, classes } of provenances) for (const unitType of classes) (fromArt[unitType] ??= []).push(set);
     const fromContent = Object.fromEntries(Object.entries(SPRITE_SETS).map(([u, sets]) => [u, [...sets].sort()]));
     expect(fromContent).toEqual(fromArt);
     expect(Object.keys(SPRITE_SETS).sort()).toEqual([...UNIT_TYPES].sort());
+  });
+
+  it("labels every sprite set masculine, feminine or either, exactly as its provenance says", () => {
+    expect(SPRITE_SET_PRESENTATION).toEqual(Object.fromEntries(provenances.map(({ set, presentation }) => [set, presentation])));
+    for (const p of Object.values(SPRITE_SET_PRESENTATION)) expect(PRESENTATIONS).toContain(p);
   });
 
   it("offers the villager at hall level 1 at every location, which the free villager needs", () => {
@@ -54,8 +64,41 @@ describe("static content", () => {
     expect(warehouseCapacity(1)).toBe(100);
   });
 
-  it("has enough distinct names that a full hall never runs out", () => {
-    expect(new Set(HERO_NAMES).size).toBe(HERO_NAMES.length);
-    expect(HERO_NAMES.length).toBeGreaterThan(hallCapacity(1));
+  it("has enough distinct names for every presentation that a full hall never runs out", () => {
+    const all = PRESENTATIONS.flatMap((p) => HERO_NAMES[p]);
+    expect(new Set(all).size).toBe(all.length);
+    const largestHall = Math.max(...HALL_CAPACITY);
+    for (const p of PRESENTATIONS) expect(heroNames(p).length).toBeGreaterThan(largestHall);
+  });
+});
+
+describe("heroNames", () => {
+  it("gives a masculine set the masculine and either names, never a feminine one", () => {
+    const names = heroNames("masculine");
+    expect(names).toEqual([...HERO_NAMES.masculine, ...HERO_NAMES.either]);
+    for (const n of HERO_NAMES.feminine) expect(names).not.toContain(n);
+  });
+
+  it("gives a feminine set the feminine and either names, never a masculine one", () => {
+    const names = heroNames("feminine");
+    expect(names).toEqual([...HERO_NAMES.feminine, ...HERO_NAMES.either]);
+    for (const n of HERO_NAMES.masculine) expect(names).not.toContain(n);
+  });
+
+  it("gives an either set every name", () => {
+    expect([...heroNames("either")].sort()).toEqual(PRESENTATIONS.flatMap((p) => HERO_NAMES[p]).sort());
+  });
+
+  it("leaves out the names on the living roster", () => {
+    const taken = new Set(["Hugh", "Rowan", "Maud"]);
+    const names = heroNames("masculine", taken);
+    expect(names).not.toContain("Hugh");
+    expect(names).not.toContain("Rowan");
+    expect(names).toHaveLength(HERO_NAMES.masculine.length + HERO_NAMES.either.length - 2);
+  });
+
+  it("falls back to every allowed name when the roster has taken them all", () => {
+    const allowed = heroNames("feminine");
+    expect(heroNames("feminine", new Set(allowed))).toEqual(allowed);
   });
 });
