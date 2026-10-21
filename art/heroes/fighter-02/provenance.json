@@ -2,6 +2,7 @@
   "set": "fighter-02",
   "kind": "hero sprite set",
   "classes": ["fighter"],
+  "presentation": "masculine",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

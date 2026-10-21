@@ -2,6 +2,7 @@
   "set": "ranger-01",
   "kind": "hero sprite set",
   "classes": ["ranger"],
+  "presentation": "either",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

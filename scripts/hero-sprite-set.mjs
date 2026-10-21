@@ -13,7 +13,7 @@
 //
 // With --record, it also writes provenance.json (docs/process/assets.md, rule 5)
 // from the agent's record of the generation calls, which the export lacks:
-//   { "name": "Fighter 02", "classes": ["fighter"], "characterGenerations": 1,
+//   { "name": "Fighter 02", "classes": ["fighter"], "presentation": "masculine", "characterGenerations": 1,
 //     "characterNote"?: "...", "handEdits"?: ["..."],
 //     "waivers"?: [{ "check": "hit east: height drifts", "date": "...", "note": "..." }],
 //     "animations": { "walk": { "groupId": "...", "source"?: "<PixelLab name>",
@@ -343,6 +343,7 @@ if (record) {
     set,
     kind: "hero sprite set",
     classes: record.classes,
+    presentation: record.presentation,
     service: SERVICE,
     pixellab: { characterId: values.character, name: record.name, tags: ["heat", "hero", ...record.classes] },
     character: {

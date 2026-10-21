@@ -1,0 +1,140 @@
+{
+  "set": "villager-10",
+  "kind": "hero sprite set",
+  "classes": ["villager"],
+  "presentation": "masculine",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "c7784f0f-53c6-462c-9f2b-ca057acf1f2e",
+    "name": "Villager 10",
+    "tags": ["heat", "hero", "villager"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-10-21T02:08:01.290856+00:00",
+    "parameters": {
+      "description": "young peasant man with dark brown skin and short curly black hair, in an ochre linen tunic belted with leather and brown hose, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "86178bf3-a859-464a-bb8e-204a00f971e3",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["south", "east", "north"],
+          "generations": 9
+        }
+      ],
+      "generations": 9
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "b787584a-9a6a-4545-a3f4-3b0178448731",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "act": {
+      "template": "lead-jab",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "a8dcbbfb-8d43-44bf-bba7-37c6f099a325",
+      "directions": ["east"],
+      "framesPerDirection": 3,
+      "canvas": [64, 64],
+      "holdFrame": 1,
+      "files": "act-east-<0..2>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 2
+        }
+      ],
+      "generations": 2
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "a8208c3a-f532-44f7-894d-3a3926ffc2f5",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "298b947c-f3cf-49c9-be62-e792d6c838f9",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        },
+        {
+          "directions": ["east"],
+          "via": "website",
+          "date": "2026-10-21",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, because frame 2 of the first fall had a grey wisp detached beside the body. The website shows no receipt: the owner's website re-rolls of 2026-10-21, this one, Villager 10's down and Villager 11's and 12's act, cost 11 generations together, read from the balance (1,602.7 before, 1,591.7 after)."
+        }
+      ],
+      "generations": 3
+    }
+  },
+  "animationGenerations": 20,
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-21)."
+}

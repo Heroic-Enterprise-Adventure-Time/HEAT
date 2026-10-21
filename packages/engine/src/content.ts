@@ -97,7 +97,7 @@ export function warehouseCapacity(level: number): number {
  * `classes`, so a new set is added here and there together.
  */
 export const SPRITE_SETS: Readonly<Record<UnitType, readonly string[]>> = {
-  villager: ["villager-01"],
+  villager: ["villager-01", "villager-07", "villager-08", "villager-09", "villager-10", "villager-11", "villager-12"],
   fighter: ["fighter-02"],
   knight: ["knight-06"],
   ranger: ["ranger-01"],
@@ -106,14 +106,65 @@ export const SPRITE_SETS: Readonly<Record<UnitType, readonly string[]>> = {
 };
 
 /**
- * The names a hero is given at recruitment, drawn at random. A fixed list,
+ * How a sprite set or a name reads, so that a hero's name suits its sprite
+ * (game.md, "Heroes"). "either" fits both.
+ */
+export type Presentation = "masculine" | "feminine" | "either";
+
+export const PRESENTATIONS: readonly Presentation[] = ["masculine", "feminine", "either"];
+
+/**
+ * Every sprite set's presentation, by its directory under art/heroes/. The
+ * test checks this against every set's provenance.json `presentation`.
+ */
+export const SPRITE_SET_PRESENTATION: Readonly<Record<string, Presentation>> = {
+  "villager-01": "either",
+  "villager-07": "feminine",
+  "villager-08": "masculine",
+  "villager-09": "feminine",
+  "villager-10": "masculine",
+  "villager-11": "either",
+  "villager-12": "feminine",
+  "fighter-02": "masculine",
+  "knight-06": "either",
+  "ranger-01": "either",
+  "wizard-01": "either",
+  "wizard-03": "masculine",
+  "priest-02": "either",
+};
+
+/**
+ * The names a hero is given at recruitment, by presentation. A fixed list,
  * so no text a player wrote is ever shown to another (game.md, "Heroes").
  * Quiet-village names, to suit Millbrook.
  */
-export const HERO_NAMES: readonly string[] = [
-  "Agnes", "Alder", "Alys", "Ansel", "Bertram", "Bryn", "Cora", "Cuthbert",
-  "Dora", "Edwin", "Elspeth", "Gilbert", "Godwin", "Hilda", "Hob", "Hugh",
-  "Isolde", "Jory", "Kit", "Leofric", "Linnet", "Mabel", "Matilda", "Maud",
-  "Ned", "Nell", "Osric", "Oswin", "Perrin", "Piers", "Rowan", "Sabine",
-  "Tamsin", "Tobias", "Ulric", "Wat", "Wenna", "Wilfred", "Winifred", "Wren",
-];
+export const HERO_NAMES: Readonly<Record<Presentation, readonly string[]>> = {
+  masculine: [
+    "Aldous", "Ansel", "Baldwin", "Bertram", "Colin", "Cuthbert", "Drogo", "Edwin",
+    "Everard", "Fulk", "Geoffrey", "Gilbert", "Godwin", "Hamon", "Hob", "Hugh",
+    "Jasper", "Jory", "Lambert", "Leofric", "Ned", "Osric", "Oswin", "Perrin",
+    "Piers", "Ralf", "Simkin", "Tobias", "Ulric", "Walter", "Wat", "Wilfred",
+  ],
+  feminine: [
+    "Ada", "Agnes", "Alys", "Avice", "Beatrix", "Clemence", "Constance", "Cora",
+    "Dora", "Edith", "Elinor", "Elspeth", "Gwen", "Hawise", "Hilda", "Ida",
+    "Isolde", "Joan", "Juliana", "Lettice", "Linnet", "Mabel", "Marjory", "Matilda",
+    "Maud", "Nell", "Petronel", "Rosamund", "Sabine", "Sybil", "Tamsin", "Una",
+    "Wenna", "Winifred",
+  ],
+  either: [
+    "Alder", "Ash", "Briar", "Bryn", "Ellis", "Fen", "Hollis", "Kit",
+    "Lark", "Morgan", "Robin", "Rowan", "Sorrel", "Wren",
+  ],
+};
+
+/**
+ * The names a new hero with a sprite set of this presentation may be given:
+ * its own and the "either" names, or every name for an "either" set. Names
+ * in `taken`, the camp's living roster, are left out while any remain.
+ */
+export function heroNames(presentation: Presentation, taken: ReadonlySet<string> = new Set()): readonly string[] {
+  const allowed = presentation === "either" ? PRESENTATIONS.flatMap((p) => HERO_NAMES[p]) : [...HERO_NAMES[presentation], ...HERO_NAMES.either];
+  const free = allowed.filter((n) => !taken.has(n));
+  return free.length > 0 ? free : allowed;
+}

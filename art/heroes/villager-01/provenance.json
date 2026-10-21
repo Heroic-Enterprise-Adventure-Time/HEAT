@@ -2,6 +2,7 @@
   "set": "villager-01",
   "kind": "hero sprite set",
   "classes": ["villager"],
+  "presentation": "either",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",
