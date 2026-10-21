@@ -1,56 +1,25 @@
-<section class="camp">
-  <div #stage class="stage"></div>
+<section class="camp" [class.side]="side()" [class.labels]="labels()">
+  <div #stage class="stage" [style.height.px]="stageHeight()"></div>
 
-  @if (hallOpen()) {
-    <aside class="panel" aria-label="Heroes hall">
-      <button type="button" class="close" (click)="close()" aria-label="Close">×</button>
-      <h2>Heroes hall</h2>
-      @if (game.camp(); as camp) {
-        <p>Level {{ camp.hallLevel }}: {{ camp.activeHeroes }} of {{ camp.heroCapacity }} heroes.</p>
-      }
+  <nav class="menu" aria-label="Facilities">
+    @for (facility of state.facilities(); track facility.kind) {
+      <a
+        class="entry"
+        [class.unbuilt]="facility.level === 0"
+        [routerLink]="['/camp', location(), facility.kind]"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
+        [attr.title]="labels() ? null : facility.name"
+      >
+        <img [src]="'art/icons/' + facility.kind + '.png'" [width]="iconPx()" [height]="iconPx()" alt="" />
+        <span class="label">{{ facility.name }}</span>
+      </a>
+    }
+  </nav>
 
-      @if (game.heroesHere().length > 0) {
-        <ul class="roster">
-          @for (hero of game.heroesHere(); track hero.id) {
-            <li>
-              <button type="button" class="link" (click)="hallOpen.set(false); heroId.set(hero.id)">{{ hero.name }}</button>
-              <span>{{ hero.unitType }}, level {{ hero.level }}</span>
-              @if (hero.status === 'DEAD') {
-                <span class="dead">dead</span>
-              }
-            </li>
-          }
-        </ul>
-      } @else {
-        <p>No heroes yet.</p>
-      }
-
-      @if (game.freeVillager(); as free) {
-        @if (free.offered) {
-          <button type="button" (click)="recruit()" [disabled]="game.busy()">Recruit a villager, free</button>
-        } @else if (free.reason) {
-          <p class="note">{{ free.reason }}</p>
-        }
-      }
-    </aside>
-  }
-
-  @if (hero(); as hero) {
-    <aside class="panel card" aria-label="Hero">
-      <button type="button" class="close" (click)="close()" aria-label="Close">×</button>
-      <h2>{{ hero.name }}</h2>
-      <dl>
-        <dt>Unit type</dt>
-        <dd>{{ hero.unitType }}</dd>
-        <dt>Level</dt>
-        <dd>{{ hero.level }} ({{ hero.xp }} XP)</dd>
-        <dt>Status</dt>
-        <dd>{{ hero.status === 'ALIVE' ? 'alive' : hero.status === 'DEAD' ? 'dead' : 'retired' }}</dd>
-        <dt>Recruited</dt>
-        <dd>{{ hero.recruitedAt | date: 'mediumDate' }}</dd>
-      </dl>
-    </aside>
-  }
+  <aside class="panel" aria-labelledby="panel-title">
+    <router-outlet />
+  </aside>
 
   @if (game.error(); as error) {
     <p class="error">{{ error }}</p>

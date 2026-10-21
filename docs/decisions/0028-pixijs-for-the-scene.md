@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box)
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -24,6 +24,14 @@
 - the initial bundle: from 269 kB to 311 kB, which is the client's own new code (the camp, the header and the engine's content).
 
 **Particles and sound are chosen when they are needed.** An ability's effect is a drawn frame animation (`docs/design/game.md`, "How the game looks"; PixelLab's effects tool exports frames), and Pixi plays those in its core. Pixi's core has `ParticleContainer` for drawing many particles but no emitter. The emitter port for v8 is a small community package (`@spd789562/particle-emitter`), and whether it is maintained was not checked. Sound is not in Pixi's core: `@pixi/sound` 6 is the line for Pixi 8, and Howler.js is the common standalone. Neither is a dependency yet.
+
+## Amendment: the stage fills its box (Issue-89, 2026-10-20)
+
+**The stage is no longer a fixed 320×180.** A camp is a map of whole tiles, Millbrook's 400×225, and the canvas covers the whole box the page gives the scene. The scale is the largest whole number at which the map's height and its core width fit: the middle 352 px that every facility stands inside, so a box a little narrower than the whole map crops bare ground at its edges rather than drop a scale step. The textures are still nearest-neighbour, so each art pixel stays a square of screen pixels. The canvas shows more ground around the map to cover the rest of the box, with the map centred; a box narrower than the map at scale 1, a phone's, crops the map's edges evenly. `packages/client/src/app/camp/page-layout.ts` holds the arithmetic.
+
+**Why.** With the content area beside the scene rather than over it (`docs/design/game.md`, "The page"), a fixed 320×180 left bars around the scene on most screens. The owner asked for the scene to fill its area. Stretching it by a fraction was considered and not chosen: it blurs pixel art or makes its pixels uneven. Filling with more of the world keeps the pixels square and leaves no bars.
+
+**Not solved by this.** On a screen whose device pixel ratio is not a whole number, such as Windows at 125%, the scale counts CSS pixels, so an art pixel is 1.25 device pixels and the pixels come out uneven. That was true before the amendment too.
 
 ## Considered and not chosen
 

@@ -1,0 +1,89 @@
+{
+  "set": "caravan-hub",
+  "kind": "facility",
+  "facility": {
+    "kind": "caravan hub",
+    "owner": "player",
+    "buildable": true
+  },
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "levels": {
+    "1": {
+      "file": "level-1.png",
+      "canvas": [
+        64,
+        64
+      ],
+      "pixellab": {
+        "mapObjectId": "52f6ddb4-597a-40e9-9743-ddfe247b8b66",
+        "tags": [
+          "heat",
+          "facility",
+          "caravan-hub"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20",
+      "parameters": {
+        "description": "caravan station: wooden stable building with a wide door and a covered wagon parked beside it, seen at a slight angle so its side wall shows, three-quarter view, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 64,
+        "height": 64,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    },
+    "0": {
+      "file": "level-0.png",
+      "canvas": [
+        64,
+        64
+      ],
+      "pixellab": {
+        "mapObjectId": "5f93e162-b7ba-4a8e-a7bb-a67efd5a156c",
+        "tags": [
+          "heat",
+          "facility",
+          "caravan-hub"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-20",
+      "parameters": {
+        "description": "unfinished stable under construction: bare timber wall frame with no roof yet, wooden scaffolding, a stack of planks and a sawhorse beside it, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 64,
+        "height": 64,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    }
+  },
+  "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
+  "rejected": [
+    {
+      "mapObjectId": "e82ffb51-9009-4988-b356-1bcc6dc4cf87",
+      "why": "Level 1: nearly head-on, its side wall barely showing."
+    },
+    {
+      "mapObjectId": "af883633-935d-40df-8ba7-044812090a81",
+      "why": "Level 0: on a ground patch, and reads as nearly finished."
+    }
+  ],
+  "chosenBy": "Agent's picks, 2026-10-20 (Issue-89), shown to the owner in a mock-up of the 400×225 Millbrook at 3× (art/mockups/millbrook-400x225-3x.png) beside every candidate; the owner reviews them on PR-92 and may swap any.",
+  "verified": "Each level-<n>.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
+}

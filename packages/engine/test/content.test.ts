@@ -39,6 +39,16 @@ describe("static content", () => {
     expect(location(STARTING_LOCATION)?.sharedFacilities).toEqual(["job-board"]);
   });
 
+  it("lets a Millbrook camp build a mine, a lumber camp and a caravan hub, none of them already standing", () => {
+    expect(location(STARTING_LOCATION)?.buildableFacilities).toEqual(["mine", "lumber-camp", "caravan-hub"]);
+    for (const l of LOCATIONS) {
+      for (const kind of l.buildableFacilities) {
+        expect(l.ownFacilities).not.toContain(kind);
+        expect(l.sharedFacilities).not.toContain(kind);
+      }
+    }
+  });
+
   it("caps a level-1 camp at 4 heroes and 100 of each resource", () => {
     expect(hallCapacity(1)).toBe(4);
     expect(warehouseCapacity(1)).toBe(100);

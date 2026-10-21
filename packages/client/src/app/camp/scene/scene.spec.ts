@@ -1,5 +1,5 @@
 import { layGround, type Terrain, type TilesetJson } from './ground';
-import { MILLBROOK, SCENE_HEIGHT, SCENE_WIDTH } from './layout';
+import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK, cornersAround } from './layout';
 import { WALK_SPEED, facingFor, newWalker, randomSpot, step } from './wander';
 
 /** A tileset with one tile for each of the sixteen corner combinations, as PixelLab's tileset15 has. */
@@ -44,29 +44,46 @@ describe('the ground', () => {
     expect(() => layGround(tileset, [['lower', 'lower'], ['lower', 'lower']])).toThrow(/no tile with corners lower\/lower\/lower\/lower/);
   });
 
-  it('covers the whole Millbrook scene', () => {
+  it('covers the whole Millbrook map', () => {
     const tiles = layGround(fullTileset(), MILLBROOK.corners);
-    expect(Math.max(...tiles.map((t) => (t.col + 1) * 16))).toBeGreaterThanOrEqual(SCENE_WIDTH);
-    expect(Math.max(...tiles.map((t) => (t.row + 1) * 16))).toBeGreaterThanOrEqual(SCENE_HEIGHT);
+    expect(Math.max(...tiles.map((t) => (t.col + 1) * 16))).toBeGreaterThanOrEqual(MAP_WIDTH);
+    expect(Math.max(...tiles.map((t) => (t.row + 1) * 16))).toBeGreaterThanOrEqual(MAP_HEIGHT);
+  });
+
+  it('runs the ground on past the map as grass, and keeps the corners of the map inside it', () => {
+    const window = cornersAround(MILLBROOK, -2, -1, 4, 3);
+    expect(window[0]).toEqual(['upper', 'upper', 'upper', 'upper', 'upper']);
+    expect(window[1]![2]).toBe(MILLBROOK.corners[0]![0]);
+    const road = cornersAround(MILLBROOK, 0, 8, 1, 1);
+    expect(road[0]).toEqual(['lower', 'lower']);
   });
 });
 
 describe('the Millbrook layout', () => {
-  it('stands the hall, the job board and the warehouse inside the scene', () => {
-    expect(MILLBROOK.facilities.map((f) => f.kind).sort()).toEqual(['heroes-hall', 'job-board', 'warehouse']);
+  it('stands every facility of the camp, built or not, inside the map', () => {
+    expect(MILLBROOK.facilities.map((f) => f.kind).sort()).toEqual(['caravan-hub', 'heroes-hall', 'job-board', 'lumber-camp', 'mine', 'warehouse']);
     for (const f of MILLBROOK.facilities) {
       expect(f.at.x).toBeGreaterThan(0);
-      expect(f.at.x).toBeLessThan(SCENE_WIDTH);
-      expect(f.at.y).toBeLessThan(SCENE_HEIGHT);
+      expect(f.at.x).toBeLessThan(MAP_WIDTH);
+      expect(f.at.y).toBeLessThan(MAP_HEIGHT);
+    }
+  });
+
+  it('stands every facility inside the core width, which a narrow box never crops', () => {
+    // Half the widest facility canvas, 64 px, on either side of its spot.
+    const margin = (MAP_WIDTH - MAP_CORE_WIDTH) / 2;
+    for (const f of MILLBROOK.facilities) {
+      expect(f.at.x - 32).toBeGreaterThanOrEqual(margin);
+      expect(f.at.x + 32).toBeLessThanOrEqual(MAP_WIDTH - margin);
     }
   });
 
   it('keeps every walkable spot inside the scene', () => {
     for (const a of MILLBROOK.walkable) {
       expect(a.x0).toBeGreaterThanOrEqual(0);
-      expect(a.x1).toBeLessThanOrEqual(SCENE_WIDTH);
+      expect(a.x1).toBeLessThanOrEqual(MAP_WIDTH);
       expect(a.y0).toBeGreaterThanOrEqual(0);
-      expect(a.y1).toBeLessThanOrEqual(SCENE_HEIGHT);
+      expect(a.y1).toBeLessThanOrEqual(MAP_HEIGHT);
     }
   });
 });

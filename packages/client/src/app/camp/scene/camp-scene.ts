@@ -1,12 +1,15 @@
 import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
 import type { FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
-import { SCENE_HEIGHT, SCENE_WIDTH, TILE, type CampLayout } from './layout';
+import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
+import { sceneView } from '../page-layout';
 import { newWalker, randomSpot, step, type Facing, type Walker } from './wander';
 
 /**
- * The camp scene, drawn with PixiJS (decision 0028) at 320×180 and scaled up
- * by whole numbers, so every art pixel is a square of screen pixels. Ground
+ * The camp scene, drawn with PixiJS (decision 0028): the camp's whole map,
+ * scaled up by the largest whole number that fits its box, so every art pixel
+ * is a square of screen pixels, with the ground running on around the map to
+ * fill the rest of the box (Issue-89). Ground
  * tiles, then the facilities and the heroes in one container sorted by the
  * line they stand on (assets.md, rule 18), which is what puts a hero walking
  * behind the hall behind it. The scene knows nothing of the hub: the camp
@@ -33,8 +36,6 @@ const WALK_DIRECTIONS: readonly WalkDirection[] = ['south', 'east', 'north'];
 const STILL_DIRECTIONS: readonly Facing[] = ['south', 'east', 'north', 'west'];
 const WALK_FRAMES = 6;
 const WALK_FRAME_MS = 100;
-/** The facilities a player can click; the job board waits for Issue-15. */
-const CLICKABLE: ReadonlySet<FacilityKind> = new Set(['heroes-hall']);
 
 interface HeroFrames {
   still: Record<Facing, Texture>;
@@ -101,50 +102,79 @@ function show(sprite: Sprite, texture: Texture, foot: number, mirrored: boolean)
   sprite.hitArea = new Rectangle(texture.width / 2 - 8, foot - 27, 16, 28);
 }
 
-export async function createCampScene(host: HTMLElement, layout: CampLayout, callbacks: SceneCallbacks): Promise<CampSceneHandle> {
+/**
+ * Draws the camp in the host element. `levels` says which picture each
+ * facility shows: 0 for one the camp has not built, an unfinished building
+ * (docs/process/assets.md, rule 17).
+ */
+export async function createCampScene(
+  host: HTMLElement,
+  layout: CampLayout,
+  levels: Readonly<Partial<Record<FacilityKind, number>>>,
+  callbacks: SceneCallbacks,
+): Promise<CampSceneHandle> {
   // Nearest-neighbour everywhere: pixel art blurs under any other filter.
   TextureStyle.defaultOptions.scaleMode = 'nearest';
   const app = new Application();
-  await app.init({ width: SCENE_WIDTH, height: SCENE_HEIGHT, background: '#4f7f2a', antialias: false, resolution: 1, roundPixels: true });
+  await app.init({ width: MAP_WIDTH, height: MAP_HEIGHT, background: '#4f7f2a', antialias: false, resolution: 1, roundPixels: true });
   app.canvas.style.imageRendering = 'pixelated';
+  app.canvas.style.display = 'block';
   host.appendChild(app.canvas);
 
+  const tileset = (await (await fetch(`/art/ground/${layout.ground}/tileset.json`)).json()) as TilesetJson;
+  const sheet = await Assets.load<Texture>(`/art/ground/${layout.ground}/tileset.png`);
+
+  // The world: the ground, then the facilities and heroes back to front by the
+  // line they stand on, all in the map's coordinates, moved as one to centre
+  // the map in whatever window the box shows.
+  const world = new Container();
+  const ground = new Container();
+  const things = new Container({ sortableChildren: true });
+  world.addChild(ground, things);
+  app.stage.addChild(world);
+
+  /** Lays the ground over the window, the map's tiles where it overlaps the map and grass around it. */
+  const layWindow = (x0: number, y0: number, width: number, height: number) => {
+    for (const child of ground.removeChildren()) child.destroy();
+    const col0 = Math.floor(x0 / TILE);
+    const row0 = Math.floor(y0 / TILE);
+    const cols = Math.ceil((x0 + width) / TILE) - col0;
+    const rows = Math.ceil((y0 + height) / TILE) - row0;
+    for (const tile of layGround(tileset, cornersAround(layout, col0, row0, cols, rows))) {
+      const frame = new Rectangle(tile.box.x, tile.box.y, tile.box.width, tile.box.height);
+      const sprite = new Sprite(new Texture({ source: sheet.source, frame }));
+      sprite.position.set((col0 + tile.col) * TILE, (row0 + tile.row) * TILE);
+      ground.addChild(sprite);
+    }
+  };
+
+  let shown = '';
   const resize = () => {
-    const scale = Math.max(1, Math.floor(Math.min(host.clientWidth / SCENE_WIDTH, host.clientHeight / SCENE_HEIGHT)));
-    app.canvas.style.width = `${SCENE_WIDTH * scale}px`;
-    app.canvas.style.height = `${SCENE_HEIGHT * scale}px`;
+    const view = sceneView(host.clientWidth, host.clientHeight);
+    const key = `${view.width}x${view.height}`;
+    app.canvas.style.width = `${view.width * view.scale}px`;
+    app.canvas.style.height = `${view.height * view.scale}px`;
+    if (key === shown) return;
+    shown = key;
+    app.renderer.resize(view.width, view.height);
+    world.position.set(view.mapX, view.mapY);
+    layWindow(-view.mapX, -view.mapY, view.width, view.height);
   };
   const observer = new ResizeObserver(resize);
   observer.observe(host);
   resize();
 
-  // The ground, laid once.
-  const ground = new Container();
-  const tileset = (await (await fetch(`/art/ground/${layout.ground}/tileset.json`)).json()) as TilesetJson;
-  const sheet = await Assets.load<Texture>(`/art/ground/${layout.ground}/tileset.png`);
-  for (const tile of layGround(tileset, layout.corners)) {
-    const frame = new Rectangle(tile.box.x, tile.box.y, tile.box.width, tile.box.height);
-    const sprite = new Sprite(new Texture({ source: sheet.source, frame }));
-    sprite.position.set(tile.col * TILE, tile.row * TILE);
-    ground.addChild(sprite);
-  }
-  app.stage.addChild(ground);
-
-  // Facilities and heroes, back to front by the line they stand on.
-  const world = new Container({ sortableChildren: true });
-  app.stage.addChild(world);
   for (const spot of layout.facilities) {
-    const texture = await Assets.load<Texture>(`/art/facilities/${spot.kind}/level-1.png`);
+    const texture = await Assets.load<Texture>(`/art/facilities/${spot.kind}/level-${levels[spot.kind] ?? 1}.png`);
     const sprite = new Sprite(texture);
     sprite.pivot.set(texture.width / 2, lowestOpaqueRow(texture) + 1);
     sprite.position.set(spot.at.x, spot.at.y);
     sprite.zIndex = spot.at.y;
-    if (CLICKABLE.has(spot.kind)) {
-      sprite.eventMode = 'static';
-      sprite.cursor = 'pointer';
-      sprite.on('pointertap', () => callbacks.onFacility(spot.kind));
-    }
-    world.addChild(sprite);
+    // Every facility opens its panel, as its entry in the menu does (Issue-89).
+    sprite.eventMode = 'static';
+    sprite.cursor = 'pointer';
+    sprite.on('pointertap', () => callbacks.onFacility(spot.kind));
+    things.addChild(sprite);
   }
 
   const heroes = new Map<string, HeroOnScreen>();
@@ -190,7 +220,7 @@ export async function createCampScene(host: HTMLElement, layout: CampLayout, cal
           sprite.eventMode = 'static';
           sprite.cursor = 'pointer';
           sprite.on('pointertap', () => callbacks.onHero(h.id));
-          world.addChild(sprite);
+          things.addChild(sprite);
           heroes.set(h.id, { sprite, walker, frames, clockMs: 0 });
         });
       }

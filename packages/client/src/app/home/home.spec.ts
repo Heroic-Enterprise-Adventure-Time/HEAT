@@ -1,10 +1,15 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Component } from '@angular/core';
+import { Router, provideRouter } from '@angular/router';
 import { Config } from '../config';
 import { Session, type SessionUser } from '../session';
 import { CAMP_SCENE_FACTORY } from '../camp/camp';
 import { Game } from '../game';
 import { Home } from './home';
+
+@Component({ template: '' })
+class Stub {}
 
 /** A session with a settable user and recorded actions, in place of the real one. */
 function fakeSession(user: SessionUser | null) {
@@ -26,6 +31,7 @@ async function render(session: ReturnType<typeof fakeSession>, configError: stri
   await TestBed.configureTestingModule({
     imports: [Home],
     providers: [
+      provideRouter([{ path: 'camp/:location', component: Stub }]),
       { provide: Session, useValue: session },
       { provide: Config, useValue: config },
       // The camp's own collaborators, standing in: no hub and no WebGL in a test.
@@ -53,10 +59,10 @@ describe('Home', () => {
     expect(session.signedIn).toBe(1);
   });
 
-  it('shows the camp to a signed-in player', async () => {
+  it('sends a signed-in player on to their camp', async () => {
     const session = fakeSession({ email: 'player@example.com', name: 'Player', accessToken: 'token' });
     const { page } = await render(session);
-    expect(page.querySelector('heat-camp')).not.toBeNull();
+    await vi.waitFor(() => expect(TestBed.inject(Router).url).toBe('/camp/millbrook'));
     expect(page.querySelector('h1')).toBeNull();
   });
 

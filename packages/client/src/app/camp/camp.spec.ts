@@ -1,8 +1,12 @@
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Router, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { routes } from '../app.routes';
 import { Game, type HeroView } from '../game';
+import { Session } from '../session';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
-import { CAMP_SCENE_FACTORY, Camp } from './camp';
+import { CAMP_SCENE_FACTORY } from './camp';
 
 const wren: HeroView = {
   id: 'h1',
@@ -43,7 +47,9 @@ function fakeScene() {
   const scene = {
     callbacks: null as SceneCallbacks | null,
     shown: [] as { heroes: readonly SceneHero[]; arriving: string | undefined }[],
-    factory: async (_host: HTMLElement, _layout: unknown, callbacks: SceneCallbacks) => {
+    levels: null as Readonly<Record<string, number>> | null,
+    factory: async (_host: HTMLElement, _layout: unknown, levels: Readonly<Record<string, number>>, callbacks: SceneCallbacks) => {
+      scene.levels = levels;
       scene.callbacks = callbacks;
       return {
         setHeroes: (heroes: readonly SceneHero[], arriving?: string) => scene.shown.push({ heroes, arriving }),
@@ -54,31 +60,33 @@ function fakeScene() {
   return scene;
 }
 
-async function render(game: ReturnType<typeof fakeGame>) {
+async function render(game: ReturnType<typeof fakeGame>, url = '/camp/millbrook') {
   const scene = fakeScene();
-  await TestBed.configureTestingModule({
-    imports: [Camp],
+  TestBed.configureTestingModule({
     providers: [
+      provideRouter(routes),
       { provide: Game, useValue: game },
+      { provide: Session, useValue: { user: signal({ email: 'player@example.com', name: null, accessToken: 't' }) } },
       { provide: CAMP_SCENE_FACTORY, useValue: scene.factory },
     ],
-  }).compileComponents();
-  const fixture = TestBed.createComponent(Camp);
-  await fixture.whenStable();
+  });
+  const harness = await RouterTestingHarness.create(url);
   await vi.waitFor(() => expect(scene.callbacks).not.toBeNull());
+  const router = TestBed.inject(Router);
   const settle = async () => {
-    fixture.detectChanges();
-    await fixture.whenStable();
+    harness.detectChanges();
+    await harness.fixture.whenStable();
   };
-  return { fixture, scene, settle, page: fixture.nativeElement as HTMLElement };
+  return { harness, router, scene, settle, page: harness.routeNativeElement as HTMLElement };
 }
 
+const current = (page: HTMLElement) => page.querySelector('nav.menu a[aria-current="page"]')?.textContent?.trim();
+
 describe('Camp', () => {
-  it('opens the heroes hall on a click, recruits the free villager and sends it walking in from the hall', async () => {
+  it('shows the heroes hall at the camp itself, recruits the free villager and sends it walking in from the hall', async () => {
     const game = fakeGame([]);
-    const { scene, settle, page } = await render(game);
-    scene.callbacks!.onFacility('heroes-hall');
-    await settle();
+    const { router, scene, settle, page } = await render(game);
+    expect(router.url).toBe('/camp/millbrook/heroes-hall');
     expect(page.querySelector('aside h2')?.textContent).toBe('Heroes hall');
     expect(page.textContent).toContain('No heroes yet.');
 
@@ -91,13 +99,29 @@ describe('Camp', () => {
     expect(page.textContent).toContain('The villager is free only when no hero here is alive.');
   });
 
-  it('shows a hero card when a hero is clicked', async () => {
-    const { scene, settle, page } = await render(fakeGame([wren]));
+  it('opens a facility clicked in the scene at its path', async () => {
+    const { router, scene, settle, page } = await render(fakeGame([]));
+    scene.callbacks!.onFacility('job-board');
+    await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook/job-board'));
+    await settle();
+    expect(page.querySelector('aside h2')?.textContent).toBe('Job board');
+    expect(current(page)).toBe('Job board');
+  });
+
+  it('shows a hero card under the hall, keeping the hall marked in the menu', async () => {
+    const { router, scene, settle, page } = await render(fakeGame([wren]));
     scene.callbacks!.onHero('h1');
+    await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook/heroes-hall/heroes/h1'));
     await settle();
     expect(page.querySelector('aside h2')?.textContent).toBe('Wren');
     expect(page.querySelector('dl')?.textContent).toContain('villager');
-    expect(page.querySelector('dl')?.textContent).toContain('alive');
+    expect(current(page)).toBe('Heroes hall');
+    expect(page.querySelector('aside .back')?.getAttribute('href')).toBe('/camp/millbrook/heroes-hall');
+  });
+
+  it('links each roster entry to its card', async () => {
+    const { page } = await render(fakeGame([wren]));
+    expect(page.querySelector('.roster a')?.getAttribute('href')).toBe('/camp/millbrook/heroes-hall/heroes/h1');
   });
 
   it('walks only the living heroes about the camp', async () => {
@@ -106,10 +130,36 @@ describe('Camp', () => {
     expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h1']);
   });
 
-  it('opens nothing for the job board yet', async () => {
-    const { scene, settle, page } = await render(fakeGame([]));
-    scene.callbacks!.onFacility('job-board');
-    await settle();
-    expect(page.querySelector('aside')).toBeNull();
+  it('lists every facility of the camp in the menu, built or not, each linking to its path', async () => {
+    const { page } = await render(fakeGame([]));
+    const entries = [...page.querySelectorAll<HTMLAnchorElement>('nav.menu a')];
+    expect(entries.map((a) => a.textContent?.trim())).toEqual(['Heroes hall', 'Job board', 'Warehouse', 'Lumber camp', 'Mine', 'Caravan hub']);
+    expect(entries[4]!.getAttribute('href')).toBe('/camp/millbrook/mine');
+    expect(entries[4]!.classList).toContain('unbuilt');
+    expect(entries[0]!.classList).not.toContain('unbuilt');
+    expect(entries[0]!.querySelector('img')?.getAttribute('src')).toBe('art/icons/heroes-hall.png');
+  });
+
+  it('hands the scene each facility level: 0 for the ones not built', async () => {
+    const { scene } = await render(fakeGame([]));
+    expect(scene.levels).toEqual({ 'heroes-hall': 1, 'job-board': 1, warehouse: 1, 'lumber-camp': 0, mine: 0, 'caravan-hub': 0 });
+  });
+
+  it('says what an unbuilt facility does and that it is not built', async () => {
+    const { page } = await render(fakeGame([]), '/camp/millbrook/mine');
+    expect(page.querySelector('aside h2')?.textContent).toBe('Mine');
+    expect(page.querySelector('aside')?.textContent).toContain('Not built yet.');
+    expect(page.querySelector('aside')?.textContent).toContain('mining runs');
+    expect(current(page)).toBe('Mine');
+  });
+
+  it('sends a facility the camp does not have back to the hall', async () => {
+    const { router } = await render(fakeGame([]), '/camp/millbrook/forge');
+    await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook/heroes-hall'));
+  });
+
+  it('sends a camp with no layout to the starting camp', async () => {
+    const { router } = await render(fakeGame([]), '/camp/atlantis');
+    await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook/heroes-hall'));
   });
 });

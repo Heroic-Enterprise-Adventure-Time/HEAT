@@ -1,5 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Game, type PlayerView } from '../game';
 import { Session, type SessionUser } from '../session';
 import { Header } from './header';
@@ -17,6 +18,7 @@ async function render(user: SessionUser | null, loaded: PlayerView | null) {
   await TestBed.configureTestingModule({
     imports: [Header],
     providers: [
+      provideRouter([]),
       { provide: Session, useValue: session },
       { provide: Game, useValue: game },
     ],
