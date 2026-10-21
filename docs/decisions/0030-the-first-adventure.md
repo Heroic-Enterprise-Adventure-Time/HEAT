@@ -12,7 +12,7 @@
 
 **Stages and time limits.** A job is an ordered list of stages on one timeline with health and cargo carried over. Every fight and gather stage carries its own time limit, because some are expected to resolve faster than others; reaching it ends the adventure as a retreat with the job's penalty. It is a deadlock kill switch, shown only in its last stretch, never a mechanic to play against.
 
-**One version for the whole app.** The client, the hub and the engine carry one version, the commit the workflow deployed. An adventure is stamped with it at start and is verified only by that version. Every deploy republishes the hub and moves its `live` alias; a second alias, `previous`, keeps the deploy before, reachable at a second route behind the same authorizer, so an adventure started under the previous deploy is verified by it. The current route refuses another version with `ENGINE_UPDATED`; the client tries the previous route; the same refusal there means too old, and the client asks for the discard. The client sends its version on every request and is told when it is outdated, and defers the refresh prompt while an adventure is in progress. The snapshot therefore holds only the party's effective numbers and the job by id; the content is read by the version that verifies. A golden replay test keeps a change to determinism visible in review, with no version semantics.
+**One version for the whole app.** The client, the hub and the engine carry one version, the commit the workflow deployed. An adventure is stamped with it at start and is verified only by that version. Every deploy republishes the hub and moves its `live` alias; a second alias, `previous`, keeps the deploy before, reachable at a second route behind the same authorizer, so an adventure started under the previous deploy is verified by it. The current route refuses another version with `ENGINE_UPDATED`; the client tries the previous route; the same refusal there means too old, and the client asks for the discard. The client sends its version on every request and is told when it is outdated, and defers the refresh prompt while an adventure is in progress. The snapshot therefore holds only the party's effective numbers and the job by id; the content is read by the version that verifies. Determinism is a property within one version, which the engine's test proves by stepping the same run two ways.
 
 **Replays and resume.** A replay is the timeline the hub wrote at settlement, display only, played by any client without the engine. Resuming replays the override log so far with the client's own engine, whatever version issued the adventure; the issuing version's verification is the result.
 
@@ -45,6 +45,8 @@
 **Reading replays from the bucket through CloudFront.** The hub is the one API and the one place authorization is answered (decision 0012); the bucket stays private. The lever if timelines grow.
 
 **Retiring the previous version by time** rather than by the next deploy. A clock in the decision for no gain.
+
+**A golden replay test**, a recorded run whose timeline a change must not alter, to make a change to determinism visible in review. Raised by the owner in review of PR-116: with every adventure fixed to the version that issued it, a change to the timeline between versions is just another change, and a replay makes no decisions, so there is nothing across versions to guard. Dropped.
 
 ## Where it is described
 
