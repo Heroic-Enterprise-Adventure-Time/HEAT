@@ -149,6 +149,27 @@ describe("the camp through the graph", () => {
     const missing = await gql(retire, { id: randomUUID() }, `p-${randomUUID()}`);
     expect((missing.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("NOT_FOUND");
   });
+
+  it("shows other players' heroes seen at the location by their public fields, never the caller's own", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(`mutation { joinGame { id } }`, {}, p);
+    const mine = randomUUID();
+    await gql(`mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id } }`, { id: mine }, p);
+
+    const seen = `query($at: String!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
+    const r = await gql<{ heroesSeenAt: { id: string }[] }>(seen, { at: "millbrook" }, p);
+    expect(r.errors).toBeUndefined();
+    expect(r.data?.heroesSeenAt.length).toBeLessThanOrEqual(6);
+    expect(r.data?.heroesSeenAt.map((h) => h.id)).not.toContain(mine);
+
+    const fields = await gql<{ __type: { fields: { name: string }[] } }>(`{ __type(name: "SeenHero") { fields { name } } }`);
+    expect(fields.data?.__type.fields.map((f) => f.name).sort()).toEqual(["id", "level", "name", "spriteSet", "unitType"]);
+
+    const anonymous = await gql(seen, { at: "millbrook" });
+    expect(anonymous.errors).toBeDefined();
+    const nowhere = await gql(seen, { at: "atlantis" }, p);
+    expect((nowhere.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("BAD_USER_INPUT");
+  });
 });
 
 describe("the adventure loop through the graph", () => {

@@ -96,9 +96,27 @@ type Player {
 }
 
 type Query {
+  """
+  A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.
+  """
+  heroesSeenAt(location: String!): [SeenHero!]!
+
   """The signed-in player, or null before joinGame has made their profile."""
   me: Player
 
   """Public: any caller may look a player up by id."""
   player(id: String!): Player
+}
+
+"""
+Another player's hero seen at a location: its public fields only, and nothing that says whose it is (decision 0029).
+"""
+type SeenHero {
+  id: String!
+  level: Int!
+  name: String!
+
+  """The set's directory under art/heroes/."""
+  spriteSet: String!
+  unitType: String!
 }
