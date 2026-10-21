@@ -60,20 +60,36 @@ How the page around the scene is laid out (Issue-89). The scene's own rules are 
 - **Decided.** No real-time gating. Players can pause, and can fast-forward, including through content they have automated.
 - **Decided.** One unresolved adventure per player at a time.
   - It must be easy for the player to find, so they know it is in progress and can return to it.
-  - If the browser closes, the adventure waits. On next sign-in the app checks for an unresolved adventure and picks it up.
+  - If the browser closes, the adventure waits. On next sign-in the app checks for an unresolved adventure and picks it up, replaying the overrides so far with the client's own engine.
   - If the player never returns, it stays unresolved.
-  - If a game update ships before it is resolved, it is discarded.
+  - An adventure survives one game update and not two: the update before the current one stays able to verify it, so a player in the middle of an adventure when an update ships finishes and submits as if nothing happened. After a second update it is discarded, and the player is told (decision 0030, amending 0003).
   - A player who dislikes how a run is going must finish it to continue, or wait for the next update.
+- **Decided.** A replay is what the server verified, played back. It is display only: any version of the game plays it, and it never needs the engine again.
 
 ## The battle
 
-How an adventure plays out. Everything in this section is expected to change as the game is played; it is written down so that there is something to change.
+How an adventure plays out: the first cut, agreed 2026-10-21 (decision 0030). The shape is decided; the numbers are working assumptions in the engine's static content and are expected to change as the game is played.
 
-- **Working assumption.** A job is an ordered list of stages (travel, fight, gather, arrive). An adventure runs them on one timeline, with health and cargo carried between stages. A cart is a party member with health and no actions. A tree is a resource that a chopping ability "damages" into lumber.
-- **Open.** Unit types and abilities. A first cut to react to: a fighter who holds the front, a ranger who hits from behind, and a laborer who chops and carries but fights badly, with mana and status effects left out until the loop works.
-- **Working assumption.** There are two kinds of override: forcing a unit's next action, and party orders such as press on or retreat.
+- **Decided.** A job is an ordered list of stages: travel, fight, gather and arrive. An adventure runs them on one timeline, with health and cargo carried between stages. A tree is a resource that a chopping ability "damages" into timber. A cart is a party member with health and no actions, for caravans later.
+- **Decided.** Active time. Each unit has a charge timer that fills at its speed. When it fills, the unit picks the first usable action from its unit type's list, with the target the ability's rule chooses, warms up, resolves, and the timer resets. Nothing waits for the player: the battle plays itself, and the player watches, pauses, fast-forwards and interjects.
+- **Decided.** One action list per unit type, fixed. The list is the unit's whole intelligence, and a better unit type is a better list, which is how progression automates what the player used to do by hand ("The business"). The player never edits a list.
+- **Decided.** A marching order, not a grid. Each side has four lines, front, near, far and back; a line holds any number of units, with no order within it. A unit type has a home line, where it starts; the party pick places nobody. Reach is by line: an ability says which enemy lines it reaches from which of its own. When a side's front line empties, every unit on that side moves up a line, so the nearest occupied line is always the front. Stepping up is also an action, for the unit types whose list says so.
+- **Working assumption.** The first unit types and monsters. Not very tactical, by design: a villager walks up and swings, because the player is not meant to keep villagers for long.
+
+  | Unit | Home line | Its list, first usable action wins |
+  | --- | --- | --- |
+  | Villager | near | strike the closest in reach; chop a tree if one is there; move up |
+  | Fighter | front | guard an ally below half health; strike the closest |
+  | Wolf | front | bite the closest; move up |
+  | Bandit | near | strike the weakest in reach; move up |
+
+- **Decided.** Two kinds of override: forcing a unit's next action, which applies at its next turn if it is usable then and is dropped silently if not; and party orders, press on and retreat.
 - **Decided.** Retreat. Each job states its own retreat penalty. Retreating from a lumber run leaves with what was gathered and misses the better lumber further on; retreating from a caravan abandons the cargo.
 - **Working assumption.** A retreat is attempted every so often until it succeeds, each attempt rolled with the adventure's seeded random number generator. Bonuses and items raise the chance, and the chance rises with each failed attempt, so bad luck alone cannot trap a party.
+- **Decided.** Every fight and gather stage carries its own time limit, on the adventure's own clock, because some are expected to resolve faster than others. Reaching it ends the adventure as a retreat with the job's penalty. It is a deadlock kill switch, not a mechanic: the timer is shown only in its last stretch, and nothing is designed to be beaten against it.
+- **Decided.** Mana and status effects are left out until the loop works.
+- **Working assumption.** Millbrook's first jobs. "Wolves on the mill road": travel, fight two wolves, arrive; paid in cloth; a retreat forfeits the pay. "Timber from the near woods": travel, gather from trees, fight a wolf on the way back, arrive; the timber gathered and a small pay; a retreat keeps what was gathered. A party is one to four heroes. A job's pay is a reward from whoever posted it, so it need not be loot.
+- **Decided.** The first battle shows no weapon and no effect sprites: a hero's act animation and the hit on its target carry it. The sprites of "How the game looks" come later.
 
 ## Locations and camps
 
@@ -114,8 +130,6 @@ How an adventure plays out. Everything in this section is expected to change as 
 
 ## Open
 
-- Whether to keep mana and status effects, and whether the party is a marching order instead of a grid.
-- Discrete stages (assumed) versus one continuous track with positions.
 - Which locations exist, and how each is unlocked.
-- Rewards, and what settlement credits besides XP and returned consumables.
+- What settlement credits besides XP, a job's pay, what was gathered and returned consumables.
 - The names job and adventure.
