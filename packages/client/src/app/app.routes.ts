@@ -7,8 +7,17 @@ import { HeroCard } from './camp/panels/hero-card';
 import { Home } from './home/home';
 import { Session } from './session';
 
-/** A camp is for a signed-in player; anyone else is sent to the home page and its sign-in. */
-const signedIn: CanActivateFn = () => (inject(Session).user() ? true : inject(Router).createUrlTree(['/']));
+/**
+ * A camp is for a signed-in player; anyone else is sent to the home page and
+ * its sign-in, and the session keeps the path refused, so that sign-in
+ * returns to it (Issue-96).
+ */
+export const signedIn: CanActivateFn = (_route, state) => {
+  const session = inject(Session);
+  if (session.user()) return true;
+  session.keep(state.url);
+  return inject(Router).createUrlTree(['/']);
+};
 
 /**
  * The addresses (Issue-89): the home page, and a camp with its panel as a

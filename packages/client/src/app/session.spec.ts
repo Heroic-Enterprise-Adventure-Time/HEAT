@@ -2,7 +2,7 @@ import { DOCUMENT } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import type { User, UserManagerSettings } from 'oidc-client-ts';
 import { Config, type StackConfig } from './config';
-import { SESSION_MANAGER_FACTORY, Session, type SessionManager, logoutUrl, sessionSettings } from './session';
+import { SESSION_MANAGER_FACTORY, Session, type SessionManager, inAppPath, logoutUrl, sessionSettings } from './session';
 
 const config: StackConfig = {
   graphqlPath: '/graphql',
@@ -41,6 +41,34 @@ describe('logoutUrl', () => {
   });
 });
 
+describe('inAppPath', () => {
+  const origin = 'https://96.heat-sb.dcg-games.com';
+
+  it('keeps a path of the page with its query and fragment', () => {
+    expect(inAppPath('/camp/millbrook/mine', origin)).toBe('/camp/millbrook/mine');
+    expect(inAppPath('/camp/millbrook/heroes-hall/heroes/h1?x=1#top', origin)).toBe('/camp/millbrook/heroes-hall/heroes/h1?x=1#top');
+  });
+
+  it('refuses anything that is not a path of this page', () => {
+    for (const value of [
+      '//evil.example/camp',
+      '/\\evil.example/camp',
+      '/\t/evil.example/camp',
+      'https://evil.example/camp',
+      `${origin}/camp/millbrook/mine`,
+      'javascript:alert(1)',
+      'camp/millbrook/mine',
+      '',
+      null,
+      undefined,
+      42,
+      { path: '/camp/millbrook/mine' },
+    ]) {
+      expect(inAppPath(value, origin), String(value)).toBeNull();
+    }
+  });
+});
+
 /** A manager that records calls and answers with a given user. */
 function fakeManager(user: User | null) {
   const handlers: Record<string, ((...args: never[]) => void)[]> = {};
@@ -48,7 +76,7 @@ function fakeManager(user: User | null) {
     settings: null as UserManagerSettings | null,
     calls: [] as string[],
     getUser: async () => user,
-    signinRedirect: async () => void fake.calls.push('signinRedirect'),
+    signinRedirect: async (args?: unknown) => void fake.calls.push(args ? `signinRedirect ${JSON.stringify(args)}` : 'signinRedirect'),
     signinCallback: async (url?: string) => {
       fake.calls.push(`signinCallback ${url}`);
       return user ?? undefined;
@@ -64,8 +92,8 @@ function fakeManager(user: User | null) {
   return fake;
 }
 
-function signedInUser(): User {
-  return { expired: false, access_token: 'access', profile: { email: 'player@example.com', name: 'Player' } } as unknown as User;
+function signedInUser(state?: unknown): User {
+  return { expired: false, access_token: 'access', profile: { email: 'player@example.com', name: 'Player' }, state } as unknown as User;
 }
 
 async function sessionWith(manager: ReturnType<typeof fakeManager>, loaded: StackConfig | null, href: string) {
@@ -129,6 +157,29 @@ describe('Session', () => {
     expect(manager.calls).toEqual([`signinCallback ${href}`]);
     expect(replaced).toEqual(['/']);
     expect(session.user()).toEqual({ email: 'player@example.com', name: 'Player', accessToken: 'access' });
+  });
+
+  it('sends a kept path through sign-in as the custom state, and nothing else', async () => {
+    const manager = fakeManager(null);
+    const { session } = await sessionWith(manager, config, 'https://46.heat-sb.dcg-games.com/');
+    session.keep('//evil.example/camp');
+    await session.signIn();
+    session.keep('/camp/millbrook/mine');
+    await session.signIn();
+    expect(manager.calls).toEqual(['signinRedirect', 'signinRedirect {"state":"/camp/millbrook/mine"}']);
+  });
+
+  it('returns to the path kept at sign-in after the redirect', async () => {
+    const manager = fakeManager(signedInUser('/camp/millbrook/mine'));
+    const { session, replaced } = await sessionWith(manager, config, 'https://46.heat-sb.dcg-games.com/?code=abc&state=xyz');
+    expect(replaced).toEqual(['/camp/millbrook/mine']);
+    expect(session.user()?.email).toBe('player@example.com');
+  });
+
+  it('refuses a returned state that is not a path of the page', async () => {
+    const manager = fakeManager(signedInUser('https://evil.example/camp'));
+    const { replaced } = await sessionWith(manager, config, 'https://46.heat-sb.dcg-games.com/?code=abc&state=xyz');
+    expect(replaced).toEqual(['/']);
   });
 
   it('reports a refused sign-in from the redirect', async () => {
