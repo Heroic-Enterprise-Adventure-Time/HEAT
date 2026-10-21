@@ -53,3 +53,27 @@ dt {
 dd {
   margin: 0;
 }
+
+.confirm {
+  margin-top: 0.75rem;
+}
+
+.confirm p {
+  margin: 0 0 0.5rem;
+}
+
+.confirm button + button {
+  margin-left: 0.5rem;
+}
+
+.retire {
+  margin-top: 0.75rem;
+}
+
+.retired {
+  margin-bottom: 0.75rem;
+}
+
+.retired summary {
+  cursor: pointer;
+}

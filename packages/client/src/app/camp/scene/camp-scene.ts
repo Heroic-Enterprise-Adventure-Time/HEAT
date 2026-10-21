@@ -3,7 +3,7 @@ import type { FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
 import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
 import { sceneView } from '../page-layout';
-import { newWalker, randomSpot, step, type Facing, type Walker } from './wander';
+import { gone, leave, newWalker, randomSpot, step, type Facing, type Walker } from './wander';
 
 /**
  * The camp scene, drawn with PixiJS (decision 0028): the camp's whole map,
@@ -27,7 +27,8 @@ export interface SceneCallbacks {
 }
 
 export interface CampSceneHandle {
-  setHeroes(heroes: readonly SceneHero[], arriving?: string): void;
+  /** Shows these heroes: `arriving` walks out of the hall, `leaving`, no longer listed, walks back in. */
+  setHeroes(heroes: readonly SceneHero[], arriving?: string, leaving?: string): void;
   destroy(): void;
 }
 
@@ -181,8 +182,13 @@ export async function createCampScene(
   let destroyed = false;
 
   app.ticker.add((ticker) => {
-    for (const hero of heroes.values()) {
+    for (const [id, hero] of heroes) {
       const walking = step(hero.walker, ticker.deltaMS, layout.walkable, Math.random);
+      if (gone(hero.walker)) {
+        hero.sprite.destroy();
+        heroes.delete(id);
+        continue;
+      }
       const { facing } = hero.walker;
       if (walking) {
         hero.clockMs += ticker.deltaMS;
@@ -199,10 +205,16 @@ export async function createCampScene(
   });
 
   return {
-    setHeroes(list, arriving) {
+    setHeroes(list, arriving, leaving) {
       const wanted = new Set(list.map((h) => h.id));
       for (const [id, hero] of heroes) {
-        if (!wanted.has(id)) {
+        if (wanted.has(id) || hero.walker.leaving) continue;
+        if (id === leaving) {
+          // A hero just retired walks back into the hall and is no longer clickable.
+          leave(hero.walker, layout.hallDoor);
+          hero.sprite.eventMode = 'none';
+          hero.sprite.cursor = 'default';
+        } else {
           hero.sprite.destroy();
           heroes.delete(id);
         }

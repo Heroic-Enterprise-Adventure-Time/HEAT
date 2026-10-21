@@ -1,6 +1,6 @@
 import { layGround, type Terrain, type TilesetJson } from './ground';
 import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK, cornersAround } from './layout';
-import { WALK_SPEED, facingFor, newWalker, randomSpot, step } from './wander';
+import { WALK_SPEED, facingFor, gone, leave, newWalker, randomSpot, step } from './wander';
 
 /** A tileset with one tile for each of the sixteen corner combinations, as PixelLab's tileset15 has. */
 function fullTileset(): TilesetJson {
@@ -124,5 +124,17 @@ describe('wandering', () => {
     expect(walker.target).toBeNull();
     expect(step(walker, 1000, area, sequence(0.5, 0.9, 0.1))).toBe(true);
     expect(walker.target).toEqual({ x: 90, y: 10 });
+  });
+
+  it('leaves for a door from mid-walk, and is gone once there, never setting out again', () => {
+    const walker = newWalker({ x: 0, y: 0 }, sequence(0.5), { x: 90, y: 90 });
+    step(walker, 500, area, sequence(0.5));
+    leave(walker, { x: 0, y: WALK_SPEED });
+    expect(gone(walker)).toBe(false);
+    expect(step(walker, 2000, area, sequence(0.5))).toBe(false);
+    expect(walker).toMatchObject({ x: 0, y: WALK_SPEED, target: null });
+    expect(gone(walker)).toBe(true);
+    expect(step(walker, 60_000, area, sequence(0.5))).toBe(false);
+    expect(walker.target).toBeNull();
   });
 });

@@ -18,13 +18,16 @@ const wren: HeroView = {
   level: 1,
   xp: 0,
   status: 'ALIVE',
+  retiredAt: null,
 };
 
-/** A game with settable heroes and a recorded recruit, in place of the real one. */
+/** A game with settable heroes and a recorded recruit and retire, in place of the real one. */
 function fakeGame(heroes: HeroView[]) {
-  const here = signal(heroes);
+  const all = signal(heroes);
+  const here = computed(() => all().filter((h) => h.status !== 'RETIRED'));
   const fake = {
     heroesHere: here,
+    retiredHere: computed(() => all().filter((h) => h.status === 'RETIRED')),
     camp: signal({ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: heroes.length, livingHeroes: heroes.length }),
     freeVillager: computed(() =>
       here().length === 0 ? { offered: true, reason: null } : { offered: false, reason: 'The villager is free only when no hero here is alive.' },
@@ -35,8 +38,15 @@ function fakeGame(heroes: HeroView[]) {
     recruited: 0,
     recruitVillager: async () => {
       fake.recruited++;
-      here.set([wren]);
+      all.set([wren]);
       return wren;
+    },
+    retired: [] as string[],
+    retire: async (id: string) => {
+      fake.retired.push(id);
+      const hero = { ...all().find((h) => h.id === id)!, status: 'RETIRED' as const, retiredAt: '2026-10-21T12:00:00.000Z' };
+      all.set(all().map((h) => (h.id === id ? hero : h)));
+      return hero;
     },
   };
   return fake;
@@ -46,13 +56,14 @@ function fakeGame(heroes: HeroView[]) {
 function fakeScene() {
   const scene = {
     callbacks: null as SceneCallbacks | null,
-    shown: [] as { heroes: readonly SceneHero[]; arriving: string | undefined }[],
+    shown: [] as { heroes: readonly SceneHero[]; arriving: string | undefined; leaving?: string | undefined }[],
     levels: null as Readonly<Record<string, number>> | null,
     factory: async (_host: HTMLElement, _layout: unknown, levels: Readonly<Record<string, number>>, callbacks: SceneCallbacks) => {
       scene.levels = levels;
       scene.callbacks = callbacks;
       return {
-        setHeroes: (heroes: readonly SceneHero[], arriving?: string) => scene.shown.push({ heroes, arriving }),
+        setHeroes: (heroes: readonly SceneHero[], arriving?: string, leaving?: string) =>
+          scene.shown.push({ heroes, arriving, leaving }),
         destroy: () => undefined,
       };
     },
@@ -128,6 +139,41 @@ describe('Camp', () => {
     const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
     const { scene } = await render(fakeGame([wren, dead]));
     expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h1']);
+  });
+
+  it('retires a hero from its card behind a confirmation, and walks it back into the hall', async () => {
+    const game = fakeGame([wren]);
+    const { scene, settle, page } = await render(game, '/camp/millbrook/heroes-hall/heroes/h1');
+    const button = (text: string) => [...page.querySelectorAll('aside button')].find((b) => b.textContent?.trim() === text) as HTMLButtonElement | undefined;
+
+    button('Retire')!.click();
+    await settle();
+    expect(page.querySelector('.confirm')?.textContent).toContain('Retiring is permanent.');
+    button('Keep')!.click();
+    await settle();
+    expect(page.querySelector('.confirm')).toBeNull();
+    expect(game.retired).toEqual([]);
+
+    button('Retire')!.click();
+    await settle();
+    button('Retire Wren')!.click();
+    await vi.waitFor(() => expect(game.retired).toEqual(['h1']));
+    await settle();
+    expect(page.querySelector('dl')?.textContent).toContain('retired on Oct 21, 2026');
+    expect(page.querySelectorAll('aside button')).toHaveLength(0);
+    expect(scene.shown.at(-1)).toEqual({ heroes: [], arriving: undefined, leaving: 'h1' });
+  });
+
+  it('shows the retired apart from the active heroes, collapsed', async () => {
+    const retired = { ...wren, id: 'h3', name: 'Ash', status: 'RETIRED' as const, retiredAt: '2026-10-21T12:00:00.000Z' };
+    const { page } = await render(fakeGame([wren, retired]));
+    const [active, apart] = [...page.querySelectorAll('.roster')];
+    expect(active?.textContent).toContain('Wren');
+    expect(active?.textContent).not.toContain('Ash');
+    const details = page.querySelector('details.retired') as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(details.querySelector('summary')?.textContent).toBe('Retired (1)');
+    expect(apart?.querySelector('a')?.getAttribute('href')).toBe('/camp/millbrook/heroes-hall/heroes/h3');
   });
 
   it('lists every facility of the camp in the menu, built or not, each linking to its path', async () => {

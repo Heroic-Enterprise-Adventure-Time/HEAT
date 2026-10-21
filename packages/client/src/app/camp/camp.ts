@@ -87,7 +87,7 @@ export class Camp {
         if (this.rendered) void this.mount();
       });
     });
-    effect(() => this.showHeroes(this.game.heroesHere(), this.state.arriving()));
+    effect(() => this.showHeroes(this.game.heroesHere(), this.state.arriving(), this.state.leaving()));
     inject(DestroyRef).onDestroy(() => {
       this.mounts++;
       this.scene?.destroy();
@@ -114,14 +114,15 @@ export class Camp {
       return;
     }
     this.scene = scene;
-    this.showHeroes(this.game.heroesHere(), this.state.arriving());
+    this.showHeroes(this.game.heroesHere(), this.state.arriving(), this.state.leaving());
   }
 
-  /** The living heroes walk about; the dead are on the roster, not in the camp. */
-  private showHeroes(heroes: readonly HeroView[], arriving: string | undefined): void {
+  /** The living heroes walk about; the dead and the retired are on the roster, not in the camp. */
+  private showHeroes(heroes: readonly HeroView[], arriving: string | undefined, leaving: string | undefined): void {
     this.scene?.setHeroes(
       heroes.filter((h) => h.status === 'ALIVE').map((h) => ({ id: h.id, spriteSet: h.spriteSet })),
       arriving,
+      leaving,
     );
   }
 }

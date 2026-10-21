@@ -162,6 +162,24 @@ if (millbrook.livingHeroes === 0) {
 const second = await graphql(token, recruitMutation, { id: crypto.randomUUID() });
 check(second.errors?.[0]?.extensions?.code === "NOT_FREE", `a second free villager is refused while a hero lives (${second.ms} ms)`);
 
+// Retirement (Issue-98), on a sandbox stack only: retire the living villager,
+// which frees the next one, and recruit it. Dev's test user keeps its one
+// villager, so its records do not gain a retired hero on every merge.
+if (stack.startsWith("heat-sb")) {
+  const living = await graphql(token, campQuery);
+  const villager = living.data?.me?.heroes?.find((h) => h.status === "ALIVE");
+  check(villager, `the camp has a living hero to retire (${living.ms} ms)`);
+  const retireMutation = `mutation($id: String!) { retireHero(heroId: $id) { id status retiredAt } }`;
+  const retired = await graphql(token, retireMutation, { id: villager.id });
+  check(!retired.errors && retired.data?.retireHero?.status === "RETIRED", `retireHero retired ${villager.id} (${retired.ms} ms)`);
+  const again = await graphql(token, retireMutation, { id: villager.id });
+  check(again.data?.retireHero?.retiredAt === retired.data.retireHero.retiredAt, `a repeat of the retire answers the hero as it is (${again.ms} ms)`);
+  const counts = (await graphql(token, campQuery)).data?.me?.camps?.find((c) => c.location === "millbrook");
+  check(counts?.livingHeroes === 0, `the camp counts no living hero after the retire: ${JSON.stringify(counts)}`);
+  const next = await graphql(token, recruitMutation, { id: crypto.randomUUID() });
+  check(!next.errors && next.data?.recruitHero?.status === "ALIVE", `the free villager is offered again and recruited: ${next.data?.recruitHero?.name} (${next.ms} ms)`);
+}
+
 // A permanent environment's test user keeps its records between runs, so an
 // adventure left open by a run that failed between its start and its settle
 // would refuse every later start. Settle whatever is open first; a sandbox

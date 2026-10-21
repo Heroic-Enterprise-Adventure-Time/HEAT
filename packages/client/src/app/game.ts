@@ -13,6 +13,7 @@ export interface HeroView {
   readonly level: number;
   readonly xp: number;
   readonly status: 'ALIVE' | 'DEAD' | 'RETIRED';
+  readonly retiredAt: string | null;
 }
 
 export interface CampView {
@@ -31,14 +32,14 @@ export interface PlayerView {
   readonly openAdventure: { readonly id: string; readonly startedAt: string } | null;
 }
 
-const HERO_FIELDS = 'id name unitType spriteSet location recruitedAt level xp status';
+const HERO_FIELDS = 'id name unitType spriteSet location recruitedAt level xp status retiredAt';
 const ME = `{ me { id camps { location name hallLevel heroCapacity activeHeroes livingHeroes } heroes { ${HERO_FIELDS} } openAdventure { id startedAt } } }`;
 
 /**
  * The signed-in player's game: their camps, their heroes and the open
- * adventure, loaded from the hub after every sign-in, and the one thing they
- * can do yet, recruit the free villager. Joining comes first, because the
- * profile is made on first sign-in (joinGame, Issue-81).
+ * adventure, loaded from the hub after every sign-in, and the two things they
+ * can do yet, recruit the free villager and retire a hero. Joining comes
+ * first, because the profile is made on first sign-in (joinGame, Issue-81).
  */
 @Injectable({ providedIn: 'root' })
 export class Game {
@@ -55,6 +56,10 @@ export class Game {
   /** The heroes the camp shows: the living and the dead, not the retired. */
   readonly heroesHere = computed(() =>
     (this.player()?.heroes ?? []).filter((h) => h.location === this.location() && h.status !== 'RETIRED'),
+  );
+  /** The camp's retired heroes, who stay on the record (game.md, "The heroes hall"). */
+  readonly retiredHere = computed(() =>
+    (this.player()?.heroes ?? []).filter((h) => h.location === this.location() && h.status === 'RETIRED'),
   );
   /** Whether the hall offers the free villager now, and if not, why not. */
   readonly freeVillager = computed((): { offered: boolean; reason: string | null } => {
@@ -93,6 +98,20 @@ export class Game {
         { id: crypto.randomUUID() },
       );
       hero = data.recruitHero;
+      await this.load();
+    });
+    return hero;
+  }
+
+  /** Retires a hero, alive or dead: permanent. Answers the hero as retired, or null if it failed. */
+  async retire(heroId: string): Promise<HeroView | null> {
+    let hero: HeroView | null = null;
+    await this.run(async () => {
+      const data = await this.api.request<{ retireHero: HeroView }>(
+        `mutation($id: String!) { retireHero(heroId: $id) { ${HERO_FIELDS} } }`,
+        { id: heroId },
+      );
+      hero = data.retireHero;
       await this.load();
     });
     return hero;

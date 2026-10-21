@@ -2,11 +2,12 @@ import { randomUUID } from "node:crypto";
 import { STARTING_LOCATION, hallCapacity, location, rewardsForSeed, warehouseCapacity } from "@heat/engine";
 import { builder } from "./builder.js";
 import { recruitHero } from "../recruit.js";
+import { retireHero } from "../retire.js";
 import type { Camp, Hero, Holding, OpenAdventure, Player } from "../db/repository.js";
 
 /**
  * The graph: a public player; their camps, heroes and the open adventure
- * behind the `self` scope; joining, recruiting, and the spike's two
+ * behind the `self` scope; joining, recruiting, retiring, and the spike's two
  * adventure mutations. Settle is exposed as a mutation here only so the
  * spike can exercise it; in the design it is triggered by the verifier's
  * result, not by a client.
@@ -54,6 +55,7 @@ const HeroRef = builder.objectRef<Hero>("Hero").implement({
     level: t.exposeInt("level"),
     xp: t.exposeInt("xp"),
     status: t.field({ type: HeroStatusRef, resolve: (hero) => hero.status }),
+    retiredAt: t.exposeString("retiredAt", { nullable: true }),
   }),
 });
 
@@ -125,6 +127,13 @@ builder.mutationFields((t) => ({
       requestId: t.arg.string({ required: true }),
     },
     resolve: (_root, args, ctx) => recruitHero(ctx.repo, ctx.playerId!, args.unitType, args.requestId),
+  }),
+  retireHero: t.field({
+    type: HeroRef,
+    authScopes: { authenticated: true },
+    description: "Retires one of the player's heroes, alive or dead: permanent, and the hero stays on the record. It frees a slot in the heroes hall. A hero already retired is answered as it is.",
+    args: { heroId: t.arg.string({ required: true }) },
+    resolve: (_root, args, ctx) => retireHero(ctx.repo, ctx.playerId!, args.heroId),
   }),
   startAdventure: t.field({
     type: AdventureRef,
