@@ -26,7 +26,7 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 ### Review and merging
 
 11. The project owner reviews every pull request and is the only one who merges. An agent never merges.
-12. Merge with a merge commit. Do not squash and do not rebase.
+12. Merge with a merge commit. Do not squash and do not rebase. A branch is brought up to date with `main` the same way, by merging `main` into it, never by rebasing.
 13. Changes requested in review are added as new commits on the same branch.
 14. The branch is deleted after the merge.
 15. The cycle stays tight: small pull requests, reviewed and merged promptly, so that the next piece of work starts from a current `main`.
