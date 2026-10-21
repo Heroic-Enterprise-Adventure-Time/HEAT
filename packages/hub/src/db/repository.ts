@@ -8,6 +8,7 @@ import {
   type DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
 import { STARTING_LOCATION, type UnitType } from "@heat/engine";
+import { sightingOf, type Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
@@ -22,7 +23,8 @@ import { locationKeys, playerKeys } from "./keys.js";
  *
  * Start and settle write to both tables in one transaction: the player's
  * open item and ledger in the player table, the adventure record in the
- * location table. TransactWriteItems spans tables in one account and
+ * location table. Recruit and retire do too, for the hero's sighting at its
+ * location (decision 0029). TransactWriteItems spans tables in one account and
  * region, so the split of decision 0023 costs the transactions nothing.
  */
 
@@ -98,6 +100,19 @@ export interface AdventureRecord {
 
 type TransactItems = NonNullable<ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]>;
 type Item = Record<string, unknown>;
+
+function toSighting(i: Item): Sighting {
+  return {
+    heroId: i["heroId"] as string,
+    location: i["location"] as string,
+    name: i["name"] as string,
+    unitType: i["unitType"] as UnitType,
+    spriteSet: i["spriteSet"] as string,
+    level: (i["level"] as number | undefined) ?? 1,
+    seenAt: i["seenAt"] as string,
+    expiresAt: i["expiresAt"] as number,
+  };
+}
 
 function emptyCamp(location: string): Camp {
   return { location, hallLevel: 1, warehouseLevel: 1, activeHeroes: 0, livingHeroes: 0, holdings: [], stored: false };
@@ -351,7 +366,8 @@ export class Repository {
    * upgrade between the read and the write fails the condition instead of
    * passing the cap. A camp with no item is created at level 1. No debit and
    * no ledger entry: the villager is free when no active hero is alive
-   * (decision 0026). Throws HeroExists when the id is taken, which is a
+   * (decision 0026). The hero is seen at its location as it is recruited
+   * (decision 0029). Throws HeroExists when the id is taken, which is a
    * repeated request, and RecruitRefused when the camp's condition fails.
    */
   async recruitFree(playerId: string, camp: Camp, capacity: number, hero: Hero): Promise<Hero> {
@@ -378,6 +394,12 @@ export class Repository {
           ExpressionAttributeValues: values,
         },
       },
+      {
+        Put: {
+          TableName: this.tables.location,
+          Item: { ...locationKeys.seen(hero.location, hero.id), ...sightingOf(hero, new Date(hero.recruitedAt)) },
+        },
+      },
     ], [HeroExists, RecruitRefused]);
     return hero;
   }
@@ -388,7 +410,9 @@ export class Repository {
    * and out of the living ones if it was alive. A concurrent retire, death
    * or move between the read and the write fails the hero's condition, so
    * the counts change once. The camp's condition keeps a count from going
-   * below zero. Throws HeroChanged when either condition fails.
+   * below zero. The hero's sighting is deleted, so it leaves other players'
+   * camps at once (decision 0029). Throws HeroChanged when either condition
+   * fails.
    */
   async retire(playerId: string, hero: Hero, now = new Date()): Promise<Hero> {
     const retired: Hero = { ...hero, status: "RETIRED", retiredAt: now.toISOString() };
@@ -413,8 +437,37 @@ export class Repository {
           ExpressionAttributeValues: { ":less": -1, ":zero": 0 },
         },
       },
+      { Delete: { TableName: this.tables.location, Key: locationKeys.seen(hero.location, hero.id) } },
     ], [HeroChanged, HeroChanged]);
     return retired;
+  }
+
+  /**
+   * One window of a location's sightings, in key order: from a point to the
+   * end of the collection, or from its start to just before a point. Reads
+   * at most `limit` items and says how many it read; the filter on expiry
+   * runs after the limit, so an expired item counts towards it, which is
+   * what keeps a sample's read bounded (decision 0029).
+   */
+  async sightings(
+    location: string,
+    window: { from: string } | { before: string },
+    limit: number,
+    now = new Date(),
+  ): Promise<{ sightings: Sighting[]; read: number }> {
+    const range = "from" in window
+      ? { ":lo": `SEEN#${window.from}`, ":hi": "SEEN$" }
+      : { ":lo": "SEEN#", ":hi": `SEEN#${window.before}` };
+    const r = await this.db.send(
+      new QueryCommand({
+        TableName: this.tables.location,
+        KeyConditionExpression: "PK = :pk AND SK BETWEEN :lo AND :hi",
+        FilterExpression: "expiresAt > :now",
+        ExpressionAttributeValues: { ":pk": `LOCATION#${location}`, ...range, ":now": Math.floor(now.getTime() / 1000) },
+        Limit: limit,
+      }),
+    );
+    return { sightings: (r.Items ?? []).map(toSighting), read: r.ScannedCount ?? 0 };
   }
 
   private async query(playerId: string, prefix: string): Promise<Item[]> {

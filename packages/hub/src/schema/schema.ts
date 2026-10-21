@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { STARTING_LOCATION, hallCapacity, location, rewardsForSeed, warehouseCapacity } from "@heat/engine";
+import { GraphQLError } from "graphql";
 import { builder } from "./builder.js";
 import { recruitHero } from "../recruit.js";
 import { retireHero } from "../retire.js";
+import { heroesSeenAt, type Sighting } from "../seen.js";
 import type { Camp, Hero, Holding, OpenAdventure, Player } from "../db/repository.js";
 
 /**
  * The graph: a public player; their camps, heroes and the open adventure
- * behind the `self` scope; joining, recruiting, retiring, and the spike's two
+ * behind the `self` scope; other players' heroes seen at a location, by
+ * their public fields only; joining, recruiting, retiring, and the spike's two
  * adventure mutations. Settle is exposed as a mutation here only so the
  * spike can exercise it; in the design it is triggered by the verifier's
  * result, not by a client.
@@ -56,6 +59,17 @@ const HeroRef = builder.objectRef<Hero>("Hero").implement({
     xp: t.exposeInt("xp"),
     status: t.field({ type: HeroStatusRef, resolve: (hero) => hero.status }),
     retiredAt: t.exposeString("retiredAt", { nullable: true }),
+  }),
+});
+
+const SeenHeroRef = builder.objectRef<Sighting>("SeenHero").implement({
+  description: "Another player's hero seen at a location: its public fields only, and nothing that says whose it is (decision 0029).",
+  fields: (t) => ({
+    id: t.exposeString("heroId"),
+    name: t.exposeString("name"),
+    unitType: t.exposeString("unitType"),
+    spriteSet: t.exposeString("spriteSet", { description: "The set's directory under art/heroes/." }),
+    level: t.exposeInt("level"),
   }),
 });
 
@@ -108,6 +122,16 @@ builder.queryFields((t) => ({
     authScopes: { authenticated: true },
     description: "The signed-in player, or null before joinGame has made their profile.",
     resolve: async (_root, _args, ctx) => (ctx.playerId ? ctx.repo.getPlayer(ctx.playerId) : undefined),
+  }),
+  heroesSeenAt: t.field({
+    type: [SeenHeroRef],
+    authScopes: { authenticated: true },
+    description: "A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.",
+    args: { location: t.arg.string({ required: true }) },
+    resolve: (_root, args, ctx) => {
+      if (!location(args.location)) throw new GraphQLError(`no location ${args.location}`, { extensions: { code: "BAD_USER_INPUT" } });
+      return heroesSeenAt(ctx.repo, ctx.playerId!, args.location);
+    },
   }),
 }));
 

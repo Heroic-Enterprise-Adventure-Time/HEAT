@@ -31,7 +31,8 @@ resource "aws_dynamodb_table" "player" {
 }
 
 # Partitioned by location, and by adventure for the record settle looks up
-# by id. Public: what every player may see.
+# by id. Public: what every player may see. Its TTL attribute, expiresAt in
+# epoch seconds, is set on the heroes seen at a location (decision 0029).
 resource "aws_dynamodb_table" "location" {
   name         = "${var.name_prefix}-location"
   billing_mode = "PAY_PER_REQUEST"
@@ -46,6 +47,11 @@ resource "aws_dynamodb_table" "location" {
   attribute {
     name = "SK"
     type = "S"
+  }
+
+  ttl {
+    attribute_name = "expiresAt"
+    enabled        = true
   }
 
   point_in_time_recovery {

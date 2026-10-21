@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from '../app.routes';
-import { Game, type HeroView } from '../game';
+import { Game, type HeroView, type SeenHeroView } from '../game';
 import { Session } from '../session';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
 import { CAMP_SCENE_FACTORY } from './camp';
@@ -21,12 +21,16 @@ const wren: HeroView = {
   retiredAt: null,
 };
 
+/** Another player's villager, seen at Millbrook. */
+const moss: SeenHeroView = { id: 's1', name: 'Moss', unitType: 'villager', spriteSet: 'villager-07', level: 2 };
+
 /** A game with settable heroes and a recorded recruit and retire, in place of the real one. */
-function fakeGame(heroes: HeroView[]) {
+function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
   const all = signal(heroes);
   const here = computed(() => all().filter((h) => h.status !== 'RETIRED'));
   const fake = {
     heroesHere: here,
+    seenHere: signal<readonly SeenHeroView[]>(seen),
     retiredHere: computed(() => all().filter((h) => h.status === 'RETIRED')),
     camp: signal({ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: heroes.length, livingHeroes: heroes.length }),
     freeVillager: computed(() =>
@@ -139,6 +143,27 @@ describe('Camp', () => {
     const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
     const { scene } = await render(fakeGame([wren, dead]));
     expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h1']);
+  });
+
+  it("walks other players' heroes seen here beside the player's own", async () => {
+    const { scene } = await render(fakeGame([wren], [moss]));
+    expect(scene.shown.at(-1)?.heroes).toEqual([
+      { id: 'h1', spriteSet: 'villager-01' },
+      { id: 's1', spriteSet: 'villager-07' },
+    ]);
+  });
+
+  it("opens another player's hero on a read-only card that never says whose it is", async () => {
+    const { router, scene, settle, page } = await render(fakeGame([wren], [moss]));
+    scene.callbacks!.onHero('s1');
+    await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook/seen/s1'));
+    await settle();
+    const card = page.querySelector('aside')!;
+    expect(card.querySelector('h2')?.textContent).toBe('Moss');
+    expect(card.querySelector('dl')?.textContent).toContain('villager');
+    expect(card.querySelector('dl')?.textContent).toContain('2');
+    expect(card.textContent).not.toContain('@');
+    expect(card.querySelector('button')).toBeNull();
   });
 
   it('retires a hero from its card behind a confirmation, and walks it back into the hall', async () => {
