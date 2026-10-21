@@ -123,6 +123,13 @@
         {
           "directions": ["east"],
           "generations": 3
+        },
+        {
+          "directions": ["east"],
+          "via": "website",
+          "date": "2026-10-21",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, because frame 2 of the first fall had a grey wisp detached beside the body. The website shows no receipt: the owner's website re-rolls of 2026-10-21, this one, Villager 10's down and Villager 11's and 12's act, cost 11 generations together, read from the balance (1,602.7 before, 1,591.7 after)."
         }
       ],
       "generations": 3

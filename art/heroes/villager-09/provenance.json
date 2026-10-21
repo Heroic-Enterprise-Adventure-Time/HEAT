@@ -129,5 +129,13 @@
     }
   },
   "animationGenerations": 20,
+  "waivedChecks": [
+    {
+      "failure": "hit east: height drifts 3 px",
+      "check": "hit east: height drifts",
+      "date": "2026-10-21",
+      "note": "Waived by the owner after review: a 3 px drift in the hit, as on Fighter 02 and Villager 01."
+    }
+  ],
   "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-21)."
 }

@@ -89,6 +89,13 @@
         {
           "directions": ["east"],
           "generations": 2
+        },
+        {
+          "directions": ["east"],
+          "via": "website",
+          "date": "2026-10-21",
+          "generations": null,
+          "note": "Re-rolled by the owner with the website's button, because frame 2 of the first act had a grey puff detached in front of the fist. The website shows no receipt: the owner's website re-rolls of 2026-10-21, this one, Villager 10's down and Villager 11's and 12's act, cost 11 generations together, read from the balance (1,602.7 before, 1,591.7 after)."
         }
       ],
       "generations": 2
@@ -129,5 +136,13 @@
     }
   },
   "animationGenerations": 20,
+  "waivedChecks": [
+    {
+      "failure": "hit east: height drifts 3 px",
+      "check": "hit east: height drifts",
+      "date": "2026-10-21",
+      "note": "Waived by the owner after review: a 3 px drift in the hit, as on Fighter 02 and Villager 01."
+    }
+  ],
   "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-21)."
 }
