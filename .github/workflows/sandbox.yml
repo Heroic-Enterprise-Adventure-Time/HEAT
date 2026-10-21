@@ -19,7 +19,8 @@
 #             they also run in Build and test while a pull request is open.
 #   pull_request (opened, reopened)   the URL comment alone, so the pull
 #             request carries it from its first minute; the hostname is
-#             known from the issue number, with no apply.
+#             known from the issue number, with no apply. Not on a release
+#             pull request, whose head is main and has no stack.
 #   delete    destroy the branch's stack from its state key, with main's
 #             copy of the root. The root evaluates the bundle's hash even to
 #             destroy, so the job bundles first. The distribution's destroy
@@ -290,7 +291,10 @@ jobs:
   # -------------------------------------------------------- pull request --
   comment-url:
     name: Comment the stack's URL on the pull request
-    if: github.event_name == 'pull_request'
+    # A release pull request has main as its head: no issue number, so no
+    # stack and no URL (decision 0021). A hotfix/<issue>-* head has a stack
+    # and keeps its comment.
+    if: github.event_name == 'pull_request' && github.head_ref != 'main'
     runs-on: ubuntu-latest
     permissions:
       contents: read

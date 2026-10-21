@@ -20,7 +20,7 @@ Run on 2026-10-18 (Issue-64), after Issue-41 built the path.
 - The guard failed on its first run: the job checked out `release` to run `scripts/check-release-source.sh`, and `release`, cut before Issue-41's merge, did not have the script. PR-68 made the guard run `main`'s copy, which is the ref a `pull_request_target` run carries and the one the workflow file itself comes from. The second run passed, and the plan was 45 to add, 0 to change, 0 to destroy.
 - The merge at 636218e ran 22 minutes 35 seconds, 12:42 to 13:04 UTC, most of it the apply's wait at the certificate validation while the `heat.dcg-games.com` delegation was written in `dcg-platform` (its PR-41) and applied by the owner. The smoke test passed, and the tag `v2026.10.18` and its Release were written by the workflow's token.
 - Two facts decision 0021 had left open were found: the token creates the tag with no tag ruleset in force, and the `prod` environment's policy admits the `pull_request_target` run on `main`'s ref.
-- The "Sandbox stacks" workflow's URL comment job fails on a release pull request, whose head carries no issue number; it is not a required check (Issue-66).
+- The "Sandbox stacks" workflow's URL comment job fails on a release pull request, whose head carries no issue number; it is not a required check. Since Issue-66 the job is skipped when the head is `main`.
 
 ## Why
 
