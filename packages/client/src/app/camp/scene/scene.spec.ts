@@ -1,5 +1,5 @@
 import { layGround, type Terrain, type TilesetJson } from './ground';
-import { MAP_HEIGHT, MAP_WIDTH, MILLBROOK, cornersAround } from './layout';
+import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK, cornersAround } from './layout';
 import { WALK_SPEED, facingFor, newWalker, randomSpot, step } from './wander';
 
 /** A tileset with one tile for each of the sixteen corner combinations, as PixelLab's tileset15 has. */
@@ -66,6 +66,15 @@ describe('the Millbrook layout', () => {
       expect(f.at.x).toBeGreaterThan(0);
       expect(f.at.x).toBeLessThan(MAP_WIDTH);
       expect(f.at.y).toBeLessThan(MAP_HEIGHT);
+    }
+  });
+
+  it('stands every facility inside the core width, which a narrow box never crops', () => {
+    // Half the widest facility canvas, 64 px, on either side of its spot.
+    const margin = (MAP_WIDTH - MAP_CORE_WIDTH) / 2;
+    for (const f of MILLBROOK.facilities) {
+      expect(f.at.x - 32).toBeGreaterThanOrEqual(margin);
+      expect(f.at.x + 32).toBeLessThanOrEqual(MAP_WIDTH - margin);
     }
   });
 

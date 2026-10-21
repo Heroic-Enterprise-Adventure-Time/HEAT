@@ -15,6 +15,13 @@ import type { Terrain } from './ground';
 
 export const MAP_WIDTH = 400;
 export const MAP_HEIGHT = 225;
+/**
+ * The middle of the map's width that every facility stands inside, 24 px in
+ * from each side. The scene's scale only needs this much of the width to fit,
+ * so a box a little narrower than the map at the next scale up crops the
+ * edges, which hold only ground, rather than drop a whole scale step.
+ */
+export const MAP_CORE_WIDTH = 352;
 export const TILE = 16;
 
 export interface Point {
@@ -64,7 +71,7 @@ export const MILLBROOK: CampLayout = {
     { kind: 'job-board', at: { x: 110, y: 126 } },
     { kind: 'warehouse', at: { x: 300, y: 124 } },
     { kind: 'lumber-camp', at: { x: 56, y: 92 } },
-    { kind: 'mine', at: { x: 348, y: 88 } },
+    { kind: 'mine', at: { x: 344, y: 88 } },
     { kind: 'caravan-hub', at: { x: 92, y: 214 } },
   ],
   walkable: [

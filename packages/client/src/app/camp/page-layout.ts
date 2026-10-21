@@ -1,4 +1,4 @@
-import { MAP_HEIGHT, MAP_WIDTH } from './scene/layout';
+import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH } from './scene/layout';
 
 /**
  * The arithmetic of the page around the scene (Issue-89): whether the
@@ -22,9 +22,9 @@ export const SIDE_BY_SIDE_MIN_SCALE = 2;
 /** The scene scale from which the labelled menu draws its icons at 2×. */
 export const BIG_ICONS_MIN_SCALE = 3;
 
-/** The largest whole number at which the whole map fits the space, never below 1. */
+/** The largest whole number at which the map's height and its core width fit the space, never below 1. */
 export function sceneScale(width: number, height: number): number {
-  return Math.max(1, Math.floor(Math.min(width / MAP_WIDTH, height / MAP_HEIGHT)));
+  return Math.max(1, Math.floor(Math.min(width / MAP_CORE_WIDTH, height / MAP_HEIGHT)));
 }
 
 /** The panel beside the scene: 26% of the window, held between 17rem and 28rem. Matches the CSS's `clamp(17rem, 26vw, 28rem)`. */
@@ -64,7 +64,7 @@ export function iconScale(width: number, height: number): number {
  */
 export function stackedStageHeight(width: number, height: number): number {
   const byHeight = Math.floor((height - HEADER_PX - MENU_ROW_PX) / MAP_HEIGHT);
-  return MAP_HEIGHT * Math.max(1, Math.min(Math.floor(width / MAP_WIDTH), byHeight));
+  return MAP_HEIGHT * Math.max(1, Math.min(Math.floor(width / MAP_CORE_WIDTH), byHeight));
 }
 
 export interface SceneView {
@@ -78,10 +78,11 @@ export interface SceneView {
 }
 
 /**
- * What the scene shows in a box of the given CSS size: the whole map at the
+ * What the scene shows in a box of the given CSS size: the map at the
  * whole-number scale, centred, and enough ground around it to cover the box,
- * so there are no bars and no fractional scaling. A box narrower than the map
- * at scale 1, a phone's, crops the map's edges evenly.
+ * so there are no bars and no fractional scaling. A box narrower than the
+ * whole map at that scale, a phone's or a tablet's, crops the map's edges
+ * evenly, never into its core.
  */
 export function sceneView(boxWidth: number, boxHeight: number): SceneView {
   const scale = sceneScale(boxWidth, boxHeight);

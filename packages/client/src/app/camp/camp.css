@@ -86,6 +86,29 @@
   color: var(--ink);
 }
 
+/*
+ * A phone's menu row has no room for six labels: icons only, the label kept
+ * for screen readers, and shown on the entry whose panel is open, which takes
+ * the room of two.
+ */
+@media (max-width: 37.5rem) {
+  .camp:not(.side) .entry {
+    position: relative;
+  }
+
+  .camp:not(.side) .entry.active {
+    flex: 2;
+  }
+
+  .camp:not(.side) .entry:not(.active) .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+}
+
 /* Side by side, where that leaves the scene scale 2 (page-layout.ts, isSideBySide): the menu, the scene and the panel in columns. */
 .camp.side {
   display: grid;
