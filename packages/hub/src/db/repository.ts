@@ -14,8 +14,9 @@ import { locationKeys, playerKeys } from "./keys.js";
 /**
  * The transactions the architecture names, as DynamoDB transactions: start
  * (the one-open-adventure rule), debit (the ledger's non-negative balance),
- * settle (rewards once, keyed on the adventure id) and recruit (the hall's
- * cap and the free-villager rule, on the camp's counts). Each is one
+ * settle (rewards once, keyed on the adventure id), recruit (the hall's
+ * cap and the free-villager rule, on the camp's counts) and retire (the
+ * hero's status and the camp's counts together). Each is one
  * TransactWriteItems call with condition checks; a failed condition cancels
  * the whole write and the cancellation reasons say which item failed.
  *
@@ -32,6 +33,7 @@ export class AlreadySettled extends Error {}
 export class TransactionConflict extends Error {}
 export class HeroExists extends Error {}
 export class RecruitRefused extends Error {}
+export class HeroChanged extends Error {}
 
 export interface Player {
   id: string;
@@ -78,6 +80,7 @@ export interface Hero {
   xp: number;
   picks: string[];
   status: HeroStatus;
+  retiredAt: string | null;
 }
 
 export interface OpenAdventure {
@@ -112,6 +115,7 @@ function toHero(i: Item): Hero {
     xp: (i["xp"] as number | undefined) ?? 0,
     picks: (i["picks"] as string[] | undefined) ?? [],
     status: (i["status"] as HeroStatus | undefined) ?? "ALIVE",
+    retiredAt: (i["retiredAt"] as string | undefined) ?? null,
   };
 }
 
@@ -376,6 +380,41 @@ export class Repository {
       },
     ], [HeroExists, RecruitRefused]);
     return hero;
+  }
+
+  /**
+   * Retire: set the hero's status to retired only if it is still the status
+   * the caller read, and count it out of the camp: out of the active heroes,
+   * and out of the living ones if it was alive. A concurrent retire, death
+   * or move between the read and the write fails the hero's condition, so
+   * the counts change once. The camp's condition keeps a count from going
+   * below zero. Throws HeroChanged when either condition fails.
+   */
+  async retire(playerId: string, hero: Hero, now = new Date()): Promise<Hero> {
+    const retired: Hero = { ...hero, status: "RETIRED", retiredAt: now.toISOString() };
+    const alive = hero.status === "ALIVE";
+    await this.transact([
+      {
+        Update: {
+          TableName: this.tables.player,
+          Key: playerKeys.hero(playerId, hero.id),
+          UpdateExpression: "SET #s = :retired, retiredAt = :at",
+          ConditionExpression: "#s = :was AND #location = :location",
+          ExpressionAttributeNames: { "#s": "status", "#location": "location" },
+          ExpressionAttributeValues: { ":retired": "RETIRED", ":at": retired.retiredAt, ":was": hero.status, ":location": hero.location },
+        },
+      },
+      {
+        Update: {
+          TableName: this.tables.player,
+          Key: playerKeys.camp(playerId, hero.location),
+          UpdateExpression: alive ? "ADD activeHeroes :less, livingHeroes :less" : "ADD activeHeroes :less",
+          ConditionExpression: alive ? "activeHeroes > :zero AND livingHeroes > :zero" : "activeHeroes > :zero",
+          ExpressionAttributeValues: { ":less": -1, ":zero": 0 },
+        },
+      },
+    ], [HeroChanged, HeroChanged]);
+    return retired;
   }
 
   private async query(playerId: string, prefix: string): Promise<Item[]> {

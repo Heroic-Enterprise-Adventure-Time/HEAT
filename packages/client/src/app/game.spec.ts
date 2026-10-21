@@ -14,6 +14,7 @@ const villager: HeroView = {
   level: 1,
   xp: 0,
   status: 'ALIVE',
+  retiredAt: null,
 };
 
 function playerWith(heroes: HeroView[], activeHeroes = heroes.length, livingHeroes = heroes.length): PlayerView {
@@ -39,6 +40,11 @@ function fakeApi(start: PlayerView) {
         const hero = { ...villager, id: variables['id'] as string };
         player = playerWith([...player.heroes, hero]);
         return { recruitHero: hero };
+      }
+      if (query.includes('retireHero')) {
+        const hero = { ...player.heroes.find((h) => h.id === variables['id'])!, status: 'RETIRED' as const, retiredAt: '2026-10-21T12:00:00.000Z' };
+        player = playerWith(player.heroes.map((h) => (h.id === hero.id ? hero : h)), 0, 0);
+        return { retireHero: hero };
       }
       return { me: player };
     },
@@ -92,6 +98,18 @@ describe('Game', () => {
     TestBed.tick();
     await vi.waitFor(() => expect(game.player()).not.toBeNull());
     expect(game.freeVillager()).toEqual({ offered: false, reason: 'The hall is full.' });
+  });
+
+  it('retires a hero, which moves it to the retired and offers the free villager again', async () => {
+    const { api, game } = setup(playerWith([villager]));
+    TestBed.tick();
+    await vi.waitFor(() => expect(game.player()).not.toBeNull());
+    const hero = await game.retire(villager.id);
+    expect(api.calls.find((c) => c.query.includes('retireHero'))?.variables).toEqual({ id: villager.id });
+    expect(hero?.status).toBe('RETIRED');
+    expect(game.heroesHere()).toEqual([]);
+    expect(game.retiredHere().map((h) => h.id)).toEqual([villager.id]);
+    expect(game.freeVillager()).toEqual({ offered: true, reason: null });
   });
 
   it('records the hub refusal instead of throwing', async () => {

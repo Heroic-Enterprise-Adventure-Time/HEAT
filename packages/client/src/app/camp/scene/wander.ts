@@ -16,6 +16,8 @@ export interface Walker {
   facing: Facing;
   /** Milliseconds left standing still before the next walk. */
   restMs: number;
+  /** Walking to a door to leave the camp: at the door it stops for good. */
+  leaving: boolean;
 }
 
 /** Pixels a second: a stroll. */
@@ -49,11 +51,31 @@ export function facingFor(dx: number, dy: number): Facing {
 }
 
 export function newWalker(at: Point, random: Random, target: Point | null = null): Walker {
-  return { x: at.x, y: at.y, target, facing: 'south', restMs: target ? 0 : REST_MIN_MS + random() * (REST_MAX_MS - REST_MIN_MS) };
+  return {
+    x: at.x,
+    y: at.y,
+    target,
+    facing: 'south',
+    restMs: target ? 0 : REST_MIN_MS + random() * (REST_MAX_MS - REST_MIN_MS),
+    leaving: false,
+  };
+}
+
+/** Sends a walker to a door, from wherever it is: a retired hero going back into the hall. */
+export function leave(walker: Walker, door: Point): void {
+  walker.target = { ...door };
+  walker.restMs = 0;
+  walker.leaving = true;
+}
+
+/** Whether a leaving walker has reached its door and is gone. */
+export function gone(walker: Walker): boolean {
+  return walker.leaving && walker.target === null;
 }
 
 /** Advances a walker by dtMs. Answers whether it is walking. */
 export function step(walker: Walker, dtMs: number, areas: readonly Rect[], random: Random): boolean {
+  if (gone(walker)) return false;
   if (!walker.target) {
     walker.restMs -= dtMs;
     if (walker.restMs > 0) return false;

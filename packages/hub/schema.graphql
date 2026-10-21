@@ -35,6 +35,7 @@ type Hero {
   location: String!
   name: String!
   recruitedAt: String!
+  retiredAt: String
 
   """The set's directory under art/heroes/."""
   spriteSet: String!
@@ -64,6 +65,11 @@ type Mutation {
   Recruits a hero of the unit type at the heroes hall of the starting camp. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Only the free villager for now: a camp with no living hero and a free slot.
   """
   recruitHero(requestId: String!, unitType: String!): Hero!
+
+  """
+  Retires one of the player's heroes, alive or dead: permanent, and the hero stays on the record. It frees a slot in the heroes hall. A hero already retired is answered as it is.
+  """
+  retireHero(heroId: String!): Hero!
 
   """
   Spike only: settles the caller's open adventure with the engine's rewards for its seed, credited at the starting camp.

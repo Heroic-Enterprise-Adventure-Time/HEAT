@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
 
-/** The heroes hall's panel, `/camp/<location>/heroes-hall`: the hall's count, the roster and the free villager. */
+/** The heroes hall's panel, `/camp/<location>/heroes-hall`: the hall's count, the roster with the retired apart, and the free villager. */
 @Component({
   selector: 'heat-hall-panel',
   imports: [RouterLink],
@@ -27,6 +27,20 @@ import { CampState } from '../camp-state';
       </ul>
     } @else {
       <p>No heroes yet.</p>
+    }
+
+    @if (game.retiredHere().length > 0) {
+      <details class="retired">
+        <summary>Retired ({{ game.retiredHere().length }})</summary>
+        <ul class="roster">
+          @for (hero of game.retiredHere(); track hero.id) {
+            <li>
+              <a class="link" [routerLink]="['heroes', hero.id]">{{ hero.name }}</a>
+              <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+            </li>
+          }
+        </ul>
+      </details>
     }
 
     @if (game.freeVillager(); as free) {

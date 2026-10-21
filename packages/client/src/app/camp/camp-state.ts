@@ -13,9 +13,10 @@ export interface FacilityEntry {
 
 /**
  * What the camp and its panels share while one camp is on screen: its layout,
- * its facilities with their levels, and the hero just recruited, who walks
- * out of the hall. Provided by the camp component, so it lives as long as
- * the camp does and each panel the router puts in it reads the same one.
+ * its facilities with their levels, the hero just recruited, who walks out
+ * of the hall, and the hero just retired, who walks back in. Provided by the
+ * camp component, so it lives as long as the camp does and each panel the
+ * router puts in it reads the same one.
  */
 @Injectable()
 export class CampState {
@@ -30,6 +31,8 @@ export class CampState {
   });
   /** The hero the hall just recruited, whom the scene walks out of the hall's door. */
   readonly arriving = signal<string | undefined>(undefined);
+  /** The hero just retired, whom the scene walks back into the hall. */
+  readonly leaving = signal<string | undefined>(undefined);
 
   facility(kind: string | null | undefined): FacilityEntry | undefined {
     return this.facilities().find((f) => f.kind === kind);

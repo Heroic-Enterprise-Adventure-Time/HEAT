@@ -127,6 +127,28 @@ describe("the camp through the graph", () => {
     const second = await gql(recruit, { id: randomUUID() }, p);
     expect((second.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("NOT_FREE");
   });
+
+  it("retires the villager, which frees the next villager", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(`mutation { joinGame { id } }`, {}, p);
+    const recruit = `mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id } }`;
+    const retire = `mutation($id: String!) { retireHero(heroId: $id) { id status retiredAt } }`;
+    const id = randomUUID();
+    await gql(recruit, { id }, p);
+
+    const retired = await gql<{ retireHero: { id: string; status: string; retiredAt: string | null } }>(retire, { id }, p);
+    expect(retired.errors).toBeUndefined();
+    expect(retired.data?.retireHero).toMatchObject({ id, status: "RETIRED" });
+    expect(retired.data?.retireHero.retiredAt).toEqual(expect.any(String));
+
+    const counts = await gql<{ me: { camps: unknown[] } }>(`{ me { camps { activeHeroes livingHeroes } } }`, {}, p);
+    expect(counts.data?.me.camps).toEqual([{ activeHeroes: 0, livingHeroes: 0 }]);
+    const next = await gql(recruit, { id: randomUUID() }, p);
+    expect(next.errors).toBeUndefined();
+
+    const missing = await gql(retire, { id: randomUUID() }, `p-${randomUUID()}`);
+    expect((missing.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("NOT_FOUND");
+  });
 });
 
 describe("the adventure loop through the graph", () => {
