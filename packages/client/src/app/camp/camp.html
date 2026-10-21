@@ -2,14 +2,13 @@
   <div #stage class="stage" [style.height.px]="stageHeight()"></div>
 
   <nav class="menu" aria-label="Facilities">
-    @for (facility of facilities(); track facility.kind) {
+    @for (facility of state.facilities(); track facility.kind) {
       <a
         class="entry"
         [class.unbuilt]="facility.level === 0"
-        [routerLink]="[]"
-        [queryParams]="{ open: facility.kind }"
-        [class.active]="open()?.kind === facility.kind"
-        [attr.aria-current]="open()?.kind === facility.kind ? 'page' : null"
+        [routerLink]="['/camp', location(), facility.kind]"
+        routerLinkActive="active"
+        ariaCurrentWhenActive="page"
         [attr.title]="labels() ? null : facility.name"
       >
         <img [src]="'art/icons/' + facility.kind + '.png'" [width]="iconPx()" [height]="iconPx()" alt="" />
@@ -19,70 +18,7 @@
   </nav>
 
   <aside class="panel" aria-labelledby="panel-title">
-    @if (hero(); as hero) {
-      <a class="back" [routerLink]="[]" [queryParams]="{ open: 'heroes-hall' }">← Heroes hall</a>
-      <h2 id="panel-title">{{ hero.name }}</h2>
-      <dl>
-        <dt>Unit type</dt>
-        <dd>{{ hero.unitType }}</dd>
-        <dt>Level</dt>
-        <dd>{{ hero.level }} ({{ hero.xp }} XP)</dd>
-        <dt>Status</dt>
-        <dd>{{ hero.status === 'ALIVE' ? 'alive' : hero.status === 'DEAD' ? 'dead' : 'retired' }}</dd>
-        <dt>Recruited</dt>
-        <dd>{{ hero.recruitedAt | date: 'mediumDate' }}</dd>
-      </dl>
-    } @else if (open(); as facility) {
-      <h2 id="panel-title">{{ facility.name }}</h2>
-      @if (facility.level === 0) {
-        <p class="status">Not built yet.</p>
-        <p>{{ facility.description }}</p>
-        <p class="note">Building opens in a later update.</p>
-      } @else {
-        @switch (facility.kind) {
-          @case ('heroes-hall') {
-            @if (game.camp(); as camp) {
-              <p>Level {{ camp.hallLevel }}: {{ camp.activeHeroes }} of {{ camp.heroCapacity }} heroes.</p>
-            }
-
-            @if (game.heroesHere().length > 0) {
-              <ul class="roster">
-                @for (hero of game.heroesHere(); track hero.id) {
-                  <li>
-                    <a class="link" [routerLink]="[]" [queryParams]="{ hero: hero.id }">{{ hero.name }}</a>
-                    <span>{{ hero.unitType }}, level {{ hero.level }}</span>
-                    @if (hero.status === 'DEAD') {
-                      <span class="dead">dead</span>
-                    }
-                  </li>
-                }
-              </ul>
-            } @else {
-              <p>No heroes yet.</p>
-            }
-
-            @if (game.freeVillager(); as free) {
-              @if (free.offered) {
-                <button type="button" (click)="recruit()" [disabled]="game.busy()">Recruit a villager, free</button>
-              } @else if (free.reason) {
-                <p class="note">{{ free.reason }}</p>
-              }
-            }
-          }
-          @case ('job-board') {
-            <p>{{ facility.description }}</p>
-            <p>No jobs are posted yet.</p>
-          }
-          @case ('warehouse') {
-            <p>{{ facility.description }}</p>
-            <p>The warehouse is empty.</p>
-          }
-          @default {
-            <p>{{ facility.description }}</p>
-          }
-        }
-      }
-    }
+    <router-outlet />
   </aside>
 
   @if (game.error(); as error) {

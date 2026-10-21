@@ -1,16 +1,24 @@
-import { Component, inject } from '@angular/core';
-import { Camp } from '../camp/camp';
+import { Component, effect, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { Config } from '../config';
+import { Game } from '../game';
 import { Session } from '../session';
 
-/** The home page: the camp for a signed-in player; the name of the game and sign-in for anyone else. */
+/** The home page: the name of the game and sign-in; a signed-in player goes on to their camp. */
 @Component({
   selector: 'heat-home',
-  imports: [Camp],
   templateUrl: './home.html',
   styleUrl: './home.css',
 })
 export class Home {
   protected readonly session = inject(Session);
   protected readonly config = inject(Config);
+
+  constructor() {
+    const router = inject(Router);
+    const game = inject(Game);
+    effect(() => {
+      if (this.session.user()) void router.navigate(['/camp', game.location()], { replaceUrl: true });
+    });
+  }
 }
