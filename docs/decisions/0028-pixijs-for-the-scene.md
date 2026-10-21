@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box) and 2026-10-21 by Issue-99 (heroes at half the scene's scale)
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale) and 2026-10-21 by Issue-95 (the scale counts device pixels)
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -31,13 +31,21 @@
 
 **Why.** With the content area beside the scene rather than over it (`docs/design/game.md`, "The page"), a fixed 320×180 left bars around the scene on most screens. The owner asked for the scene to fill its area. Stretching it by a fraction was considered and not chosen: it blurs pixel art or makes its pixels uneven. Filling with more of the world keeps the pixels square and leaves no bars.
 
-**Not solved by this.** On a screen whose device pixel ratio is not a whole number, such as Windows at 125%, the scale counts CSS pixels, so an art pixel is 1.25 device pixels and the pixels come out uneven. That was true before the amendment too.
+**Not solved by this.** On a screen whose device pixel ratio is not a whole number, such as Windows at 125%, the scale counts CSS pixels, so an art pixel is 1.25 device pixels and the pixels come out uneven. That was true before the amendment too. Closed by the Issue-95 amendment below.
 
 ## Amendment: heroes at half the scene's scale (Issue-99, 2026-10-21)
 
 **Heroes in the camp are drawn at half the scene's scale, rounded up:** 1 at scene scale 1 and 2, 2 at 3 and 4, 3 at 5. The scale stays a whole number, so a hero's art pixels stay square; the ground and the facilities keep the scene's scale. The canvas therefore renders at the scene's scale, one canvas pixel per CSS pixel, instead of at the map's pixels enlarged by CSS, and each hero is placed on a whole canvas pixel. A hero still stands by its feet (`docs/process/assets.md`, rule 11), its click area shrinks with it, and it walks 18 of its own art pixels a second, so its stride stays in step with its frames. Battle keeps its own scale, and the sprite files do not change. `heroScale` in `page-layout.ts` holds the rule.
 
 **Why.** At the scene's scale a hero stood half as tall as the hall, and the owner found the heroes too large for the camp. In a mock-up of Millbrook at scene scales 3 and 4, half rounded up read as people in a village; at scene scale 3, heroes at 1, half rounded down, were too small to tell apart or click.
+
+## Amendment: the scale counts device pixels (Issue-95, 2026-10-21)
+
+**The scene's scale is the largest whole number of device pixels per art pixel that fits**, not of CSS pixels, so every art pixel is the same square of device pixels at any device pixel ratio, Windows' 125% and 150% included. The canvas covers its box exactly, with one canvas pixel per device pixel, so the browser draws it without scaling. Where the browser reports the box's exact size in device pixels (`ResizeObserver`'s `device-pixel-content-box`: Chrome and Edge 84, Firefox 93; not Safari, by web.dev and MDN), that size is used; elsewhere the CSS size times the ratio, rounded. A change of ratio, browser zoom or a move to another screen, is followed. The page's regions, side by side or stacked, the menu's labels and its icons, are still decided in CSS pixels; the stacked scene's box takes its height from the scale in device pixels.
+
+**Heroes are half the scene's scale, rounded up, never below one CSS pixel per art pixel and never above the scene.** At ratio 1 that is the rule of Issue-99 unchanged. Without the floor, a phone at ratio 2 with the scene at 2 device pixels would draw its heroes at 1, too small to tap.
+
+**What it changes on screen.** At a whole ratio above 1, the scale moves in steps of one device pixel, not one CSS pixel, so the map may stand a step larger. At a fractional ratio the largest whole step may be smaller than the old uneven one: a 1920×1080 laptop at 125% shows the map at 3 device pixels, 2.4 CSS pixels, where it showed 3 CSS pixels as 3.75 uneven device pixels, with more ground around it.
 
 ## Considered and not chosen
 

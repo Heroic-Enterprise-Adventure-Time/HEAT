@@ -7,8 +7,9 @@ import { WALK_SPEED, gone, leave, newWalker, randomSpot, step, type Facing, type
 
 /**
  * The camp scene, drawn with PixiJS (decision 0028): the camp's whole map,
- * scaled up by the largest whole number that fits its box, so every art pixel
- * is a square of screen pixels, with the ground running on around the map to
+ * scaled up by the largest whole number of device pixels that fits its box,
+ * so every art pixel is a square of device pixels at any display scaling
+ * (Issue-95), with the ground running on around the map to
  * fill the rest of the box (Issue-89). The heroes are drawn at their own,
  * smaller whole-number scale (Issue-99), so the canvas renders at the scene's
  * scale rather than at the map's pixels enlarged by CSS. Ground
@@ -155,23 +156,68 @@ export async function createCampScene(
     }
   };
 
+  // The box in device pixels, which the browser reports exactly where it
+  // can (`device-pixel-content-box`; not Safari, which falls back to the CSS
+  // size times the ratio), and in CSS pixels for the canvas's own size.
+  const measured = () => ({
+    cssWidth: host.clientWidth,
+    cssHeight: host.clientHeight,
+    width: Math.round(host.clientWidth * window.devicePixelRatio),
+    height: Math.round(host.clientHeight * window.devicePixelRatio),
+  });
+  let box = measured();
   let shown = '';
-  let view: SceneView = sceneView(host.clientWidth, host.clientHeight);
+  let view: SceneView = sceneView(box.width, box.height, window.devicePixelRatio);
   const resize = () => {
-    view = sceneView(host.clientWidth, host.clientHeight);
-    const key = `${view.width}x${view.height}@${view.scale}`;
-    app.canvas.style.width = `${view.width * view.scale}px`;
-    app.canvas.style.height = `${view.height * view.scale}px`;
+    const ratio = window.devicePixelRatio;
+    view = sceneView(box.width, box.height, ratio);
+    const key = `${box.width}x${box.height}@${ratio}`;
+    app.canvas.style.width = `${box.cssWidth}px`;
+    app.canvas.style.height = `${box.cssHeight}px`;
     if (key === shown) return;
     shown = key;
-    // One canvas pixel per CSS pixel: the map's art pixels are scale × scale
-    // squares, and a hero's, at its own smaller scale, are still whole squares.
-    app.renderer.resize(view.width, view.height, view.scale);
+    // One canvas pixel per device pixel, the canvas exactly the box, so the
+    // browser draws it unscaled: the map's art pixels are scale × scale
+    // squares of device pixels, and a hero's, at its own smaller scale, are
+    // still whole squares (Issues 95 and 99).
+    app.renderer.resize(box.width / view.scale, box.height / view.scale, view.scale);
     world.position.set(view.mapX, view.mapY);
     layWindow(-view.mapX, -view.mapY, view.width, view.height);
   };
-  const observer = new ResizeObserver(resize);
-  observer.observe(host);
+  const observer = new ResizeObserver(([entry]) => {
+    if (!entry) return;
+    const ratio = window.devicePixelRatio;
+    const css = entry.contentBoxSize[0];
+    const device = entry.devicePixelContentBoxSize?.[0];
+    const cssWidth = css?.inlineSize ?? entry.contentRect.width;
+    const cssHeight = css?.blockSize ?? entry.contentRect.height;
+    box = {
+      cssWidth,
+      cssHeight,
+      width: device?.inlineSize ?? Math.round(cssWidth * ratio),
+      height: device?.blockSize ?? Math.round(cssHeight * ratio),
+    };
+    resize();
+  });
+  try {
+    observer.observe(host, { box: 'device-pixel-content-box' });
+  } catch {
+    observer.observe(host);
+  }
+  // A change of ratio alone, browser zoom or another screen, may leave the
+  // device size as it was; the canvas's CSS size and the heroes' scale follow it.
+  let ratioQuery: MediaQueryList | null = null;
+  const watchRatio = () => {
+    ratioQuery?.removeEventListener('change', onRatio);
+    ratioQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
+    ratioQuery.addEventListener('change', onRatio);
+  };
+  const onRatio = () => {
+    box = measured();
+    resize();
+    watchRatio();
+  };
+  watchRatio();
   resize();
 
   for (const spot of layout.facilities) {
@@ -211,7 +257,7 @@ export async function createCampScene(
         hero.clockMs = 0;
         show(hero.sprite, hero.frames.still[facing], hero.frames.stillFoot, false, size);
       }
-      // On a whole canvas pixel, so every art pixel of the hero covers whole ones.
+      // On a whole canvas pixel, a device pixel, so every art pixel of the hero covers whole ones.
       hero.sprite.position.set(Math.round(hero.walker.x * view.scale) / view.scale, Math.round(hero.walker.y * view.scale) / view.scale);
       hero.sprite.zIndex = hero.walker.y;
     }
@@ -253,6 +299,7 @@ export async function createCampScene(
     destroy() {
       destroyed = true;
       observer.disconnect();
+      ratioQuery?.removeEventListener('change', onRatio);
       app.destroy(true, { children: true });
     },
   };
