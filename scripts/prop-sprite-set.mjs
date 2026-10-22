@@ -15,7 +15,7 @@
 //   { "name": "Tree 01", "props": ["tree"], "createdAt": "...", "description": "...", "canvas": [48, 64],
 //     "parameters": { ... }, "generations": 1,
 //     "animations": { "hit": { "folder": "<export folder>", "groupId": "...", "description": "...",
-//                              "frameCount": 6, "frames": 7, "generations": 1, "heldLast"?: true, "fadeToLast"?: true,
+//                              "frameCount": 6, "frames": 7, "generations": 1, "heldLast"?: true, "fadeAboveEnd"?: true,
 //                              "endFrame"?: { "objectId": "...", "stateName": "...", "editDescription": "...", "generations": 1 },
 //                              "replaced"?: [{ "groupId": "...", "description": "...", "generations": 1, "why": "..." }] } },
 //     "rejected"?: [{ "name": "...", "objectId": "...", "description": "..." }] }
@@ -111,7 +111,7 @@ const animations = Object.fromEntries(
     canvas: record.canvas,
     ...(a.endFrame ? { endFrame: a.endFrame } : {}),
     ...(a.heldLast ? { heldLast: true } : {}),
-    ...(a.fadeToLast ? { fadeToLast: true } : {}),
+    ...(a.fadeAboveEnd ? { fadeAboveEnd: true } : {}),
     files: `${name}-<0..${a.frames - 1}>.png`,
     generations: a.generations,
     ...(a.replaced ? { replaced: a.replaced } : {}),

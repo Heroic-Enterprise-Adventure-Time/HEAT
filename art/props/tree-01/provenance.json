@@ -73,7 +73,7 @@
         "generations": 1
       },
       "heldLast": true,
-      "fadeToLast": true,
+      "fadeAboveEnd": true,
       "files": "down-<0..8>.png",
       "generations": 1,
       "replaced": [
@@ -93,7 +93,7 @@
           "groupId": "37610aac-fb1a-40e9-a584-f79f8da30367",
           "description": "the trunk breaks and the whole leafy crown drops straight down onto the ground, where it breaks apart into loose leaves that scatter, settle and fade away around the cut stump and two logs",
           "generations": 1,
-          "why": "The crown sank onto the stump, then vanished on the last frame. The owner asked for a fade, which PixelLab cannot draw; the kept take holds the crown still and the drawer fades it (fadeToLast)."
+          "why": "The crown sank onto the stump, then vanished on the last frame. The owner asked for a fade, which PixelLab cannot draw; the kept take holds the crown still and the drawer fades it (fadeAboveEnd)."
         }
       ]
     }
