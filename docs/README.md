@@ -9,8 +9,8 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
-| [process/assets.md](process/assets.md) | Generated art and audio: the services, the connectors, the hero sprite set, a camp's ground and facilities, the page's icons, the provenance beside each set | When the agent reads it |
-| [runbooks/hero-sprite-set.md](runbooks/hero-sprite-set.md) | Making a hero sprite set: the order of work, the script that writes and checks the files and the provenance; the skill `.claude/skills/hero-sprite-set/` points at it | When the agent makes art |
+| [process/assets.md](process/assets.md) | Generated art and audio: the services, the connectors, the hero sprite set, a camp's ground and facilities, the page's icons, monsters and props, the provenance beside each set | When the agent reads it |
+| [runbooks/hero-sprite-set.md](runbooks/hero-sprite-set.md) | Making a hero or monster sprite set: the order of work, the script that writes and checks the files and the provenance; the skill `.claude/skills/hero-sprite-set/` points at it | When the agent makes art |
 | [process/development.md](process/development.md) | Running and seeing a change: the branch's sandbox stack, the fast loop on the laptop, logs, the cap | When the agent reads it |
 | [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |

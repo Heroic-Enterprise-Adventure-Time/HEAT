@@ -1,0 +1,110 @@
+{
+  "set": "tree-01",
+  "kind": "prop sprite set",
+  "props": ["tree"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "objectId": "5ce90c11-3e48-4a83-8327-9a5826be9085",
+    "name": "Tree 01",
+    "tags": ["heat", "prop", "tree"]
+  },
+  "object": {
+    "tool": "create_map_object",
+    "via": "MCP",
+    "createdAt": "2026-10-21T21:16Z",
+    "parameters": {
+      "description": "leafy oak tree with a thick brown trunk, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "view": "low top-down",
+      "outline": "single color outline",
+      "shading": "flat shading",
+      "detail": "low detail"
+    },
+    "canvas": [48, 64],
+    "generations": 1
+  },
+  "files": {
+    "standing": {
+      "file": "standing.png",
+      "canvas": [48, 64],
+      "from": "the object's one rotation"
+    }
+  },
+  "animations": {
+    "hit": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "abd305da-5345-4c0e-8416-7108b3e285b9",
+      "animationDescription": "the whole tree sways to one side and back from a blow to its trunk, the leaves shaking, no particles, no effects",
+      "frameCount": 6,
+      "frames": 7,
+      "canvas": [48, 64],
+      "files": "hit-<0..6>.png",
+      "generations": 1,
+      "replaced": [
+        {
+          "groupId": "b3a0dc06-cd6d-4508-95a8-c5749406cc03",
+          "description": "the tree shudders from an axe blow to its trunk, the leaves shake and a few fall, then it settles back still",
+          "generations": 1,
+          "why": "Drew white puffs at the trunk, an effect sprite, which the first battle leaves out."
+        }
+      ]
+    },
+    "down": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "fea3d663-07ed-40d2-bac6-99528ad57c7f",
+      "animationDescription": "the trunk splits into a cut stump and two logs while the leafy crown stays in place and slowly fades away, dissolving gradually over every frame, its pixels thinning out until it is gone",
+      "frameCount": 8,
+      "frames": 9,
+      "canvas": [48, 64],
+      "endFrame": {
+        "objectId": "7499fa82-fad0-477d-8c61-6df0f6210361",
+        "tool": "create_object_state",
+        "stateName": "stump",
+        "editDescription": "the tree has been chopped down: only a short cut stump remains at the base of the trunk, with two small logs lying beside it on the ground; the crown and the upper trunk are gone, empty transparent space above",
+        "generations": 1
+      },
+      "heldLast": true,
+      "fadeToLast": true,
+      "files": "down-<0..8>.png",
+      "generations": 1,
+      "replaced": [
+        {
+          "groupId": "d5cf3c11-59d7-42f1-85a8-932833bb39bb",
+          "description": "the chopped tree cracks at the base of its trunk, the crown breaks apart and crumbles to the ground, leaving a short stump and a few logs",
+          "generations": 1,
+          "why": "The trunk became a stump while the crown stayed floating in the air."
+        },
+        {
+          "groupId": "c87d5f72-3b11-4dee-983d-944b9edc6499",
+          "description": "the chopped tree topples over and falls to the ground, the crown and upper trunk falling away out of view, leaving only the cut stump and two logs",
+          "generations": 1,
+          "why": "Interpolated to the stump; the crown lifted for two frames, then vanished. The owner asked for the crown to fall."
+        },
+        {
+          "groupId": "37610aac-fb1a-40e9-a584-f79f8da30367",
+          "description": "the trunk breaks and the whole leafy crown drops straight down onto the ground, where it breaks apart into loose leaves that scatter, settle and fade away around the cut stump and two logs",
+          "generations": 1,
+          "why": "The crown sank onto the stump, then vanished on the last frame. The owner asked for a fade, which PixelLab cannot draw; the kept take holds the crown still and the drawer fades it (fadeToLast)."
+        }
+      ]
+    }
+  },
+  "animationGenerations": 7,
+  "rejected": [
+    {
+      "name": "pine",
+      "objectId": "ff6abeba-d159-49fd-a842-3c4ed17c655c",
+      "description": "tall pine tree with a straight brown trunk, black outline, warm earthy tones, NES-era retro pixel art, few colors"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-10-22."
+}
