@@ -27,7 +27,10 @@ describe("The adventure's content", () => {
     }
   });
 
-  it("has Millbrook's two jobs as the design describes them", () => {
+  it("has Millbrook's three jobs as the design describes them", () => {
+    expect(JOBS["pick-up-sticks"].stages.map((s) => s.kind)).toEqual(["travel", "gather", "arrive"]);
+    expect(JOBS["pick-up-sticks"].pay).toEqual([]);
+    expect(JOBS["pick-up-sticks"].retreat).toEqual({ keepsPay: false, keepsCargo: true, xpPercent: 50 });
     expect(JOBS["wolves-on-the-mill-road"].stages.map((s) => s.kind)).toEqual(["travel", "fight", "arrive"]);
     expect(JOBS["wolves-on-the-mill-road"].pay).toEqual([{ material: "cloth", amount: 10 }]);
     expect(JOBS["wolves-on-the-mill-road"].retreat).toEqual({ keepsPay: false, keepsCargo: true, xpPercent: 50 });

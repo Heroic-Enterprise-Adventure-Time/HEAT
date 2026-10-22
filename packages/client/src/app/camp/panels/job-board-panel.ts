@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FACILITIES } from '@heat/engine';
 import { Game } from '../../game';
-import { jobsAt, payWords } from './job-words';
+import { jobsAt, yieldWords } from './job-words';
 
 /**
  * The job board's panel, `/camp/<location>/job-board`: the jobs the
@@ -23,7 +23,7 @@ import { jobsAt, payWords } from './job-words';
         @for (job of jobs(); track job.id) {
           <li>
             <a class="link" [routerLink]="['jobs', job.id]">{{ job.name }}</a>
-            <span>{{ pay(job) }}</span>
+            <span>{{ brings(job) }}</span>
           </li>
         }
       </ul>
@@ -37,5 +37,5 @@ export class JobBoardPanel {
   protected readonly game = inject(Game);
   protected readonly description = FACILITIES['job-board'].description;
   protected readonly jobs = computed(() => jobsAt(this.game.location()));
-  protected readonly pay = payWords;
+  protected readonly brings = yieldWords;
 }

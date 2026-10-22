@@ -67,9 +67,10 @@ export const LOCATIONS: readonly Location[] = [
     ownFacilities: ["heroes-hall", "warehouse"],
     buildableFacilities: ["mine", "lumber-camp", "caravan-hub"],
     recruits: [
-      // Working assumptions until Issue-82 sets the costs.
-      { unitType: "villager", hallLevel: 1, cost: [{ material: "timber", amount: 5 }] },
-      { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 10 }, { material: "cloth", amount: 5 }] },
+      // The first progression (decision 0031): one run of "Pick up sticks"
+      // pays for a villager, one run of the mine's first job for a fighter.
+      { unitType: "villager", hallLevel: 1, cost: [{ material: "timber", amount: 20 }] },
+      { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 40 }] },
     ],
   },
 ];
@@ -309,25 +310,28 @@ export const BATTLE_CONTENT: BattleContent = {
 
 // ── Jobs and advancement ───────────────────────────────────────────
 
-export type JobId = "wolves-on-the-mill-road" | "timber-from-the-near-woods";
+export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road";
 
 /**
- * The jobs, by id (game.md, "The battle"). A retreat forfeits the pay; from
- * the lumber run it keeps what was gathered. A retreat earns half the XP.
+ * The jobs, by id, in the order the board lists them, easiest first
+ * (game.md, "The battle"; decision 0031). A retreat forfeits the pay; from a
+ * gathering job it keeps what was gathered. A retreat earns half the XP.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
-  "wolves-on-the-mill-road": {
-    id: "wolves-on-the-mill-road",
-    name: "Wolves on the mill road",
-    description: "Two wolves have been at the miller's carts. The weavers pay in cloth to see the road clear.",
+  // A lone villager cannot fail it: no monster, and its time limit is beyond
+  // even a villager forced to swing at the tree every turn (decision 0031).
+  "pick-up-sticks": {
+    id: "pick-up-sticks",
+    name: "Pick up sticks",
+    description: "One old tree by the village green needs felling. Bring the wood home; nothing out there bites.",
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "fight", monsters: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "gather", nodes: [{ type: "tree", count: 1 }], carry: 40, timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
-    pay: [{ material: "cloth", amount: 10 }],
-    xp: 20,
+    pay: [],
+    xp: 5,
     retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
   },
   "timber-from-the-near-woods": {
@@ -343,6 +347,22 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     ],
     pay: [{ material: "cloth", amount: 3 }],
     xp: 15,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
+  // A lone villager dies here on every seed; a fighter with a villager, or
+  // three villagers, clear it (decision 0031).
+  "wolves-on-the-mill-road": {
+    id: "wolves-on-the-mill-road",
+    name: "Wolves on the mill road",
+    description: "Two wolves have been at the miller's carts. The weavers pay in cloth to see the road clear.",
+    location: "millbrook",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", monsters: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [{ material: "cloth", amount: 10 }],
+    xp: 20,
     retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
   },
 };

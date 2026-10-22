@@ -114,15 +114,16 @@ const boxes = (page: HTMLElement) => [...page.querySelectorAll<HTMLInputElement>
 const depart = (page: HTMLElement) => [...page.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Depart');
 
 describe('Job board', () => {
-  it("lists the board's jobs with their pay, each linked to its detail", async () => {
+  it("lists the board's jobs, easiest first, with what each brings home, each linked to its detail", async () => {
     const { page } = await render(fakeGame([]), '/camp/millbrook/job-board');
     expect(page.querySelector('aside h2')?.textContent).toBe('Job board');
     const jobs = [...page.querySelectorAll('.jobs li')].map((li) => [...li.children].map((c) => c.textContent?.trim()));
     expect(jobs).toEqual([
-      ['Wolves on the mill road', 'pays 10 cloth'],
-      ['Timber from the near woods', 'pays 3 cloth'],
+      ['Pick up sticks', 'up to 40 timber'],
+      ['Timber from the near woods', '3 cloth and up to 60 timber'],
+      ['Wolves on the mill road', '10 cloth'],
     ]);
-    expect(page.querySelector('.jobs a')?.getAttribute('href')).toBe('/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
+    expect(page.querySelector('.jobs a')?.getAttribute('href')).toBe('/camp/millbrook/job-board/jobs/pick-up-sticks');
     expect(current(page)).toBe('Job board');
   });
 
