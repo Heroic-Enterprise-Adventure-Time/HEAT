@@ -14,10 +14,10 @@ export const RELOADED_FROM = 'heat.reloadedFrom';
 
 /**
  * Loads a newer deploy when the hub says this client is outdated (decision
- * 0030): at once if no adventure is open, and otherwise once it has closed,
- * so a player mid-adventure finishes on the client they loaded and submits
- * to the previous route. The owner's call on Issue-115: a reload, not a
- * prompt. Issue-15 moves the queued reload to after the result is shown.
+ * 0030): at once if no adventure is open, and otherwise once it has closed
+ * and the player has left its result (Issue-15), so a player mid-adventure
+ * finishes on the client they loaded, submits to the previous route and
+ * reads the result. The owner's call on Issue-115: a reload, not a prompt.
  *
  * A tab reloads away from a version once. If the page it gets is still
  * outdated, as when `config.json` and the hub are briefly out of step during
@@ -36,7 +36,7 @@ export class Updates {
       if (!this.api.outdated()) return;
       const player = this.game.player();
       // Before the player is read, an open adventure cannot be ruled out.
-      if (!player || player.openAdventure) return;
+      if (!player || player.openAdventure || this.game.settled()) return;
       const version = this.config.value()?.version;
       if (!version) return;
       untracked(() => this.reloadOnce(version));

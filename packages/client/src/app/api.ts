@@ -21,6 +21,14 @@ interface GraphqlResponse<T> {
 /** The request header that carries the client's version; the hub's `VERSION_HEADER`. */
 export const VERSION_HEADER = 'heat-version';
 
+/**
+ * Which deploy a request goes to: the current one at the stack's GraphQL
+ * path, or the one before at `/previous` in front of it, which verifies the
+ * adventures it issued (decision 0030).
+ */
+export type Route = 'current' | 'previous';
+export const PREVIOUS: Route = 'previous';
+
 export type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 
 /**
@@ -39,11 +47,11 @@ export class Api {
   /** Whether the hub has said this client is not the deploy's. It stays set until the page reloads. */
   readonly outdated = signal(false);
 
-  async request<T>(query: string, variables: Record<string, unknown> = {}): Promise<T> {
+  async request<T>(query: string, variables: Record<string, unknown> = {}, route: Route = 'current'): Promise<T> {
     const config = this.config.value();
     const user = this.session.user();
     if (!config || !user) throw new ApiError('not signed in', null);
-    const response = await this.fetchFn(config.graphqlPath, {
+    const response = await this.fetchFn(route === 'previous' ? `/previous${config.graphqlPath}` : config.graphqlPath, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

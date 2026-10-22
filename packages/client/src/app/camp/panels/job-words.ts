@@ -23,7 +23,7 @@ function gathered(stage: Extract<Stage, { kind: 'gather' }>): string[] {
 
 /**
  * One stage in the player's words. A stage's time limit is not said: it is a
- * deadlock kill switch, shown only in its last stretch (decision 0030).
+ * deadlock kill switch, counted down only in its last ten seconds (decision 0030).
  */
 export function stageWords(stage: Stage): string {
   switch (stage.kind) {

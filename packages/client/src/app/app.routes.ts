@@ -1,6 +1,5 @@
 import { inject } from '@angular/core';
 import { Router, type CanActivateFn, type Routes } from '@angular/router';
-import { Adventure } from './adventure/adventure';
 import { Camp } from './camp/camp';
 import { FacilityPanel } from './camp/panels/facility-panel';
 import { HallPanel } from './camp/panels/hall-panel';
@@ -48,6 +47,7 @@ export const routes: Routes = [
       { path: ':facility', component: FacilityPanel },
     ],
   },
-  { path: 'adventure', component: Adventure, canActivate: [signedIn] },
+  // Loaded on first use, so the engine that plays it is a chunk of its own (Issue-15).
+  { path: 'adventure', loadComponent: () => import('./adventure/adventure').then((m) => m.Adventure), canActivate: [signedIn] },
   { path: '**', redirectTo: '' },
 ];

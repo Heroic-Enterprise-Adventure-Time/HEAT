@@ -13,8 +13,14 @@ const player: PlayerView = {
     id: 'a1',
     startedAt: '2026-10-20T07:00:00.000Z',
     location: 'millbrook',
+    seed: 's1',
+    version: 'v1',
     job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves.' },
-    snapshot: { heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1 }] },
+    snapshot: {
+      version: 'v1',
+      jobId: 'wolves-on-the-mill-road',
+      heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
+    },
   },
 };
 
