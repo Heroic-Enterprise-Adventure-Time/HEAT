@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyEventV2WithJWTAuthorizer } 
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { Tables } from "./db/client.js";
 import { Repository } from "./db/repository.js";
+import { VERSION_HEADER } from "./version.js";
 
 /**
  * Per-request context. Identity comes from the API Gateway JWT authorizer,
@@ -15,6 +16,10 @@ export interface Context {
   /** The name a profile is created with when the player has none: the token's email, else the subject. */
   playerName: string | undefined;
   repo: Repository;
+  /** The deploy's version, HEAT_VERSION (decision 0030). */
+  version: string;
+  /** The version the client sent in the `heat-version` header, if it sent one. */
+  clientVersion: string | undefined;
 }
 
 export interface Identity {
@@ -33,10 +38,12 @@ export function identityFromEvent(event: APIGatewayProxyEventV2): Identity | und
   return { playerId: sub, playerName: typeof email === "string" && email.length > 0 ? email : sub };
 }
 
-export function createContextFactory(db: DynamoDBDocumentClient, tables: Tables) {
+export function createContextFactory(db: DynamoDBDocumentClient, tables: Tables, version: string) {
   const repo = new Repository(db, tables);
   return async ({ event }: { event: APIGatewayProxyEventV2 }): Promise<Context> => {
     const identity = identityFromEvent(event);
-    return { playerId: identity?.playerId, playerName: identity?.playerName, repo };
+    // Payload 2.0 lower-cases header names.
+    const clientVersion = event.headers?.[VERSION_HEADER];
+    return { playerId: identity?.playerId, playerName: identity?.playerName, repo, version, clientVersion };
   };
 }

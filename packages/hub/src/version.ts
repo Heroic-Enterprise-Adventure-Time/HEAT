@@ -1,0 +1,40 @@
+import type { ApolloServerPlugin } from "@apollo/server";
+import type { Context } from "./context.js";
+
+/**
+ * One version for the whole app (decision 0030): the commit the workflow
+ * deployed, which Terraform sets on the function as HEAT_VERSION and the
+ * publish step writes into config.json. The hub stamps it on every
+ * adventure it starts, and the client sends the one it loaded in the
+ * `heat-version` header of every request, so the hub can say when the
+ * client is not the deploy's.
+ */
+export const VERSION_HEADER = "heat-version";
+
+export function versionFromEnv(env: NodeJS.ProcessEnv = process.env): string {
+  const version = env.HEAT_VERSION;
+  if (!version) throw new Error("HEAT_VERSION is not set");
+  return version;
+}
+
+/**
+ * `extensions.outdated: true` on every response to a request whose header
+ * names another version, errors included. A request with no header is not
+ * flagged: the client sends it from Issue-115 on, and what it does with the
+ * flag is Issue-115's and Issue-15's.
+ */
+export function outdatedFlag(): ApolloServerPlugin<Context> {
+  return {
+    async requestDidStart() {
+      return {
+        async willSendResponse({ contextValue, response }) {
+          const { clientVersion, version } = contextValue;
+          if (clientVersion === undefined || clientVersion === version) return;
+          if (response.body.kind !== "single") return;
+          const result = response.body.singleResult;
+          result.extensions = { ...result.extensions, outdated: true };
+        },
+      };
+    },
+  };
+}

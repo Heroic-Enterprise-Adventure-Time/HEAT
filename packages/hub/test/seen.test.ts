@@ -38,7 +38,7 @@ const place = () => `test-${randomUUID()}`;
 function hero(location: string, overrides: Partial<Hero> = {}): Hero {
   return {
     id: randomUUID(), location, unitType: "villager", spriteSet: "villager-01", name: "Ada",
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, ...overrides,
+    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null, ...overrides,
   };
 }
 

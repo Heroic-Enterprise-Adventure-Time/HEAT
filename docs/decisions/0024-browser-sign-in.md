@@ -14,7 +14,7 @@
 
 **Token lifetimes.** Access and ID tokens of one hour, Cognito's default and the `ci` client's; a refresh token of 30 days, Cognito's default, with refresh token rotation on and a grace period of ten seconds. Rotation is incompatible with the `REFRESH_TOKEN_AUTH` flow, so the client's explicit flows name `USER_SRP_AUTH` alone, the one flow the API requires to be named that reveals nothing a browser cannot already do; nothing uses it.
 
-**What the client knows.** `config.json`, written beside the build by the apply job from the stack's outputs: `graphqlPath`, `userPoolId`, `clientId`, `loginHost`, `passwordSignIn`. It is read before the application starts; a page that cannot read it says so instead of failing. On the dev server, `proxy.conf.mjs` fetches it, and `/graphql`, from the branch's stack, found from the issue number in the branch name.
+**What the client knows.** `config.json`, written beside the build by the apply job from the stack's outputs: `graphqlPath`, `userPoolId`, `clientId`, `loginHost`, `passwordSignIn`, and since Issue-113 `version`, the deploy's version of decision 0030. It is read before the application starts; a page that cannot read it says so instead of failing. On the dev server, `proxy.conf.mjs` fetches it, and `/graphql`, from the branch's stack, found from the issue number in the branch name.
 
 **Which token the API gets** is Issue-15's call: the authorizer accepts the ID token's `aud` and the access token's `client_id` alike, and the hub reads the email claim when it is there, which only the ID token carries.
 

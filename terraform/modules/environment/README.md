@@ -8,7 +8,7 @@ One HEAT environment: the two tables, one function per entry in `manifest.json` 
 | --- | --- | --- |
 | Table | `<prefix>-player` | Partitioned by player; private. `PK`, `SK` strings, on-demand (decision 0023) |
 | Table | `<prefix>-location` | Partitioned by location and by adventure; public. Same schema |
-| Function, per manifest entry | `<prefix>-<name>` | `nodejs24.x`, arm64, memory and timeout from the manifest, `publish`, active tracing, environment variables `HEAT_PLAYER_TABLE`, `HEAT_LOCATION_TABLE`, `POWERTOOLS_SERVICE_NAME`, `POWERTOOLS_LOG_LEVEL` |
+| Function, per manifest entry | `<prefix>-<name>` | `nodejs24.x`, arm64, memory and timeout from the manifest, `publish`, active tracing, environment variables `HEAT_PLAYER_TABLE`, `HEAT_LOCATION_TABLE`, `POWERTOOLS_SERVICE_NAME`, `POWERTOOLS_LOG_LEVEL` and `HEAT_VERSION`, the deploy's version from `app_version`, which changes with every commit, so every deploy publishes a version and moves the alias (decision 0030) |
 | Alias | `live` | At the function's latest version; what the routes invoke. Rollback moves it back (decision 0017) |
 | Execution role | `<prefix>-<name>` | Under the account's boundary. Its own log group, the item operations on the two tables, X-Ray writes. Nothing else |
 | Log group | `/aws/lambda/<prefix>-<name>` | Created before the function, with retention |
@@ -43,4 +43,4 @@ The throttle, under the account's Lambda concurrency, is the environment's kill 
 
 ## What the root supplies
 
-`name_prefix`, `environment`, `functions` (from `manifest.json`), `dist_dir`, the base's `user_pool_id` and the `app_client_id` of its `ci` client (null where the base has none, as in `prod`), the `login_host` of the pool's managed login domain (`terraform/modules/login-domain`), the `hostname` with the base's `zone_id` and `certificate_arn` and the distribution's `price_class` (`PriceClass_100` everywhere today), `permissions_boundary_arn` built from the account id, and the literals above. The module builds no ARN from an account id itself.
+`name_prefix`, `environment`, `functions` (from `manifest.json`), `dist_dir`, the base's `user_pool_id` and the `app_client_id` of its `ci` client (null where the base has none, as in `prod`), the `login_host` of the pool's managed login domain (`terraform/modules/login-domain`), the `hostname` with the base's `zone_id` and `certificate_arn` and the distribution's `price_class` (`PriceClass_100` everywhere today), `permissions_boundary_arn` built from the account id, `app_version`, the commit being deployed (`TF_VAR_app_version` from `github.sha` in the workflows, the worktree's `HEAD` on a laptop; a full 40-character hash, which the module checks), and the literals above. The module returns `app_version` and `password_sign_in` as outputs for `config.json`, so the client and the hub of one deploy carry one version. The module builds no ARN from an account id itself.

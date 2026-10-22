@@ -141,6 +141,10 @@ resource "aws_lambda_function" "function" {
       HEAT_LOCATION_TABLE     = aws_dynamodb_table.location.name
       POWERTOOLS_SERVICE_NAME = "heat-${each.key}"
       POWERTOOLS_LOG_LEVEL    = var.log_level
+      # The deploy's version (decision 0030). It changes with every commit,
+      # so every deploy publishes a new version and moves the alias, even
+      # one whose bundle is unchanged.
+      HEAT_VERSION = var.app_version
     }
   }
 

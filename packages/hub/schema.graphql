@@ -1,7 +1,18 @@
+"""
+An adventure as the hub issued it: what the client needs to play it with the seed.
+"""
 type Adventure {
   id: String!
+  job: Job!
+  location: String!
   seed: String!
+  snapshot: Snapshot!
   startedAt: String!
+
+  """
+  The deploy that issued the adventure, and the only one that verifies it.
+  """
+  version: String!
 }
 
 """
@@ -55,6 +66,18 @@ type Holding {
   material: String!
 }
 
+"""
+A job on a location's job board, from the static content; the client reads its stages from the engine it loaded.
+"""
+type Job {
+  description: String!
+  id: String!
+
+  """The location whose job board posts it."""
+  location: String!
+  name: String!
+}
+
 type Mutation {
   """
   Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing.
@@ -72,14 +95,14 @@ type Mutation {
   retireHero(heroId: String!): Hero!
 
   """
-  Spike only: settles the caller's open adventure with the engine's rewards for its seed, credited at the starting camp.
+  Spike only, until Issue-114's submit: settles the caller's open adventure with the engine's rewards for its seed, credited at its location, and brings its party back to the camp.
   """
   settleAdventure(adventureId: String!): Player
 
   """
-  Issues the seed and opens the player's one adventure. Fails if one is already open.
+  Starts a job from the location's job board with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.
   """
-  startAdventure: Adventure!
+  startAdventure(heroIds: [String!]!, jobId: String!, location: String!): Adventure!
 }
 
 type Player {
@@ -119,4 +142,36 @@ type SeenHero {
   """The set's directory under art/heroes/."""
   spriteSet: String!
   unitType: String!
+}
+
+"""
+The frozen snapshot the hub issued at the start, the engine's AdventureSnapshot field for field: the party's effective numbers and the job by id (decision 0030).
+"""
+type Snapshot {
+  heroes: [SnapshotHero!]!
+  jobId: String!
+  version: String!
+}
+
+"""
+A hero as the adventure took it at the start: its effective numbers, frozen for the run.
+"""
+type SnapshotHero {
+  heroId: String!
+  level: Int!
+  name: String!
+  spriteSet: String!
+  stats: UnitStats!
+  unitType: String!
+}
+
+type UnitStats {
+  damage: Int!
+
+  """Work done to a resource node by a gather ability."""
+  gathering: Int!
+  maxHealth: Int!
+
+  """Turns per ten seconds."""
+  speed: Int!
 }

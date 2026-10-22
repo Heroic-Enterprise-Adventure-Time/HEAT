@@ -38,6 +38,11 @@ output "password_sign_in" {
   value       = var.password_sign_in
 }
 
+output "app_version" {
+  description = "The deploy's version, the same value the functions carry as HEAT_VERSION, for config.json."
+  value       = var.app_version
+}
+
 output "login_host" {
   description = "The pool's managed login host, for config.json."
   value       = var.login_host

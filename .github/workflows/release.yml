@@ -273,7 +273,7 @@ jobs:
         run: |
           set -eu
           out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
-          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)"
+          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
 
       - name: Write the environment's URL to the job summary
         id: summary

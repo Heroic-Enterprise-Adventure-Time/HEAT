@@ -14,7 +14,7 @@ HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, 
 | Test users | `player1`, `player2`, created by the apply job | none, and no `test-users.txt` |
 | Authorizer audiences | the `ci` client and the browser client | the browser client alone |
 | Parameters | the six | five: no `app_client_id` |
-| Smoke test | the whole loop, signed in as `e2e@heat-dev.dcg-games.com` | the token-free half of `scripts/e2e.mjs` (`--anonymous`): the page, `config.json`, the managed login page, the hand-off to Google, 401 at `/graphql`; nothing signs in, nothing is written, no cold start is read |
+| Smoke test | the whole loop, signed in as `e2e@heat-dev.dcg-games.com` | the token-free half of `scripts/e2e.mjs` (`--anonymous`): the page, `config.json` with the deploy's version, the managed login page, the hand-off to Google, 401 at `/graphql`; nothing signs in, nothing is written, no cold start is read |
 | Applied by | `deploy.yml`, on every merge to `main` | `release.yml`, on every merge to `release`, behind the guard, then the tag and the Release |
 | Who merges the apply | the owner, any pull request to `main` | the owner, the release pull request from `main` (or a hotfix branch) to `release` |
 
@@ -48,7 +48,7 @@ One name per value in every environment; the environment supplies the value (dec
 
 ## Outputs
 
-`zone_id`, `zone_name`, `zone_name_servers`, `user_pool_id`, `user_pool_name`, `certificate_arn`, `login_host`, `browser_client_id`, `site_url`, `api_url`, `client_bucket`, `distribution_id`, `function_names`, `parameter_prefix`, `alarm_topic_arn`. No `ci_client_id`. None is secret and none carries the account id. The apply job reads `client_bucket`, `user_pool_id`, `browser_client_id` and `login_host` for `config.json`.
+`zone_id`, `zone_name`, `zone_name_servers`, `user_pool_id`, `user_pool_name`, `certificate_arn`, `login_host`, `browser_client_id`, `site_url`, `api_url`, `client_bucket`, `distribution_id`, `function_names`, `parameter_prefix`, `alarm_topic_arn`, `password_sign_in`, `app_version`. No `ci_client_id`. None is secret and none carries the account id. The apply job reads `client_bucket`, `user_pool_id`, `browser_client_id`, `login_host`, `password_sign_in` and `app_version` for `config.json`.
 
 ## Who applies it
 
@@ -92,6 +92,7 @@ $env:AWS_PROFILE = "plan-heat-prod"
 $env:TF_VAR_google_client_id = "000000000000-example.apps.googleusercontent.com"
 $env:TF_VAR_google_client_secret = "GOCSPX-example"
 $env:TF_VAR_alarm_email = "alarms@example.com"
+$env:TF_VAR_app_version = git rev-parse HEAD
 npm ci
 npm run bundle
 terraform -chdir=terraform/environment/prod init
