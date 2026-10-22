@@ -1,8 +1,11 @@
-import { Component, DestroyRef, InjectionToken, afterNextRender, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { Router } from '@angular/router';
 import { ABILITIES, JOBS, UNIT_PROFILES, location, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
 import { Game, type AdventureResultView } from '../game';
 import { isSideBySide } from '../camp/page-layout';
+import { stackedBattleHeight } from './battle/battle-layout';
+import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
 import { stageWords } from '../camp/panels/job-words';
 import { secondsLeft } from './field';
 import { Play, SPEEDS } from './play';
@@ -24,6 +27,15 @@ export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.adventure.frames',
     });
     return () => cancelAnimationFrame(id);
   },
+});
+
+export type BattleSceneFactory = (host: HTMLElement, callbacks: BattleSceneCallbacks) => Promise<BattleSceneHandle>;
+
+/** How the page gets its battle scene; a test provides one that draws nothing, since jsdom has no WebGL. */
+export const BATTLE_SCENE_FACTORY = new InjectionToken<BattleSceneFactory>('heat.adventure.scene', {
+  providedIn: 'root',
+  // Loaded on first use, so PixiJS is a chunk of its own, as the camp's scene is.
+  factory: () => async (host, callbacks) => (await import('./battle/battle-scene')).createBattleScene(host, callbacks),
 });
 
 /** How a stage ended, in the player's words. */
@@ -48,11 +60,14 @@ const OUTCOMES: Readonly<Record<AdventureResultView['outcome'], string>> = {
  * abilities to force its next action, the party's orders, press on and
  * retreat, and in a stage's last ten seconds the time left before the party
  * turns back. When the run ends it is submitted, and the result takes the
- * controls' place, with Back to camp. With no adventure open and no result
- * to show, the address goes to the camp.
+ * controls' place, with the replay, which plays the stored timeline in the
+ * same scene with no engine, and Back to camp. With no adventure open and no
+ * result to show, the address goes to the camp. The run waits for the scene
+ * to load, so that the party can run on from the start.
  */
 @Component({
   selector: 'heat-adventure',
+  imports: [NgTemplateOutlet],
   templateUrl: './adventure.html',
   styleUrl: './adventure.css',
   providers: [Play],
@@ -68,15 +83,27 @@ export class Adventure {
   protected readonly endings = ENDINGS;
   protected readonly outcomes = OUTCOMES;
 
-  private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight });
+  private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
   protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height));
+  /** Stacked, the stage's box is the page's width by the stage's height at the scale that fits; side by side the grid sizes it. */
+  protected readonly stageHeight = computed(() =>
+    this.side() ? null : stackedBattleHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
+  );
+  private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
+  private readonly createScene = inject(BATTLE_SCENE_FACTORY);
+  private scene: BattleSceneHandle | null = null;
+  /** Set once the scene has loaded, or failed to, and the run may start. */
+  private readonly sceneReady = signal(false);
+  private startedId: string | null = null;
+  /** The replay's timeline is being fetched, or could not be. */
+  protected readonly replayState = signal<'idle' | 'loading' | 'failed'>('idle');
 
   protected readonly from = computed(() => {
     const at = (this.game.settled()?.adventure ?? this.game.adventure())?.location ?? '';
     return location(at)?.name ?? at;
   });
   /** The stage under way in words, "Stage 2 of 3: Fight 2 wolves". */
-  protected readonly stage = computed(() => {
+  protected readonly stageName = computed(() => {
     const field = this.play.field();
     const jobId = this.game.adventure()?.snapshot.jobId;
     const job = jobId && Object.hasOwn(JOBS, jobId) ? JOBS[jobId as JobId] : undefined;
@@ -96,7 +123,12 @@ export class Adventure {
   constructor() {
     effect(() => {
       const adventure = this.game.adventure();
-      if (adventure && !this.game.settled()) untracked(() => this.play.start(adventure));
+      if (!adventure || this.game.settled() || !this.sceneReady() || this.startedId === adventure.id) return;
+      untracked(() => {
+        this.startedId = adventure.id;
+        this.play.start(adventure);
+        this.scene?.reset(this.play.field()!, new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
+      });
     });
     effect(() => {
       // Only once the player is loaded: before then, no adventure means not read yet.
@@ -106,11 +138,55 @@ export class Adventure {
     });
     const frames = inject(FRAME_LOOP);
     const destroyRef = inject(DestroyRef);
-    afterNextRender(() => destroyRef.onDestroy(frames((ms) => this.play.tick(ms))));
+    let destroyed = false;
+    afterNextRender(() => {
+      void this.mount().then(() => {
+        if (!destroyed) destroyRef.onDestroy(frames((ms) => this.frame(ms)));
+      });
+    });
+    destroyRef.onDestroy(() => {
+      destroyed = true;
+      this.scene?.destroy();
+    });
   }
 
   protected measure(): void {
-    this.viewport.set({ width: window.innerWidth, height: window.innerHeight });
+    this.viewport.set({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
+  }
+
+  /** Loads the scene; without one, as where WebGL is missing, the run plays with the controls alone. */
+  private async mount(): Promise<void> {
+    try {
+      this.scene = await this.createScene(this.box().nativeElement, { onEntered: () => this.play.entered() });
+      this.play.holdEntries = true;
+    } catch {
+      this.scene = null;
+    }
+    this.sceneReady.set(true);
+  }
+
+  /** One frame: the run moves on, and the scene animates what happened and moves on by the same time. */
+  private frame(ms: number): void {
+    const events = this.play.tick(ms);
+    const field = this.play.field();
+    if (!this.scene || !field) return;
+    if (events.length > 0) this.scene.feed(events, field);
+    this.scene.frame(this.play.paused() ? 0 : ms * this.play.speed(), this.play.simTime(), field);
+  }
+
+  /** Plays the stored timeline of the adventure just settled, read through the hub, in the same scene. */
+  protected async replay(): Promise<void> {
+    const settled = this.game.settled();
+    if (!settled) return;
+    this.replayState.set('loading');
+    const timeline = await this.game.timeline(settled.adventure.id).catch(() => null);
+    if (!timeline) {
+      this.replayState.set('failed');
+      return;
+    }
+    this.replayState.set('idle');
+    this.play.replay(timeline);
+    this.scene?.reset(this.play.field()!, new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */

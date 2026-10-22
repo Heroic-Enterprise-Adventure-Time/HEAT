@@ -2,10 +2,12 @@ import { Component, computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { UNIT_PROFILES, type AdventureLogEntry } from '@heat/engine';
+import { UNIT_PROFILES, replay, type AdventureEvent, type AdventureLogEntry, type AdventureSnapshot } from '@heat/engine';
 import { ApiError } from '../api';
 import { Game, type AdventureResultView, type AdventureView, type SettledView } from '../game';
-import { Adventure, FRAME_LOOP } from './adventure';
+import { Adventure, BATTLE_SCENE_FACTORY, FRAME_LOOP } from './adventure';
+import type { BattleSceneCallbacks } from './battle/battle-scene';
+import { isEntry, type Field } from './field';
 import { AdventureRun, loadRun, saveRun } from './run';
 
 @Component({ template: 'camp' })
@@ -54,6 +56,37 @@ const result: AdventureResultView = {
   ],
 };
 
+/**
+ * A scene that draws nothing and records what it was given. By default it
+ * says everyone is on at once, as if the rush in took no time; `holding`
+ * keeps an entry waiting until the test calls `release`.
+ */
+function fakeScene(holding = false) {
+  let callbacks: BattleSceneCallbacks | null = null;
+  const scene = {
+    resets: [] as { field: Field; enter: boolean }[],
+    fed: [] as AdventureEvent[],
+    frames: 0,
+    release: () => callbacks?.onEntered(),
+    factory: async (_host: HTMLElement, given: BattleSceneCallbacks) => {
+      callbacks = given;
+      return {
+        reset: (field: Field, _sets: ReadonlyMap<string, string>, enter: boolean) => {
+          scene.resets.push({ field, enter });
+          if (enter && !holding) given.onEntered();
+        },
+        feed: (events: readonly AdventureEvent[]) => {
+          scene.fed.push(...events);
+          if (events.some(isEntry) && !holding) given.onEntered();
+        },
+        frame: () => void scene.frames++,
+        destroy: () => undefined,
+      };
+    },
+  };
+  return scene;
+}
+
 /** A game with the open adventure and a submit that answers as the test says, recording each log it was given. */
 function fakeGame(answer: () => AdventureResultView | null | Error = () => result) {
   const open = signal<AdventureView | null>(adventure);
@@ -64,6 +97,11 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
     adventure: open,
     settled,
     submitted: [] as (readonly AdventureLogEntry[])[],
+    timelines: [] as string[],
+    timeline: async (id: string) => {
+      fake.timelines.push(id);
+      return replay(adventure.snapshot as AdventureSnapshot, adventure.seed, []).timeline;
+    },
     submitAdventure: async (submittedAdventure: AdventureView, log: readonly AdventureLogEntry[]) => {
       fake.submitted.push([...log]);
       const answered = answer();
@@ -75,7 +113,7 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
   return fake;
 }
 
-async function render(game: ReturnType<typeof fakeGame>) {
+async function render(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
   let onFrame: (ms: number) => void = () => undefined;
   TestBed.configureTestingModule({
     providers: [
@@ -85,6 +123,7 @@ async function render(game: ReturnType<typeof fakeGame>) {
       ]),
       { provide: Game, useValue: game },
       { provide: FRAME_LOOP, useValue: (f: (ms: number) => void) => ((onFrame = f), () => undefined) },
+      { provide: BATTLE_SCENE_FACTORY, useValue: scene.factory },
     ],
   });
   const harness = await RouterTestingHarness.create('/adventure');
@@ -93,13 +132,16 @@ async function render(game: ReturnType<typeof fakeGame>) {
     await harness.fixture.whenStable();
   };
   await settle();
+  // The scene loads after the first render; the run starts once it has.
+  await vi.waitFor(() => expect(scene.resets.length).toBeGreaterThan(0));
+  await settle();
   const page = harness.routeNativeElement as HTMLElement;
   /** Runs `ms` of wall-clock time in frames of at most 250 ms, as the browser would. */
   const run = async (ms: number) => {
     for (let left = ms; left > 0; left -= 250) onFrame(Math.min(250, left));
     await settle();
   };
-  return { harness, page, settle, run, router: TestBed.inject(Router) };
+  return { harness, page, settle, run, scene, router: TestBed.inject(Router) };
 }
 
 const button = (page: HTMLElement, text: string, within = page) =>
@@ -181,12 +223,35 @@ describe('Adventure', () => {
     expect(game.submitted[0]!.some((e) => e.kind === 'party' && e.order === 'retreat')).toBe(true);
   });
 
+  it('holds the clock at an entry until the scene has brought everyone on', async () => {
+    const scene = fakeScene(true);
+    const { page, run } = await render(fakeGame(), scene);
+    expect(scene.resets).toEqual([{ field: expect.objectContaining({ stage: 0 }), enter: true }]);
+    await run(2000);
+    expect(scene.fed).toEqual([]);
+    scene.release();
+    await run(4100);
+    expect(page.querySelector('.stage-name')?.textContent).toContain('Stage 2 of 4');
+    expect(scene.fed.filter((e) => e.kind === 'battle-start')).toHaveLength(1);
+    // The fight's clock waits for the trees and their road to come on: nothing more happens until then.
+    const fed = scene.fed.length;
+    await run(3000);
+    expect(scene.fed).toHaveLength(fed);
+    scene.release();
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
+    expect(scene.frames).toBeGreaterThan(0);
+  });
+
   it('resumes from the log saved in the browser, at the time it reached', async () => {
     const earlier = new AdventureRun(adventure.snapshot as never, adventure.seed);
     earlier.advanceTo(8000);
     saveRun('a1', { log: earlier.log, simTime: earlier.simTime });
-    const { page } = await render(fakeGame());
+    const scene = fakeScene();
+    const { page } = await render(fakeGame(), scene);
     expect(page.querySelector('.note')?.textContent).toBe('Picked up where you left off.');
+    // Picked up, everyone stands where they were: nobody runs on.
+    expect(scene.resets.map((r) => r.enter)).toEqual([false]);
     expect(page.querySelector('.stage-name')?.textContent).toContain('Stage 2 of 4');
   });
 
@@ -214,6 +279,28 @@ describe('Adventure', () => {
     await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook'));
     await settle();
     expect(game.settled()).toBeNull();
+  });
+
+  it('replays the stored timeline in the scene from its start, and goes back to the result', async () => {
+    const scene = fakeScene();
+    const game = fakeGame();
+    const { page, run, settle } = await render(game, scene);
+    await run(120_000);
+    button(page, 'Watch the replay')!.click();
+    await vi.waitFor(() => expect(scene.resets).toHaveLength(2));
+    await settle();
+    expect(game.timelines).toEqual(['a1']);
+    expect(scene.resets[1]).toEqual({ field: expect.objectContaining({ stage: 0, outcome: null }), enter: true });
+    expect(page.querySelector('.note')?.textContent).toBe('Replay');
+    expect(page.querySelector('.abilities')).toBeNull();
+    const before = scene.fed.length;
+    await run(10_000);
+    expect(scene.fed.length).toBeGreaterThan(before);
+    expect(game.submitted).toHaveLength(1);
+
+    button(page, 'Back to the result')!.click();
+    await settle();
+    expect(page.querySelector('.outcome')?.textContent).toBe('Job done.');
   });
 
   it('says so when the adventure was lost to a game update', async () => {

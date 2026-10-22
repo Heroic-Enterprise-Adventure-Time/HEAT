@@ -2,6 +2,7 @@ import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyl
 import type { FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
 import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
+import { lowestOpaqueRow } from '../../pixel-art';
 import { sceneView, type SceneView } from '../page-layout';
 import { WALK_SPEED, gone, leave, newWalker, randomSpot, step, type Facing, type Walker } from './wander';
 
@@ -54,22 +55,6 @@ interface HeroOnScreen {
   walker: Walker;
   frames: HeroFrames;
   clockMs: number;
-}
-
-/** The row of the lowest pixel that is not transparent: where a figure's feet or a building's base are. */
-function lowestOpaqueRow(texture: Texture): number {
-  const { width, height } = texture.source;
-  const canvas = document.createElement('canvas');
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext('2d', { willReadFrequently: true });
-  if (!context) return height - 1;
-  context.drawImage(texture.source.resource as CanvasImageSource, 0, 0);
-  const data = context.getImageData(0, 0, width, height).data;
-  for (let y = height - 1; y >= 0; y--) {
-    for (let x = 0; x < width; x++) if ((data[(y * width + x) * 4 + 3] ?? 0) > 0) return y;
-  }
-  return height - 1;
 }
 
 const heroFrames = new Map<string, Promise<HeroFrames>>();

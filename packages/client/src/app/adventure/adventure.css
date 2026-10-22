@@ -21,22 +21,9 @@
 
 .stage {
   width: 100%;
-  min-height: 12rem;
   overflow: hidden;
   background: var(--night);
   color: var(--light);
-}
-
-.sides {
-  display: flex;
-  justify-content: space-between;
-  padding: 1rem;
-}
-
-.sides ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
 }
 
 .panel {
@@ -93,8 +80,15 @@ button[aria-pressed='true'] {
   gap: 0.25rem;
 }
 
-.orders {
+.orders,
+.after {
   margin-top: 0.5rem;
+}
+
+.after {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
 }
 
 .party,
