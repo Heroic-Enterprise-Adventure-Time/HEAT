@@ -20,8 +20,8 @@ The item holds the hero's public fields only: name, unit type, sprite set and le
 | --- | --- | --- |
 | Recruit | put, with a fresh expiry | here |
 | Retire | deleted, so a retired hero leaves other players' camps at once | here |
-| A mission completed | put again, refreshing the expiry and the level | with adventures, Issue-15 |
-| Death | deleted | with adventures, Issue-15 |
+| A mission completed | put again, refreshing the expiry and the level | at settlement, Issue-114 |
+| Death | deleted | at settlement, Issue-114 |
 | A caravan delivering a hero | deleted at the old location, put at the new | with caravans |
 
 Opening or switching camps is **not** a sighting. A hero is seen when it does something, and looking at a camp is not the hero doing anything; until missions exist, a recruit is the only thing a hero does.

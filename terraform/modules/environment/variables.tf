@@ -25,7 +25,7 @@ variable "environment" {
 }
 
 variable "functions" {
-  description = "The functions of manifest.json, keyed by name: the exported handler, memory, timeout and HTTP routes. The root passes jsondecode(file(manifest.json)).functions; nothing declares a function or route anywhere else (docs/standards/typescript.md, rule 4)."
+  description = "The functions of manifest.json, keyed by name: the exported handler, memory, timeout and HTTP routes, each route integrated with the function's live alias or the alias it names. The root passes jsondecode(file(manifest.json)).functions; nothing declares a function or route anywhere else (docs/standards/typescript.md, rule 4)."
   type = map(object({
     export         = string
     memoryMb       = number
@@ -33,8 +33,14 @@ variable "functions" {
     http = list(object({
       method = string
       path   = string
+      alias  = optional(string, "live")
     }))
   }))
+
+  validation {
+    condition     = alltrue(flatten([for fn in var.functions : [for route in fn.http : contains(["live", "previous"], route.alias)]]))
+    error_message = "a route's alias must be live or previous."
+  }
 }
 
 variable "dist_dir" {

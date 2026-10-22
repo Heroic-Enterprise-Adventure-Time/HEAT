@@ -1,6 +1,10 @@
 # The HTTP API: the manifest's routes, each behind one JWT authorizer that
-# verifies the shared pool's tokens, integrated with each function's live
-# alias. The $default stage, auto-deployed, throttled, with an access log
+# verifies the shared pool's tokens, integrated with the function's live
+# alias or, where the route names it, its previous alias (previous.tf):
+# POST /previous/graphql reaches the deploy before the current one
+# (decision 0030). A route is matched on its method and its full path
+# before anything else (API Gateway developer guide, "Create routes for
+# HTTP APIs", read 2026-10-22). The $default stage, auto-deployed, throttled, with an access log
 # that shows what the authorizer refused, which the functions never see.
 # No custom domain: the environment's hostname is CloudFront's, which sends
 # /graphql here (decision 0018, Issue-39).
@@ -42,11 +46,20 @@ resource "aws_apigatewayv2_integration" "function" {
   payload_format_version = "2.0"
 }
 
+resource "aws_apigatewayv2_integration" "previous" {
+  for_each = var.functions
+
+  api_id                 = aws_apigatewayv2_api.this.id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = aws_lambda_alias.previous[each.key].invoke_arn
+  payload_format_version = "2.0"
+}
+
 # One route per manifest entry, flattened to a map keyed "METHOD /path".
 locals {
   routes = merge([
     for name, fn in var.functions : {
-      for route in fn.http : "${route.method} ${route.path}" => name
+      for route in fn.http : "${route.method} ${route.path}" => { function = name, alias = route.alias }
     }
   ]...)
 }
@@ -56,7 +69,7 @@ resource "aws_apigatewayv2_route" "this" {
 
   api_id             = aws_apigatewayv2_api.this.id
   route_key          = each.key
-  target             = "integrations/${aws_apigatewayv2_integration.function[each.value].id}"
+  target             = "integrations/${each.value.alias == "previous" ? aws_apigatewayv2_integration.previous[each.value.function].id : aws_apigatewayv2_integration.function[each.value.function].id}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
 }
@@ -68,6 +81,17 @@ resource "aws_lambda_permission" "api" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.function[each.key].function_name
   qualifier     = aws_lambda_alias.live[each.key].name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.this.execution_arn}/*/*"
+}
+
+resource "aws_lambda_permission" "previous" {
+  for_each = var.functions
+
+  statement_id  = "AllowThisApi"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.function[each.key].function_name
+  qualifier     = aws_lambda_alias.previous[each.key].name
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_apigatewayv2_api.this.execution_arn}/*/*"
 }

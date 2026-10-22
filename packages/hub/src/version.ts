@@ -18,6 +18,16 @@ export function versionFromEnv(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 /**
+ * The version the previous alias runs (decision 0030), HEAT_PREVIOUS_VERSION,
+ * which Terraform reads from the function at live when it plans the deploy;
+ * undefined where it is empty, a previous deploy from before Issue-113.
+ * Only a discard reads it.
+ */
+export function previousVersionFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
+  return env.HEAT_PREVIOUS_VERSION || undefined;
+}
+
+/**
  * `extensions.outdated: true` on every response to a request whose header
  * names another version, errors included. A request with no header is not
  * flagged: the client sends it from Issue-115 on, and what it does with the

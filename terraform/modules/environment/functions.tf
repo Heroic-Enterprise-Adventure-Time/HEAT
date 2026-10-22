@@ -2,7 +2,8 @@
 # dist/<name>/ zipped here, passed with its hash, every change published as
 # a version, and an alias at that version for the routes (decision 0017).
 # Each function has its own execution role, under the boundary, with the
-# least it needs, and its own log group with retention.
+# least it needs, and its own log group with retention. The second alias,
+# previous, and how it learns what live was, are in previous.tf.
 
 data "archive_file" "function" {
   for_each = var.functions
@@ -39,14 +40,15 @@ resource "aws_iam_role" "function" {
   for_each = var.functions
 
   name                 = "${var.name_prefix}-${each.key}"
-  description          = "Execution role of the ${each.key} function of ${var.name_prefix}. Its log group, the two tables, and X-Ray."
+  description          = "Execution role of the ${each.key} function of ${var.name_prefix}. Its log group, the two tables, the replay bucket's objects, and X-Ray."
   assume_role_policy   = data.aws_iam_policy_document.function_trust.json
   permissions_boundary = var.permissions_boundary_arn
 }
 
 # Least privilege: the function's own log group, the item operations the
-# repository uses on the two tables, and the trace writes. No table
-# management, no other log group, no other service.
+# repository uses on the two tables, putting and getting the replay
+# bucket's objects, and the trace writes. No table or bucket management, no
+# listing, no other log group, no other service.
 data "aws_iam_policy_document" "function" {
   for_each = var.functions
 
@@ -81,6 +83,22 @@ data "aws_iam_policy_document" "function" {
       aws_dynamodb_table.player.arn,
       aws_dynamodb_table.location.arn,
     ]
+  }
+
+  # The timelines, one object per adventure (replays.tf, Issue-114). A
+  # conditional put needs nothing beyond s3:PutObject (S3 user guide,
+  # "How to prevent object overwrites with conditional writes", read
+  # 2026-10-22). Without s3:ListBucket a missing key answers 403, not 404.
+  statement {
+    sid    = "PutAndGetTimelines"
+    effect = "Allow"
+
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+    ]
+
+    resources = ["${aws_s3_bucket.replays.arn}/*"]
   }
 
   statement {
@@ -145,6 +163,11 @@ resource "aws_lambda_function" "function" {
       # so every deploy publishes a new version and moves the alias, even
       # one whose bundle is unchanged.
       HEAT_VERSION = var.app_version
+      # The version the previous alias runs, read when Terraform plans
+      # (previous.tf), so a discard can refuse an adventure that either
+      # deploy still verifies.
+      HEAT_PREVIOUS_VERSION = local.previous[each.key].app_version
+      HEAT_REPLAY_BUCKET    = aws_s3_bucket.replays.id
     }
   }
 

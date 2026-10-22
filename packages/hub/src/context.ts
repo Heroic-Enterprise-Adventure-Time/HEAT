@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyEventV2WithJWTAuthorizer } 
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { Tables } from "./db/client.js";
 import { Repository } from "./db/repository.js";
+import type { Timelines } from "./timelines.js";
 import { VERSION_HEADER } from "./version.js";
 
 /**
@@ -18,6 +19,10 @@ export interface Context {
   repo: Repository;
   /** The deploy's version, HEAT_VERSION (decision 0030). */
   version: string;
+  /** The previous deploy's version, HEAT_PREVIOUS_VERSION, if it is known. */
+  previousVersion: string | undefined;
+  /** The replay bucket's timelines (Issue-114). */
+  timelines: Timelines;
   /** The version the client sent in the `heat-version` header, if it sent one. */
   clientVersion: string | undefined;
 }
@@ -38,12 +43,18 @@ export function identityFromEvent(event: APIGatewayProxyEventV2): Identity | und
   return { playerId: sub, playerName: typeof email === "string" && email.length > 0 ? email : sub };
 }
 
-export function createContextFactory(db: DynamoDBDocumentClient, tables: Tables, version: string) {
+export interface Versions {
+  version: string;
+  previousVersion: string | undefined;
+}
+
+export function createContextFactory(db: DynamoDBDocumentClient, tables: Tables, versions: Versions, timelines: Timelines) {
   const repo = new Repository(db, tables);
+  const { version, previousVersion } = versions;
   return async ({ event }: { event: APIGatewayProxyEventV2 }): Promise<Context> => {
     const identity = identityFromEvent(event);
     // Payload 2.0 lower-cases header names.
     const clientVersion = event.headers?.[VERSION_HEADER];
-    return { playerId: identity?.playerId, playerName: identity?.playerName, repo, version, clientVersion };
+    return { playerId: identity?.playerId, playerName: identity?.playerName, repo, version, previousVersion, timelines, clientVersion };
   };
 }

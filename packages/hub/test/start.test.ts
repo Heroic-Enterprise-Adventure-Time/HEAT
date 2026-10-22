@@ -9,6 +9,8 @@ import { Repository, type Hero, type HeroStatus } from "../src/db/repository.js"
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
+import { submitAdventure } from "../src/submit.js";
+import { MemoryTimelines } from "../src/timelines.js";
 
 /**
  * startAdventure against DynamoDB Local: the job on the location's board,
@@ -157,14 +159,16 @@ describe("startAdventure", () => {
 });
 
 describe("no retiring a hero while it is adventuring", () => {
-  it("refuses the retire until the adventure is settled", async () => {
+  it("refuses the retire until the adventure is settled, or until the hero is dead", async () => {
     const p = player();
     const villager = await recruitHero(repo, p, "villager", randomUUID());
     const started = await startAdventure(repo, p, version, at, wolves, [villager.id]);
     expect((await refusal(retireHero(repo, p, villager.id)))?.code).toBe("HERO_ADVENTURING");
     expect((await repo.getHero(p, villager.id))?.status).toBe("ALIVE");
 
-    await repo.settle(p, started.adventureId, at, [], [villager.id]);
+    // A lone villager does not survive the wolves (settle.test.ts); a dead
+    // hero may retire, and its mark is gone with the settlement.
+    await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect((await repo.getHero(p, villager.id))?.adventureId).toBeNull();
     expect((await retireHero(repo, p, villager.id)).status).toBe("RETIRED");
   });
