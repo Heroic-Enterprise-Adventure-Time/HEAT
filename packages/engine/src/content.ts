@@ -2,14 +2,15 @@
  * The game's static content: the locations, what each recruits, the caps of
  * the hall and the warehouse per level, the hero names, the sprite sets each
  * unit type allows, and the battle's abilities, unit types, monsters and
- * resource nodes. TypeScript data, imported by the hub and the client alike
+ * resource nodes, the jobs, and the XP each level needs. TypeScript data, imported by the hub and the client alike
  * (decision 0013); a change here is a change to the rules, reviewed like
  * code. The design is docs/design/game.md, "Locations and camps", "The heroes
- * hall", "Resources" and "The battle"; the numbers are its working
- * assumptions.
+ * hall", "Resources" and "The battle", and the jobs, the retreat and the XP
+ * table at the end; the numbers are its working assumptions.
  */
 
 import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
+import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
 import type { Material } from "./index.js";
 
 /** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. */
@@ -301,3 +302,62 @@ export const BATTLE_CONTENT: BattleContent = {
   resources: RESOURCE_NODES,
   resourceHit: { workPercent: 50, yieldPercent: 50 },
 };
+
+// ── Jobs and advancement ───────────────────────────────────────────
+
+export type JobId = "wolves-on-the-mill-road" | "timber-from-the-near-woods";
+
+/**
+ * The jobs, by id (game.md, "The battle"). A retreat forfeits the pay; from
+ * the lumber run it keeps what was gathered. A retreat earns half the XP.
+ */
+export const JOBS: Readonly<Record<JobId, Job>> = {
+  "wolves-on-the-mill-road": {
+    id: "wolves-on-the-mill-road",
+    name: "Wolves on the mill road",
+    description: "Two wolves have been at the miller's carts. The weavers pay in cloth to see the road clear.",
+    location: "millbrook",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", monsters: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [{ material: "cloth", amount: 10 }],
+    xp: 20,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
+  "timber-from-the-near-woods": {
+    id: "timber-from-the-near-woods",
+    name: "Timber from the near woods",
+    description: "Fell what you can carry in the near woods and bring it home. A wolf has been seen on the path.",
+    location: "millbrook",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", nodes: [{ type: "tree", count: 3 }], carry: 60, timeLimitMs: 90_000 },
+      { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [{ material: "cloth", amount: 3 }],
+    xp: 15,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
+};
+
+/** A retreat in a fight: an attempt every 2 s, 30% at first, 20 points more after each failure. */
+export const RETREAT: RetreatRule = { intervalMs: 2000, firstChancePercent: 30, risePercent: 20 };
+
+/** The content an adventure reads by default. */
+export const ADVENTURE_CONTENT: AdventureContent = { battle: BATTLE_CONTENT, jobs: JOBS, retreat: RETREAT };
+
+/**
+ * The total XP each level needs; index 0 is level 1. One wolves job takes a
+ * hero to level 2, so the fighter's first level is easy to reach.
+ */
+export const LEVEL_XP: readonly number[] = [0, 10, 30, 60, 100, 150, 210, 280, 360, 450];
+
+/** The level a hero with this much XP has, at most the table's last. */
+export function levelForXp(xp: number): number {
+  let level = 1;
+  while (level < LEVEL_XP.length && xp >= (LEVEL_XP[level] ?? Infinity)) level++;
+  return level;
+}
