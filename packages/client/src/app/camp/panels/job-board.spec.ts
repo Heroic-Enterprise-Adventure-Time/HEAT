@@ -7,6 +7,7 @@ import { routes } from '../../app.routes';
 import { Game, type AdventureView, type HeroView } from '../../game';
 import { Session } from '../../session';
 import { CAMP_SCENE_FACTORY } from '../camp';
+import { FRAME_LOOP } from '../../adventure/adventure';
 
 function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): HeroView {
   return {
@@ -49,6 +50,7 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     location: signal('millbrook'),
     player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
     adventure: open,
+    settled: signal(null),
     busy: signal(false),
     error: signal<string | null>(null),
     started: [] as { location: string; jobId: string; heroIds: readonly string[] }[],
@@ -69,9 +71,15 @@ function adventureOf(heroIds: readonly string[]): AdventureView {
     id: 'a1',
     startedAt: '2026-10-22T07:00:00.000Z',
     location: 'millbrook',
+    seed: 's1',
+    version: 'v1',
     job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves have been at the carts.' },
     snapshot: {
-      heroes: party.filter((h) => heroIds.includes(h.id)).map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level })),
+      version: 'v1',
+      jobId: 'wolves-on-the-mill-road',
+      heroes: party
+        .filter((h) => heroIds.includes(h.id))
+        .map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } })),
     },
   };
 }
@@ -82,6 +90,8 @@ async function render(game: ReturnType<typeof fakeGame>, url: string) {
       provideRouter(routes),
       { provide: Game, useValue: game },
       { provide: Session, useValue: { user: signal({ email: 'player@example.com', name: null, accessToken: 't' }) } },
+      // The adventure's frames never come, so a run stays at its start.
+      { provide: FRAME_LOOP, useValue: () => () => undefined },
       {
         provide: CAMP_SCENE_FACTORY,
         useValue: async () => ({ setHeroes: () => undefined, destroy: () => undefined }),
@@ -162,8 +172,8 @@ describe('Job board', () => {
 
     await settle();
     const shown = harness.routeNativeElement as HTMLElement;
-    expect(shown.querySelector('h1')?.textContent).toBe('Wolves on the mill road');
-    expect([...shown.querySelectorAll('li strong')].map((s) => s.textContent)).toEqual(['Wren', 'Lark']);
+    expect(shown.querySelector('aside h2')?.textContent).toBe('Wolves on the mill road');
+    expect([...shown.querySelectorAll('.party strong')].map((s) => s.textContent)).toEqual(['Wren', 'Lark']);
   });
 
   it("shows a start's refusal in place, in the player's words", async () => {

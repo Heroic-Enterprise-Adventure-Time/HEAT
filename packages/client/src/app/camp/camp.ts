@@ -65,6 +65,12 @@ export class Camp {
     this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
   );
 
+  /** The heroes about the camp: not those away on the open adventure (Issue-15). */
+  private readonly campHeroes = computed(() => {
+    const away = new Set(this.game.adventure()?.snapshot.heroes.map((h) => h.heroId));
+    return this.game.heroesHere().filter((h) => !away.has(h.id));
+  });
+
   private readonly ratioWatch = new AbortController();
   private scene: CampSceneHandle | null = null;
   private rendered = false;
@@ -91,7 +97,7 @@ export class Camp {
         if (this.rendered) void this.mount();
       });
     });
-    effect(() => this.showHeroes(this.game.heroesHere(), this.game.seenHere(), this.state.arriving(), this.state.leaving()));
+    effect(() => this.showHeroes(this.campHeroes(), this.game.seenHere(), this.state.arriving(), this.state.leaving()));
     this.watchRatio();
     inject(DestroyRef).onDestroy(() => {
       this.ratioWatch.abort();
@@ -138,10 +144,10 @@ export class Camp {
       return;
     }
     this.scene = scene;
-    this.showHeroes(this.game.heroesHere(), this.game.seenHere(), this.state.arriving(), this.state.leaving());
+    this.showHeroes(this.campHeroes(), this.game.seenHere(), this.state.arriving(), this.state.leaving());
   }
 
-  /** The living heroes walk about, with the few of other players' seen here; the dead and the retired are on the roster, not in the camp. */
+  /** The living heroes at home walk about, with the few of other players' seen here; the dead and the retired are on the roster, not in the camp. */
   private showHeroes(
     heroes: readonly HeroView[],
     seen: readonly SeenHeroView[],

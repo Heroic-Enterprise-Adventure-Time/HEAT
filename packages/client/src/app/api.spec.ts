@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Api, ApiError, VERSION_HEADER } from './api';
+import { Api, ApiError, PREVIOUS, VERSION_HEADER } from './api';
 import { Config, type StackConfig } from './config';
 import { Session } from './session';
 
@@ -23,11 +23,13 @@ function setup(body: unknown) {
   });
   const api = TestBed.inject(Api);
   const headers: Record<string, string>[] = [];
-  api.fetchFn = async (_input, init) => {
+  const paths: string[] = [];
+  api.fetchFn = async (input, init) => {
+    paths.push(input);
     headers.push(init.headers as Record<string, string>);
     return new Response(JSON.stringify(body), { status: 200 });
   };
-  return { api, headers };
+  return { api, headers, paths };
 }
 
 describe('Api', () => {
@@ -49,5 +51,12 @@ describe('Api', () => {
     const { api } = setup({ errors: [{ message: 'a party is 1 to 4 heroes', extensions: { code: 'PARTY_SIZE' } }], extensions: { outdated: true } });
     await expect(api.request('mutation { x }')).rejects.toEqual(new ApiError('a party is 1 to 4 heroes', 'PARTY_SIZE'));
     expect(api.outdated()).toBe(true);
+  });
+
+  it("sends a request for the previous deploy to /previous in front of the stack's path", async () => {
+    const { api, paths } = setup({ data: { version: 'v0' } });
+    await api.request('{ version }');
+    await api.request('{ version }', {}, PREVIOUS);
+    expect(paths).toEqual(['/graphql', '/previous/graphql']);
   });
 });

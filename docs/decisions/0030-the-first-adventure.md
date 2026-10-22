@@ -1,6 +1,6 @@
 # 0030: The first adventure: the engine, the marching order, stage time limits, and one version per deploy
 
-- **Status:** Decided. Amended by Issue-115 on 2026-10-22, the owner's call: an outdated client reloads itself rather than prompting a refresh, at once with no adventure open and otherwise once the adventure is over, and a tab reloads away from a version only once.
+- **Status:** Decided. Amended by Issue-115 on 2026-10-22, the owner's call: an outdated client reloads itself rather than prompting a refresh, at once with no adventure open and otherwise once the adventure is over, and a tab reloads away from a version only once. Amended by Issue-15 on 2026-10-22, the owner's call: a stage's time limit is shown as a countdown in whole seconds in its last ten seconds of simulated time.
 - **Date:** 2026-10-21
 - **Settles:** Issue-109: the shape that Issue-110 to Issue-115 and Issue-15 build, agreed in the planning session of 2026-10-21.
 
@@ -10,7 +10,7 @@
 
 **A marching order.** Each side has four lines, front, near, far and back; a line holds any number of units with no order within it; a unit type has a home line. Reach is by line. When a side's front line empties, every unit on that side moves up a line, so the nearest occupied line is always the front. Stepping up is also an action for the unit types whose list says so, the villager and the monsters among the first; the fighter holds its line.
 
-**Stages and time limits.** A job is an ordered list of stages on one timeline with health and cargo carried over. Every fight and gather stage carries its own time limit, because some are expected to resolve faster than others; reaching it ends the adventure as a retreat with the job's penalty. It is a deadlock kill switch, shown only in its last stretch, never a mechanic to play against.
+**Stages and time limits.** A job is an ordered list of stages on one timeline with health and cargo carried over. Every fight and gather stage carries its own time limit, because some are expected to resolve faster than others; reaching it ends the adventure as a retreat with the job's penalty. It is a deadlock kill switch, never a mechanic to play against, shown only in its last ten seconds, as a countdown (amended by Issue-15).
 
 **One version for the whole app.** The client, the hub and the engine carry one version, the commit the workflow deployed. An adventure is stamped with it at start and is verified only by that version. Every deploy republishes the hub and moves its `live` alias; a second alias, `previous`, keeps the deploy before, reachable at a second route behind the same authorizer, so an adventure started under the previous deploy is verified by it. The current route refuses another version with `ENGINE_UPDATED`; the client tries the previous route; the same refusal there means too old, and the client asks for the discard. The client sends its version on every request and is told when it is outdated, and defers the refresh prompt while an adventure is in progress. The snapshot therefore holds only the party's effective numbers and the job by id; the content is read by the version that verifies. Determinism is a property within one version, which the engine's test proves by stepping the same run two ways.
 
