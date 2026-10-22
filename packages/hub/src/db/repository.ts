@@ -11,6 +11,7 @@ import {
   STARTING_LOCATION,
   type AdventureOutcome,
   type AdventureSnapshot,
+  type Cost,
   type Material,
   type Reward,
   type StageResult,
@@ -26,7 +27,8 @@ import { locationKeys, playerKeys } from "./keys.js";
  * debit (the ledger's non-negative balance), settle (the result once, keyed
  * on the adventure id, with the credits capped at the warehouse, the XP and
  * the deaths), discard (an adventure closed with nothing credited), recruit
- * (the hall's cap and the free-villager rule, on the camp's counts) and
+ * (the hall's cap and the free-villager rule, on the camp's counts, and the
+ * cost's debits with their ledger entries) and
  * retire (the hero's status and the camp's counts together, never while the
  * hero is adventuring). Each is one
  * TransactWriteItems call with condition checks; a failed condition cancels
@@ -579,19 +581,60 @@ export class Repository {
   }
 
   /**
-   * Recruit for free: put the hero only if its id is new, and count it into
-   * the camp only if the camp has no living hero and a free slot, on the
-   * camp as the caller read it, so a concurrent recruit, death or hall
-   * upgrade between the read and the write fails the condition instead of
-   * passing the cap. A camp with no item is created at level 1. No debit and
-   * no ledger entry: the villager is free when no active hero is alive
-   * (decision 0026). The hero is seen at its location as it is recruited
-   * (decision 0029). Throws HeroExists when the id is taken, which is a
-   * repeated request, and RecruitRefused when the camp's condition fails.
+   * Recruit, in one transaction (decision 0026): put the hero only if its id
+   * is new; count it into the camp only if the hall is at the level read and
+   * has a free slot, on the camp as the caller read it, so a concurrent
+   * recruit, death or hall upgrade between the read and the write fails the
+   * condition instead of passing the cap; and for each resource in the cost,
+   * debit the holding only if its balance covers the amount, with a ledger
+   * entry under the hero's id that can exist once. A camp with no item is
+   * created at level 1. The hero is seen at its location as it is recruited
+   * (decision 0029).
+   *
+   * `living` holds the price to the camp it was read from: a free villager
+   * needs no living hero, a paid one at least one, so a death or a recruit
+   * between the read and the write cannot make a villager free that was
+   * charged, or charged that was free. A unit type whose price does not
+   * depend on it passes "any".
+   *
+   * Throws HeroExists when the id is taken, which is a repeated request;
+   * RecruitRefused when the camp's condition fails; InsufficientBalance when
+   * a holding does not cover its debit.
    */
-  async recruitFree(playerId: string, camp: Camp, capacity: number, hero: Hero): Promise<Hero> {
+  async recruit(
+    playerId: string,
+    camp: Camp,
+    capacity: number,
+    hero: Hero,
+    cost: Cost,
+    living: "none" | "some" | "any",
+  ): Promise<Hero> {
     const values: Record<string, unknown> = { ":one": 1, ":location": camp.location };
-    if (camp.stored) Object.assign(values, { ":level": camp.hallLevel, ":zero": 0, ":cap": capacity });
+    const conditions = ["hallLevel = :level", "activeHeroes < :cap"];
+    if (living === "none") conditions.push("livingHeroes = :zero");
+    if (living === "some") conditions.push("livingHeroes > :zero");
+    if (camp.stored) {
+      Object.assign(values, { ":level": camp.hallLevel, ":cap": capacity });
+      if (living !== "any") values[":zero"] = 0;
+    }
+    const debits: TransactItems = cost.flatMap(({ material, amount }) => [
+      {
+        Update: {
+          TableName: this.tables.player,
+          Key: playerKeys.holding(playerId, camp.location, material),
+          UpdateExpression: "SET balance = balance - :amount",
+          ConditionExpression: "balance >= :amount",
+          ExpressionAttributeValues: { ":amount": amount },
+        },
+      },
+      {
+        Put: {
+          TableName: this.tables.player,
+          Item: { ...playerKeys.ledger(playerId, hero.id, `debit#${material}`), location: camp.location, material, delta: -amount },
+          ConditionExpression: "attribute_not_exists(PK)",
+        },
+      },
+    ]);
     await this.transact([
       {
         Put: {
@@ -606,20 +649,21 @@ export class Repository {
           Key: playerKeys.camp(playerId, camp.location),
           UpdateExpression:
             "SET #location = :location, hallLevel = if_not_exists(hallLevel, :one), warehouseLevel = if_not_exists(warehouseLevel, :one) ADD activeHeroes :one, livingHeroes :one",
-          ConditionExpression: camp.stored
-            ? "hallLevel = :level AND livingHeroes = :zero AND activeHeroes < :cap"
-            : "attribute_not_exists(PK)",
+          // No item is a camp at level 1 with no heroes.
+          ConditionExpression: camp.stored ? conditions.join(" AND ") : "attribute_not_exists(PK)",
           ExpressionAttributeNames: { "#location": "location" },
           ExpressionAttributeValues: values,
         },
       },
+      ...debits,
       {
         Put: {
           TableName: this.tables.location,
           Item: { ...locationKeys.seen(hero.location, hero.id), ...sightingOf(hero, new Date(hero.recruitedAt)) },
         },
       },
-    ], [HeroExists, RecruitRefused]);
+      // A ledger entry under the hero's id exists only if the hero does, so its failure is a repeat too.
+    ], [HeroExists, RecruitRefused, ...cost.flatMap(() => [InsufficientBalance, HeroExists])]);
     return hero;
   }
 

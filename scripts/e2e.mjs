@@ -170,7 +170,7 @@ if (leftover) {
 
 // The free villager (Issue-81). A sandbox stack's user meets a new camp
 // and recruits; a test user that kept its villager from an earlier run
-// (dev's, or a stack's after an earlier push) goes straight to the refusal.
+// (dev's, or a stack's after an earlier push) goes straight to the fighter.
 const campQuery = `{ me { camps { location livingHeroes activeHeroes } heroes { id unitType status location } } }`;
 const camp = await graphql(token, campQuery);
 const millbrook = camp.data?.me?.camps?.find((c) => c.location === "millbrook");
@@ -189,8 +189,11 @@ if (millbrook.livingHeroes === 0) {
 } else {
   console.log(`the test user already has ${millbrook.livingHeroes} living hero(es) at millbrook; checking the refusal only`);
 }
-const second = await graphql(token, recruitMutation, { id: crypto.randomUUID() });
-check(second.errors?.[0]?.extensions?.code === "NOT_FREE", `a second free villager is refused while a hero lives (${second.ms} ms)`);
+// A fighter costs 40 ore, and no job yields ore until the mine's (Issue-133),
+// so on every stack it is refused with what is short (Issue-82).
+const fighter = await graphql(token, `mutation($id: String!) { recruitHero(unitType: "fighter", requestId: $id) { id } }`, { id: crypto.randomUUID() });
+const short = fighter.errors?.[0]?.extensions;
+check(short?.code === "INSUFFICIENT_RESOURCES" && short.short?.[0]?.material === "ore" && short.short[0].amount === 40, `a fighter is refused for want of ore: ${JSON.stringify(short?.short)} (${fighter.ms} ms)`);
 
 // Retirement (Issue-98), on a sandbox stack only: retire the living villager,
 // which frees the next one, and recruit it. Dev's test user keeps its one
@@ -272,6 +275,17 @@ check(free.data?.me?.openAdventure === null, `no adventure is open after the set
 const repeated = await graphql(token, submitMutation, { id, log: [] });
 const unchanged = (await graphql(token, heroQuery)).data?.me;
 check(!repeated.errors && JSON.stringify(repeated.data.submitAdventure.result) === JSON.stringify(result) && JSON.stringify(unchanged) === JSON.stringify(after), `a repeated submit answers the settled result and pays nothing (${repeated.ms} ms)`);
+
+// Paid recruitment (Issue-82): the timber run pays for a second villager,
+// 20 timber debited while the first lives. It is retired at once, on every
+// stack, so dev's test user never fills its hall.
+const paid = await graphql(token, recruitMutation, { id: crypto.randomUUID() });
+const bought = paid.data?.recruitHero;
+check(!paid.errors && bought?.status === "ALIVE", `recruitHero sold a second villager, ${bought?.name}, while one lives (${paid.ms} ms)`);
+const paidFor = (await graphql(token, heroQuery)).data?.me;
+check(balance(paidFor, "timber") === balance(unchanged, "timber") - 20, `the camp paid 20 timber for it: ${balance(unchanged, "timber")} to ${balance(paidFor, "timber")}`);
+const dismissed = await graphql(token, `mutation($id: String!) { retireHero(heroId: $id) { status } }`, { id: bought.id });
+check(dismissed.data?.retireHero?.status === "RETIRED", `the paid villager retired, leaving the hall as it was (${dismissed.ms} ms)`);
 
 // The timeline, read back through the hub from the replay bucket.
 const read = await graphql(token, `query($id: String!) { adventure(id: $id) { id status timeline } }`, { id });

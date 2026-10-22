@@ -43,8 +43,18 @@ export interface Recruit {
   unitType: UnitType;
   /** The hall level the unit type needs. */
   hallLevel: number;
-  /** The cost when the recruit is not the free villager. Paid recruitment is Issue-82. */
+  /** The cost when the recruit is not the free villager. */
   cost: Cost;
+}
+
+/**
+ * What a recruit costs a camp with this many living heroes: nothing for a
+ * villager when none is alive, so no player is ever locked out (game.md,
+ * "The heroes hall"), and the unit type's cost otherwise. The hub charges
+ * it and the hall shows it, from this one rule.
+ */
+export function recruitCost(recruit: Recruit, livingHeroes: number): Cost {
+  return recruit.unitType === "villager" && livingHeroes === 0 ? [] : recruit.cost;
 }
 
 export interface Location {

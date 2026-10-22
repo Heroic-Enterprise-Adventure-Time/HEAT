@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
@@ -108,7 +108,7 @@ describe("retireHero", () => {
   it("makes the villager free again when the camp's only living hero retires", async () => {
     const p = player();
     const villager = await recruitHero(repo, p, "villager", randomUUID());
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBe("NOT_FREE");
+    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBe("INSUFFICIENT_RESOURCES");
     await retireHero(repo, p, villager.id);
     const next = await recruitHero(repo, p, "villager", randomUUID());
     expect(next.status).toBe("ALIVE");
@@ -139,6 +139,31 @@ describe("retireHero", () => {
       expect(heroes).toHaveLength(recruit.status === "fulfilled" ? 5 : 4);
       expect(heroes.filter((h) => h.status !== "RETIRED").length).toBeLessThanOrEqual(4);
       await expectCountsAgree(p);
+    }
+  });
+
+  it("pays for a paid recruit only if it is made, when it races a retire for the last slot", async () => {
+    // A full hall of living heroes and timber for two villagers. The recruit
+    // wins only if it reads the camp after the retire; either way the hall
+    // never passes its cap, the counts match the heroes, and the timber and
+    // the ledger show one debit exactly when a hero was made.
+    for (let round = 0; round < 5; round++) {
+      const p = player();
+      const [leaving] = await putCamp(p, ["ALIVE", "ALIVE", "ALIVE", "ALIVE"]);
+      await repo.setBalance(p, at, "timber", 40);
+      const requestId = randomUUID();
+      const [retire, recruit] = await Promise.allSettled([
+        retireHero(repo, p, leaving!.id),
+        recruitHero(repo, p, "villager", requestId),
+      ]);
+      expect(retire.status).toBe("fulfilled");
+      const made = recruit.status === "fulfilled";
+      if (!made) expect(recruit.reason).toBeInstanceOf(GraphQLError);
+      expect(await repo.heroes(p)).toHaveLength(made ? 5 : 4);
+      await expectCountsAgree(p);
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: made ? 20 : 40 }]);
+      const ledger = await db.send(new GetCommand({ TableName: tables.player, Key: playerKeys.ledger(p, requestId, "debit#timber") }));
+      expect(ledger.Item?.["delta"]).toBe(made ? -20 : undefined);
     }
   });
 
