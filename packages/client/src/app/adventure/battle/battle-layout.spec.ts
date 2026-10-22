@@ -32,15 +32,17 @@ describe('Battle layout', () => {
     expect(entryOffset([])).toBe(0);
   });
 
-  it('scales the stage by the largest whole number that fits, with ground around it', () => {
-    expect(battleView(1280, 720)).toEqual({ scale: 4, width: 320, height: 180, stageX: 0, stageY: 0 });
-    expect(battleView(1000, 700)).toMatchObject({ scale: 3, width: 334, height: 234, stageX: 7, stageY: 27 });
+  it('scales the stage by the largest whole number that fits and shows at least 400 pixels of road, with ground around it', () => {
+    expect(battleView(1600, 900)).toEqual({ scale: 4, width: 400, height: 225, stageX: 40, stageY: 22 });
+    expect(battleView(1500, 1000)).toMatchObject({ scale: 3, width: 500, height: 334, stageX: 90, stageY: 77 });
+    expect(battleView(1280, 360)).toMatchObject({ scale: 2 });
     expect(battleView(200, 100).scale).toBe(1);
   });
 
   it('gives the stacked stage the scale the page width allows, no more than half the window high', () => {
     expect(stackedBattleHeight(400, 900)).toBe(STAGE_HEIGHT);
-    expect(stackedBattleHeight(700, 900)).toBe(STAGE_HEIGHT * 2);
+    expect(stackedBattleHeight(700, 900)).toBe(STAGE_HEIGHT);
+    expect(stackedBattleHeight(900, 900)).toBe(STAGE_HEIGHT * 2);
     expect(stackedBattleHeight(1400, 700)).toBe(STAGE_HEIGHT);
     expect(stackedBattleHeight(400, 900, 2)).toBe(STAGE_HEIGHT);
   });

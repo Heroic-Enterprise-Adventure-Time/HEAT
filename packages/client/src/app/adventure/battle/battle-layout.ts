@@ -67,9 +67,16 @@ export interface BattleView {
   readonly stageY: number;
 }
 
-/** The largest whole number of device pixels per art pixel at which the stage fits the box, at least 1. */
+/** The road shown across at the least, so that a wide box shows more of the world rather than the stage closer (the owner's call on Issue-15). */
+export const MIN_VIEW_WIDTH = 400;
+
+/**
+ * The largest whole number of device pixels per art pixel at which the
+ * stage fits the box and at least `MIN_VIEW_WIDTH` of road shows across,
+ * at least 1.
+ */
 export function battleScale(boxWidth: number, boxHeight: number): number {
-  return Math.max(1, Math.floor(Math.min(boxWidth / STAGE_WIDTH, boxHeight / STAGE_HEIGHT)));
+  return Math.max(1, Math.floor(Math.min(boxWidth / MIN_VIEW_WIDTH, boxHeight / STAGE_HEIGHT)));
 }
 
 /**
@@ -86,11 +93,11 @@ export function battleView(boxWidth: number, boxHeight: number): BattleView {
 
 /**
  * The stage's box height in CSS pixels when the controls go below it: the
- * stage at the largest whole scale that fits the page's width, in device
- * pixels, and no more than half the window's height.
+ * stage at the scale `battleScale` gives the page's width, in device pixels,
+ * and no more than half the window's height.
  */
 export function stackedBattleHeight(width: number, height: number, ratio = 1): number {
-  const byWidth = Math.floor((width * ratio) / STAGE_WIDTH);
+  const byWidth = Math.floor((width * ratio) / MIN_VIEW_WIDTH);
   const byHeight = Math.floor((height * ratio) / 2 / STAGE_HEIGHT);
   return (STAGE_HEIGHT * Math.max(1, Math.min(byWidth, byHeight))) / ratio;
 }

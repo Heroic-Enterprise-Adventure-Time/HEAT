@@ -53,7 +53,7 @@ const DOWN_MS = 100;
 const WALK_MS = 100;
 const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
-/** A fallen monster lies this long after its fall, then fades over the next. */
+/** A fallen monster or a felled tree lies this long after its fall, then fades over the next. */
 const FADE_AFTER_MS = 600;
 const FADE_MS = 500;
 
@@ -282,8 +282,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const since = unitView.clock - unitView.downAt;
       const index = Math.min(last, Math.floor(since / DOWN_MS));
       show(unitView, art.down, index, mirrored, last > 0 ? 1 - index / last : null);
-      // A fallen monster lies a moment, then fades away; a fallen hero stays down, and a tree leaves its stump.
-      if (unitView.unit.kind === 'monster') {
+      // A fallen monster or a felled tree lies a moment, then fades away; a fallen hero stays down.
+      if (unitView.unit.kind !== 'hero') {
         unitView.body.alpha = Math.max(0, Math.min(1, 1 - (since - last * DOWN_MS - FADE_AFTER_MS) / FADE_MS));
       }
       return;
