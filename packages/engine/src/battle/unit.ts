@@ -99,6 +99,12 @@ export interface BattleSetup {
   readonly opponents: readonly Opponent[];
   /** The fight's time limit on its own clock; reaching it ends the battle as `timeout`. */
   readonly timeLimitMs: number;
+  /**
+   * What the party can carry: material yielded beyond it is left behind, and
+   * reaching it ends the battle as a win, the party loaded. Absent, a battle
+   * yields whatever is harvested.
+   */
+  readonly carryLimit?: number;
 }
 
 /** A unit as it stood at the start, for the timeline. */
