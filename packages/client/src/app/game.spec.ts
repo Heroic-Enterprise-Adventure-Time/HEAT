@@ -20,7 +20,7 @@ const villager: HeroView = {
 function playerWith(heroes: HeroView[], activeHeroes = heroes.length, livingHeroes = heroes.length): PlayerView {
   return {
     id: 'p1',
-    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes }],
+    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings: [], resourceCapacity: 100 }],
     heroes,
     openAdventure: null,
   };
@@ -48,6 +48,19 @@ function fakeApi(start: PlayerView) {
         const hero = { ...player.heroes.find((h) => h.id === variables['id'])!, status: 'RETIRED' as const, retiredAt: '2026-10-21T12:00:00.000Z' };
         player = playerWith(player.heroes.map((h) => (h.id === hero.id ? hero : h)), 0, 0);
         return { retireHero: hero };
+      }
+      if (query.includes('startAdventure')) {
+        if (player.openAdventure) throw new ApiError('an adventure is already open', 'ADVENTURE_OPEN');
+        const heroes = player.heroes.filter((h) => (variables['heroes'] as string[]).includes(h.id));
+        const adventure = {
+          id: 'a1',
+          startedAt: '2026-10-22T07:00:00.000Z',
+          location: variables['at'] as string,
+          job: { id: variables['job'] as string, name: 'Wolves on the mill road', description: 'Two wolves.' },
+          snapshot: { heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level })) },
+        };
+        player = { ...player, openAdventure: adventure };
+        return { startAdventure: adventure };
       }
       return { me: player };
     },
@@ -136,5 +149,35 @@ describe('Game', () => {
     await vi.waitFor(() => expect(game.player()).not.toBeNull());
     expect(await game.recruitVillager()).toBeNull();
     expect(game.error()).toContain('free only when no hero');
+  });
+
+  it('starts a job with a party, and then knows the open adventure', async () => {
+    const { api, game } = setup(playerWith([villager]));
+    TestBed.tick();
+    await vi.waitFor(() => expect(game.player()).not.toBeNull());
+    expect(game.livingHere().map((h) => h.id)).toEqual([villager.id]);
+
+    const adventure = await game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id]);
+    expect(api.calls.find((c) => c.query.includes('startAdventure'))?.variables).toEqual({
+      at: 'millbrook',
+      job: 'wolves-on-the-mill-road',
+      heroes: [villager.id],
+    });
+    expect(adventure.snapshot.heroes.map((h) => h.name)).toEqual(['Wren']);
+    expect(game.adventure()?.job.name).toBe('Wolves on the mill road');
+    expect(game.busy()).toBe(false);
+  });
+
+  it("throws a start's refusal with its code, and reads the player again", async () => {
+    const { api, game } = setup(playerWith([villager]));
+    TestBed.tick();
+    await vi.waitFor(() => expect(game.player()).not.toBeNull());
+    await game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id]);
+    const reads = api.calls.filter((c) => c.query.includes('me {')).length;
+
+    await expect(game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id])).rejects.toMatchObject({ code: 'ADVENTURE_OPEN' });
+    expect(api.calls.filter((c) => c.query.includes('me {'))).toHaveLength(reads + 1);
+    expect(game.error()).toBeNull();
+    expect(game.busy()).toBe(false);
   });
 });
