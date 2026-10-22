@@ -126,7 +126,7 @@ describe('Job board', () => {
     ]);
     expect([...page.querySelectorAll('.credits li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
       '3 cloth. Millbrook holds 0, with room for 100 more.',
-      'up to 60 timber. Millbrook holds 90, with room for 10 more.',
+      'Up to 60 timber. Millbrook holds 90, with room for 10 more.',
       '15 XP to each hero who comes back.',
     ]);
     expect(page.querySelector('.retreat')?.textContent).toBe('A retreat forfeits the pay, keeps the timber gathered, and earns half the XP.');

@@ -60,7 +60,9 @@ const REFUSALS: Readonly<Record<string, string>> = {
       <p class="retreat">{{ retreat() }}</p>
 
       <h3>Party</h3>
-      @if (game.adventure(); as adventure) {
+      @if (!game.player()) {
+        <p>Loading…</p>
+      } @else if (game.adventure(); as adventure) {
         <p class="note">An adventure is under way: <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>.</p>
       } @else if (game.livingHere().length === 0) {
         <p>
@@ -110,7 +112,8 @@ export class JobPanel {
     if (!job) return [];
     return credits(job).map((credit) => {
       const balance = camp?.holdings.find((h) => h.material === credit.material)?.balance ?? 0;
-      return { material: credit.material, words: creditWords(credit), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
+      const words = creditWords(credit);
+      return { material: credit.material, words: words[0]!.toUpperCase() + words.slice(1), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
     });
   });
   protected readonly retreat = computed(() => {
