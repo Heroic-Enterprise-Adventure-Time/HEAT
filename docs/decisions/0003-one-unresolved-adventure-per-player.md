@@ -1,6 +1,6 @@
 # 0003: One unresolved adventure per player
 
-- **Status:** Decided
+- **Status:** Decided; the discard on a game update amended by 0030: an adventure survives one deploy and is discarded after a second
 - **Date:** 2026-10-08
 
 ## Decision

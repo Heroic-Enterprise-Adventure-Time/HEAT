@@ -1,15 +1,19 @@
 /**
  * The game's static content: the locations, what each recruits, the caps of
- * the hall and the warehouse per level, the hero names and the sprite sets
- * each unit type allows. TypeScript data, imported by the hub and the client
- * alike (decision 0013); a change here is a change to the rules, reviewed
- * like code. The design is docs/design/game.md, "Locations and camps", "The
- * heroes hall" and "Resources"; the numbers are its working assumptions.
+ * the hall and the warehouse per level, the hero names, the sprite sets each
+ * unit type allows, and the battle's abilities, unit types, monsters and
+ * resource nodes, the jobs, and the XP each level needs. TypeScript data, imported by the hub and the client alike
+ * (decision 0013); a change here is a change to the rules, reviewed like
+ * code. The design is docs/design/game.md, "Locations and camps", "The heroes
+ * hall", "Resources" and "The battle", and the jobs, the retreat and the XP
+ * table at the end; the numbers are its working assumptions.
  */
 
+import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
+import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
 import type { Material } from "./index.js";
 
-/** The unit types that have a sprite set. Their stats and abilities come with the turn machinery. */
+/** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. */
 export type UnitType = "villager" | "fighter" | "knight" | "ranger" | "wizard" | "priest";
 
 export const UNIT_TYPES: readonly UnitType[] = ["villager", "fighter", "knight", "ranger", "wizard", "priest"];
@@ -167,4 +171,193 @@ export function heroNames(presentation: Presentation, taken: ReadonlySet<string>
   const allowed = presentation === "either" ? PRESENTATIONS.flatMap((p) => HERO_NAMES[p]) : [...HERO_NAMES[presentation], ...HERO_NAMES.either];
   const free = allowed.filter((n) => !taken.has(n));
   return free.length > 0 ? free : allowed;
+}
+
+// ── The battle ─────────────────────────────────────────────────────
+
+/** The monsters, by the type a fight stage names. Their sprite sets are mapped beside them (Issue-111). */
+export type MonsterType = "wolf" | "bandit";
+
+export const MONSTER_TYPES: readonly MonsterType[] = ["wolf", "bandit"];
+
+/** The resource nodes a gather stage names. */
+export type ResourceType = "tree" | "ore-vein";
+
+export const RESOURCE_TYPES: readonly ResourceType[] = ["tree", "ore-vein"];
+
+export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "move-up";
+
+const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
+
+const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as const).map((actorLine) => ({
+  actorLine,
+  targetLines: ["front", "near", "far", "back"],
+}));
+
+/** Every ability a unit type or monster's list names (game.md, "The battle"). */
+export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
+  strike: {
+    abilityId: "strike",
+    name: "Strike",
+    tags: ["melee-attack", "physical", "slashing"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 300,
+    effect: { kind: "damage" },
+  },
+  "strike-weakest": {
+    abilityId: "strike-weakest",
+    name: "Strike the weakest",
+    tags: ["melee-attack", "physical", "slashing"],
+    targeting: { side: "enemy", reach: [{ actorLine: "front", targetLines: ["front", "near"] }], selection: "weakest" },
+    warmupMs: 300,
+    effect: { kind: "damage" },
+  },
+  bite: {
+    abilityId: "bite",
+    name: "Bite",
+    tags: ["melee-attack", "physical", "piercing"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 200,
+    effect: { kind: "damage" },
+  },
+  guard: {
+    abilityId: "guard",
+    name: "Guard",
+    tags: ["support"],
+    targeting: { side: "ally", reach: ANY_LINE, selection: "below-half" },
+    warmupMs: 0,
+    effect: { kind: "guard", durationMs: 4000 },
+  },
+  chop: {
+    abilityId: "chop",
+    name: "Chop",
+    tags: ["gather", "physical"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 500,
+    effect: { kind: "gather", material: "timber" },
+  },
+  mine: {
+    abilityId: "mine",
+    name: "Mine",
+    tags: ["gather", "physical"],
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    warmupMs: 500,
+    effect: { kind: "gather", material: "ore" },
+  },
+  "move-up": {
+    abilityId: "move-up",
+    name: "Move up",
+    tags: ["movement"],
+    targeting: { side: "self" },
+    warmupMs: 400,
+    effect: { kind: "move-up" },
+  },
+};
+
+/**
+ * Each unit type's home line, base stats and one action list, the first
+ * usable action winning. A unit type without one cannot join a battle yet.
+ * A villager gathers both timber and ore, and a specialized gatherer later
+ * does one of them better with a higher `gathering`.
+ */
+export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
+  villager: {
+    homeLine: "near",
+    stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 },
+    actions: ["strike", "chop", "mine", "move-up"],
+  },
+  fighter: {
+    homeLine: "front",
+    stats: { maxHealth: 50, speed: 10, damage: 6, gathering: 0 },
+    actions: ["guard", "strike"],
+  },
+};
+
+export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
+  wolf: {
+    name: "Wolf",
+    homeLine: "front",
+    stats: { maxHealth: 24, speed: 12, damage: 3, gathering: 0 },
+    actions: ["bite", "move-up"],
+  },
+  bandit: {
+    name: "Bandit",
+    homeLine: "near",
+    stats: { maxHealth: 30, speed: 9, damage: 5, gathering: 0 },
+    actions: ["strike-weakest", "move-up"],
+  },
+};
+
+/** A node's amount is its health: the material it holds. */
+export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>> = {
+  tree: { name: "Tree", homeLine: "front", material: "timber", amount: 40 },
+  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", amount: 40 },
+};
+
+/** The content a battle reads by default. A regular attack on a node does half its damage as work and keeps half of that. */
+export const BATTLE_CONTENT: BattleContent = {
+  abilities: ABILITIES,
+  heroes: UNIT_PROFILES,
+  monsters: MONSTERS,
+  resources: RESOURCE_NODES,
+  resourceHit: { workPercent: 50, yieldPercent: 50 },
+};
+
+// ── Jobs and advancement ───────────────────────────────────────────
+
+export type JobId = "wolves-on-the-mill-road" | "timber-from-the-near-woods";
+
+/**
+ * The jobs, by id (game.md, "The battle"). A retreat forfeits the pay; from
+ * the lumber run it keeps what was gathered. A retreat earns half the XP.
+ */
+export const JOBS: Readonly<Record<JobId, Job>> = {
+  "wolves-on-the-mill-road": {
+    id: "wolves-on-the-mill-road",
+    name: "Wolves on the mill road",
+    description: "Two wolves have been at the miller's carts. The weavers pay in cloth to see the road clear.",
+    location: "millbrook",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", monsters: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [{ material: "cloth", amount: 10 }],
+    xp: 20,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
+  "timber-from-the-near-woods": {
+    id: "timber-from-the-near-woods",
+    name: "Timber from the near woods",
+    description: "Fell what you can carry in the near woods and bring it home. A wolf has been seen on the path.",
+    location: "millbrook",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", nodes: [{ type: "tree", count: 3 }], carry: 60, timeLimitMs: 90_000 },
+      { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [{ material: "cloth", amount: 3 }],
+    xp: 15,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
+};
+
+/** A retreat in a fight: an attempt every 2 s, 30% at first, 20 points more after each failure. */
+export const RETREAT: RetreatRule = { intervalMs: 2000, firstChancePercent: 30, risePercent: 20 };
+
+/** The content an adventure reads by default. */
+export const ADVENTURE_CONTENT: AdventureContent = { battle: BATTLE_CONTENT, jobs: JOBS, retreat: RETREAT };
+
+/**
+ * The total XP each level needs; index 0 is level 1. One wolves job takes a
+ * hero to level 2, so the fighter's first level is easy to reach.
+ */
+export const LEVEL_XP: readonly number[] = [0, 10, 30, 60, 100, 150, 210, 280, 360, 450];
+
+/** The level a hero with this much XP has, at most the table's last. */
+export function levelForXp(xp: number): number {
+  let level = 1;
+  while (level < LEVEL_XP.length && xp >= (LEVEL_XP[level] ?? Infinity)) level++;
+  return level;
 }

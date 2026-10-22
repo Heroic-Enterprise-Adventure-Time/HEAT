@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-// Writes a hero sprite set from PixelLab's export of a character, and runs the
-// checks of docs/process/assets.md, rule 13, that a script can run.
+// Writes a hero or monster sprite set from PixelLab's export of a character, and
+// runs the checks of docs/process/assets.md, rules 13 and 29, that a script can run.
 //
 //   node scripts/hero-sprite-set.mjs --character <id> --out art/heroes/<set>
 //        [--record <file>] [--source <heat name>=<PixelLab animation name> ...] [--mirror-west] [--zip <file>]
@@ -18,6 +18,11 @@
 //     "waivers"?: [{ "check": "hit east: height drifts", "date": "...", "note": "..." }],
 //     "animations": { "walk": { "groupId": "...", "source"?: "<PixelLab name>",
 //                               "calls": [{ "directions": ["south"], "generations": 3, "date"?: "...", "note"?: "..." }] } } }
+// A monster's record says "kind": "monster" and lists "monsters" in place of "classes" and "presentation", and
+// may give "characterParameters" that differ from rule 8 (a quadruped's body_type and template). Each of its
+// animations may name its own "template" and "mode", or "mode": "v3" with its "actionDescription", and its
+// "frames" and, for act, its "holdFrame", where they differ from rule 11's (rule 28). Either kind may list the
+// candidates not kept, as "rejected": [{ "name": "...", "characterId": "...", "description": "..." }].
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -52,6 +57,7 @@ if (!values.character || !values.out) {
   process.exit(2);
 }
 const record = values.record ? JSON.parse(readFileSync(values.record, "utf8")) : null;
+for (const [name, spec] of Object.entries(SET)) spec.frames = record?.animations?.[name]?.frames ?? spec.frames;
 const sourceName = Object.fromEntries(Object.keys(SET).map((n) => [n, record?.animations?.[n]?.source ?? n]));
 for (const pair of values.source) {
   const [name, source] = pair.split("=");
@@ -318,21 +324,22 @@ const TEMPLATES = { walk: "walking", stance: "fight-stance-idle-8-frames", act: 
 
 if (record) {
   const set = values.out.split(/[\\/]/).filter(Boolean).pop();
+  const monster = record.kind === "monster";
   const total = (calls) => calls.reduce((n, c) => n + c.generations, 0);
   const animations = Object.fromEntries(
     Object.entries(SET).map(([name, spec]) => {
       const r = record.animations[name];
       if (!r) throw new Error(`the record has no calls for ${name}`);
       return [name, {
-        template: TEMPLATES[name],
-        mode: "skeleton-v3",
+        ...(r.mode === "v3" ? { actionDescription: r.actionDescription } : { template: r.template ?? TEMPLATES[name] }),
+        mode: r.mode ?? "skeleton-v3",
         via: "MCP",
         groupId: r.groupId,
         ...(r.source && r.source !== name ? { pixellabName: r.source } : {}),
         directions: spec.directions,
         framesPerDirection: spec.frames,
         canvas: report.animations[name].canvas,
-        ...(name === "act" ? { holdFrame: 1 } : {}),
+        ...(name === "act" ? { holdFrame: r.holdFrame ?? 1 } : {}),
         files: `${name}-${spec.directions.length > 1 ? "<direction>" : spec.directions[0]}-<0..${spec.frames - 1}>.png`,
         calls: r.calls,
         generations: total(r.calls),
@@ -341,16 +348,15 @@ if (record) {
   );
   const provenance = {
     set,
-    kind: "hero sprite set",
-    classes: record.classes,
-    presentation: record.presentation,
+    kind: monster ? "monster sprite set" : "hero sprite set",
+    ...(monster ? { monsters: record.monsters } : { classes: record.classes, presentation: record.presentation }),
     service: SERVICE,
-    pixellab: { characterId: values.character, name: record.name, tags: ["heat", "hero", ...record.classes] },
+    pixellab: { characterId: values.character, name: record.name, tags: ["heat", monster ? "monster" : "hero", ...(monster ? record.monsters : record.classes)] },
     character: {
       tool: "create_character",
       via: "MCP",
       createdAt: report.createdAt,
-      parameters: { description: report.description, ...CHARACTER_PARAMETERS },
+      parameters: { description: report.description, ...CHARACTER_PARAMETERS, ...record.characterParameters },
       canvas: report.canvas,
       generations: record.characterGenerations,
       ...(record.characterNote ? { note: record.characterNote } : {}),
@@ -366,6 +372,7 @@ if (record) {
     animations,
     animationGenerations: Object.values(animations).reduce((n, a) => n + a.generations, 0),
     ...(report.waived.length ? { waivedChecks: report.waived } : {}),
+    ...(record.rejected ? { rejected: record.rejected } : {}),
     verified: values["mirror-west"]
       ? `Every PNG here except still-west.png is byte-identical to the same file in PixelLab's own export of the character (export version ${report.exportVersion}, ${report.exportDate.slice(0, 10)}).`
       : `Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version ${report.exportVersion}, ${report.exportDate.slice(0, 10)}).`,

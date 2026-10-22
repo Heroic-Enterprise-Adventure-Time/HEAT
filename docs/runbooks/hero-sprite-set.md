@@ -1,6 +1,6 @@
 # Making a hero sprite set
 
-How one hero sprite set is made with PixelLab, from an appearance and a class to committed files under `art/heroes/` with their provenance. The rules are `docs/process/assets.md`, rules 5 to 15; this runbook is the order of work and the tooling, and does not repeat them. The Claude Code skill `.claude/skills/hero-sprite-set/` points here.
+How one hero sprite set is made with PixelLab, from an appearance and a class to committed files under `art/heroes/` with their provenance. A monster's set is made the same way, with the differences under "A monster" below. The rules are `docs/process/assets.md`, rules 5 to 13 and 28 to 29; this runbook is the order of work and the tooling, and does not repeat them. The Claude Code skill `.claude/skills/hero-sprite-set/` points here.
 
 ## Rules
 
@@ -42,6 +42,17 @@ The record is the agent's note of what the export does not hold, from which the 
 ```
 
 `source` names an animation that carries another name in PixelLab. `--mirror-west` writes `still-west.png` as the east rotation mirrored, where the owner finds the west rotation bad (rule 11). `--zip <file>` reads an export already downloaded.
+
+## A monster
+
+The same steps, with four differences (`docs/process/assets.md`, rules 28 and 29):
+
+- The inputs are the monster, for example `wolf`, in place of the class and the presentation, and the set is named `<monster>-<nn>` under `art/monsters/`.
+- Every candidate is shown in a battle line-up as well, facing west (the east rotation mirrored) opposite a kept hero.
+- A four-legged monster's walk and stance are `mode: template`, and its act, hit and down `mode: v3`, so its record names each animation's `template` or `mode` and `actionDescription`, its `frames`, and the act's `holdFrame`, chosen by eye.
+- The record says `"kind": "monster"` and lists `monsters`, the candidates not kept as `rejected`, and for a quadruped the `characterParameters` that differ from rule 8.
+
+A prop, such as a tree, is an object, not a character: rules 30 and 31, and `node scripts/prop-sprite-set.mjs --object <id> --out art/props/<set> --record <record.json>`, whose header gives the record's shape.
 
 ## Cost
 
