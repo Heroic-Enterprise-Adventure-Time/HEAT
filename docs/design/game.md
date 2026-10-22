@@ -109,7 +109,7 @@ How an adventure plays out: the first cut, agreed 2026-10-21 (decision 0030). Th
 ## The heroes hall
 
 - **Decided.** Every unlocked location has the player's own heroes hall, at level 1 or above. The hall is where heroes are recruited, and where the player views and manages their heroes at that location.
-- **Decided.** A hero belongs to one camp at a time. The hall's level sets the number of active heroes the camp can hold. Living and dead heroes are both active. A retired hero is not: retiring is permanent, and a retired hero stays on the record with its history, like a dead one.
+- **Decided.** A hero belongs to one camp at a time. The hall's level sets the number of active heroes the camp can hold. Living and dead heroes are both active. A retired hero is not: retiring is permanent, and a retired hero stays on the record with its history, like a dead one. A hero on an adventure cannot retire until the adventure is over (owner, 2026-10-22, Issue-113).
 - **Decided.** Recruiting anyone needs a free slot. When no active hero at the location is alive, the next villager is free, so a player can never be locked out: a camp full of dead heroes retires one and recruits a villager for nothing.
 - **Decided.** Each location lists the unit types that can be recruited there, each with the hall level it needs and its cost in resources. Common unit types are on many lists; some are found in one place only, such as the templar at a temple or the witch in a swamp. Every location offers the villager at hall level 1, which is what makes the free villager work everywhere.
 - **Decided.** The first location is Millbrook, a quiet village. **Working assumption:** it recruits the villager and the fighter at hall level 1. The fighter's first level is easy to reach.

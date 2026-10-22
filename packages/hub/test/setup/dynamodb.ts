@@ -25,6 +25,7 @@ export async function setup(): Promise<void> {
   process.env.AWS_ACCESS_KEY_ID = "test";
   process.env.AWS_SECRET_ACCESS_KEY = "test";
   process.env.POWERTOOLS_LOG_LEVEL = "SILENT";
+  process.env.HEAT_VERSION = "0123456789abcdef0123456789abcdef01234567";
 
   const client = new DynamoDBClient({ region: "us-east-1", endpoint });
   await ensureTable(client, "heat-test-player");

@@ -19,21 +19,33 @@ beforeAll(() => {
 const player = () => `p-${randomUUID()}`;
 const at = "millbrook";
 
+/** An adventure with no party: these tests are of the open item and the record, not the heroes. */
+const adventure = (adventureId: string, seed: string) => ({
+  adventureId,
+  seed,
+  location: at,
+  jobId: "wolves-on-the-mill-road",
+  snapshot: { version: "v", jobId: "wolves-on-the-mill-road", heroes: [] },
+  version: "v",
+  startedAt: new Date().toISOString(),
+});
+
 describe("start: one open adventure per player", () => {
   it("opens one and refuses a second", async () => {
     const p = player();
     await repo.putPlayer({ id: p, name: "Ada" });
-    const first = await repo.startAdventure(p, randomUUID(), "seed-1");
-    expect(await repo.openAdventure(p)).toEqual(first);
-    await expect(repo.startAdventure(p, randomUUID(), "seed-2")).rejects.toBeInstanceOf(AdventureAlreadyOpen);
+    const first = await repo.startAdventure(p, adventure(randomUUID(), "seed-1"));
+    expect(await repo.openAdventure(p)).toEqual({ adventureId: first.adventureId, seed: "seed-1", startedAt: first.startedAt });
+    expect(await repo.getAdventure(first.adventureId)).toEqual(first);
+    await expect(repo.startAdventure(p, adventure(randomUUID(), "seed-2"))).rejects.toBeInstanceOf(AdventureAlreadyOpen);
   });
 
   it("lets exactly one of two concurrent starts win", async () => {
     const p = player();
     await repo.putPlayer({ id: p, name: "Bea" });
     const results = await Promise.allSettled([
-      repo.startAdventure(p, randomUUID(), "a"),
-      repo.startAdventure(p, randomUUID(), "b"),
+      repo.startAdventure(p, adventure(randomUUID(), "a")),
+      repo.startAdventure(p, adventure(randomUUID(), "b")),
     ]);
     const won = results.filter((r) => r.status === "fulfilled");
     const lost = results.filter((r) => r.status === "rejected");
@@ -81,7 +93,7 @@ describe("settle: rewards once, keyed on the adventure", () => {
     const p = player();
     await repo.putPlayer({ id: p, name: "Cy" });
     const adv = randomUUID();
-    await repo.startAdventure(p, adv, "seed");
+    await repo.startAdventure(p, adventure(adv, "seed"));
     const rewards = [
       { material: "timber", amount: 3 },
       { material: "ore", amount: 2 },
@@ -103,7 +115,7 @@ describe("settle: rewards once, keyed on the adventure", () => {
   it("will not settle an adventure that is not the open one", async () => {
     const p = player();
     await repo.putPlayer({ id: p, name: "Di" });
-    await repo.startAdventure(p, "open-one", "s");
+    await repo.startAdventure(p, adventure("open-one", "s"));
     await expect(repo.settle(p, "some-other", at, [])).rejects.toBeInstanceOf(AlreadySettled);
     expect((await repo.openAdventure(p))?.adventureId).toBe("open-one");
   });

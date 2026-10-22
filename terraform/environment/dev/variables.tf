@@ -36,3 +36,8 @@ variable "alarm_email" {
   description = "The address dev's alarms notify, from the dev environment's variable HEAT_ALARM_EMAIL; the same address the budget alerts go to, kept out of committed files as that one is (decision 0016)."
   type        = string
 }
+
+variable "app_version" {
+  description = "The deploy's version, the commit being deployed: TF_VAR_app_version from the workflow (github.sha). The environment module checks its shape (decision 0030)."
+  type        = string
+}

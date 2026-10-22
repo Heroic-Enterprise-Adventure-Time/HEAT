@@ -1,19 +1,30 @@
-import { randomUUID } from "node:crypto";
-import { STARTING_LOCATION, hallCapacity, location, rewardsForSeed, warehouseCapacity } from "@heat/engine";
+import {
+  JOBS,
+  STARTING_LOCATION,
+  hallCapacity,
+  location,
+  rewardsForSeed,
+  warehouseCapacity,
+  type Job,
+  type SnapshotHero,
+  type UnitStats,
+  type AdventureSnapshot,
+} from "@heat/engine";
 import { GraphQLError } from "graphql";
 import { builder } from "./builder.js";
 import { recruitHero } from "../recruit.js";
 import { retireHero } from "../retire.js";
+import { startAdventure } from "../start.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
-import type { Camp, Hero, Holding, OpenAdventure, Player } from "../db/repository.js";
+import type { AdventureRecord, Camp, Hero, Holding, Player } from "../db/repository.js";
 
 /**
  * The graph: a public player; their camps, heroes and the open adventure
  * behind the `self` scope; other players' heroes seen at a location, by
- * their public fields only; joining, recruiting, retiring, and the spike's two
- * adventure mutations. Settle is exposed as a mutation here only so the
- * spike can exercise it; in the design it is triggered by the verifier's
- * result, not by a client.
+ * their public fields only; joining, recruiting, retiring, starting an
+ * adventure from the job board, and the spike's settle. Settle is exposed
+ * as a mutation here only until Issue-114's submit replaces it; in the
+ * design it is the verifier's result, not a client's call.
  */
 
 const HoldingRef = builder.objectRef<Holding>("Holding").implement({
@@ -73,11 +84,64 @@ const SeenHeroRef = builder.objectRef<Sighting>("SeenHero").implement({
   }),
 });
 
-const AdventureRef = builder.objectRef<OpenAdventure>("Adventure").implement({
+const JobRef = builder.objectRef<Job>("Job").implement({
+  description: "A job on a location's job board, from the static content; the client reads its stages from the engine it loaded.",
+  fields: (t) => ({
+    id: t.exposeString("id"),
+    name: t.exposeString("name"),
+    description: t.exposeString("description"),
+    location: t.exposeString("location", { description: "The location whose job board posts it." }),
+  }),
+});
+
+const UnitStatsRef = builder.objectRef<UnitStats>("UnitStats").implement({
+  fields: (t) => ({
+    maxHealth: t.exposeInt("maxHealth"),
+    speed: t.exposeInt("speed", { description: "Turns per ten seconds." }),
+    damage: t.exposeInt("damage"),
+    gathering: t.exposeInt("gathering", { description: "Work done to a resource node by a gather ability." }),
+  }),
+});
+
+const SnapshotHeroRef = builder.objectRef<SnapshotHero>("SnapshotHero").implement({
+  description: "A hero as the adventure took it at the start: its effective numbers, frozen for the run.",
+  fields: (t) => ({
+    heroId: t.exposeString("heroId"),
+    unitType: t.exposeString("unitType"),
+    name: t.exposeString("name"),
+    spriteSet: t.exposeString("spriteSet"),
+    level: t.exposeInt("level"),
+    stats: t.expose("stats", { type: UnitStatsRef }),
+  }),
+});
+
+const SnapshotRef = builder.objectRef<AdventureSnapshot>("Snapshot").implement({
+  description: "The frozen snapshot the hub issued at the start, the engine's AdventureSnapshot field for field: the party's effective numbers and the job by id (decision 0030).",
+  fields: (t) => ({
+    version: t.exposeString("version"),
+    jobId: t.exposeString("jobId"),
+    heroes: t.expose("heroes", { type: [SnapshotHeroRef] }),
+  }),
+});
+
+const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
+  description: "An adventure as the hub issued it: what the client needs to play it with the seed.",
   fields: (t) => ({
     id: t.exposeString("adventureId"),
     seed: t.exposeString("seed"),
     startedAt: t.exposeString("startedAt"),
+    location: t.exposeString("location"),
+    job: t.field({
+      type: JobRef,
+      resolve: (adventure) => {
+        const job = Object.hasOwn(JOBS, adventure.jobId) ? JOBS[adventure.jobId as keyof typeof JOBS] : undefined;
+        // A job this version does not know means the adventure is another version's.
+        if (!job) throw new GraphQLError(`no job ${adventure.jobId} in this version`, { extensions: { code: "NO_SUCH_JOB" } });
+        return job;
+      },
+    }),
+    snapshot: t.expose("snapshot", { type: SnapshotRef }),
+    version: t.exposeString("version", { description: "The deploy that issued the adventure, and the only one that verifies it." }),
   }),
 });
 
@@ -103,7 +167,10 @@ const PlayerRef = builder.objectRef<Player>("Player").implement({
       type: AdventureRef,
       nullable: true,
       authScopes: (player) => ({ self: player.id }),
-      resolve: (player, _args, ctx) => ctx.repo.openAdventure(player.id),
+      resolve: async (player, _args, ctx) => {
+        const open = await ctx.repo.openAdventure(player.id);
+        return open ? ctx.repo.getAdventure(open.adventureId) : undefined;
+      },
     }),
   }),
 });
@@ -162,20 +229,27 @@ builder.mutationFields((t) => ({
   startAdventure: t.field({
     type: AdventureRef,
     authScopes: { authenticated: true },
-    description: "Issues the seed and opens the player's one adventure. Fails if one is already open.",
-    resolve: (_root, _args, ctx) => ctx.repo.startAdventure(ctx.playerId!, randomUUID(), randomUUID()),
+    description: "Starts a job from the location's job board with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.",
+    args: {
+      location: t.arg.string({ required: true }),
+      jobId: t.arg.string({ required: true }),
+      heroIds: t.arg.stringList({ required: true }),
+    },
+    resolve: (_root, args, ctx) => startAdventure(ctx.repo, ctx.playerId!, ctx.version, args.location, args.jobId, args.heroIds),
   }),
   settleAdventure: t.field({
     type: PlayerRef,
     nullable: true,
     authScopes: { authenticated: true },
-    description: "Spike only: settles the caller's open adventure with the engine's rewards for its seed, credited at the starting camp.",
+    description: "Spike only, until Issue-114's submit: settles the caller's open adventure with the engine's rewards for its seed, credited at its location, and brings its party back to the camp.",
     args: { adventureId: t.arg.string({ required: true }) },
     resolve: async (_root, args, ctx) => {
       const playerId = ctx.playerId!;
       const record = await ctx.repo.getAdventure(args.adventureId);
       if (!record || record.playerId !== playerId) throw new Error("not your adventure");
-      await ctx.repo.settle(playerId, args.adventureId, STARTING_LOCATION, rewardsForSeed(record.seed));
+      // A record the spike started before Issue-113 has no location and no party.
+      const heroIds = record.snapshot?.heroes.map((h) => h.heroId) ?? [];
+      await ctx.repo.settle(playerId, args.adventureId, record.location ?? STARTING_LOCATION, rewardsForSeed(record.seed), heroIds);
       return ctx.repo.getPlayer(playerId);
     },
   }),

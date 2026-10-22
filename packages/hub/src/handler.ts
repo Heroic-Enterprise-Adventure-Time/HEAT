@@ -5,23 +5,26 @@ import { configFromEnv, createDocumentClient } from "./db/client.js";
 import { createContextFactory, type Context } from "./context.js";
 import { logger, requestLogging, tracer } from "./observability.js";
 import { schema } from "./schema/schema.js";
+import { outdatedFlag, versionFromEnv } from "./version.js";
 
 /**
  * The hub as one Lambda behind the HTTP API. Apollo Server builds the
  * executable schema once per cold start; the Lambda integration adapts the
  * API Gateway HTTP API (payload 2.0) event to a request and back. The
  * DynamoDB client is captured by the tracer, so each call is a subsegment
- * of the request's trace.
+ * of the request's trace. The deploy's version is read once, like the
+ * tables, and every response says when the client's differs.
  */
 const config = configFromEnv();
+const version = versionFromEnv();
 const db = createDocumentClient(config, (client) => tracer.captureAWSv3Client(client));
 
-export const server = new ApolloServer<Context>({ schema, plugins: [requestLogging()] });
+export const server = new ApolloServer<Context>({ schema, plugins: [requestLogging(), outdatedFlag()] });
 
 const graphql = startServerAndCreateLambdaHandler(
   server,
   handlers.createAPIGatewayProxyEventV2RequestHandler(),
-  { context: createContextFactory(db, config.tables) },
+  { context: createContextFactory(db, config.tables, version) },
 );
 
 /**

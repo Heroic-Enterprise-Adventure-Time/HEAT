@@ -160,6 +160,10 @@ jobs:
       pull-requests: write
     env:
       TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      # The deploy's version, the commit this run deploys (decision 0030):
+      # the hub's HEAT_VERSION and config.json's version. A root without the
+      # variable ignores it.
+      TF_VAR_app_version: ${{ github.sha }}
       ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
       ISSUE: ${{ needs.checks.outputs.issue }}
       STACK: ${{ needs.checks.outputs.name }}
@@ -238,7 +242,8 @@ jobs:
           client_id="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw browser_client_id)"
           login_host="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw login_host)"
           password_sign_in="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw password_sign_in)"
-          sh scripts/publish-client.sh "$bucket" client "/graphql" "$pool_id" "$client_id" "$login_host" "$password_sign_in"
+          app_version="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw app_version)"
+          sh scripts/publish-client.sh "$bucket" client "/graphql" "$pool_id" "$client_id" "$login_host" "$password_sign_in" "$app_version"
 
       - name: Write the stack's URL to the job summary
         id: summary
@@ -367,6 +372,10 @@ jobs:
       id-token: write
     env:
       TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      # The deploy's version, the commit this run deploys (decision 0030):
+      # the hub's HEAT_VERSION and config.json's version. A root without the
+      # variable ignores it.
+      TF_VAR_app_version: ${{ github.sha }}
       ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
       ISSUE: ${{ needs.name-deleted.outputs.issue }}
       STACK: ${{ needs.name-deleted.outputs.name }}
@@ -433,6 +442,10 @@ jobs:
       id-token: write
     env:
       TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      # The deploy's version, the commit this run deploys (decision 0030):
+      # the hub's HEAT_VERSION and config.json's version. A root without the
+      # variable ignores it.
+      TF_VAR_app_version: ${{ github.sha }}
       ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
       DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
     steps:

@@ -7,7 +7,7 @@
 # are this script's, because the plan role may not read objects outside
 # the state prefix and Terraform could not refresh them.
 #
-# Usage: scripts/publish-client.sh <bucket> <build dir> <graphql path> <user pool id> <client id> <login host> <password sign-in>
+# Usage: scripts/publish-client.sh <bucket> <build dir> <graphql path> <user pool id> <client id> <login host> <password sign-in> <version>
 #   bucket        the stack's client bucket, from the output client_bucket
 #   build dir     what ng build wrote: packages/client/dist/client/browser
 #   graphql path  the API's path on the stack's hostname, /graphql
@@ -16,12 +16,17 @@
 #   login host    the pool's managed login host, from the output login_host
 #   password sign-in  true or false, from the output password_sign_in: whether
 #                 the login page offers email and password beside Google
+#   version       the deploy's version, from the output app_version: the
+#                 commit the workflow deployed, which the hub carries as
+#                 HEAT_VERSION, so the client and the hub of one deploy
+#                 agree (decision 0030)
 #
 # config.json is the client's whole knowledge of the stack it runs in
 # (packages/client/src/app/config.ts reads it before the application
 # starts): where the API is, which pool issues tokens, which client to sign
 # in as and where, and whether to show the login page or go straight to
-# Google. None of it is secret; the browser carries all of it.
+# Google, and which deploy it belongs to, which the client sends back on
+# every request so the hub can say when it is outdated. None of it is secret; the browser carries all of it.
 #
 # Lifetimes, which the distribution's cache policy honours between one
 # second and a year: the hashed assets are immutable for a year, since a
@@ -39,10 +44,15 @@ user_pool_id="${4:?user pool id}"
 client_id="${5:?client id}"
 login_host="${6:?login host}"
 password_sign_in="${7:?password sign-in}"
+version="${8:?version}"
 
 case "$password_sign_in" in
   true|false) ;;
   *) echo "password sign-in must be true or false, not $password_sign_in" >&2; exit 1 ;;
+esac
+
+case "$version" in
+  *[!0-9a-f]*|"") echo "version must be a commit hash, not $version" >&2; exit 1 ;;
 esac
 
 [ -f "$build_dir/index.html" ] || { echo "$build_dir holds no index.html; is the client built?" >&2; exit 1; }
@@ -62,7 +72,7 @@ aws s3 cp "$build_dir/favicon.png" "s3://$bucket/favicon.png" --only-show-errors
 
 config="$(mktemp)"
 trap 'rm -f "$config"' EXIT
-printf '{"graphqlPath":"%s","userPoolId":"%s","clientId":"%s","loginHost":"%s","passwordSignIn":%s}\n' "$graphql_path" "$user_pool_id" "$client_id" "$login_host" "$password_sign_in" > "$config"
+printf '{"graphqlPath":"%s","userPoolId":"%s","clientId":"%s","loginHost":"%s","passwordSignIn":%s,"version":"%s"}\n' "$graphql_path" "$user_pool_id" "$client_id" "$login_host" "$password_sign_in" "$version" >"$config"
 aws s3 cp "$config" "s3://$bucket/config.json" --only-show-errors \
   --cache-control "$short" --content-type "application/json"
 

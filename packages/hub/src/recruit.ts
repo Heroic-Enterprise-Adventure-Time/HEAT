@@ -79,6 +79,7 @@ export async function recruitHero(
     picks: [],
     status: "ALIVE",
     retiredAt: null,
+    adventureId: null,
   };
   try {
     return await repo.recruitFree(playerId, camp, capacity, hero);

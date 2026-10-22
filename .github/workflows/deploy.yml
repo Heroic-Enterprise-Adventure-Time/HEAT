@@ -87,6 +87,10 @@ jobs:
             code: true
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
+      # The deploy's version, the commit this run deploys (decision 0030):
+      # the hub's HEAT_VERSION and config.json's version. A root without the
+      # variable ignores it.
+      TF_VAR_app_version: ${{ github.sha }}
       # The base's Google OAuth client and the alarms' address, from the
       # environment this job runs under: one name in every environment, the
       # environment supplies the value (decision 0020). An environment
@@ -198,6 +202,10 @@ jobs:
             stack: heat-dev
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
+      # The deploy's version, the commit this run deploys (decision 0030):
+      # the hub's HEAT_VERSION and config.json's version. A root without the
+      # variable ignores it.
+      TF_VAR_app_version: ${{ github.sha }}
       # The base's Google OAuth client and the alarms' address, from the
       # environment this job runs under: one name in every environment, the
       # environment supplies the value (decision 0020). An environment
@@ -298,7 +306,7 @@ jobs:
         run: |
           set -eu
           out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
-          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)"
+          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
 
       - name: Write the environment's URL to the job summary
         id: summary

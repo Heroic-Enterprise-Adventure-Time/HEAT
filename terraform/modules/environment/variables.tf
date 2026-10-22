@@ -78,6 +78,16 @@ variable "password_sign_in" {
   type        = bool
 }
 
+variable "app_version" {
+  description = "The deploy's version: the commit the workflow deployed, TF_VAR_app_version from github.sha (decision 0030). Set on every function as HEAT_VERSION, stamped by the hub on every adventure it starts, and returned as an output that the publish step writes into config.json, so the client and the hub of one deploy carry the same value. A local plan passes the worktree's HEAD (docs/process/development.md, rule 6)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{40}$", var.app_version))
+    error_message = "app_version must be a full 40-character commit hash."
+  }
+}
+
 variable "alarm_email" {
   description = "Where the environment's alarms notify (alarms.tf): an SNS topic with this address subscribed, one email per alarm state change. null, and no topic or alarm is created: a sandbox stack lives as long as its branch and nobody is on call for it. dev and prod pass the address from their GitHub environment's variable HEAT_ALARM_EMAIL, never from a committed file (decision 0016)."
   type        = string

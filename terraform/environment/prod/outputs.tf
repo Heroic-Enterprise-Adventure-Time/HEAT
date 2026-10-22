@@ -37,6 +37,11 @@ output "login_host" {
   value       = module.login_domain.login_host
 }
 
+output "app_version" {
+  description = "The deploy's version; read by the apply job for config.json (decision 0030)."
+  value       = module.environment.app_version
+}
+
 output "password_sign_in" {
   description = "Whether the browser client offers email and password beside Google; read by the apply job for config.json."
   value       = module.environment.password_sign_in

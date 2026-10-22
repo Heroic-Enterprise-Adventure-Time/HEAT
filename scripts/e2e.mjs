@@ -77,11 +77,11 @@ async function signIn() {
   return body.AuthenticationResult.AccessToken;
 }
 
-async function graphql(token, query, variables = {}) {
+async function graphql(token, query, variables = {}, headers = {}) {
   const started = performance.now();
   const response = await fetch(graphqlUrl, {
     method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...headers },
     body: JSON.stringify({ query, variables }),
   });
   const ms = Math.round(performance.now() - started);
@@ -106,6 +106,9 @@ check(typeof config.clientId === "string" && config.clientId.length > 0 && /^htt
 // and prod are Google only.
 const passwordExpected = stack.startsWith("heat-sb");
 check(config.passwordSignIn === passwordExpected, `config.json says password sign-in is ${passwordExpected ? "offered" : "not offered"} (got ${config.passwordSignIn})`);
+// The deploy's version, the commit the workflow deployed (decision 0030);
+// the authenticated half checks that the hub carries the same one.
+check(/^[0-9a-f]{40}$/.test(config.version ?? ""), `config.json names the deploy's version ${config.version}`);
 
 // Sign-in as the browser does it, up to Google's door: the managed login
 // page renders for this stack's client and its callback, which proves the
@@ -138,10 +141,22 @@ console.log(`signed in as ${username} through client ${clientId}`);
 const joined = await graphql(token, `mutation { joinGame { id name } }`);
 check(!joined.errors && joined.data?.joinGame?.id, `joinGame answered the profile (${joined.ms} ms)`);
 
+// A permanent environment's test user keeps its records between runs, and a
+// stack's keeps them between pushes, so an adventure left open by a run that
+// failed between its start and its settle would refuse every later start and
+// keep its villager from retiring. Settle whatever is open first.
+const settleMutation = `mutation($id: String!) { settleAdventure(adventureId: $id) { id camps { location holdings { material balance } } } }`;
+const before = await graphql(token, `{ me { openAdventure { id } } }`);
+const leftover = before.data?.me?.openAdventure?.id;
+if (leftover) {
+  const cleared = await graphql(token, settleMutation, { id: leftover });
+  check(!cleared.errors, `settled the adventure ${leftover} that an earlier run left open (${cleared.ms} ms)`);
+}
+
 // The free villager (Issue-81). A sandbox stack's user meets a new camp
 // and recruits; a test user that kept its villager from an earlier run
 // (dev's, or a stack's after an earlier push) goes straight to the refusal.
-const campQuery = `{ me { camps { location livingHeroes activeHeroes } heroes { id unitType status } } }`;
+const campQuery = `{ me { camps { location livingHeroes activeHeroes } heroes { id unitType status location } } }`;
 const camp = await graphql(token, campQuery);
 const millbrook = camp.data?.me?.camps?.find((c) => c.location === "millbrook");
 check(!camp.errors && millbrook, `me shows the starting camp: ${JSON.stringify(millbrook)} (${camp.ms} ms)`);
@@ -180,24 +195,32 @@ if (stack.startsWith("heat-sb")) {
   check(!next.errors && next.data?.recruitHero?.status === "ALIVE", `the free villager is offered again and recruited: ${next.data?.recruitHero?.name} (${next.ms} ms)`);
 }
 
-// A permanent environment's test user keeps its records between runs, so an
-// adventure left open by a run that failed between its start and its settle
-// would refuse every later start. Settle whatever is open first; a sandbox
-// stack's user is new to each stack and has nothing open.
-const settleMutation = `mutation($id: String!) { settleAdventure(adventureId: $id) { id camps { location holdings { material balance } } } }`;
-const before = await graphql(token, `{ me { openAdventure { id } } }`);
-const leftover = before.data?.me?.openAdventure?.id;
-if (leftover) {
-  const cleared = await graphql(token, settleMutation, { id: leftover });
-  check(!cleared.errors, `settled the adventure ${leftover} that an earlier run left open (${cleared.ms} ms)`);
-}
-
-const start = await graphql(token, `mutation { startAdventure { id seed } }`);
-check(!start.errors && start.data?.startAdventure?.id, `startAdventure opened an adventure (${start.ms} ms)`);
+// The first job (Issue-113): "Wolves on the mill road" with the living
+// villager, the snapshot stamped with the deploy's version.
+const party = (await graphql(token, campQuery)).data?.me?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");
+check(party?.unitType === "villager", `the camp has a living villager to send: ${party?.id}`);
+const startMutation = `mutation($heroIds: [String!]!) { startAdventure(location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds) { id seed } }`;
+const start = await graphql(token, startMutation, { heroIds: [party.id] });
+check(!start.errors && start.data?.startAdventure?.id, `startAdventure set out on the wolves job (${start.ms} ms)`);
 const { id, seed } = start.data.startAdventure;
 
-const again = await graphql(token, `mutation { startAdventure { id } }`);
-check(again.errors?.[0]?.message.includes("condition failed"), `a second start is refused while one is open (${again.ms} ms)`);
+const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType stats { maxHealth } } } } } }`);
+const adventure = open.data?.me?.openAdventure;
+check(!open.errors && adventure?.id === id && adventure.seed === seed && adventure.job?.id === "wolves-on-the-mill-road", `me shows the open adventure: ${adventure?.job?.name} at ${adventure?.location} (${open.ms} ms)`);
+check(adventure.snapshot?.jobId === adventure.job.id && adventure.snapshot.heroes.length === 1 && adventure.snapshot.heroes[0].heroId === party.id && adventure.snapshot.heroes[0].unitType === "villager", `the snapshot holds the villager and the job: ${JSON.stringify(adventure.snapshot?.heroes)}`);
+check(adventure.version === config.version && adventure.snapshot.version === config.version, `the adventure is stamped with config.json's version, so the hub and the client carry one (${adventure.version})`);
+
+const again = await graphql(token, startMutation, { heroIds: [party.id] });
+check(again.errors?.[0]?.extensions?.code === "ADVENTURE_OPEN" && again.errors[0].extensions.adventureId === id, `a second start is refused with ADVENTURE_OPEN, naming the open one (${again.ms} ms)`);
+const busy = await graphql(token, `mutation($id: String!) { retireHero(heroId: $id) { id } }`, { id: party.id });
+check(busy.errors?.[0]?.extensions?.code === "HERO_ADVENTURING", `the villager cannot retire while it is adventuring (${busy.ms} ms)`);
+
+// The version header (decision 0030): the deploy's own gets no flag, any
+// other gets outdated: true, through CloudFront and the gateway.
+const current = await graphql(token, `{ me { id } }`, {}, { "heat-version": config.version });
+check(current.extensions?.outdated === undefined, `a request carrying the deploy's version is not flagged (${current.ms} ms)`);
+const stale = await graphql(token, `{ me { id } }`, {}, { "heat-version": "0".repeat(40) });
+check(stale.extensions?.outdated === true, `a request carrying another version is flagged outdated (${stale.ms} ms)`);
 
 const settle = await graphql(token, settleMutation, { id });
 check(!settle.errors && settle.data?.settleAdventure, `settleAdventure settled it (${settle.ms} ms)`);
