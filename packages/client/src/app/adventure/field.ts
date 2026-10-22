@@ -131,6 +131,15 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
 }
 
 /**
+ * Whether the scene brings units on at this event: the party setting out,
+ * or the other side of a fight or a gather arriving. The clock waits there
+ * while they come on (the owner's call on Issue-15).
+ */
+export function isEntry(event: AdventureEvent): boolean {
+  return event.kind === 'adventure-start' || (event.kind === 'stage-start' && (event.stageKind === 'fight' || event.stageKind === 'gather'));
+}
+
+/**
  * Whole seconds left before the stage's time limit turns the party back,
  * shown only in the last ten (the owner's call on Issue-15, amending
  * decision 0030); null outside them.

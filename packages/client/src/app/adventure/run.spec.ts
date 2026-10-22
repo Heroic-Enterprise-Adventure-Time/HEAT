@@ -1,5 +1,6 @@
 import { UNIT_PROFILES, replay, type AdventureSnapshot } from '@heat/engine';
-import { AdventureRun, SAVED_RUN_PREFIX, forgetRun, loadRun, saveRun } from './run';
+import { isEntry } from './field';
+import { AdventureRun, SAVED_RUN_PREFIX, TimelineRun, forgetRun, loadRun, saveRun } from './run';
 
 const villager = UNIT_PROFILES.villager!;
 const fighter = UNIT_PROFILES.fighter!;
@@ -68,5 +69,31 @@ describe('AdventureRun', () => {
     expect(loadRun('a1')).toBeNull();
     localStorage.setItem(`${SAVED_RUN_PREFIX}a2`, '{not json');
     expect(loadRun('a2')).toBeNull();
+  });
+
+  it('stops at an entry, with the clock at its time, and goes on from there', () => {
+    const run = new AdventureRun(SNAPSHOT, 'seed-4');
+    expect(run.events.map((e) => e.kind)).toEqual(['adventure-start', 'stage-start']);
+    const events = run.advanceTo(60_000);
+    expect(events.at(-1)?.kind).toBe('battle-start');
+    expect(events.some(isEntry)).toBe(true);
+    expect(run.simTime).toBe(4000);
+    expect(run.advanceTo(5000).some(isEntry)).toBe(false);
+    expect(run.simTime).toBe(5000);
+  });
+});
+
+describe('TimelineRun', () => {
+  it('plays a stored timeline with no engine, stopping at the same entries, to the same events', () => {
+    const { timeline } = replay(SNAPSHOT, 'seed-5', []);
+    const live = new AdventureRun(SNAPSHOT, 'seed-5');
+    const stored = new TimelineRun(timeline);
+    expect(stored.events).toEqual(live.events);
+    for (let t = 16; !stored.complete; t += 16) {
+      live.advanceTo(t);
+      stored.advanceTo(t);
+      expect(stored.simTime).toBe(live.simTime);
+    }
+    expect(stored.events).toEqual(timeline.events);
   });
 });

@@ -1,26 +1,15 @@
 <section class="adventure" [class.side]="side()">
-  <div class="stage">
-    @if (play.field(); as field) {
-      <!-- The battle scene's place; until it is drawn, the two sides by line. -->
-      <div class="sides">
-        <ul aria-label="Party">
-          @for (unit of field.party; track unit.unitId) {
-            <li [class.down]="unit.health <= 0">{{ unit.name }} {{ unit.line ?? '' }} {{ unit.health }}/{{ unit.maxHealth }}</li>
-          }
-        </ul>
-        <ul aria-label="Opponents">
-          @for (unit of field.opponents; track unit.unitId) {
-            <li [class.down]="unit.health <= 0">{{ unit.name }} {{ unit.line }} {{ unit.health }}/{{ unit.maxHealth }}</li>
-          }
-        </ul>
-      </div>
-    }
-  </div>
+  <div #box class="stage" [style.height.px]="stageHeight()"></div>
 
   <aside class="panel" aria-labelledby="panel-title">
     @if (game.settled(); as settled) {
       <h2 id="panel-title">{{ settled.adventure.job.name }}</h2>
-      @if (settled.result; as result) {
+      @if (play.replaying()) {
+        <p class="note">Replay</p>
+        <ng-container *ngTemplateOutlet="playback" />
+        <ng-container *ngTemplateOutlet="health" />
+        <button type="button" (click)="play.endReplay()">Back to the result</button>
+      } @else if (settled.result; as result) {
         <p class="outcome">{{ outcomes[result.outcome] }}.</p>
 
         <h3>Stages</h3>
@@ -64,13 +53,20 @@
             </li>
           }
         </ul>
+        <div class="after">
+          <button type="button" (click)="replay()" [disabled]="replayState() === 'loading'">Watch the replay</button>
+          <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
+        </div>
+        @if (replayState() === 'failed') {
+          <p class="lost" role="alert">The replay could not be read.</p>
+        }
       } @else {
         <p class="lost" role="alert">This adventure was lost to a game update. The party came home with nothing.</p>
+        <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
       }
-      <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
     } @else if (game.adventure(); as adventure) {
       <h2 id="panel-title">{{ adventure.job.name }}</h2>
-      @if (stage(); as stage) {
+      @if (stageName(); as stage) {
         <p class="stage-name">{{ stage }}</p>
       }
       @if (countdown(); as seconds) {
@@ -80,14 +76,7 @@
         <p class="note">Picked up where you left off.</p>
       }
 
-      <div class="playback" role="group" aria-label="Playback">
-        <button type="button" (click)="play.togglePause()" [attr.aria-pressed]="play.paused()">
-          {{ play.paused() ? 'Resume' : 'Pause' }}
-        </button>
-        @for (speed of speeds; track speed) {
-          <button type="button" (click)="play.setSpeed(speed)" [attr.aria-pressed]="play.speed() === speed">{{ speed }}×</button>
-        }
-      </div>
+      <ng-container *ngTemplateOutlet="playback" />
 
       <h3>Party</h3>
       @if (play.field(); as field) {
@@ -156,3 +145,30 @@
     }
   </aside>
 </section>
+
+<ng-template #playback>
+  <div class="playback" role="group" aria-label="Playback">
+    <button type="button" (click)="play.togglePause()" [attr.aria-pressed]="play.paused()">
+      {{ play.paused() ? 'Resume' : 'Pause' }}
+    </button>
+    @for (speed of speeds; track speed) {
+      <button type="button" (click)="play.setSpeed(speed)" [attr.aria-pressed]="play.speed() === speed">{{ speed }}×</button>
+    }
+  </div>
+</ng-template>
+
+<ng-template #health>
+  @if (play.field(); as field) {
+    <ul class="party">
+      @for (hero of field.party; track hero.unitId) {
+        <li [class.down]="hero.health <= 0">
+          <div class="who">
+            <strong>{{ hero.name }}</strong>
+            <span class="health">{{ hero.health }}/{{ hero.maxHealth }}</span>
+          </div>
+          <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="hero.name + ' health'"></meter>
+        </li>
+      }
+    </ul>
+  }
+</ng-template>

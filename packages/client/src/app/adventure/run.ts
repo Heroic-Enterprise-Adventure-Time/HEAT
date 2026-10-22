@@ -3,8 +3,23 @@ import {
   type AdventureEvent,
   type AdventureLogEntry,
   type AdventureSnapshot,
+  type AdventureTimeline,
   type PartyOrder,
 } from '@heat/engine';
+import { isEntry } from './field';
+
+/**
+ * What the page plays: a run of the engine, or a stored timeline replayed
+ * with no engine. Stepping stops at an entry, the party setting out or a
+ * fight or gather beginning, so that the clock can wait there while the
+ * scene brings everyone on (the owner's call on Issue-15).
+ */
+export interface Run {
+  readonly simTime: number;
+  readonly complete: boolean;
+  readonly events: readonly AdventureEvent[];
+  advanceTo(simTime: number): readonly AdventureEvent[];
+}
 
 /**
  * One adventure being played in the browser: the engine run from the issued
@@ -18,7 +33,7 @@ import {
  * handing each entry in before the step that reaches it, as the engine's
  * `replay` does, and then plays on.
  */
-export class AdventureRun {
+export class AdventureRun implements Run {
   private readonly engine: AdventureEngine;
   private readonly entries: AdventureLogEntry[] = [];
   private readonly all: AdventureEvent[] = [];
@@ -54,10 +69,20 @@ export class AdventureRun {
     return this.engine.getOrder();
   }
 
-  /** Steps every event due by `simTime` and answers them; the clock stops at the end. */
+  /**
+   * Steps every event due by `simTime` and answers them, stopping after a
+   * step that holds an entry, with the clock at the entry's time; the clock
+   * also stops at the end.
+   */
   advanceTo(simTime: number): readonly AdventureEvent[] {
     const from = this.all.length;
-    while (!this.engine.isComplete() && this.engine.getNextEventTime() <= simTime) this.take(this.engine.step());
+    while (!this.engine.isComplete() && this.engine.getNextEventTime() <= simTime) {
+      const entry = this.take(this.engine.step()).find(isEntry);
+      if (entry) {
+        this.time = entry.timestamp;
+        return this.all.slice(from);
+      }
+    }
     this.time = this.engine.isComplete() ? this.engine.getCurrentSimTime() : Math.max(this.time, simTime);
     return this.all.slice(from);
   }
@@ -85,7 +110,7 @@ export class AdventureRun {
     this.time = this.engine.isComplete() ? this.engine.getCurrentSimTime() : simTime;
   }
 
-  private take(events: readonly AdventureEvent[]): void {
+  private take(events: readonly AdventureEvent[]): readonly AdventureEvent[] {
     for (const event of events) {
       this.all.push(event);
       if (event.kind === 'action-overridden') {
@@ -99,6 +124,48 @@ export class AdventureRun {
         this.entries.push({ kind: 'party', acceptedAtSimTime: event.timestamp, order: event.order });
       }
     }
+    return events;
+  }
+}
+
+/**
+ * A stored timeline played back: the replay, which is display only and
+ * never needs the engine (decision 0030). It stops at an entry as a run
+ * does, after every event at the entry's time.
+ */
+export class TimelineRun implements Run {
+  private next = 0;
+  private time = 0;
+
+  constructor(private readonly timeline: AdventureTimeline) {
+    this.advanceTo(0);
+  }
+
+  get simTime(): number {
+    return this.time;
+  }
+
+  get complete(): boolean {
+    return this.next >= this.timeline.events.length;
+  }
+
+  get events(): readonly AdventureEvent[] {
+    return this.timeline.events.slice(0, this.next);
+  }
+
+  advanceTo(simTime: number): readonly AdventureEvent[] {
+    const { events } = this.timeline;
+    const from = this.next;
+    while (this.next < events.length && events[this.next]!.timestamp <= simTime) {
+      const event = events[this.next++]!;
+      if (isEntry(event)) {
+        while (this.next < events.length && events[this.next]!.timestamp === event.timestamp) this.next++;
+        this.time = event.timestamp;
+        return events.slice(from, this.next);
+      }
+    }
+    this.time = this.complete ? (events.at(-1)?.timestamp ?? 0) : Math.max(this.time, simTime);
+    return events.slice(from, this.next);
   }
 }
 

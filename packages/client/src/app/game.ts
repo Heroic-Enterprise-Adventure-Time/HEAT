@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { STARTING_LOCATION, type AdventureLogEntry } from '@heat/engine';
+import { STARTING_LOCATION, type AdventureLogEntry, type AdventureTimeline } from '@heat/engine';
 import { Api, ApiError, PREVIOUS } from './api';
 import { Session } from './session';
 
@@ -101,6 +101,7 @@ const RESULT_FIELDS =
 const SEEN = `query($at: String!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
 const ME = `{ me { id camps { ${CAMP_FIELDS} } heroes { ${HERO_FIELDS} } openAdventure { ${ADVENTURE_FIELDS} } } }`;
 const SUBMIT = `mutation($id: String!, $overrides: [OverrideInput!]!) { submitAdventure(adventureId: $id, overrides: $overrides) { result { ${RESULT_FIELDS} } } }`;
+const TIMELINE = `query($id: String!) { adventure(id: $id) { timeline } }`;
 const DISCARD = `mutation($id: String!) { discardAdventure(adventureId: $id) { id } }`;
 const START = `mutation($at: String!, $job: String!, $heroes: [String!]!) { startAdventure(location: $at, jobId: $job, heroIds: $heroes) { ${ADVENTURE_FIELDS} } }`;
 
@@ -260,6 +261,12 @@ export class Game {
     this.settled.set({ adventure, result });
     // A failed read leaves the view as it was; the result is what the player sees now.
     await this.load().catch(() => undefined);
+  }
+
+  /** The timeline the hub stored at settlement, for the replay: display only, played with no engine (decision 0030). */
+  async timeline(adventureId: string): Promise<AdventureTimeline | null> {
+    const data = await this.api.request<{ adventure: { timeline: AdventureTimeline | null } | null }>(TIMELINE, { id: adventureId });
+    return data.adventure?.timeline ?? null;
   }
 
   private async run(work: () => Promise<void>): Promise<void> {

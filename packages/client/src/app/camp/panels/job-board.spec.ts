@@ -7,7 +7,7 @@ import { routes } from '../../app.routes';
 import { Game, type AdventureView, type HeroView } from '../../game';
 import { Session } from '../../session';
 import { CAMP_SCENE_FACTORY } from '../camp';
-import { FRAME_LOOP } from '../../adventure/adventure';
+import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
 
 function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): HeroView {
   return {
@@ -92,6 +92,7 @@ async function render(game: ReturnType<typeof fakeGame>, url: string) {
       { provide: Session, useValue: { user: signal({ email: 'player@example.com', name: null, accessToken: 't' }) } },
       // The adventure's frames never come, so a run stays at its start.
       { provide: FRAME_LOOP, useValue: () => () => undefined },
+      { provide: BATTLE_SCENE_FACTORY, useValue: async () => Promise.reject(new Error('no WebGL in jsdom')) },
       {
         provide: CAMP_SCENE_FACTORY,
         useValue: async () => ({ setHeroes: () => undefined, destroy: () => undefined }),
@@ -173,7 +174,11 @@ describe('Job board', () => {
     await settle();
     const shown = harness.routeNativeElement as HTMLElement;
     expect(shown.querySelector('aside h2')?.textContent).toBe('Wolves on the mill road');
-    expect([...shown.querySelectorAll('.party strong')].map((s) => s.textContent)).toEqual(['Wren', 'Lark']);
+    // The run starts once the scene has loaded, or failed to as it does in jsdom.
+    await vi.waitFor(async () => {
+      await settle();
+      expect([...shown.querySelectorAll('.party strong')].map((s) => s.textContent)).toEqual(['Wren', 'Lark']);
+    });
   });
 
   it("shows a start's refusal in place, in the player's words", async () => {

@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale) and 2026-10-21 by Issue-95 (the scale counts device pixels)
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels) and 2026-10-22 by Issue-15 (the battle scene)
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -47,6 +47,16 @@
 
 **What it changes on screen.** At a whole ratio above 1, the scale moves in steps of one device pixel, not one CSS pixel, so the map may stand a step larger. At a fractional ratio the largest whole step may be smaller than the old uneven one: a 1920×1080 laptop at 125% shows the map at 3 device pixels, 2.4 CSS pixels, where it showed 3 CSS pixels as 3.75 uneven device pixels, with more ground around it.
 
+## Amendment: the battle scene (Issue-15, 2026-10-22)
+
+**The battle is a second PixiJS scene, loaded like the camp's, on first use.** Its stage is 320×180 art pixels, scaled by the largest whole number of device pixels at which it fits its box and at least 400 art pixels of road show across, so a wide box shows more of the world rather than the stage closer (the owner's call), with ground around it, as the camp's map is; heroes and monsters are drawn at the stage's own scale, not half of it, since the battle is about them. The ground is the meadow tileset with a road of its lower terrain across the middle, one column of tiles repeated so that it can scroll. The camp's sprites stand side-on (game.md, "How the game looks"): the party on the left facing east, the other side on the right drawn mirrored, each side's four lines from the middle outwards, a line's units spread in depth and a little aside. `packages/client/src/app/adventure/battle/battle-layout.ts` holds the arithmetic, tested without a renderer.
+
+**It draws from the field and animates from the events.** Where everyone stands and how they are comes from `field.ts`, which reads the adventure's events alone, the same for a run being played and a stored timeline being replayed with no engine. An act plays to its hold frame and holds there until the action resolves, then plays the rest; a hit plays on damage or a harvest; a fall plays and its last frame is held, the tree's crown fading as its provenance says (`docs/process/assets.md`, rule 30); a fallen monster or a felled tree lies a moment and then fades away, while a fallen hero stays down; stepping up a line and a collapse are a walk. An act runs on the adventure's clock, because it holds until its action resolves; everything else runs on the presentation clock, the wall clock times the speed, so fast-forward speeds it all and a fall still plays once the adventure's clock has stopped at the end. The frame counts and hold frames are read from each set's `provenance.json`.
+
+**The progression reads left to right** (the owner's call on Issue-15). The party runs on from the left at the start, at four times the pace, since it is no scroll; on a travel it walks in place while the road scrolls left; at a fight or a gather the other side rushes on from the right as the road scrolls with it, which reads as the party rushing to meet it; what is left of a stage scrolls away on the next travel; a retreat runs off to the left. Every run and every scroll goes at one speed, so the progression never changes pace. The rush on is flavor only: the adventure's clock stops at the entry, the party setting out or a fight or gather beginning, and runs again only when the scene says everyone is on, so the first blow is never struck while the other side is still coming on. The timeline, the log and verification are untouched by it. A resumed run places everyone where they stand, with no rush.
+
+**Without WebGL** the scene does not load, the clock does not wait, and the run plays with the controls alone.
+
 ## Considered and not chosen
 
 **A plain canvas with its 2D context**, drawn by the client. It needs no dependency and is enough for a few dozen sprites. The agent first recommended it. The owner prefers a library over code of our own, and Pixi's sprites, animation, pointer events and depth sorting are exactly the code a plain canvas would need written.
@@ -55,4 +65,4 @@
 
 ## Where it is described
 
-`packages/client/src/app/camp/`: the component, and the scene under `scene/`. `docs/standards/typescript.md`, rule 15, for how the art reaches the build.
+`packages/client/src/app/camp/`: the component, and the scene under `scene/`. `packages/client/src/app/adventure/battle/`: the battle scene. `docs/standards/typescript.md`, rule 15, for how the art reaches the build.
