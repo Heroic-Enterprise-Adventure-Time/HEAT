@@ -31,5 +31,6 @@ export function ofKind<K extends AdventureEvent["kind"]>(events: readonly Advent
   return events.filter((e): e is Extract<AdventureEvent, { kind: K }> => e.kind === kind);
 }
 
+export const STICKS = "pick-up-sticks";
 export const WOLVES = "wolves-on-the-mill-road";
 export const TIMBER = "timber-from-the-near-woods";

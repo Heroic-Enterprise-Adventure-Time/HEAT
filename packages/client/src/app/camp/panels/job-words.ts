@@ -66,9 +66,14 @@ export function creditWords(credit: Credit): string {
   return `${parts.join(' and ')} ${credit.material}`;
 }
 
-/** The pay alone, for the board's list: "pays 10 cloth". */
-export function payWords(job: Job): string {
-  return job.pay.length === 0 ? 'no pay' : `pays ${job.pay.map((r) => `${r.amount} ${r.material}`).join(' and ')}`;
+/**
+ * What a job brings home, its pay and its cargo, for the board's list:
+ * "10 cloth", "up to 40 timber", "3 cloth and up to 60 timber". A job with
+ * no pay still brings home what it gathers (decision 0031).
+ */
+export function yieldWords(job: Job): string {
+  const words = credits(job).map(creditWords);
+  return words.length === 0 ? 'nothing to bring home' : words.join(' and ');
 }
 
 /** A job's retreat penalty in words: "A retreat forfeits the pay, keeps the timber gathered, and earns half the XP." */

@@ -211,9 +211,10 @@ if (stack.startsWith("heat-sb")) {
 }
 
 // A job (Issue-113, Issue-114): "Timber from the near woods" with the living
-// villager, the snapshot stamped with the deploy's version. Timber, because
-// a lone villager clears it on every seed and comes home paid, while the
-// wolves kill it on every seed (Issue-126).
+// villager, the snapshot stamped with the deploy's version. Timber rather
+// than "Pick up sticks", the first job, because a lone villager clears it on
+// every seed too, and it also runs a fight and credits two materials on the
+// server; the wolves kill a lone villager on every seed (decision 0031).
 const job = "timber-from-the-near-woods";
 const heroQuery = `{ me { camps { location holdings { material balance } } heroes { id unitType status location xp level } } }`;
 const home = (await graphql(token, heroQuery)).data?.me;
