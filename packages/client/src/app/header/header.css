@@ -24,6 +24,13 @@ header {
   padding: 0 0.5rem;
   border: 1px solid #d9a441;
   color: #f5cf7a;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.adventure:hover,
+.adventure:focus-visible {
+  background: #3a2a1c;
 }
 
 /* A phone keeps the bar to one line: the email address goes, sign-out stays. */

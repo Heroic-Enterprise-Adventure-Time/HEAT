@@ -1,4 +1,4 @@
-// The dev server's proxy: /graphql and /config.json go to the branch's
+// The dev server's proxy: /graphql, /previous/graphql and /config.json go to the branch's
 // sandbox stack, so the local client is that stack's client, signing in
 // through the stack's browser app client with the http://localhost:4200
 // callback (decision 0018; docs/process/development.md). The stack follows
@@ -19,9 +19,10 @@ function stackOrigin() {
 }
 
 const target = stackOrigin();
-console.log(`proxying /graphql and /config.json to ${target}`);
+console.log(`proxying /graphql, /previous/graphql and /config.json to ${target}`);
 
 export default {
   "/graphql": { target, changeOrigin: true, secure: true },
+  "/previous/graphql": { target, changeOrigin: true, secure: true },
   "/config.json": { target, changeOrigin: true, secure: true },
 };

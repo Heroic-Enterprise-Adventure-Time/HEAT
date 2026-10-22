@@ -1,5 +1,5 @@
 {
-  "$comment": "The one list of functions and routes (docs/standards/typescript.md, rule 4). Read by scripts/bundle.mjs for packaging and by terraform/modules/environment for the real functions and routes; nothing declares a function or route anywhere else. `entry` is the handler module relative to the repository root; `export` is the exported handler name; `memoryMb` and `timeoutSeconds` are the function's own and the same in every environment; `http` lists the routes, each behind the environment's JWT authorizer.",
+  "$comment": "The one list of functions and routes (docs/standards/typescript.md, rule 4). Read by scripts/bundle.mjs for packaging and by terraform/modules/environment for the real functions and routes; nothing declares a function or route anywhere else. `entry` is the handler module relative to the repository root; `export` is the exported handler name; `memoryMb` and `timeoutSeconds` are the function's own and the same in every environment; `http` lists the routes, each behind the environment's JWT authorizer and integrated with the function's `live` alias, or with the alias the route names: `previous` is the deploy before the current one, which verifies the adventures it issued (decision 0030).",
   "functions": {
     "hub": {
       "entry": "packages/hub/src/handler.ts",
@@ -8,7 +8,8 @@
       "timeoutSeconds": 10,
       "http": [
         { "method": "POST", "path": "/graphql" },
-        { "method": "GET", "path": "/graphql" }
+        { "method": "GET", "path": "/graphql" },
+        { "method": "POST", "path": "/previous/graphql", "alias": "previous" }
       ]
     }
   }

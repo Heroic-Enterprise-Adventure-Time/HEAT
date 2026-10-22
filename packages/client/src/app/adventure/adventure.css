@@ -1,0 +1,144 @@
+/*
+ * The battle's regions (game.md, "The page"): the stage, then the party and
+ * the controls below it on a narrow screen; side by side, where the camp
+ * would be (page-layout.ts, isSideBySide), the stage beside a content area of
+ * the camp's width, reserved for them and never over the scene.
+ */
+:host {
+  --night: #0b0806;
+  --ink: #140d08;
+  --parchment: #94805c;
+  --gold: #d9a441;
+  --light: #e6d6b8;
+}
+
+.adventure {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100dvh - 2.25rem);
+  background: var(--night);
+}
+
+.stage {
+  width: 100%;
+  overflow: hidden;
+  background: var(--night);
+  color: var(--light);
+}
+
+.panel {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: var(--parchment);
+  color: var(--ink);
+}
+
+.adventure.side {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(17rem, 26vw, 28rem);
+  height: calc(100dvh - 2.25rem);
+  min-height: 0;
+}
+
+.side .stage {
+  height: 100%;
+}
+
+.side .panel {
+  overflow-y: auto;
+  border-left: 3px solid var(--ink);
+}
+
+h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.1rem;
+}
+
+h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
+p {
+  margin: 0 0 0.5rem;
+}
+
+button {
+  font: inherit;
+}
+
+button[aria-pressed='true'] {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+.playback,
+.orders,
+.abilities {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.orders,
+.after {
+  margin-top: 0.5rem;
+}
+
+.after {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.party,
+.heroes,
+.rewards {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.party li {
+  margin-bottom: 0.5rem;
+}
+
+.who {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.health {
+  margin-left: auto;
+}
+
+meter {
+  width: 100%;
+}
+
+.down,
+.dead,
+.lost,
+.note {
+  color: #3d140c;
+}
+
+.countdown {
+  font-weight: bold;
+  color: #3d140c;
+}
+
+.queued {
+  margin: 0.125rem 0 0;
+  font-size: 0.9rem;
+}
+
+.stages {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.outcome,
+.up {
+  font-weight: bold;
+}

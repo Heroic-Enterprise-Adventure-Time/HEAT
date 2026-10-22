@@ -4,6 +4,11 @@ h2 {
   font-size: 1.1rem;
 }
 
+h3 {
+  margin: 0.75rem 0 0.25rem;
+  font-size: 1rem;
+}
+
 .back {
   display: inline-block;
   margin-bottom: 0.5rem;
@@ -19,6 +24,32 @@ h2 {
 .roster li {
   display: flex;
   gap: 0.5rem;
+}
+
+.jobs,
+.party {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 0.75rem;
+}
+
+.jobs li,
+.party li {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.5rem;
+}
+
+.stages,
+.credits {
+  margin: 0 0 0.5rem;
+  padding-left: 1.25rem;
+}
+
+.refusal {
+  margin: 0.5rem 0 0;
+  color: #3d140c;
+  font-weight: bold;
 }
 
 .link {

@@ -63,6 +63,9 @@ module "environment" {
   # through a login form (Issue-86, decision 0024 as amended).
   password_sign_in = false
 
+  # The commit this apply deploys (decision 0030).
+  app_version = var.app_version
+
   # No laptop signs in to dev: its records are players'. Display work uses a
   # sandbox stack (docs/process/development.md, rule 5).
   extra_callback_urls = []

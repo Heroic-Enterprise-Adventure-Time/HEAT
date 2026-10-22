@@ -19,6 +19,11 @@ export const builder = new SchemaBuilder<{
     authenticated: boolean;
     self: string;
   };
+  Scalars: {
+    // A stored timeline, display only and a union of many event types, is
+    // served as the JSON it was written as (Issue-114).
+    JSON: { Input: unknown; Output: unknown };
+  };
 }>({
   plugins: [ScopeAuthPlugin],
   defaultFieldNullability: false,

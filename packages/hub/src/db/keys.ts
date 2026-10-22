@@ -11,8 +11,9 @@
  *   PLAYER#<id>    | PROFILE                           the player
  *   PLAYER#<id>    | AT#<location>#CAMP                hall and warehouse levels, the counts of active and living heroes
  *   PLAYER#<id>    | AT#<location>#HOLDING#<material>  a resource balance at that location
- *   PLAYER#<id>    | HERO#<heroId>                     a hero, its location an attribute, since a hero can move
- *   PLAYER#<id>    | OPEN                              the one open adventure
+ *   PLAYER#<id>    | HERO#<heroId>                     a hero, its location an attribute, since a hero can move, and
+ *                                                       adventureId while it is on the open adventure
+ *   PLAYER#<id>    | OPEN                              the one open adventure: its id, seed and start time
  *   PLAYER#<id>    | LEDGER#<causeId>#<entry>          append-only; the cause is an adventure or a hero id, and the
  *                                                       entry can exist once, which is what makes settle pay once
  *
@@ -22,7 +23,8 @@
  * The location table, partitioned by location, and by adventure for the one
  * record settle looks up by id. Public: what every player may see.
  *
- *   ADVENTURE#<id> | RECORD                         status, seed, result
+ *   ADVENTURE#<id> | RECORD                         status, seed, location, job, the frozen snapshot, the
+ *                                                   version that issued it, start time; at settlement the result
  *   LOCATION#<id>  | SEEN#<heroId>                  a hero seen there: public fields only, no owner, and
  *                                                   expiresAt, the table's TTL attribute (decision 0029)
  *   LOCATION#<id>  | ...                            the feed, offers: the rest of build order step 3

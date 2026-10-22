@@ -25,7 +25,7 @@ variable "environment" {
 }
 
 variable "functions" {
-  description = "The functions of manifest.json, keyed by name: the exported handler, memory, timeout and HTTP routes. The root passes jsondecode(file(manifest.json)).functions; nothing declares a function or route anywhere else (docs/standards/typescript.md, rule 4)."
+  description = "The functions of manifest.json, keyed by name: the exported handler, memory, timeout and HTTP routes, each route integrated with the function's live alias or the alias it names. The root passes jsondecode(file(manifest.json)).functions; nothing declares a function or route anywhere else (docs/standards/typescript.md, rule 4)."
   type = map(object({
     export         = string
     memoryMb       = number
@@ -33,8 +33,14 @@ variable "functions" {
     http = list(object({
       method = string
       path   = string
+      alias  = optional(string, "live")
     }))
   }))
+
+  validation {
+    condition     = alltrue(flatten([for fn in var.functions : [for route in fn.http : contains(["live", "previous"], route.alias)]]))
+    error_message = "a route's alias must be live or previous."
+  }
 }
 
 variable "dist_dir" {
@@ -76,6 +82,16 @@ variable "extra_callback_urls" {
 variable "password_sign_in" {
   description = "Whether the browser client also offers the pool's own email and password sign-in beside Google (Issue-86): true in a sandbox stack, so that the test users of the base can sign in from the agent's session browser without Google; false in dev and prod, where every player arrives through Google. The pool keeps administrator-only creation and recovery either way (decision 0022), so the form is a sign-in form and nothing else."
   type        = bool
+}
+
+variable "app_version" {
+  description = "The deploy's version: the commit the workflow deployed, TF_VAR_app_version from github.sha (decision 0030). Set on every function as HEAT_VERSION, stamped by the hub on every adventure it starts, and returned as an output that the publish step writes into config.json, so the client and the hub of one deploy carry the same value. A local plan passes the worktree's HEAD (docs/process/development.md, rule 6)."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{40}$", var.app_version))
+    error_message = "app_version must be a full 40-character commit hash."
+  }
 }
 
 variable "alarm_email" {

@@ -38,6 +38,21 @@ output "password_sign_in" {
   value       = var.password_sign_in
 }
 
+output "replay_bucket" {
+  description = "The bucket the hub writes each settled adventure's timeline to, <adventureId>.json."
+  value       = aws_s3_bucket.replays.id
+}
+
+output "previous_versions" {
+  description = "Per function, the deploy's version the previous alias runs, read when Terraform planned (previous.tf)."
+  value       = { for name, p in local.previous : name => p.app_version }
+}
+
+output "app_version" {
+  description = "The deploy's version, the same value the functions carry as HEAT_VERSION, for config.json."
+  value       = var.app_version
+}
+
 output "login_host" {
   description = "The pool's managed login host, for config.json."
   value       = var.login_host

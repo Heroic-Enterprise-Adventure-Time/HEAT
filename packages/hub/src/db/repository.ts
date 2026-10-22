@@ -7,17 +7,28 @@ import {
   UpdateCommand,
   type DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
-import { STARTING_LOCATION, type UnitType } from "@heat/engine";
+import {
+  STARTING_LOCATION,
+  type AdventureOutcome,
+  type AdventureSnapshot,
+  type Material,
+  type Reward,
+  type StageResult,
+  type UnitType,
+} from "@heat/engine";
 import { sightingOf, type Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
  * The transactions the architecture names, as DynamoDB transactions: start
- * (the one-open-adventure rule), debit (the ledger's non-negative balance),
- * settle (rewards once, keyed on the adventure id), recruit (the hall's
- * cap and the free-villager rule, on the camp's counts) and retire (the
- * hero's status and the camp's counts together). Each is one
+ * (the one-open-adventure rule, and the party marked as adventuring),
+ * debit (the ledger's non-negative balance), settle (the result once, keyed
+ * on the adventure id, with the credits capped at the warehouse, the XP and
+ * the deaths), discard (an adventure closed with nothing credited), recruit
+ * (the hall's cap and the free-villager rule, on the camp's counts) and
+ * retire (the hero's status and the camp's counts together, never while the
+ * hero is adventuring). Each is one
  * TransactWriteItems call with condition checks; a failed condition cancels
  * the whole write and the cancellation reasons say which item failed.
  *
@@ -31,11 +42,14 @@ import { locationKeys, playerKeys } from "./keys.js";
 export class AdventureAlreadyOpen extends Error {}
 export class InsufficientBalance extends Error {}
 export class AlreadyApplied extends Error {}
-export class AlreadySettled extends Error {}
 export class TransactionConflict extends Error {}
 export class HeroExists extends Error {}
 export class RecruitRefused extends Error {}
 export class HeroChanged extends Error {}
+/** A balance or the warehouse changed between settlement's read and its write: read again and retry. */
+export class CampChanged extends Error {}
+/** The open item is gone or the record is no longer open: settled or discarded already. */
+export class AdventureClosed extends Error {}
 
 export interface Player {
   id: string;
@@ -83,19 +97,81 @@ export interface Hero {
   picks: string[];
   status: HeroStatus;
   retiredAt: string | null;
+  /** The open adventure the hero is on, set by start and cleared by settlement; null when it is at the camp. */
+  adventureId: string | null;
 }
 
+/** The player's open-adventure item: which adventure is open, and its seed. */
 export interface OpenAdventure {
   adventureId: string;
   seed: string;
   startedAt: string;
 }
 
+/**
+ * The adventure record in the location table, written at start: the seed,
+ * the location, the job, the frozen snapshot and the version that issued it
+ * (decision 0030). Records the spike started before Issue-113 have none of
+ * the last four, and are never verified: they are another version's.
+ *
+ * Settlement adds the result and its time, a discard its time (Issue-114).
+ */
 export interface AdventureRecord {
   adventureId: string;
   playerId: string;
   seed: string;
-  status: "OPEN" | "SETTLED";
+  location: string;
+  jobId: string;
+  snapshot: AdventureSnapshot;
+  version: string;
+  startedAt: string;
+  status: AdventureStatus;
+  result?: SettledResult;
+  settledAt?: string;
+  discardedAt?: string;
+}
+
+export type AdventureStatus = "OPEN" | "SETTLED" | "DISCARDED";
+
+/** One hero at settlement: the XP it gained, its totals after, and whether it died. */
+export interface HeroOutcome {
+  heroId: string;
+  xpGained: number;
+  xp: number;
+  level: number;
+  health: number;
+  dead: boolean;
+}
+
+/**
+ * What settlement recorded (overview, "Camps, heroes and resources"): how
+ * each stage ended and overall the rewards the run yielded, what the
+ * warehouse took and what its cap lost, and each hero's XP, level and fate.
+ */
+export interface SettledResult {
+  outcome: AdventureOutcome;
+  endedAtMs: number;
+  reachedStage: number;
+  stages: StageResult[];
+  rewards: Reward[];
+  credited: Reward[];
+  lost: Reward[];
+  heroes: HeroOutcome[];
+}
+
+/**
+ * Settlement's writes, computed by the caller from what it read: the camp's
+ * warehouse level, each holding's balance (null where there is no item yet)
+ * and what goes into it, each survivor's new XP and level, and the dead.
+ */
+export interface Settlement {
+  adventureId: string;
+  location: string;
+  warehouseLevel: number;
+  holdings: { material: Material; read: number | null; credit: number; lost: number }[];
+  survivors: { hero: Hero; xp: number; level: number }[];
+  dead: Hero[];
+  result: SettledResult;
 }
 
 type TransactItems = NonNullable<ConstructorParameters<typeof TransactWriteCommand>[0]["TransactItems"]>;
@@ -131,8 +207,25 @@ function toHero(i: Item): Hero {
     picks: (i["picks"] as string[] | undefined) ?? [],
     status: (i["status"] as HeroStatus | undefined) ?? "ALIVE",
     retiredAt: (i["retiredAt"] as string | undefined) ?? null,
+    adventureId: (i["adventureId"] as string | undefined) ?? null,
   };
 }
+
+/**
+ * A hero's item as written: a hero on no adventure has no adventureId
+ * attribute at all.
+ */
+function heroItem(hero: Hero): Item {
+  const { adventureId, ...rest } = hero;
+  return adventureId === null ? rest : { ...rest, adventureId };
+}
+
+/**
+ * True of a hero on no adventure: no adventureId attribute, or a null one,
+ * which a hero item written whole with `adventureId: null` would carry.
+ * Needs `:string` bound to "S".
+ */
+const AT_CAMP = "NOT attribute_type(adventureId, :string)";
 
 export class Repository {
   constructor(
@@ -237,23 +330,23 @@ export class Repository {
     const r = await this.db.send(
       new GetCommand({ TableName: this.tables.location, Key: locationKeys.adventure(adventureId) }),
     );
-    return r.Item
-      ? {
-          adventureId: r.Item["adventureId"],
-          playerId: r.Item["playerId"],
-          seed: r.Item["seed"],
-          status: r.Item["status"],
-        }
-      : undefined;
+    if (!r.Item) return undefined;
+    const { PK: _pk, SK: _sk, ...record } = r.Item;
+    return record as AdventureRecord;
   }
 
   /**
-   * Start: write the open-adventure item only if the player has none, and
-   * the adventure record only if the id is new. Throws AdventureAlreadyOpen
-   * when the first condition fails.
+   * Start: write the open-adventure item only if the player has none, the
+   * adventure record only if the id is new, and mark each hero of the party
+   * with the adventure's id only if it is still alive, at the adventure's
+   * location and on no adventure, so a retire, a death or a move that races
+   * the start fails one side or the other. Throws AdventureAlreadyOpen when
+   * the first condition fails and HeroChanged when a hero's does.
    */
-  async startAdventure(playerId: string, adventureId: string, seed: string, now = new Date()): Promise<OpenAdventure> {
-    const open: OpenAdventure = { adventureId, seed, startedAt: now.toISOString() };
+  async startAdventure(playerId: string, record: Omit<AdventureRecord, "playerId" | "status">): Promise<AdventureRecord> {
+    const started: AdventureRecord = { ...record, playerId, status: "OPEN" };
+    const open: OpenAdventure = { adventureId: record.adventureId, seed: record.seed, startedAt: record.startedAt };
+    const heroIds = record.snapshot.heroes.map((h) => h.heroId);
     await this.transact([
       {
         Put: {
@@ -265,12 +358,22 @@ export class Repository {
       {
         Put: {
           TableName: this.tables.location,
-          Item: { ...locationKeys.adventure(adventureId), adventureId, playerId, seed, status: "OPEN" },
+          Item: { ...locationKeys.adventure(record.adventureId), ...started },
           ConditionExpression: "attribute_not_exists(PK)",
         },
       },
-    ], [AdventureAlreadyOpen, AlreadyApplied]);
-    return open;
+      ...heroIds.map((heroId) => ({
+        Update: {
+          TableName: this.tables.player,
+          Key: playerKeys.hero(playerId, heroId),
+          UpdateExpression: "SET adventureId = :id",
+          ConditionExpression: `#s = :alive AND #location = :location AND ${AT_CAMP}`,
+          ExpressionAttributeNames: { "#s": "status", "#location": "location" },
+          ExpressionAttributeValues: { ":id": record.adventureId, ":alive": "ALIVE", ":location": record.location, ":string": "S" },
+        },
+      })),
+    ], [AdventureAlreadyOpen, AlreadyApplied, ...heroIds.map(() => HeroChanged)]);
+    return started;
   }
 
   /**
@@ -301,62 +404,178 @@ export class Repository {
   }
 
   /**
-   * Settle: close the open adventure only if it is this one, mark the record
-   * settled, and credit each reward at the location with a ledger entry that
-   * can exist once. A redelivery finds the open item gone and throws
-   * AlreadySettled; nothing is paid twice. The spike's adventures carry no
-   * location, so the hub credits the starting location; the warehouse cap
-   * arrives with Issue-15's settlement.
+   * Settle, in one transaction (decision 0014; overview, "Camps, heroes and
+   * resources"): the open item deleted only if it is this adventure; the
+   * record marked settled with its result only if it is still open; the
+   * camp's warehouse level checked against the one the cap was computed
+   * from, and its living count decremented by the dead only if it covers
+   * them; each survivor's XP and level set and its mark removed, and its
+   * sighting refreshed; each dead hero set dead only if it was alive, its
+   * mark removed and its sighting deleted (decision 0029); each holding
+   * written with its capped credit only if its balance is still the one
+   * read, with a ledger entry per material that can exist once and records
+   * what the cap lost. Every hero's write is conditioned on its mark being
+   * this adventure's.
+   *
+   * Throws AdventureClosed when the open item or the record has moved on,
+   * which is a repeat or a race with a discard; CampChanged when a balance
+   * or the warehouse moved between the caller's read and this write, for the
+   * caller to read again; HeroChanged when a hero is no longer on this
+   * adventure, which nothing should do.
    */
-  async settle(
-    playerId: string,
-    adventureId: string,
-    location: string,
-    rewards: readonly { material: string; amount: number }[],
-  ): Promise<void> {
-    const items: TransactItems = [
+  async settle(playerId: string, s: Settlement, now = new Date()): Promise<void> {
+    const items: TransactItems = [];
+    const failures: (new (message: string) => Error)[] = [];
+    const add = (item: TransactItems[number], failure: new (message: string) => Error) => {
+      items.push(item);
+      failures.push(failure);
+    };
+
+    add({
+      Delete: {
+        TableName: this.tables.player,
+        Key: playerKeys.open(playerId),
+        ConditionExpression: "adventureId = :id",
+        ExpressionAttributeValues: { ":id": s.adventureId },
+      },
+    }, AdventureClosed);
+    add({
+      Update: {
+        TableName: this.tables.location,
+        Key: locationKeys.adventure(s.adventureId),
+        UpdateExpression: "SET #s = :settled, #result = :result, settledAt = :at",
+        ConditionExpression: "attribute_exists(PK) AND #s = :open",
+        ExpressionAttributeNames: { "#s": "status", "#result": "result" },
+        ExpressionAttributeValues: { ":settled": "SETTLED", ":open": "OPEN", ":result": s.result, ":at": now.toISOString() },
+      },
+    }, AdventureClosed);
+
+    const camp = playerKeys.camp(playerId, s.location);
+    if (s.dead.length > 0) {
+      add({
+        Update: {
+          TableName: this.tables.player,
+          Key: camp,
+          UpdateExpression: "ADD livingHeroes :less",
+          ConditionExpression: "warehouseLevel = :wl AND livingHeroes >= :dead",
+          ExpressionAttributeValues: { ":less": -s.dead.length, ":dead": s.dead.length, ":wl": s.warehouseLevel },
+        },
+      }, CampChanged);
+    } else {
+      add({
+        ConditionCheck: {
+          TableName: this.tables.player,
+          Key: camp,
+          ConditionExpression: "warehouseLevel = :wl",
+          ExpressionAttributeValues: { ":wl": s.warehouseLevel },
+        },
+      }, CampChanged);
+    }
+
+    for (const { hero, xp, level } of s.survivors) {
+      add({
+        Update: {
+          TableName: this.tables.player,
+          Key: playerKeys.hero(playerId, hero.id),
+          UpdateExpression: "SET xp = :xp, #level = :level REMOVE adventureId",
+          ConditionExpression: "adventureId = :id",
+          ExpressionAttributeNames: { "#level": "level" },
+          ExpressionAttributeValues: { ":xp": xp, ":level": level, ":id": s.adventureId },
+        },
+      }, HeroChanged);
+      add({
+        Put: {
+          TableName: this.tables.location,
+          Item: { ...locationKeys.seen(hero.location, hero.id), ...sightingOf({ ...hero, xp, level }, now) },
+        },
+      }, HeroChanged);
+    }
+    for (const hero of s.dead) {
+      add({
+        Update: {
+          TableName: this.tables.player,
+          Key: playerKeys.hero(playerId, hero.id),
+          UpdateExpression: "SET #s = :dead REMOVE adventureId",
+          ConditionExpression: "#s = :alive AND adventureId = :id",
+          ExpressionAttributeNames: { "#s": "status" },
+          ExpressionAttributeValues: { ":dead": "DEAD", ":alive": "ALIVE", ":id": s.adventureId },
+        },
+      }, HeroChanged);
+      add({ Delete: { TableName: this.tables.location, Key: locationKeys.seen(hero.location, hero.id) } }, HeroChanged);
+    }
+
+    for (const h of s.holdings) {
+      if (h.credit > 0) {
+        add({
+          Update: {
+            TableName: this.tables.player,
+            Key: playerKeys.holding(playerId, s.location, h.material),
+            UpdateExpression: "SET material = :m, balance = :balance",
+            ConditionExpression: h.read === null ? "attribute_not_exists(PK)" : "balance = :read",
+            ExpressionAttributeValues: {
+              ":m": h.material,
+              ":balance": (h.read ?? 0) + h.credit,
+              ...(h.read === null ? {} : { ":read": h.read }),
+            },
+          },
+        }, CampChanged);
+      }
+      add({
+        Put: {
+          TableName: this.tables.player,
+          Item: {
+            ...playerKeys.ledger(playerId, s.adventureId, `credit#${h.material}`),
+            location: s.location,
+            material: h.material,
+            delta: h.credit,
+            lost: h.lost,
+          },
+          ConditionExpression: "attribute_not_exists(PK)",
+        },
+      }, AdventureClosed);
+    }
+
+    await this.transact(items, failures);
+  }
+
+  /**
+   * Discard: close an open adventure with nothing credited (decision 0030).
+   * The open item is deleted only if it is this adventure, the record marked
+   * discarded only if it is still open and the caller's, and each hero's mark
+   * removed only if it is this adventure's, so the party is back at the camp
+   * as it set out. Throws AdventureClosed when the adventure has moved on.
+   */
+  async discard(playerId: string, record: AdventureRecord, now = new Date()): Promise<void> {
+    const heroIds = record.snapshot.heroes.map((h) => h.heroId);
+    await this.transact([
       {
         Delete: {
           TableName: this.tables.player,
           Key: playerKeys.open(playerId),
           ConditionExpression: "adventureId = :id",
-          ExpressionAttributeValues: { ":id": adventureId },
+          ExpressionAttributeValues: { ":id": record.adventureId },
         },
       },
       {
         Update: {
           TableName: this.tables.location,
-          Key: locationKeys.adventure(adventureId),
-          UpdateExpression: "SET #s = :settled",
-          ConditionExpression: "attribute_exists(PK) AND #s = :open",
+          Key: locationKeys.adventure(record.adventureId),
+          UpdateExpression: "SET #s = :discarded, discardedAt = :at",
+          ConditionExpression: "attribute_exists(PK) AND #s = :open AND playerId = :player",
           ExpressionAttributeNames: { "#s": "status" },
-          ExpressionAttributeValues: { ":settled": "SETTLED", ":open": "OPEN" },
+          ExpressionAttributeValues: { ":discarded": "DISCARDED", ":open": "OPEN", ":player": playerId, ":at": now.toISOString() },
         },
       },
-    ];
-    for (const r of rewards) {
-      items.push({
+      ...heroIds.map((heroId) => ({
         Update: {
           TableName: this.tables.player,
-          Key: playerKeys.holding(playerId, location, r.material),
-          UpdateExpression: "SET material = :m ADD balance :amount",
-          ExpressionAttributeValues: { ":m": r.material, ":amount": r.amount },
+          Key: playerKeys.hero(playerId, heroId),
+          UpdateExpression: "REMOVE adventureId",
+          ConditionExpression: "adventureId = :id",
+          ExpressionAttributeValues: { ":id": record.adventureId },
         },
-      });
-      items.push({
-        Put: {
-          TableName: this.tables.player,
-          Item: {
-            ...playerKeys.ledger(playerId, adventureId, `credit#${r.material}`),
-            location,
-            material: r.material,
-            delta: r.amount,
-          },
-          ConditionExpression: "attribute_not_exists(PK)",
-        },
-      });
-    }
-    await this.transact(items, [AlreadySettled, AlreadySettled]);
+      })),
+    ], [AdventureClosed, AdventureClosed, ...heroIds.map(() => HeroChanged)]);
   }
 
   /**
@@ -377,7 +596,7 @@ export class Repository {
       {
         Put: {
           TableName: this.tables.player,
-          Item: { ...playerKeys.hero(playerId, hero.id), ...hero },
+          Item: { ...playerKeys.hero(playerId, hero.id), ...heroItem(hero) },
           ConditionExpression: "attribute_not_exists(PK)",
         },
       },
@@ -406,10 +625,10 @@ export class Repository {
 
   /**
    * Retire: set the hero's status to retired only if it is still the status
-   * the caller read, and count it out of the camp: out of the active heroes,
-   * and out of the living ones if it was alive. A concurrent retire, death
-   * or move between the read and the write fails the hero's condition, so
-   * the counts change once. The camp's condition keeps a count from going
+   * the caller read and the hero is on no adventure, and count it out of the
+   * camp: out of the active heroes, and out of the living ones if it was
+   * alive. A concurrent retire, death, move or start between the read and
+   * the write fails the hero's condition, so the counts change once. The camp's condition keeps a count from going
    * below zero. The hero's sighting is deleted, so it leaves other players'
    * camps at once (decision 0029). Throws HeroChanged when either condition
    * fails.
@@ -423,9 +642,15 @@ export class Repository {
           TableName: this.tables.player,
           Key: playerKeys.hero(playerId, hero.id),
           UpdateExpression: "SET #s = :retired, retiredAt = :at",
-          ConditionExpression: "#s = :was AND #location = :location",
+          ConditionExpression: `#s = :was AND #location = :location AND ${AT_CAMP}`,
           ExpressionAttributeNames: { "#s": "status", "#location": "location" },
-          ExpressionAttributeValues: { ":retired": "RETIRED", ":at": retired.retiredAt, ":was": hero.status, ":location": hero.location },
+          ExpressionAttributeValues: {
+            ":retired": "RETIRED",
+            ":at": retired.retiredAt,
+            ":was": hero.status,
+            ":location": hero.location,
+            ":string": "S",
+          },
         },
       },
       {
@@ -497,8 +722,8 @@ export class Repository {
    * silent success for ten minutes, which would hide exactly the repeats
    * the condition checks exist to report. The conditions are the idempotency
    * mechanism, keyed on the adventure id as the architecture states, and a
-   * repeat is a typed error the caller maps (a redelivered settle is
-   * AlreadySettled, which the consumer treats as done).
+   * repeat is a typed error the caller maps (a repeated settle is
+   * AdventureClosed, which submit answers with the settled record).
    */
   private async transact(
     items: TransactItems,

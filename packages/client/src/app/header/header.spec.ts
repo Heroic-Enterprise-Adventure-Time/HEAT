@@ -7,9 +7,21 @@ import { Header } from './header';
 
 const player: PlayerView = {
   id: 'p1',
-  camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: 0, livingHeroes: 0 }],
+  camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: 0, livingHeroes: 0, holdings: [], resourceCapacity: 100 }],
   heroes: [],
-  openAdventure: { id: 'a1', startedAt: '2026-10-20T07:00:00.000Z' },
+  openAdventure: {
+    id: 'a1',
+    startedAt: '2026-10-20T07:00:00.000Z',
+    location: 'millbrook',
+    seed: 's1',
+    version: 'v1',
+    job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves.' },
+    snapshot: {
+      version: 'v1',
+      jobId: 'wolves-on-the-mill-road',
+      heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
+    },
+  },
 };
 
 async function render(user: SessionUser | null, loaded: PlayerView | null) {
@@ -37,10 +49,11 @@ describe('Header', () => {
     expect(session.signedIn).toBe(1);
   });
 
-  it('shows a signed-in player their camps, the open adventure and sign-out', async () => {
+  it('shows a signed-in player their camps, a link to the open adventure and sign-out', async () => {
     const { session, page } = await render({ email: 'player@example.com', name: null, accessToken: 't' }, player);
     expect([...page.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['Millbrook']);
     expect(page.querySelector('.adventure')?.textContent).toBe('Adventure in progress');
+    expect(page.querySelector('.adventure')?.getAttribute('href')).toBe('/adventure');
     expect(page.querySelector('.who')?.textContent).toBe('player@example.com');
     page.querySelector('button')?.click();
     expect(session.signedOut).toBe(1);

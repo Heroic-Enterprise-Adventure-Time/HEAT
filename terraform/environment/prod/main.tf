@@ -67,6 +67,9 @@ module "environment" {
   # Google only: nothing in prod accepts a password (Issue-41, Issue-86).
   password_sign_in = false
 
+  # The commit this apply deploys (decision 0030).
+  app_version = var.app_version
+
   # No laptop signs in to prod: its records are players'. Display work uses
   # a sandbox stack (docs/process/development.md, rule 5).
   extra_callback_urls = []

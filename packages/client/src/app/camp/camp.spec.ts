@@ -32,11 +32,25 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
     heroesHere: here,
     seenHere: signal<readonly SeenHeroView[]>(seen),
     retiredHere: computed(() => all().filter((h) => h.status === 'RETIRED')),
-    camp: signal({ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: heroes.length, livingHeroes: heroes.length }),
+    camp: signal({
+      location: 'millbrook',
+      name: 'Millbrook',
+      hallLevel: 1,
+      heroCapacity: 4,
+      activeHeroes: heroes.length,
+      livingHeroes: heroes.length,
+      holdings: [
+        { material: 'timber', balance: 60 },
+        { material: 'cloth', balance: 3 },
+        { material: 'ore', balance: 0 },
+      ],
+      resourceCapacity: 100,
+    }),
     freeVillager: computed(() =>
       here().length === 0 ? { offered: true, reason: null } : { offered: false, reason: 'The villager is free only when no hero here is alive.' },
     ),
     location: signal('millbrook'),
+    adventure: signal<{ snapshot: { heroes: { heroId: string }[] } } | null>(null),
     busy: signal(false),
     error: signal<string | null>(null),
     recruited: 0,
@@ -143,6 +157,18 @@ describe('Camp', () => {
     const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
     const { scene } = await render(fakeGame([wren, dead]));
     expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h1']);
+  });
+
+  it('keeps a hero away on the open adventure out of the camp', async () => {
+    const game = fakeGame([wren, { ...wren, id: 'h2', name: 'Hob' }]);
+    game.adventure.set({ snapshot: { heroes: [{ heroId: 'h1' }] } });
+    const { scene } = await render(game);
+    expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h2']);
+  });
+
+  it("lists the camp's stock against the warehouse's cap", async () => {
+    const { page } = await render(fakeGame([]), '/camp/millbrook/warehouse');
+    expect([...page.querySelectorAll('.stock li')].map((li) => li.textContent?.trim())).toEqual(['60 of 100 timber', '3 of 100 cloth']);
   });
 
   it("walks other players' heroes seen here beside the player's own", async () => {

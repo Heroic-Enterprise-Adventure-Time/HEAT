@@ -120,7 +120,7 @@ describe("recruitHero: the free villager", () => {
     await recruitHero(repo, p, "villager", randomUUID());
     const hero: Hero = {
       id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
-      recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null,
+      recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
     };
     await expect(repo.recruitFree(p, stale, 4, hero)).rejects.toBeInstanceOf(RecruitRefused);
     expect((await repo.heroes(p)).length).toBe(1);

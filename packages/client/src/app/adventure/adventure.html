@@ -1,0 +1,174 @@
+<section class="adventure" [class.side]="side()">
+  <div #box class="stage" [style.height.px]="stageHeight()"></div>
+
+  <aside class="panel" aria-labelledby="panel-title">
+    @if (game.settled(); as settled) {
+      <h2 id="panel-title">{{ settled.adventure.job.name }}</h2>
+      @if (play.replaying()) {
+        <p class="note">Replay</p>
+        <ng-container *ngTemplateOutlet="playback" />
+        <ng-container *ngTemplateOutlet="health" />
+        <button type="button" (click)="play.endReplay()">Back to the result</button>
+      } @else if (settled.result; as result) {
+        <p class="outcome">{{ outcomes[result.outcome] }}.</p>
+
+        <h3>Stages</h3>
+        <ol class="stages">
+          @for (stage of result.stages; track stage.stage) {
+            <li>{{ stage.kind }}: {{ endings[stage.ended] ?? stage.ended }}</li>
+          }
+        </ol>
+
+        <h3>Rewards</h3>
+        @if (result.rewards.length === 0) {
+          <p>Nothing came home.</p>
+        } @else {
+          <ul class="rewards">
+            @for (reward of result.rewards; track reward.material) {
+              <li>{{ reward.amount }} {{ reward.material }}</li>
+            }
+          </ul>
+          @for (lost of result.lost; track lost.material) {
+            @if (lost.amount > 0) {
+              <p class="lost">{{ lost.amount }} {{ lost.material }} lost: the warehouse was full.</p>
+            }
+          }
+        }
+
+        <h3>Heroes</h3>
+        <ul class="heroes">
+          @for (hero of result.heroes; track hero.heroId) {
+            <li>
+              <strong>{{ heroName(hero.heroId) }}</strong>&ngsp;
+              @if (hero.dead) {
+                <span class="dead">died</span>
+              } @else {
+                <span>
+                  +{{ hero.xpGained }} XP, level {{ hero.level }}
+                  @if (hero.level > startLevel(hero.heroId)) {
+                    <strong class="up">level up</strong>
+                  }
+                </span>
+              }
+            </li>
+          }
+        </ul>
+        <div class="after">
+          <button type="button" (click)="replay()" [disabled]="replayState() === 'loading'">Watch the replay</button>
+          <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
+        </div>
+        @if (replayState() === 'failed') {
+          <p class="lost" role="alert">The replay could not be read.</p>
+        }
+      } @else {
+        <p class="lost" role="alert">This adventure was lost to a game update. The party came home with nothing.</p>
+        <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
+      }
+    } @else if (game.adventure(); as adventure) {
+      <h2 id="panel-title">{{ adventure.job.name }}</h2>
+      @if (stageName(); as stage) {
+        <p class="stage-name">{{ stage }}</p>
+      }
+      @if (countdown(); as seconds) {
+        <p class="countdown" role="timer">Turning back in {{ seconds }}</p>
+      }
+      @if (play.resumed()) {
+        <p class="note">Picked up where you left off.</p>
+      }
+
+      <ng-container *ngTemplateOutlet="playback" />
+
+      <h3>Party</h3>
+      @if (play.field(); as field) {
+        <ul class="party">
+          @for (hero of field.party; track hero.unitId) {
+            <li [class.down]="hero.health <= 0">
+              <div class="who">
+                <strong>{{ hero.name }}</strong>
+                <span>{{ hero.type }}</span>
+                <span class="health">{{ hero.health }}/{{ hero.maxHealth }}</span>
+              </div>
+              <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="hero.name + ' health'"></meter>
+              @if (hero.health > 0) {
+                <div class="abilities" role="group" [attr.aria-label]="hero.name + ' next action'">
+                  @for (ability of abilities(hero.type); track ability.id) {
+                    <button
+                      type="button"
+                      [disabled]="!inBattle()"
+                      [attr.aria-pressed]="play.queued().get(hero.unitId) === ability.id"
+                      (click)="play.force(hero.unitId, ability.id)"
+                    >
+                      {{ ability.name }}
+                    </button>
+                  }
+                </div>
+                @if (play.queued().get(hero.unitId); as queued) {
+                  <p class="queued">Next: {{ abilityName(queued) }}</p>
+                }
+              } @else {
+                <p class="dead">Down</p>
+              }
+            </li>
+          }
+        </ul>
+
+        <div class="orders" role="group" aria-label="Party orders">
+          <button type="button" [attr.aria-pressed]="field.order === 'press-on'" [disabled]="field.outcome !== null" (click)="order('press-on')">
+            Press on
+          </button>
+          <button type="button" [attr.aria-pressed]="field.order === 'retreat'" [disabled]="field.outcome !== null" (click)="order('retreat')">
+            Retreat
+          </button>
+        </div>
+
+        @if (field.cargo.length > 0) {
+          <p class="cargo">
+            Carrying
+            @for (load of field.cargo; track load.material; let last = $last) {
+              {{ load.amount }} {{ load.material }}{{ last ? '' : ', ' }}
+            }
+          </p>
+        }
+      }
+
+      @switch (play.submit().state) {
+        @case ('submitting') {
+          <p class="note">Sending the run to be checked…</p>
+        }
+        @case ('failed') {
+          <p class="lost" role="alert">The run could not be sent: {{ play.submit().reason }}</p>
+          <button type="button" (click)="play.retry()">Try again</button>
+        }
+      }
+    } @else {
+      <p>Loading…</p>
+    }
+  </aside>
+</section>
+
+<ng-template #playback>
+  <div class="playback" role="group" aria-label="Playback">
+    <button type="button" (click)="play.togglePause()" [attr.aria-pressed]="play.paused()">
+      {{ play.paused() ? 'Resume' : 'Pause' }}
+    </button>
+    @for (speed of speeds; track speed) {
+      <button type="button" (click)="play.setSpeed(speed)" [attr.aria-pressed]="play.speed() === speed">{{ speed }}×</button>
+    }
+  </div>
+</ng-template>
+
+<ng-template #health>
+  @if (play.field(); as field) {
+    <ul class="party">
+      @for (hero of field.party; track hero.unitId) {
+        <li [class.down]="hero.health <= 0">
+          <div class="who">
+            <strong>{{ hero.name }}</strong>
+            <span class="health">{{ hero.health }}/{{ hero.maxHealth }}</span>
+          </div>
+          <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="hero.name + ' health'"></meter>
+        </li>
+      }
+    </ul>
+  }
+</ng-template>

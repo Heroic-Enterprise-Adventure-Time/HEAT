@@ -68,6 +68,9 @@ module "environment" {
   # (Issue-86, decision 0024 as amended).
   password_sign_in = true
 
+  # The commit this apply deploys (decision 0030).
+  app_version = var.app_version
+
   # The Angular dev server on a laptop signs in to this stack through its
   # browser client (decision 0018, docs/process/development.md rule 5).
   extra_callback_urls = ["http://localhost:4200"]

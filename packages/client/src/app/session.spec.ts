@@ -10,6 +10,7 @@ const config: StackConfig = {
   clientId: '1example23456789',
   loginHost: 'https://auth.heat-sb.dcg-games.com',
   passwordSignIn: false,
+  version: '433e740c1d2b3a4f5e6d7c8b9a0f1e2d3c4b5a69',
 };
 
 describe('sessionSettings', () => {

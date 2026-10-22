@@ -21,3 +21,8 @@ variable "issue" {
     error_message = "issue must be a positive whole number."
   }
 }
+
+variable "app_version" {
+  description = "The deploy's version, the commit being deployed: TF_VAR_app_version from the workflow (github.sha) or, on a laptop, git rev-parse HEAD. The environment module checks its shape (decision 0030)."
+  type        = string
+}
