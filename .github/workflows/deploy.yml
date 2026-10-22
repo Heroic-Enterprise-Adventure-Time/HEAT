@@ -87,6 +87,12 @@ jobs:
             code: true
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
+      # The deploy's version (decision 0030): the pull request's head, which
+      # this job checks out and plans. Not github.sha, which in a
+      # pull_request_target run is the base branch's tip. A root without the
+      # variable ignores it; it is on main before the roots require it,
+      # because this job runs main's copy of the file (Issue-121).
+      TF_VAR_app_version: ${{ github.event.pull_request.head.sha }}
       # The base's Google OAuth client and the alarms' address, from the
       # environment this job runs under: one name in every environment, the
       # environment supplies the value (decision 0020). An environment
@@ -198,6 +204,10 @@ jobs:
             stack: heat-dev
     env:
       TF_VAR_workload_account_id: ${{ matrix.account_id }}
+      # The deploy's version, the commit this run deploys (decision 0030):
+      # the hub's HEAT_VERSION and config.json's version from Issue-113. A
+      # root without the variable ignores it.
+      TF_VAR_app_version: ${{ github.sha }}
       # The base's Google OAuth client and the alarms' address, from the
       # environment this job runs under: one name in every environment, the
       # environment supplies the value (decision 0020). An environment
