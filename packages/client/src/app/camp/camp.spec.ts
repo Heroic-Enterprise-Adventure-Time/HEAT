@@ -37,6 +37,7 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
       here().length === 0 ? { offered: true, reason: null } : { offered: false, reason: 'The villager is free only when no hero here is alive.' },
     ),
     location: signal('millbrook'),
+    adventure: signal(null),
     busy: signal(false),
     error: signal<string | null>(null),
     recruited: 0,

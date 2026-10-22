@@ -6,10 +6,11 @@ const sample = {
   clientId: '1example23456789',
   loginHost: 'https://auth.heat-sb.dcg-games.com',
   passwordSignIn: true,
+  version: '433e740c1d2b3a4f5e6d7c8b9a0f1e2d3c4b5a69',
 };
 
 describe('parseStackConfig', () => {
-  it('accepts the five fields', () => {
+  it('accepts the six fields', () => {
     expect(parseStackConfig(sample)).toEqual(sample);
   });
 
@@ -17,6 +18,8 @@ describe('parseStackConfig', () => {
     const { loginHost: _loginHost, ...without } = sample;
     expect(() => parseStackConfig(without)).toThrow('config.json lacks loginHost');
     expect(() => parseStackConfig({ ...sample, passwordSignIn: 'true' })).toThrow('config.json lacks passwordSignIn');
+    const { version: _version, ...unversioned } = sample;
+    expect(() => parseStackConfig(unversioned)).toThrow('config.json lacks version');
     expect(() => parseStackConfig(null)).toThrow('config.json is not an object');
   });
 });

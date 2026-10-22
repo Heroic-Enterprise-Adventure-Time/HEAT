@@ -1,6 +1,6 @@
 # 0030: The first adventure: the engine, the marching order, stage time limits, and one version per deploy
 
-- **Status:** Decided
+- **Status:** Decided. Amended by Issue-115 on 2026-10-22, the owner's call: an outdated client reloads itself rather than prompting a refresh, at once with no adventure open and otherwise once the adventure is over, and a tab reloads away from a version only once.
 - **Date:** 2026-10-21
 - **Settles:** Issue-109: the shape that Issue-110 to Issue-115 and Issue-15 build, agreed in the planning session of 2026-10-21.
 

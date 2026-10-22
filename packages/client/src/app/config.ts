@@ -23,9 +23,15 @@ export interface StackConfig {
    * prod. When false the client skips the login page and goes to Google.
    */
   readonly passwordSignIn: boolean;
+  /**
+   * The deploy's version, the commit the workflow deployed (decision 0030).
+   * The client sends it on every request, and the hub says when it differs
+   * from its own.
+   */
+  readonly version: string;
 }
 
-const FIELDS = ['graphqlPath', 'userPoolId', 'clientId', 'loginHost'] as const;
+const FIELDS = ['graphqlPath', 'userPoolId', 'clientId', 'loginHost', 'version'] as const;
 
 /** Reads the fields out of the parsed file, or says which one is missing. */
 export function parseStackConfig(value: unknown): StackConfig {
@@ -42,6 +48,7 @@ export function parseStackConfig(value: unknown): StackConfig {
     clientId: record['clientId'] as string,
     loginHost: record['loginHost'] as string,
     passwordSignIn: record['passwordSignIn'],
+    version: record['version'] as string,
   };
 }
 

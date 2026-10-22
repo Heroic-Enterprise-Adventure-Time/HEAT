@@ -33,7 +33,8 @@ export const CAMP_SCENE_FACTORY = new InjectionToken<CampSceneFactory>('heat.cam
  * Other players' heroes seen at the location walk about beside the player's
  * own, and a click on one opens its read-only card, `/seen/<id>`.
  * Every facility the camp has or may build is listed and drawn; one not yet
- * built stands as an unfinished building.
+ * built stands as an unfinished building. While an adventure is open, the
+ * menu ends with an entry that leads to it, `/adventure` (Issue-115).
  */
 @Component({
   selector: 'heat-camp',
