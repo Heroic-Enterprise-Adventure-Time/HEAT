@@ -63,8 +63,8 @@ function heroRefusal(hero: Hero | undefined, locationId: string): [message: stri
  */
 function snapshotHero(hero: Hero): SnapshotHero {
   const profile = UNIT_PROFILES[hero.unitType];
-  // Only villagers can be recruited, and they have a profile; a unit type
-  // without one is content not built yet, not a player's mistake.
+  // Every unit type a location recruits has a profile; a unit type without
+  // one is content not built yet, not a player's mistake.
   if (!profile) throw new Error(`unit type ${hero.unitType} has no combat profile`);
   return {
     heroId: hero.id,
@@ -100,7 +100,14 @@ export async function startAdventure(
     const heroes = await Promise.all(ids.map((id) => repo.getHero(playerId, id)));
     for (const hero of heroes) {
       const refusal = heroRefusal(hero, at.id);
-      if (refusal) refuse(...refusal);
+      if (!refusal) continue;
+      // A hero on an adventure means the player's one adventure is open: a
+      // start that read none before another committed says which it is.
+      if (refusal[1] === "HERO_ADVENTURING") {
+        const winner = await repo.openAdventure(playerId);
+        if (winner) refuseOpen(winner.adventureId);
+      }
+      refuse(...refusal);
     }
     return heroes as Hero[];
   };

@@ -156,6 +156,22 @@ describe("startAdventure", () => {
       expect(marked).toEqual(winner.snapshot.heroes.map((h) => h.heroId).sort());
     }
   });
+
+  it("answers ADVENTURE_OPEN when another start commits between its read of the open adventure and of its party", async () => {
+    const p = player();
+    const [hero] = await putHeroes(p, ["ALIVE"]);
+    const winner = await startAdventure(repo, p, version, at, wolves, [hero!.id]);
+    // The first read sees no open adventure, as it would just before the other start committed.
+    let reads = 0;
+    const late = new Proxy(repo, {
+      get: (target, key, receiver) =>
+        key === "openAdventure"
+          ? (id: string) => (reads++ === 0 ? Promise.resolve(undefined) : target.openAdventure(id))
+          : Reflect.get(target, key, receiver),
+    });
+    const lost = await startAdventure(late, p, version, at, wolves, [hero!.id]).catch((e: GraphQLError) => e);
+    expect((lost as GraphQLError).extensions).toEqual({ code: "ADVENTURE_OPEN", adventureId: winner.adventureId });
+  });
 });
 
 describe("no retiring a hero while it is adventuring", () => {
