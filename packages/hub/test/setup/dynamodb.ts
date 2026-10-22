@@ -26,6 +26,10 @@ export async function setup(): Promise<void> {
   process.env.AWS_SECRET_ACCESS_KEY = "test";
   process.env.POWERTOOLS_LOG_LEVEL = "SILENT";
   process.env.HEAT_VERSION = "0123456789abcdef0123456789abcdef01234567";
+  process.env.HEAT_PREVIOUS_VERSION = "fedcba9876543210fedcba9876543210fedcba98";
+  // Named only: the handler's tests never reach S3. Submit is proven
+  // against the in-memory store, and the bucket by the stack test.
+  process.env.HEAT_REPLAY_BUCKET = "heat-test-replays";
 
   const client = new DynamoDBClient({ region: "us-east-1", endpoint });
   await ensureTable(client, "heat-test-player");

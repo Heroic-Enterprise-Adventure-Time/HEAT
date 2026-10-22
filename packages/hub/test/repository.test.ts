@@ -4,7 +4,6 @@ import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import {
   AdventureAlreadyOpen,
   AlreadyApplied,
-  AlreadySettled,
   InsufficientBalance,
   Repository,
 } from "../src/db/repository.js";
@@ -85,38 +84,5 @@ describe("debit: the ledger never goes negative", () => {
     const fulfilled = results.filter((r) => r.status === "fulfilled").length;
     expect(fulfilled).toBe(1);
     expect(await repo.holdings(p, at)).toEqual([{ material: "cloth", balance: 3 }]);
-  });
-});
-
-describe("settle: rewards once, keyed on the adventure", () => {
-  it("credits rewards, closes the adventure, and refuses a redelivery", async () => {
-    const p = player();
-    await repo.putPlayer({ id: p, name: "Cy" });
-    const adv = randomUUID();
-    await repo.startAdventure(p, adventure(adv, "seed"));
-    const rewards = [
-      { material: "timber", amount: 3 },
-      { material: "ore", amount: 2 },
-    ];
-    await repo.settle(p, adv, at, rewards);
-    expect(await repo.openAdventure(p)).toBeUndefined();
-    expect((await repo.getAdventure(adv))?.status).toBe("SETTLED");
-    const holdings = await repo.holdings(p, at);
-    expect(holdings).toEqual(
-      expect.arrayContaining([
-        { material: "timber", balance: 3 },
-        { material: "ore", balance: 2 },
-      ]),
-    );
-    await expect(repo.settle(p, adv, at, rewards)).rejects.toBeInstanceOf(AlreadySettled);
-    expect(await repo.holdings(p, at)).toEqual(holdings);
-  });
-
-  it("will not settle an adventure that is not the open one", async () => {
-    const p = player();
-    await repo.putPlayer({ id: p, name: "Di" });
-    await repo.startAdventure(p, adventure("open-one", "s"));
-    await expect(repo.settle(p, "some-other", at, [])).rejects.toBeInstanceOf(AlreadySettled);
-    expect((await repo.openAdventure(p))?.adventureId).toBe("open-one");
   });
 });

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
 import { beforeAll, describe, expect, it } from "vitest";
-import { rewardsForSeed } from "@heat/engine";
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 
@@ -215,29 +214,23 @@ describe("the adventure loop through the graph", () => {
     const retire = await gql(`mutation($id: String!) { retireHero(heroId: $id) { id } }`, { id: villager }, p);
     expect(retire.errors?.[0]?.extensions?.["code"]).toBe("HERO_ADVENTURING");
 
-    const settle = await gql<{ settleAdventure: { camps: { holdings: { material: string; balance: number }[] }[] } }>(
-      `mutation($id: String!) { settleAdventure(adventureId: $id) { camps { holdings { material balance } } } }`,
-      { id: adventureId },
-      p,
-    );
-    expect(settle.errors).toBeUndefined();
-    // A fresh player holds exactly what the engine pays for the seed the
-    // mutation returned: the same answer the client would compute.
-    const holdings = settle.data!.settleAdventure.camps[0]!.holdings;
-    const byMaterial = (a: { material: string }, b: { material: string }) => a.material.localeCompare(b.material);
-    expect([...holdings].sort(byMaterial)).toEqual(
-      rewardsForSeed(seed).map((r) => ({ material: r.material, balance: r.amount })).sort(byMaterial),
-    );
+    // Submit's refusals that come before the replay bucket: settling itself
+    // is proven against the in-memory store (settle.test.ts) and on the
+    // stack against the real bucket.
+    const SUBMIT = `mutation($id: String!, $log: [OverrideInput!]!) { submitAdventure(adventureId: $id, overrides: $log) { id status } }`;
+    const stranger = await gql(SUBMIT, { id: adventureId, log: [] }, `p-${randomUUID()}`);
+    expect(stranger.errors?.[0]?.extensions?.["code"]).toBe("NO_SUCH_ADVENTURE");
+    const badLog = await gql(SUBMIT, { id: adventureId, log: [{ kind: "UNIT", acceptedAtSimTime: 0, unitId: "nobody", abilityId: "swing" }] }, p);
+    expect(badLog.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+    const discard = await gql(`mutation($id: String!) { discardAdventure(adventureId: $id) { id } }`, { id: adventureId }, p);
+    expect(discard.errors?.[0]?.extensions).toMatchObject({ code: "ADVENTURE_VERIFIABLE", version });
 
-    const redelivered = await gql(
-      `mutation($id: String!) { settleAdventure(adventureId: $id) { id } }`,
-      { id: adventureId },
-      p,
-    );
-    expect(redelivered.errors?.[0]?.message).toMatch(/condition failed/);
-    expect(await repo.holdings(p, "millbrook")).toEqual(expect.arrayContaining(holdings));
-    const free = await gql<{ me: { openAdventure: unknown } }>(`{ me { openAdventure { id } } }`, {}, p);
-    expect(free.data?.me.openAdventure).toBeNull();
+    // The record, open: its player reads it with no result and no timeline; nobody else does.
+    const read = `query($id: String!) { adventure(id: $id) { id status result { outcome } timeline } }`;
+    const own = await gql<{ adventure: unknown }>(read, { id: adventureId }, p);
+    expect(own.data?.adventure).toEqual({ id: adventureId, status: "OPEN", result: null, timeline: null });
+    const other = await gql<{ adventure: unknown }>(read, { id: adventureId }, `p-${randomUUID()}`);
+    expect(other.data?.adventure).toBeNull();
   });
 });
 
@@ -246,6 +239,9 @@ describe("the deploy's version", () => {
     const p = `p-${randomUUID()}`;
     await gql(`mutation { joinGame { id } }`, {}, p);
     const version = process.env.HEAT_VERSION!;
+
+    const asked = await gql<{ version: string }>(`{ version }`, {}, p);
+    expect(asked.data?.version).toBe(version);
 
     const same = await gql(`{ me { id } }`, {}, p, { "heat-version": version });
     expect(same.extensions?.["outdated"]).toBeUndefined();

@@ -4,7 +4,10 @@ import { execFileSync } from "node:child_process";
  * The stack test: signs in to the base pool as a test user through the ci
  * client, then drives the adventure loop through the stack's HTTP API,
  * exactly as a client would, and checks what the hub answers against the
- * engine, the same check the hub's own test makes against DynamoDB Local.
+ * engine, the same check the hub's own test makes against DynamoDB Local:
+ * start, submit with the hub's replay, settlement against the real tables
+ * and the real replay bucket, the timeline read back, and the version of
+ * both routes, /graphql and /previous/graphql (Issue-114).
  * The run summary of every push shows it passing against the real gateway,
  * authorizer, IAM path and tables (decision 0018).
  *
@@ -63,6 +66,8 @@ const siteUrl = parameter("site_url");
 // prod writes no app_client_id parameter, because it has no ci client.
 const clientId = anonymousOnly ? undefined : parameter("app_client_id");
 const graphqlUrl = `${siteUrl}/graphql`;
+// The deploy before the current one, at its own route (decision 0030).
+const previousUrl = `${siteUrl}/previous/graphql`;
 
 async function signIn() {
   const response = await fetch(`https://cognito-idp.${region}.amazonaws.com/`, {
@@ -77,15 +82,17 @@ async function signIn() {
   return body.AuthenticationResult.AccessToken;
 }
 
-async function graphql(token, query, variables = {}, headers = {}) {
+async function graphql(token, query, variables = {}, headers = {}, url = graphqlUrl) {
   const started = performance.now();
-  const response = await fetch(graphqlUrl, {
+  const response = await fetch(url, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...headers },
     body: JSON.stringify({ query, variables }),
   });
   const ms = Math.round(performance.now() - started);
-  if (response.status !== 200) throw new Error(`HTTP ${response.status} from ${graphqlUrl}: ${await response.text()}`);
+  // 400 is GraphQL's own refusal of a document, a field the deploy does not
+  // have among them, and carries its errors like any answer.
+  if (response.status !== 200 && response.status !== 400) throw new Error(`HTTP ${response.status} from ${url}: ${await response.text()}`);
   return { ...(await response.json()), ms };
 }
 
@@ -130,8 +137,8 @@ if (anonymousOnly) {
 }
 
 // The engine only from here on: the authenticated half compares the hub's
-// rewards with it, so the anonymous run needs no engine build.
-const { rewardsForSeed } = await import("@heat/engine");
+// result with its own replay, so the anonymous run needs no engine build.
+const { replay, levelForXp } = await import("@heat/engine");
 
 const token = await signIn();
 console.log(`signed in as ${username} through client ${clientId}`);
@@ -143,14 +150,22 @@ check(!joined.errors && joined.data?.joinGame?.id, `joinGame answered the profil
 
 // A permanent environment's test user keeps its records between runs, and a
 // stack's keeps them between pushes, so an adventure left open by a run that
-// failed between its start and its settle would refuse every later start and
-// keep its villager from retiring. Settle whatever is open first.
-const settleMutation = `mutation($id: String!) { settleAdventure(adventureId: $id) { id camps { location holdings { material balance } } } }`;
+// failed between its start and its submit would refuse every later start and
+// keep its villager from retiring. Close whatever is open first, the way the
+// client does (decision 0030): submit to the current route, then to the
+// previous one, and discard when both say ENGINE_UPDATED.
+const submitMutation = `mutation($id: String!, $log: [OverrideInput!]!) { submitAdventure(adventureId: $id, overrides: $log) { id status result { outcome rewards { material amount } credited { material amount } lost { material amount } heroes { heroId xpGained xp level dead } } } }`;
 const before = await graphql(token, `{ me { openAdventure { id } } }`);
 const leftover = before.data?.me?.openAdventure?.id;
 if (leftover) {
-  const cleared = await graphql(token, settleMutation, { id: leftover });
-  check(!cleared.errors, `settled the adventure ${leftover} that an earlier run left open (${cleared.ms} ms)`);
+  let closed = await graphql(token, submitMutation, { id: leftover, log: [] });
+  if (closed.errors?.[0]?.extensions?.code === "ENGINE_UPDATED") {
+    closed = await graphql(token, submitMutation, { id: leftover, log: [] }, {}, previousUrl);
+  }
+  if (closed.errors) {
+    closed = await graphql(token, `mutation($id: String!) { discardAdventure(adventureId: $id) { id status } }`, { id: leftover });
+  }
+  check(!closed.errors, `closed the adventure ${leftover} that an earlier run left open (${closed.ms} ms)`);
 }
 
 // The free villager (Issue-81). A sandbox stack's user meets a new camp
@@ -195,18 +210,23 @@ if (stack.startsWith("heat-sb")) {
   check(!next.errors && next.data?.recruitHero?.status === "ALIVE", `the free villager is offered again and recruited: ${next.data?.recruitHero?.name} (${next.ms} ms)`);
 }
 
-// The first job (Issue-113): "Wolves on the mill road" with the living
-// villager, the snapshot stamped with the deploy's version.
-const party = (await graphql(token, campQuery)).data?.me?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");
+// A job (Issue-113, Issue-114): "Timber from the near woods" with the living
+// villager, the snapshot stamped with the deploy's version. Timber, because
+// a lone villager clears it on every seed and comes home paid, while the
+// wolves kill it on every seed (Issue-126).
+const job = "timber-from-the-near-woods";
+const heroQuery = `{ me { camps { location holdings { material balance } } heroes { id unitType status location xp level } } }`;
+const home = (await graphql(token, heroQuery)).data?.me;
+const party = home?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");
 check(party?.unitType === "villager", `the camp has a living villager to send: ${party?.id}`);
-const startMutation = `mutation($heroIds: [String!]!) { startAdventure(location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds) { id seed } }`;
+const startMutation = `mutation($heroIds: [String!]!) { startAdventure(location: "millbrook", jobId: "${job}", heroIds: $heroIds) { id seed } }`;
 const start = await graphql(token, startMutation, { heroIds: [party.id] });
-check(!start.errors && start.data?.startAdventure?.id, `startAdventure set out on the wolves job (${start.ms} ms)`);
+check(!start.errors && start.data?.startAdventure?.id, `startAdventure set out on the timber job (${start.ms} ms)`);
 const { id, seed } = start.data.startAdventure;
 
-const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType stats { maxHealth } } } } } }`);
+const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gathering } } } } } }`);
 const adventure = open.data?.me?.openAdventure;
-check(!open.errors && adventure?.id === id && adventure.seed === seed && adventure.job?.id === "wolves-on-the-mill-road", `me shows the open adventure: ${adventure?.job?.name} at ${adventure?.location} (${open.ms} ms)`);
+check(!open.errors && adventure?.id === id && adventure.seed === seed && adventure.job?.id === job, `me shows the open adventure: ${adventure?.job?.name} at ${adventure?.location} (${open.ms} ms)`);
 check(adventure.snapshot?.jobId === adventure.job.id && adventure.snapshot.heroes.length === 1 && adventure.snapshot.heroes[0].heroId === party.id && adventure.snapshot.heroes[0].unitType === "villager", `the snapshot holds the villager and the job: ${JSON.stringify(adventure.snapshot?.heroes)}`);
 check(adventure.version === config.version && adventure.snapshot.version === config.version, `the adventure is stamped with config.json's version, so the hub and the client carry one (${adventure.version})`);
 
@@ -222,19 +242,55 @@ check(current.extensions?.outdated === undefined, `a request carrying the deploy
 const stale = await graphql(token, `{ me { id } }`, {}, { "heat-version": "0".repeat(40) });
 check(stale.extensions?.outdated === true, `a request carrying another version is flagged outdated (${stale.ms} ms)`);
 
-const settle = await graphql(token, settleMutation, { id });
-check(!settle.errors && settle.data?.settleAdventure, `settleAdventure settled it (${settle.ms} ms)`);
+// Submit with no overrides (Issue-114): the hub replays the run, stores the
+// timeline and settles. Its result must be the engine's own replay of the
+// snapshot and seed it issued, and the camp must hold what it credited.
+const expected = replay(adventure.snapshot, seed, []).result;
+const submitted = await graphql(token, submitMutation, { id, log: [] });
+const result = submitted.data?.submitAdventure?.result;
+check(!submitted.errors && submitted.data.submitAdventure.status === "SETTLED", `submitAdventure settled it (${submitted.ms} ms)`);
+check(result.outcome === expected.outcome && expected.outcome === "complete", `the hub's verdict is the engine's: ${result.outcome}`);
 
 const byMaterial = (a, b) => a.material.localeCompare(b.material);
-const expected = rewardsForSeed(seed).map((r) => ({ material: r.material, balance: r.amount })).sort(byMaterial);
-const got = [...(settle.data.settleAdventure.camps.find((c) => c.location === "millbrook")?.holdings ?? [])].sort(byMaterial);
-const previous = JSON.stringify(got) === JSON.stringify(expected);
-// A test user that has played before holds earlier rewards too: every
-// expected material must have at least the expected balance.
-const covered = expected.every((e) => got.some((g) => g.material === e.material && g.balance >= e.balance));
-check(previous || covered, `the holdings carry the engine's rewards for seed ${seed}: ${JSON.stringify(got)}`);
+const sorted = (rewards) => JSON.stringify([...rewards].sort(byMaterial));
+check(sorted(result.rewards) === sorted(expected.rewards), `the rewards are the job's pay and the cargo: ${sorted(result.rewards)}`);
+// The test user of dev keeps its warehouse between merges, so what the cap
+// turns away is part of the check rather than a failure.
+const added = (material) => [...result.credited, ...result.lost].filter((r) => r.material === material).reduce((n, r) => n + r.amount, 0);
+check(result.rewards.every((r) => added(r.material) === r.amount), `every reward was credited or lost at the cap: credited ${sorted(result.credited)}, lost ${sorted(result.lost)}`);
+const balance = (me, material) => me?.camps?.find((c) => c.location === "millbrook")?.holdings?.find((h) => h.material === material)?.balance ?? 0;
+const after = (await graphql(token, heroQuery)).data?.me;
+check(result.credited.every((r) => balance(after, r.material) === balance(home, r.material) + r.amount), `the camp's holdings rose by what was credited`);
 
-const redelivered = await graphql(token, `mutation($id: String!) { settleAdventure(adventureId: $id) { id } }`, { id });
-check(redelivered.errors?.[0]?.message.includes("condition failed"), `a second settle is refused, nothing paid twice (${redelivered.ms} ms)`);
+const gained = expected.xp.find((x) => x.heroId === party.id)?.xp ?? 0;
+const villager = after?.heroes?.find((h) => h.id === party.id);
+check(gained > 0 && villager?.xp === party.xp + gained && villager.level === Math.max(party.level, levelForXp(party.xp + gained)) && villager.status === "ALIVE", `the villager came home with ${gained} XP, at level ${villager?.level} (${villager?.xp} XP)`);
+const free = await graphql(token, `{ me { openAdventure { id } } }`);
+check(free.data?.me?.openAdventure === null, `no adventure is open after the settlement`);
+
+const repeated = await graphql(token, submitMutation, { id, log: [] });
+const unchanged = (await graphql(token, heroQuery)).data?.me;
+check(!repeated.errors && JSON.stringify(repeated.data.submitAdventure.result) === JSON.stringify(result) && JSON.stringify(unchanged) === JSON.stringify(after), `a repeated submit answers the settled result and pays nothing (${repeated.ms} ms)`);
+
+// The timeline, read back through the hub from the replay bucket.
+const read = await graphql(token, `query($id: String!) { adventure(id: $id) { id status timeline } }`, { id });
+const timeline = read.data?.adventure?.timeline;
+check(!read.errors && timeline?.version === config.version && timeline.seed === seed && timeline.jobId === job && timeline.events?.length > 0, `adventure(id) reads the stored timeline: ${timeline?.events?.length} events, version ${timeline?.version} (${read.ms} ms)`);
+check(timeline.events.at(-1)?.kind === "adventure-end" && timeline.events.at(-1).outcome === "complete", `the timeline ends as the result does`);
+
+// Both routes (decision 0030). /graphql runs this deploy. /previous/graphql
+// runs the deploy before it: a stack's first apply points both at one
+// version, and every later deploy leaves the one before at previous. The
+// first deploy after Issue-114 has a previous from before the version
+// field, which answers only through the outdated flag.
+const currentVersion = await graphql(token, `{ version }`);
+check(currentVersion.data?.version === config.version, `/graphql answers this deploy's version ${currentVersion.data?.version} (${currentVersion.ms} ms)`);
+const previousVersion = await graphql(token, `{ version }`, {}, { "heat-version": config.version }, previousUrl);
+if (previousVersion.data?.version) {
+  const same = previousVersion.data.version === config.version;
+  check(/^[0-9a-f]{40}$/.test(previousVersion.data.version), `/previous/graphql answers the previous deploy's version ${previousVersion.data.version}${same ? ", this one's: the stack's first deploy" : ""} (${previousVersion.ms} ms)`);
+} else {
+  check(previousVersion.extensions?.outdated === true, `/previous/graphql answers a deploy from before the version field, another version by its outdated flag (${previousVersion.ms} ms)`);
+}
 
 console.log("stack test passed");

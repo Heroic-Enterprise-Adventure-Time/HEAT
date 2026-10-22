@@ -1,12 +1,12 @@
 import {
   JOBS,
-  STARTING_LOCATION,
   hallCapacity,
   location,
-  rewardsForSeed,
   warehouseCapacity,
   type Job,
+  type Reward,
   type SnapshotHero,
+  type StageResult,
   type UnitStats,
   type AdventureSnapshot,
 } from "@heat/engine";
@@ -15,17 +15,25 @@ import { builder } from "./builder.js";
 import { recruitHero } from "../recruit.js";
 import { retireHero } from "../retire.js";
 import { startAdventure } from "../start.js";
+import { submitAdventure, type OverrideInput } from "../submit.js";
+import { discardAdventure } from "../discard.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
-import type { AdventureRecord, Camp, Hero, Holding, Player } from "../db/repository.js";
+import type { AdventureRecord, Camp, Hero, HeroOutcome, Holding, Player, SettledResult } from "../db/repository.js";
 
 /**
  * The graph: a public player; their camps, heroes and the open adventure
  * behind the `self` scope; other players' heroes seen at a location, by
- * their public fields only; joining, recruiting, retiring, starting an
- * adventure from the job board, and the spike's settle. Settle is exposed
- * as a mutation here only until Issue-114's submit replaces it; in the
- * design it is the verifier's result, not a client's call.
+ * their public fields only; a settled adventure, with its result and its
+ * timeline; the deploy's version; joining, recruiting, retiring, and an
+ * adventure started from the job board, submitted for verification and
+ * settlement, or discarded when no deploy can verify it.
  */
+
+builder.scalarType("JSON", {
+  description: "A JSON value, served as it was stored.",
+  serialize: (value) => value,
+  parseValue: (value) => value,
+});
 
 const HoldingRef = builder.objectRef<Holding>("Holding").implement({
   fields: (t) => ({
@@ -124,8 +132,54 @@ const SnapshotRef = builder.objectRef<AdventureSnapshot>("Snapshot").implement({
   }),
 });
 
+const AdventureStatusRef = builder.enumType("AdventureStatus", { values: ["OPEN", "SETTLED", "DISCARDED"] as const });
+
+const RewardRef = builder.objectRef<Reward>("Reward").implement({
+  fields: (t) => ({
+    material: t.exposeString("material"),
+    amount: t.exposeInt("amount"),
+  }),
+});
+
+const StageResultRef = builder.objectRef<StageResult>("StageResult").implement({
+  description: "How one stage the party entered ended.",
+  fields: (t) => ({
+    stage: t.exposeInt("stage"),
+    kind: t.exposeString("kind", { description: "travel, fight, gather or arrive." }),
+    ended: t.exposeString("ended", { description: "done for travel and arrive; win, loss, timeout or retreat for a battle." }),
+    startedAtMs: t.exposeInt("startedAtMs"),
+    endedAtMs: t.exposeInt("endedAtMs"),
+  }),
+});
+
+const HeroOutcomeRef = builder.objectRef<HeroOutcome>("HeroOutcome").implement({
+  description: "One hero of the party at settlement.",
+  fields: (t) => ({
+    heroId: t.exposeString("heroId"),
+    xpGained: t.exposeInt("xpGained"),
+    xp: t.exposeInt("xp", { description: "The hero's XP after settlement." }),
+    level: t.exposeInt("level", { description: "The hero's level after settlement." }),
+    health: t.exposeInt("health", { description: "Health at the end of the adventure." }),
+    dead: t.exposeBoolean("dead"),
+  }),
+});
+
+const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").implement({
+  description: "What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, and each hero's XP and fate.",
+  fields: (t) => ({
+    outcome: t.exposeString("outcome", { description: "complete, retreat (ordered, or a time limit reached) or defeat." }),
+    endedAtMs: t.exposeInt("endedAtMs"),
+    reachedStage: t.exposeInt("reachedStage"),
+    stages: t.expose("stages", { type: [StageResultRef] }),
+    rewards: t.expose("rewards", { type: [RewardRef], description: "What the run yielded." }),
+    credited: t.expose("credited", { type: [RewardRef], description: "What went into the warehouse." }),
+    lost: t.expose("lost", { type: [RewardRef], description: "What the warehouse's cap turned away." }),
+    heroes: t.expose("heroes", { type: [HeroOutcomeRef] }),
+  }),
+});
+
 const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
-  description: "An adventure as the hub issued it: what the client needs to play it with the seed.",
+  description: "An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.",
   fields: (t) => ({
     id: t.exposeString("adventureId"),
     seed: t.exposeString("seed"),
@@ -142,6 +196,32 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     }),
     snapshot: t.expose("snapshot", { type: SnapshotRef }),
     version: t.exposeString("version", { description: "The deploy that issued the adventure, and the only one that verifies it." }),
+    status: t.field({ type: AdventureStatusRef, resolve: (adventure) => adventure.status }),
+    result: t.field({ type: AdventureResultRef, nullable: true, resolve: (adventure) => adventure.result }),
+    timeline: t.field({
+      type: "JSON",
+      nullable: true,
+      description: "The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled.",
+      resolve: async (adventure, _args, ctx) => {
+        if (adventure.status !== "SETTLED") return null;
+        const body = await ctx.timelines.get(adventure.adventureId);
+        return body === undefined ? null : (JSON.parse(body) as unknown);
+      },
+    }),
+  }),
+});
+
+const OverrideKindRef = builder.enumType("OverrideKind", { values: ["UNIT", "PARTY"] as const });
+const PartyOrderRef = builder.enumType("PartyOrder", { values: ["PRESS_ON", "RETREAT"] as const });
+
+const OverrideInputRef = builder.inputType("OverrideInput", {
+  description: "One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up.",
+  fields: (t) => ({
+    kind: t.field({ type: OverrideKindRef, required: true }),
+    acceptedAtSimTime: t.int({ required: true, description: "Milliseconds on the adventure's clock." }),
+    unitId: t.string({ description: "The hero, for a UNIT entry." }),
+    abilityId: t.string({ description: "The ability forced, for a UNIT entry." }),
+    order: t.field({ type: PartyOrderRef, description: "The order, for a PARTY entry." }),
   }),
 });
 
@@ -190,6 +270,22 @@ builder.queryFields((t) => ({
     description: "The signed-in player, or null before joinGame has made their profile.",
     resolve: async (_root, _args, ctx) => (ctx.playerId ? ctx.repo.getPlayer(ctx.playerId) : undefined),
   }),
+  version: t.string({
+    description: "The deploy's version: the commit this route's deploy runs. /graphql answers the current deploy's, /previous/graphql the one before.",
+    resolve: (_root, _args, ctx) => ctx.version,
+  }),
+  adventure: t.field({
+    type: AdventureRef,
+    nullable: true,
+    authScopes: { authenticated: true },
+    description: "An adventure by id: any settled one, for its replay; an open or discarded one only for its own player. Null otherwise.",
+    args: { id: t.arg.string({ required: true }) },
+    resolve: async (_root, args, ctx) => {
+      const adventure = await ctx.repo.getAdventure(args.id);
+      if (!adventure) return null;
+      return adventure.status === "SETTLED" || adventure.playerId === ctx.playerId ? adventure : null;
+    },
+  }),
   heroesSeenAt: t.field({
     type: [SeenHeroRef],
     authScopes: { authenticated: true },
@@ -237,21 +333,24 @@ builder.mutationFields((t) => ({
     },
     resolve: (_root, args, ctx) => startAdventure(ctx.repo, ctx.playerId!, ctx.version, args.location, args.jobId, args.heroIds),
   }),
-  settleAdventure: t.field({
-    type: PlayerRef,
-    nullable: true,
+  submitAdventure: t.field({
+    type: AdventureRef,
     authScopes: { authenticated: true },
-    description: "Spike only, until Issue-114's submit: settles the caller's open adventure with the engine's rewards for its seed, credited at its location, and brings its party back to the camp.",
-    args: { adventureId: t.arg.string({ required: true }) },
-    resolve: async (_root, args, ctx) => {
-      const playerId = ctx.playerId!;
-      const record = await ctx.repo.getAdventure(args.adventureId);
-      if (!record || record.playerId !== playerId) throw new Error("not your adventure");
-      // A record the spike started before Issue-113 has no location and no party.
-      const heroIds = record.snapshot?.heroes.map((h) => h.heroId) ?? [];
-      await ctx.repo.settle(playerId, args.adventureId, record.location ?? STARTING_LOCATION, rewardsForSeed(record.seed), heroIds);
-      return ctx.repo.getPlayer(playerId);
+    description: "Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. Refused with ENGINE_UPDATED, and this deploy's version in extensions.version, when another version issued it: try /previous/graphql. A settled adventure answers as it is; nothing is paid twice.",
+    args: {
+      adventureId: t.arg.string({ required: true }),
+      overrides: t.arg({ type: [OverrideInputRef], required: true }),
     },
+    resolve: (_root, args, ctx) =>
+      submitAdventure(ctx.repo, ctx.timelines, ctx.playerId!, ctx.version, args.adventureId, args.overrides as OverrideInput[]),
+  }),
+  discardAdventure: t.field({
+    type: AdventureRef,
+    authScopes: { authenticated: true },
+    description: "Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. Refused with ADVENTURE_VERIFIABLE while this deploy or the previous one could still verify it.",
+    args: { adventureId: t.arg.string({ required: true }) },
+    resolve: (_root, args, ctx) =>
+      discardAdventure(ctx.repo, ctx.playerId!, { current: ctx.version, previous: ctx.previousVersion }, args.adventureId),
   }),
 }));
 

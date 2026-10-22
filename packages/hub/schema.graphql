@@ -1,18 +1,52 @@
 """
-An adventure as the hub issued it: what the client needs to play it with the seed.
+An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.
 """
 type Adventure {
   id: String!
   job: Job!
   location: String!
+  result: AdventureResult
   seed: String!
   snapshot: Snapshot!
   startedAt: String!
+  status: AdventureStatus!
+
+  """
+  The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled.
+  """
+  timeline: JSON
 
   """
   The deploy that issued the adventure, and the only one that verifies it.
   """
   version: String!
+}
+
+"""
+What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, and each hero's XP and fate.
+"""
+type AdventureResult {
+  """What went into the warehouse."""
+  credited: [Reward!]!
+  endedAtMs: Int!
+  heroes: [HeroOutcome!]!
+
+  """What the warehouse's cap turned away."""
+  lost: [Reward!]!
+
+  """complete, retreat (ordered, or a time limit reached) or defeat."""
+  outcome: String!
+  reachedStage: Int!
+
+  """What the run yielded."""
+  rewards: [Reward!]!
+  stages: [StageResult!]!
+}
+
+enum AdventureStatus {
+  DISCARDED
+  OPEN
+  SETTLED
 }
 
 """
@@ -55,6 +89,22 @@ type Hero {
   xp: Int!
 }
 
+"""One hero of the party at settlement."""
+type HeroOutcome {
+  dead: Boolean!
+
+  """Health at the end of the adventure."""
+  health: Int!
+  heroId: String!
+
+  """The hero's level after settlement."""
+  level: Int!
+
+  """The hero's XP after settlement."""
+  xp: Int!
+  xpGained: Int!
+}
+
 enum HeroStatus {
   ALIVE
   DEAD
@@ -65,6 +115,9 @@ type Holding {
   balance: Int!
   material: String!
 }
+
+"""A JSON value, served as it was stored."""
+scalar JSON
 
 """
 A job on a location's job board, from the static content; the client reads its stages from the engine it loaded.
@@ -79,6 +132,11 @@ type Job {
 }
 
 type Mutation {
+  """
+  Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. Refused with ADVENTURE_VERIFIABLE while this deploy or the previous one could still verify it.
+  """
+  discardAdventure(adventureId: String!): Adventure!
+
   """
   Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing.
   """
@@ -95,14 +153,42 @@ type Mutation {
   retireHero(heroId: String!): Hero!
 
   """
-  Spike only, until Issue-114's submit: settles the caller's open adventure with the engine's rewards for its seed, credited at its location, and brings its party back to the camp.
-  """
-  settleAdventure(adventureId: String!): Player
-
-  """
   Starts a job from the location's job board with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.
   """
   startAdventure(heroIds: [String!]!, jobId: String!, location: String!): Adventure!
+
+  """
+  Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. Refused with ENGINE_UPDATED, and this deploy's version in extensions.version, when another version issued it: try /previous/graphql. A settled adventure answers as it is; nothing is paid twice.
+  """
+  submitAdventure(adventureId: String!, overrides: [OverrideInput!]!): Adventure!
+}
+
+"""
+One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up.
+"""
+input OverrideInput {
+  """The ability forced, for a UNIT entry."""
+  abilityId: String
+
+  """Milliseconds on the adventure's clock."""
+  acceptedAtSimTime: Int!
+  kind: OverrideKind!
+
+  """The order, for a PARTY entry."""
+  order: PartyOrder
+
+  """The hero, for a UNIT entry."""
+  unitId: String
+}
+
+enum OverrideKind {
+  PARTY
+  UNIT
+}
+
+enum PartyOrder {
+  PRESS_ON
+  RETREAT
 }
 
 type Player {
@@ -120,6 +206,11 @@ type Player {
 
 type Query {
   """
+  An adventure by id: any settled one, for its replay; an open or discarded one only for its own player. Null otherwise.
+  """
+  adventure(id: String!): Adventure
+
+  """
   A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.
   """
   heroesSeenAt(location: String!): [SeenHero!]!
@@ -129,6 +220,16 @@ type Query {
 
   """Public: any caller may look a player up by id."""
   player(id: String!): Player
+
+  """
+  The deploy's version: the commit this route's deploy runs. /graphql answers the current deploy's, /previous/graphql the one before.
+  """
+  version: String!
+}
+
+type Reward {
+  amount: Int!
+  material: String!
 }
 
 """
@@ -163,6 +264,20 @@ type SnapshotHero {
   spriteSet: String!
   stats: UnitStats!
   unitType: String!
+}
+
+"""How one stage the party entered ended."""
+type StageResult {
+  """
+  done for travel and arrive; win, loss, timeout or retreat for a battle.
+  """
+  ended: String!
+  endedAtMs: Int!
+
+  """travel, fight, gather or arrive."""
+  kind: String!
+  stage: Int!
+  startedAtMs: Int!
 }
 
 type UnitStats {
