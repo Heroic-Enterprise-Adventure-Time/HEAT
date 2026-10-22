@@ -46,7 +46,7 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
       holdings: [{ material: 'timber', balance: 90 }],
       resourceCapacity: 100,
     }),
-    freeVillager: signal({ offered: false, reason: null }),
+    recruits: signal([]),
     location: signal('millbrook'),
     player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
     adventure: open,

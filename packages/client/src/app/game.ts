@@ -1,5 +1,5 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { STARTING_LOCATION, type AdventureLogEntry, type AdventureTimeline } from '@heat/engine';
+import { STARTING_LOCATION, location, recruitCost, type AdventureLogEntry, type AdventureTimeline, type UnitType } from '@heat/engine';
 import { Api, ApiError, PREVIOUS } from './api';
 import { Session } from './session';
 
@@ -104,11 +104,20 @@ const SUBMIT = `mutation($id: String!, $overrides: [OverrideInput!]!) { submitAd
 const TIMELINE = `query($id: String!) { adventure(id: $id) { timeline } }`;
 const DISCARD = `mutation($id: String!) { discardAdventure(adventureId: $id) { id } }`;
 const START = `mutation($at: String!, $job: String!, $heroes: [String!]!) { startAdventure(location: $at, jobId: $job, heroIds: $heroes) { ${ADVENTURE_FIELDS} } }`;
+const RECRUIT = `mutation($unitType: String!, $id: String!) { recruitHero(unitType: $unitType, requestId: $id) { ${HERO_FIELDS} } }`;
+
+/** A unit type the hall recruits, its price to the camp, and why it cannot be had now, or null when it can. */
+export interface RecruitOffer {
+  readonly unitType: UnitType;
+  /** Each resource of the price beside the camp's balance of it; empty for the free villager. */
+  readonly cost: readonly { readonly material: string; readonly amount: number; readonly balance: number }[];
+  readonly reason: string | null;
+}
 
 /**
  * The signed-in player's game: their camps, their heroes and the open
  * adventure, loaded from the hub after every sign-in, and the three things
- * they can do yet, recruit the free villager, retire a hero and start a job
+ * they can do yet, recruit a hero, retire one and start a job
  * from the job board. Joining comes
  * first, because the profile is made on first sign-in (joinGame, Issue-81).
  * Beside them, a few of other players' heroes seen at the camp's location,
@@ -143,13 +152,32 @@ export class Game {
   );
   /** A few of other players' heroes seen at the camp's location, who walk about it for flavor. */
   readonly seenHere = signal<readonly SeenHeroView[]>([]);
-  /** Whether the hall offers the free villager now, and if not, why not. */
-  readonly freeVillager = computed((): { offered: boolean; reason: string | null } => {
+  /**
+   * What the hall offers: each unit type on the location's list, its price
+   * to this camp beside the camp's balance, and why it cannot be had now,
+   * by the hub's rules in the hub's order (`packages/hub/src/recruit.ts`).
+   */
+  readonly recruits = computed((): readonly RecruitOffer[] => {
     const camp = this.camp();
-    if (!camp) return { offered: false, reason: null };
-    if (camp.livingHeroes > 0) return { offered: false, reason: 'The villager is free only when no hero here is alive.' };
-    if (camp.activeHeroes >= camp.heroCapacity) return { offered: false, reason: 'The hall is full.' };
-    return { offered: true, reason: null };
+    const at = location(this.location());
+    if (!camp || !at) return [];
+    return at.recruits.map((recruit) => {
+      const cost = recruitCost(recruit, camp.livingHeroes).map(({ material, amount }) => ({
+        material,
+        amount,
+        balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0,
+      }));
+      const short = cost.filter((c) => c.balance < c.amount).map((c) => c.material);
+      const reason =
+        camp.hallLevel < recruit.hallLevel
+          ? `Needs a level ${recruit.hallLevel} hall.`
+          : camp.activeHeroes >= camp.heroCapacity
+            ? 'The hall is full.'
+            : short.length > 0
+              ? `Not enough ${short.join(' or ')}.`
+              : null;
+      return { unitType: recruit.unitType, cost, reason };
+    });
   });
 
   constructor() {
@@ -189,18 +217,23 @@ export class Game {
     this.player.set(data.me);
   }
 
-  /** Recruits the free villager; the hub draws its name and look. Answers the new hero. */
-  async recruitVillager(): Promise<HeroView | null> {
-    let hero: HeroView | null = null;
-    await this.run(async () => {
-      const data = await this.api.request<{ recruitHero: HeroView }>(
-        `mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { ${HERO_FIELDS} } }`,
-        { id: crypto.randomUUID() },
-      );
-      hero = data.recruitHero;
-      await this.load();
-    });
-    return hero;
+  /**
+   * Recruits a hero of the unit type, with a fresh request id; the hub
+   * draws its name and look, and debits its cost. Answers the new hero, or
+   * throws the hub's refusal, an `ApiError` with its code, for the hall to
+   * show in place. The player is read again either way, since a refusal
+   * such as `HALL_FULL` means the view was stale.
+   */
+  async recruit(unitType: UnitType): Promise<HeroView> {
+    this.busy.set(true);
+    try {
+      const data = await this.api.request<{ recruitHero: HeroView }>(RECRUIT, { unitType, id: crypto.randomUUID() });
+      return data.recruitHero;
+    } finally {
+      // A failed read leaves the view as it was; the recruit's own answer is what matters here.
+      await this.load().catch(() => undefined);
+      this.busy.set(false);
+    }
   }
 
   /** Retires a hero, alive or dead: permanent. Answers the hero as retired, or null if it failed. */

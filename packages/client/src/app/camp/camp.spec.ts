@@ -3,7 +3,8 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from '../app.routes';
-import { Game, type HeroView, type SeenHeroView } from '../game';
+import { ApiError } from '../api';
+import { Game, type HeroView, type RecruitOffer, type SeenHeroView } from '../game';
 import { Session } from '../session';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
 import { CAMP_SCENE_FACTORY } from './camp';
@@ -46,18 +47,28 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
       ],
       resourceCapacity: 100,
     }),
-    freeVillager: computed(() =>
-      here().length === 0 ? { offered: true, reason: null } : { offered: false, reason: 'The villager is free only when no hero here is alive.' },
-    ),
+    livingHere: computed(() => here().filter((h) => h.status === 'ALIVE')),
+    recruits: computed((): RecruitOffer[] => [
+      {
+        unitType: 'villager',
+        cost: here().some((h) => h.status === 'ALIVE') ? [{ material: 'timber', amount: 20, balance: 60 }] : [],
+        reason: null,
+      },
+      { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
+    ]),
     location: signal('millbrook'),
     adventure: signal<{ snapshot: { heroes: { heroId: string }[] } } | null>(null),
     busy: signal(false),
     error: signal<string | null>(null),
-    recruited: 0,
-    recruitVillager: async () => {
-      fake.recruited++;
-      all.set([wren]);
-      return wren;
+    recruited: [] as string[],
+    /** A refusal the next recruit throws, as the hub would. */
+    refuse: null as ApiError | null,
+    recruit: async (unitType: string) => {
+      fake.recruited.push(unitType);
+      if (fake.refuse) throw fake.refuse;
+      const hero = all().length === 0 ? wren : { ...wren, id: `h${all().length + 1}`, name: 'Linnet' };
+      all.set([...all(), hero]);
+      return hero;
     },
     retired: [] as string[],
     retire: async (id: string) => {
@@ -117,15 +128,54 @@ describe('Camp', () => {
     const { router, scene, settle, page } = await render(game);
     expect(router.url).toBe('/camp/millbrook/heroes-hall');
     expect(page.querySelector('aside h2')?.textContent).toBe('Heroes hall');
-    expect(page.textContent).toContain('No heroes yet.');
+    expect(page.textContent).toContain('No living heroes.');
+    expect(page.querySelector('.recruits li')?.textContent).toContain('free');
 
     const recruit = [...page.querySelectorAll('button')].find((b) => b.textContent?.includes('Recruit a villager'));
     recruit!.click();
-    await vi.waitFor(() => expect(game.recruited).toBe(1));
+    await vi.waitFor(() => expect(game.recruited).toEqual(['villager']));
     await settle();
     expect(scene.shown.at(-1)).toEqual({ heroes: [{ id: 'h1', spriteSet: 'villager-01' }], arriving: 'h1' });
     expect(page.querySelector('.roster')?.textContent).toContain('Wren');
-    expect(page.textContent).toContain('The villager is free only when no hero here is alive.');
+    expect(page.querySelector('.recruits li')?.textContent).toContain('20 timber, you have 60');
+  });
+
+  it("shows each recruit's price beside the camp's balance, and why one cannot be had", async () => {
+    const { page } = await render(fakeGame([wren]));
+    const [villager, fighter] = [...page.querySelectorAll('.recruits li')];
+    expect(villager?.textContent).toContain('Recruit a villager');
+    expect(villager?.textContent).toContain('20 timber, you have 60');
+    expect(villager?.querySelector('button')?.disabled).toBe(false);
+    expect(fighter?.textContent).toContain('40 ore, you have 0');
+    expect(fighter?.querySelector('.note')?.textContent).toBe('Not enough ore.');
+    expect(fighter?.querySelector('button')?.disabled).toBe(true);
+  });
+
+  it("recruits a paid villager, and shows the hub's refusal in place on the recruit it refused", async () => {
+    const game = fakeGame([wren]);
+    const { settle, page } = await render(game);
+    const button = () => page.querySelector('.recruits li button') as HTMLButtonElement;
+    button().click();
+    await vi.waitFor(() => expect(game.recruited).toEqual(['villager']));
+    await settle();
+    expect(page.querySelector('.roster.living')?.textContent).toContain('Linnet');
+
+    game.refuse = new ApiError('the heroes hall is full', 'HALL_FULL');
+    button().click();
+    await vi.waitFor(() => expect(game.recruited).toHaveLength(2));
+    await settle();
+    const [villager, fighter] = [...page.querySelectorAll('.recruits li')];
+    expect(villager?.querySelector('.refusal')?.textContent).toBe('The hall is full.');
+    expect(fighter?.querySelector('.refusal')).toBeNull();
+  });
+
+  it('groups the roster into the living and the dead', async () => {
+    const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
+    const { page } = await render(fakeGame([wren, dead]));
+    expect([...page.querySelectorAll('aside h3')].map((h) => h.textContent)).toEqual(['Living', 'Dead', 'Recruit']);
+    expect(page.querySelector('.roster.living')?.textContent).toContain('Wren');
+    expect(page.querySelector('.roster.living')?.textContent).not.toContain('Hob');
+    expect(page.querySelector('.roster.dead')?.textContent).toContain('Hob');
   });
 
   it('opens a facility clicked in the scene at its path', async () => {
