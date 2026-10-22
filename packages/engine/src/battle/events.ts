@@ -7,14 +7,15 @@
  * status-effect and resource-pool events, behavior swaps, interrupts and
  * presentation cues, and the per-unit "front-line-shift" moves, which are one
  * `line-collapsed` event here. New: `harvest` and `guard` effects, and the
- * `timeout` result. The outcome carries no wall-clock time.
+ * `timeout` and `retreat` results. The outcome carries no wall-clock time.
  */
 
 import type { Material } from "../index.js";
 import type { OverrideLogEntry } from "./override.js";
 import type { Line, ParticipantSnapshot, Side } from "./unit.js";
 
-export type BattleResult = "win" | "loss" | "timeout";
+/** `retreat` is the adventure's: the party got away (Issue-112). */
+export type BattleResult = "win" | "loss" | "timeout" | "retreat";
 
 export interface BattleStartEvent {
   readonly kind: "battle-start";

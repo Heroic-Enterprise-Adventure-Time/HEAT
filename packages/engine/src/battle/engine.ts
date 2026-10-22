@@ -14,7 +14,8 @@
  * limit is the caller's and ends the battle as `timeout`, not a draw; when a
  * side's front line empties every unit on it moves up one line as one event,
  * also at the start; a guard redirects hits; resource nodes are units that
- * never act.
+ * never act; the party can carry only so much, and the adventure can end a
+ * battle as a retreat (Issue-112).
  *
  * Nothing here reads a clock. The caller decides when to step: a live client
  * paced by wall-clock time, or the hub replaying an override log as fast as it
@@ -186,6 +187,9 @@ export class CombatEngine {
     if (!Number.isInteger(setup.timeLimitMs) || setup.timeLimitMs <= 0) {
       throw new Error("The time limit is a positive whole number of milliseconds");
     }
+    if (setup.carryLimit !== undefined && (!Number.isInteger(setup.carryLimit) || setup.carryLimit <= 0)) {
+      throw new Error("The carry limit is a positive whole number");
+    }
     this.content = content;
     this.rng = new SeededRng(setup.seed);
     this.states = buildStates(setup, content, this.rng);
@@ -280,6 +284,22 @@ export class CombatEngine {
         events: [...this.events],
       },
     };
+  }
+
+  /**
+   * End the battle as a retreat at `atSimTime`, between the current clock
+   * and the next event: the adventure's retreat attempt succeeded. Returns
+   * the `battle-end` event.
+   */
+  retreat(atSimTime: number): readonly BattleEvent[] {
+    if (!this.started || this.completed) throw new Error("Only a battle in progress can be retreated from");
+    if (!Number.isInteger(atSimTime) || atSimTime < this.clock || atSimTime > this.getNextEventTime()) {
+      throw new Error(`A retreat at ${String(atSimTime)} is outside ${String(this.clock)} to ${String(this.getNextEventTime())}`);
+    }
+    const startIdx = this.events.length;
+    this.advanceClock(atSimTime - this.clock);
+    this.finishAs("retreat");
+    return this.events.slice(startIdx);
   }
 
   // ── Player override input ────────────────────────────────────────
@@ -455,12 +475,15 @@ export class CombatEngine {
     this.collapseLines();
   }
 
-  /** Work done to a resource node, capped at what it holds; the yield is a share of the work. */
+  /**
+   * Work done to a resource node, capped at what it holds; the yield is a
+   * share of the work, capped at what the party can still carry.
+   */
   private harvest(node: UnitState, work: number, yieldPercent: number): ResolvedEffect {
     const { material } = node;
     if (material === undefined) throw new Error(`${node.unitId} is not a resource node`);
     const amount = Math.min(work, node.health);
-    const gained = Math.floor((amount * yieldPercent) / 100);
+    const gained = Math.min(Math.floor((amount * yieldPercent) / 100), this.carryRoom());
     node.health -= amount;
     this.gathered[material] = (this.gathered[material] ?? 0) + gained;
     return { kind: "harvest", targetId: node.unitId, material, amount, yield: gained, newHealth: node.health };
@@ -502,9 +525,17 @@ export class CombatEngine {
     }
   }
 
+  /** What the party can still carry; unbounded without a carry limit. */
+  private carryRoom(): number {
+    if (this.setup.carryLimit === undefined) return Infinity;
+    const carried = Object.values(this.gathered).reduce((sum, n) => sum + n, 0);
+    return Math.max(0, this.setup.carryLimit - carried);
+  }
+
   private checkTermination(): BattleResult | null {
     if (!this.states.some((s) => s.side === "party" && s.alive)) return "loss";
     if (!this.states.some((s) => s.side === "opponents" && s.alive)) return "win";
+    if (this.carryRoom() === 0) return "win";
     return null;
   }
 }

@@ -50,3 +50,4 @@ export function rewardsForSeed(seed: string): Reward[] {
 }
 export * from "./content.js";
 export * from "./battle/index.js";
+export * from "./adventure/index.js";
