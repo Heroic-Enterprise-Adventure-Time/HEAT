@@ -1,0 +1,167 @@
+{
+  "set": "wolf-02",
+  "kind": "monster sprite set",
+  "monsters": ["wolf"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "51acb472-6ebb-42e6-9380-e572635a3067",
+    "name": "Wolf 02",
+    "tags": ["heat", "monster", "wolf"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-10-21T21:16:13.443257+00:00",
+    "parameters": {
+      "description": "shaggy dark grey wolf, snarling, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": null,
+      "body_type": "quadruped",
+      "template": "dog"
+    },
+    "canvas": [48, 48],
+    "generations": 1,
+    "note": "A quadruped on PixelLab's dog template: rule 28. proportions applies to humanoids only."
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walk-6-frames",
+      "mode": "template",
+      "via": "MCP",
+      "groupId": "24d4f5b0-5ac9-4244-a947-bd80920be412",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [48, 48],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["south", "east", "north"],
+          "generations": 3,
+          "note": "A skeleton-v3 call (group a8732257-e305-4493-8b9f-6a1190e1d2ab) failed first, uncharged: a quadruped has no stored 3D skeleton."
+        }
+      ],
+      "generations": 3
+    },
+    "stance": {
+      "template": "idle",
+      "mode": "template",
+      "via": "MCP",
+      "groupId": "16b61d1a-91a1-43fa-aec6-c9f52aa234ee",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [48, 48],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 1,
+          "note": "A skeleton-v3 call (group 7d722978-3afc-43e7-9171-5bae54e71785) failed first, uncharged: a quadruped has no stored 3D skeleton."
+        }
+      ],
+      "generations": 1
+    },
+    "act": {
+      "actionDescription": "lunges forward and snaps its jaws in a bite, then pulls back to its stance",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "23115500-8147-4dda-b5fa-0a68490dc997",
+      "directions": ["east"],
+      "framesPerDirection": 5,
+      "canvas": [60, 60],
+      "holdFrame": 2,
+      "files": "act-east-<0..4>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 1,
+          "note": "frame_count 4; frame 0 is the east rotation"
+        }
+      ],
+      "generations": 1
+    },
+    "hit": {
+      "actionDescription": "flinches backward from a blow to the head, then recovers to standing",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "ffa0950c-9dc1-4303-a031-7aa148606579",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [60, 60],
+      "files": "hit-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 1,
+          "note": "frame_count 6; frame 0 is the east rotation"
+        }
+      ],
+      "generations": 1
+    },
+    "down": {
+      "actionDescription": "staggers, its legs give way and it collapses onto its side, lying still",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "e1fb3c6a-6e24-4935-96a4-31dfa699db21",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [60, 60],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 1,
+          "note": "frame_count 6; frame 0 is the east rotation"
+        }
+      ],
+      "generations": 1
+    }
+  },
+  "animationGenerations": 7,
+  "waivedChecks": [
+    {
+      "failure": "walk south: height drifts 3 px",
+      "check": "walk south: height drifts",
+      "date": "2026-10-21",
+      "note": "Waived by the owner: a 1 px bob over the limit, and the battle shows a monster from the side only."
+    },
+    {
+      "failure": "act east: height drifts 6 px",
+      "check": "act east: height drifts",
+      "date": "2026-10-21",
+      "note": "Waived by the owner: the lunge drops the head and body by design."
+    },
+    {
+      "failure": "hit east: height drifts 7 px",
+      "check": "hit east: height drifts",
+      "date": "2026-10-21",
+      "note": "Waived by the owner: the flinch crouches by design."
+    }
+  ],
+  "rejected": [
+    {
+      "name": "Wolf 01",
+      "characterId": "8a82ee27-80c4-4fce-93b6-044c2fa0c25d",
+      "description": "lean grey-brown wolf with bared fangs, warm earthy tones, NES-era retro pixel art, few colors"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-21)."
+}

@@ -1,0 +1,139 @@
+{
+  "set": "bandit-01",
+  "kind": "monster sprite set",
+  "monsters": ["bandit"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "98963dac-b147-4cbb-a743-30e91efe6496",
+    "name": "Bandit 01",
+    "tags": ["heat", "monster", "bandit"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-10-21T21:16:16.886649+00:00",
+    "parameters": {
+      "description": "bandit in a ragged brown hooded cloak with a dark cloth mask over the lower face, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "4086cc04-6e2e-47f5-afdf-70982bf49d38",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["south", "east", "north"],
+          "generations": 9
+        }
+      ],
+      "generations": 9
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "e0e3004e-2f11-40ff-94dd-125b2dc8fc21",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "act": {
+      "template": "lead-jab",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "0caf1197-ce67-4135-ae3d-5c9531846b89",
+      "directions": ["east"],
+      "framesPerDirection": 3,
+      "canvas": [64, 64],
+      "holdFrame": 1,
+      "files": "act-east-<0..2>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 2
+        }
+      ],
+      "generations": 2
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "6acfc447-4939-4f0f-ab20-8cafea117bb9",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "a51861f5-1c95-48a8-88a6-a0f06959f027",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    }
+  },
+  "animationGenerations": 20,
+  "rejected": [
+    {
+      "name": "Bandit 02",
+      "characterId": "7ed58411-bd5d-4fca-9d13-35129f6c8217",
+      "description": "bandit in a patched leather vest and red bandana mask, scruffy dark hair, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-10-22)."
+}

@@ -31,7 +31,7 @@ What makes one hero different from another of the same unit type. Nothing here c
 
 ## How the game looks
 
-The rules for making a hero's sprite set are `docs/process/assets.md`, rules 8 to 13, for a camp's ground and facilities rules 14 to 19, and for the page's icons rules 25 to 27; this section says what the player sees.
+The rules for making a hero's sprite set are `docs/process/assets.md`, rules 8 to 13, for a camp's ground and facilities rules 14 to 19, for the page's icons rules 25 to 27, and for the battle's monsters and props rules 28 to 31; this section says what the player sees.
 
 - **Decided.** One view for camp and battle: low top-down, about 20 degrees, the classic 3/4 view of an RPG town. Battle arranges the same sprites so that it reads as side-on.
 - **Decided.** An NES-era look, with Final Fantasy 1 as the reference: warm, earthy colours, a black outline, few colours per sprite, characters 32 px tall.
