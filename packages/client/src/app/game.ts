@@ -32,23 +32,49 @@ export interface CampView {
   readonly heroCapacity: number;
   readonly activeHeroes: number;
   readonly livingHeroes: number;
+  /** The camp's stock; a resource it has none of may be missing. */
+  readonly holdings: readonly { readonly material: string; readonly balance: number }[];
+  /** The stock of each resource the warehouse holds at its level. */
+  readonly resourceCapacity: number;
+}
+
+/** A hero as the adventure took it at the start, from the snapshot. */
+export interface PartyHeroView {
+  readonly heroId: string;
+  readonly name: string;
+  readonly unitType: string;
+  readonly spriteSet: string;
+  readonly level: number;
+}
+
+/** The player's one open adventure: its job and its party (Issue-115); playing it is Issue-15. */
+export interface AdventureView {
+  readonly id: string;
+  readonly startedAt: string;
+  readonly location: string;
+  readonly job: { readonly id: string; readonly name: string; readonly description: string };
+  readonly snapshot: { readonly heroes: readonly PartyHeroView[] };
 }
 
 export interface PlayerView {
   readonly id: string;
   readonly camps: readonly CampView[];
   readonly heroes: readonly HeroView[];
-  readonly openAdventure: { readonly id: string; readonly startedAt: string } | null;
+  readonly openAdventure: AdventureView | null;
 }
 
 const HERO_FIELDS = 'id name unitType spriteSet location recruitedAt level xp status retiredAt';
+const CAMP_FIELDS = 'location name hallLevel heroCapacity activeHeroes livingHeroes holdings { material balance } resourceCapacity';
+const ADVENTURE_FIELDS = 'id startedAt location job { id name description } snapshot { heroes { heroId name unitType spriteSet level } }';
 const SEEN = `query($at: String!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
-const ME = `{ me { id camps { location name hallLevel heroCapacity activeHeroes livingHeroes } heroes { ${HERO_FIELDS} } openAdventure { id startedAt } } }`;
+const ME = `{ me { id camps { ${CAMP_FIELDS} } heroes { ${HERO_FIELDS} } openAdventure { ${ADVENTURE_FIELDS} } } }`;
+const START = `mutation($at: String!, $job: String!, $heroes: [String!]!) { startAdventure(location: $at, jobId: $job, heroIds: $heroes) { ${ADVENTURE_FIELDS} } }`;
 
 /**
  * The signed-in player's game: their camps, their heroes and the open
- * adventure, loaded from the hub after every sign-in, and the two things they
- * can do yet, recruit the free villager and retire a hero. Joining comes
+ * adventure, loaded from the hub after every sign-in, and the three things
+ * they can do yet, recruit the free villager, retire a hero and start a job
+ * from the job board. Joining comes
  * first, because the profile is made on first sign-in (joinGame, Issue-81).
  * Beside them, a few of other players' heroes seen at the camp's location,
  * read again when the player signs in or changes camps, not after each
@@ -70,6 +96,10 @@ export class Game {
   readonly heroesHere = computed(() =>
     (this.player()?.heroes ?? []).filter((h) => h.location === this.location() && h.status !== 'RETIRED'),
   );
+  /** The camp's living heroes, the ones a party is picked from. */
+  readonly livingHere = computed(() => this.heroesHere().filter((h) => h.status === 'ALIVE'));
+  /** The player's one open adventure, or null. */
+  readonly adventure = computed(() => this.player()?.openAdventure ?? null);
   /** The camp's retired heroes, who stay on the record (game.md, "The heroes hall"). */
   readonly retiredHere = computed(() =>
     (this.player()?.heroes ?? []).filter((h) => h.location === this.location() && h.status === 'RETIRED'),
@@ -148,6 +178,25 @@ export class Game {
       await this.load();
     });
     return hero;
+  }
+
+  /**
+   * Starts a job from the location's job board with a party of the player's
+   * heroes there. Answers the open adventure, or throws the hub's refusal,
+   * an `ApiError` with its code, for the job board to show in place. The
+   * player is read again either way, since a refusal such as
+   * `ADVENTURE_OPEN` means the view was stale.
+   */
+  async startAdventure(location: string, jobId: string, heroIds: readonly string[]): Promise<AdventureView> {
+    this.busy.set(true);
+    try {
+      const data = await this.api.request<{ startAdventure: AdventureView }>(START, { at: location, job: jobId, heroes: heroIds });
+      return data.startAdventure;
+    } finally {
+      // A failed read leaves the view as it was; the start's own answer is what matters here.
+      await this.load().catch(() => undefined);
+      this.busy.set(false);
+    }
   }
 
   private async run(work: () => Promise<void>): Promise<void> {

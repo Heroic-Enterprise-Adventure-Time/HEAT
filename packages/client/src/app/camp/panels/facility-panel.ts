@@ -5,9 +5,9 @@ import { CampState } from '../camp-state';
 
 /**
  * Any other facility's panel, `/camp/<location>/<facility>`: what it does,
- * and for one not built yet, that it is not (building is Issue-93). The job
- * board and the warehouse fill in with Issue-15. A facility the camp does
- * not have sends the address back to the hall.
+ * and for one not built yet, that it is not (building is Issue-93). The
+ * hall and the job board have panels of their own; the warehouse fills in
+ * later. A facility the camp does not have sends the address back to the hall.
  */
 @Component({
   selector: 'heat-facility-panel',
@@ -21,9 +21,6 @@ import { CampState } from '../camp-state';
       } @else {
         <p>{{ facility.description }}</p>
         @switch (facility.kind) {
-          @case ('job-board') {
-            <p>No jobs are posted yet.</p>
-          }
           @case ('warehouse') {
             <p>The warehouse is empty.</p>
           }

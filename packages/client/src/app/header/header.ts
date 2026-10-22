@@ -1,15 +1,16 @@
 import { Component, inject } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { Game } from '../game';
 import { Session } from '../session';
 
 /**
  * The thin header bar above the scene: the title, the location select, the
- * open adventure, and sign-in. It is part of the page, not of the 320×180
+ * open adventure, which links to it, and sign-in. It is part of the page, not of the 320×180
  * scene, so it reads at any scale (decision 0026).
  */
 @Component({
   selector: 'heat-header',
+  imports: [RouterLink],
   templateUrl: './header.html',
   styleUrl: './header.css',
 })

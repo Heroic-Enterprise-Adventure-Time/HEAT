@@ -15,6 +15,12 @@
         <span class="label">{{ facility.name }}</span>
       </a>
     }
+    @if (game.adventure()) {
+      <a class="entry" routerLink="/adventure" [attr.title]="labels() ? null : 'Adventure'">
+        <img src="art/icons/adventure.png" [width]="iconPx()" [height]="iconPx()" alt="" />
+        <span class="label">Adventure</span>
+      </a>
+    }
   </nav>
 
   <aside class="panel" aria-labelledby="panel-title">
