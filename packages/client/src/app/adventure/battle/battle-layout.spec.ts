@@ -20,8 +20,9 @@ describe('Battle layout', () => {
       { unitId: 'c', side: 'party' as const, line: 'front' as const },
     ];
     const at = spots(units);
-    expect(at.get('a')!.x).toBe(at.get('b')!.x);
+    expect(at.get('a')!.x).toBeLessThan(at.get('b')!.x);
     expect(at.get('a')!.y).toBeLessThan(at.get('b')!.y);
+    expect(at.get('a')!.x + at.get('b')!.x).toBe(2 * spot('party', 'near', 0, 1).x);
     expect(at.get('c')!.y).toBe(spot('party', 'front', 0, 1).y);
     expect(spots([...units].reverse())).toEqual(at);
   });

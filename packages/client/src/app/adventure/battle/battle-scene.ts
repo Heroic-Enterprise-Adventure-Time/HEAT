@@ -36,9 +36,15 @@ export interface BattleSceneHandle {
   destroy(): void;
 }
 
-/** Art pixels a second: the road on a travel, a rush on, and a step up a line. */
-const TRAVEL_SPEED = 40;
+/**
+ * Art pixels a second. One speed for every run and every scroll, the party
+ * running on, the road on a travel, the other side rushing on and a retreat,
+ * so the progression never changes pace (the owner's call on Issue-15); and
+ * a step up a line.
+ */
 const RUSH_SPEED = 320;
+/** The party's run on at the start is no scroll, and goes at four times the pace, so that it is over quickly (the owner's call). */
+const RUN_ON_SPEED = 4 * RUSH_SPEED;
 const STEP_SPEED = 90;
 /** Milliseconds a frame: on the clock for an act, a hit and a fall; on the presentation clock for a walk and the stance. */
 const ACT_MS = 90;
@@ -47,6 +53,9 @@ const DOWN_MS = 100;
 const WALK_MS = 100;
 const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
+/** A fallen monster lies this long after its fall, then fades over the next. */
+const FADE_AFTER_MS = 600;
+const FADE_MS = 500;
 
 /** The road the units stand on, in the ground's lower terrain: the corner rows from 6 to 10, y 96 to 160 on the stage. */
 const ROAD_ROWS = { from: 6, to: 10 };
@@ -64,6 +73,7 @@ interface UnitView {
   x: number;
   y: number;
   act: { readonly from: number; readonly resolve: number } | null;
+  /** When a hit or a fall began, on the unit's presentation clock, so that one still plays once the adventure's clock has stopped. */
   hitAt: number | null;
   downAt: number | null;
   /** On the presentation clock, for the walk and the stance. */
@@ -269,8 +279,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     if (!art) return;
     if (unitView.downAt !== null) {
       const last = art.down.textures.length - 1;
-      const index = Math.min(last, Math.floor((simTime - unitView.downAt) / DOWN_MS));
+      const since = unitView.clock - unitView.downAt;
+      const index = Math.min(last, Math.floor(since / DOWN_MS));
       show(unitView, art.down, index, mirrored, last > 0 ? 1 - index / last : null);
+      // A fallen monster lies a moment, then fades away; a fallen hero stays down, and a tree leaves its stump.
+      if (unitView.unit.kind === 'monster') {
+        unitView.body.alpha = Math.max(0, Math.min(1, 1 - (since - last * DOWN_MS - FADE_AFTER_MS) / FADE_MS));
+      }
       return;
     }
     const act = unitView.act;
@@ -284,15 +299,17 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       unitView.act = null;
     }
     if (unitView.hitAt !== null) {
-      const index = Math.floor((simTime - unitView.hitAt) / HIT_MS);
+      const index = Math.floor((unitView.clock - unitView.hitAt) / HIT_MS);
       if (index < art.hit.textures.length) {
         show(unitView, art.hit, index, mirrored);
         return;
       }
       unitView.hitAt = null;
     }
-    if (moving) show(unitView, art.walk, Math.floor(unitView.clock / (rushing ? RUSH_WALK_MS : WALK_MS)), mirrored);
-    else show(unitView, art.stance, Math.floor(unitView.clock / STANCE_MS), mirrored);
+    // The walk and the stance loop; the act, the hit and the fall above stop at their last frame.
+    const loop = (frames: Frames, frameMs: number) => Math.floor(unitView.clock / frameMs) % frames.textures.length;
+    if (moving) show(unitView, art.walk, loop(art.walk, rushing ? RUSH_WALK_MS : WALK_MS), mirrored);
+    else show(unitView, art.stance, loop(art.stance, STANCE_MS), mirrored);
   };
 
   return {
@@ -303,11 +320,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       offset = 0;
       sync(field);
       const at = targets(field);
+      // Running on, the party keeps its order and starts with its front hero just beyond the window's left edge.
+      const front = Math.max(...field.party.map((u) => at.get(u.unitId)!.x));
+      const runOn = front + view.stageX + 16;
       for (const unitView of units.values()) {
         const spot = at.get(unitView.unit.unitId)!;
         unitView.y = spot.y;
-        // Running on, each hero starts beyond the left edge, as far behind its spot as the front of the party is from the edge.
-        unitView.x = enter && !unitView.opponent ? spot.x - (view.stageX + 180) : spot.x;
+        unitView.x = enter && !unitView.opponent ? spot.x - runOn : spot.x;
         if (unitView.unit.health <= 0) unitView.downAt = -Infinity;
       }
       entering = enter ? 'party' : null;
@@ -317,8 +336,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     feed(events, field) {
       const beginning = events.find((e) => e.kind === 'stage-start' && (e.stageKind === 'fight' || e.stageKind === 'gather'));
       if (beginning) {
-        // What is left of the last stage scrolls away as the new one comes on.
-        for (const unitView of units.values()) if (unitView.opponent) unitView.behind = true;
+        // What is left of the last stage scrolls away as the new one comes on, and the party,
+        // its last act or hit done, walks to meet the next while the clock waits.
+        for (const unitView of units.values()) {
+          if (unitView.opponent) unitView.behind = true;
+          else {
+            unitView.act = null;
+            unitView.hitAt = null;
+          }
+        }
       }
       sync(field);
       if (beginning) {
@@ -340,12 +366,12 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           for (const effect of event.effects) {
             if (effect.kind === 'damage' || effect.kind === 'harvest') {
               const target = units.get(effect.targetId);
-              if (target && effect.newHealth > 0) target.hitAt = event.timestamp;
+              if (target && effect.newHealth > 0) target.hitAt = target.clock;
             }
           }
         } else if (event.kind === 'unit-down') {
           const unitView = units.get(event.unitId);
-          if (unitView) unitView.downAt = event.timestamp;
+          if (unitView) unitView.downAt = unitView.clock;
         }
       }
     },
@@ -360,7 +386,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         offset -= step;
         rolled = step;
       } else if (travelling) {
-        rolled = (TRAVEL_SPEED * ms) / 1000;
+        rolled = (RUSH_SPEED * ms) / 1000;
       }
       scroll += rolled;
       placeRoad();
@@ -368,6 +394,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       let partyOn = true;
       for (const unitView of [...units.values()]) {
         unitView.clock += ms;
+        // Once the adventure is over its clock stands still, so an act still showing would never finish.
+        if (field.outcome !== null) unitView.act = null;
         const standing = unitView.downAt === null && unitView.unit.health > 0;
         if (unitView.behind) {
           unitView.x -= rolled;
@@ -390,12 +418,12 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           rushing = true;
         } else if (!unitView.opponent && retreating && standing) {
           // A retreat: the party turns and runs off to the left.
-          unitView.x -= (RUSH_SPEED / 2) * (ms / 1000);
+          unitView.x -= RUSH_SPEED * (ms / 1000);
           moving = true;
           rushing = true;
           mirrored = true;
         } else {
-          const speed = entering === 'party' ? RUSH_SPEED : STEP_SPEED;
+          const speed = entering === 'party' ? RUN_ON_SPEED : STEP_SPEED;
           const dx = spot.x - unitView.x;
           const dy = spot.y - unitView.y;
           const distance = Math.hypot(dx, dy);
@@ -413,7 +441,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           // The party walks in place while the road goes by.
           if (!unitView.opponent && standing && (travelling || entering === 'opponents')) {
             moving = true;
-            rushing = entering === 'opponents';
+            rushing = true;
           }
         }
         draw(unitView, simTime, moving, rushing, mirrored);

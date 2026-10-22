@@ -16,18 +16,20 @@ export const STAGE_HEIGHT = 180;
 /** The row the units' feet stand on when a line holds one unit. */
 export const FEET_Y = 124;
 /** From the middle of the stage to each side's front line, and from one line to the next. */
-const FRONT_GAP = 18;
-const LINE_GAP = 34;
-/** Between two units of one line, front to back of the picture. */
+const FRONT_GAP = 26;
+const LINE_GAP = 30;
+/** Between two units of one line: front to back of the picture, and a little aside, so that a row of trees reads as several. */
 const DEPTH_GAP = 14;
+const ASIDE_GAP = 10;
 
 const LINE_INDEX: Readonly<Record<Line, number>> = { front: 0, near: 1, far: 2, back: 3 };
 
 /** Where a unit stands: its line's column, and its place among the line's `count` units, `index` from 0. */
 export function spot(side: Side, line: Line, index: number, count: number): { x: number; y: number } {
   const fromMiddle = FRONT_GAP + LINE_INDEX[line] * LINE_GAP;
-  const x = STAGE_WIDTH / 2 + (side === 'party' ? -fromMiddle : fromMiddle);
-  const y = FEET_Y + Math.round((index - (count - 1) / 2) * DEPTH_GAP);
+  const place = index - (count - 1) / 2;
+  const x = STAGE_WIDTH / 2 + (side === 'party' ? -fromMiddle : fromMiddle) + Math.round(place * ASIDE_GAP);
+  const y = FEET_Y + Math.round(place * DEPTH_GAP);
   return { x, y };
 }
 

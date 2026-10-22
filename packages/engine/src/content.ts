@@ -194,7 +194,11 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
   targetLines: ["front", "near", "far", "back"],
 }));
 
-/** Every ability a unit type or monster's list names (game.md, "The battle"). */
+/**
+ * Every ability a unit type or monster's list names (game.md, "The battle").
+ * A gather ability works the node with the least left, so a gatherer fells
+ * one tree before starting the next (Issue-15).
+ */
 export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
   strike: {
     abilityId: "strike",
@@ -232,7 +236,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     abilityId: "chop",
     name: "Chop",
     tags: ["gather", "physical"],
-    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
     warmupMs: 500,
     effect: { kind: "gather", material: "timber" },
   },
@@ -240,7 +244,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     abilityId: "mine",
     name: "Mine",
     tags: ["gather", "physical"],
-    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "closest" },
+    targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
     warmupMs: 500,
     effect: { kind: "gather", material: "ore" },
   },
