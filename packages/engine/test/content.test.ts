@@ -12,6 +12,7 @@ import {
   hallCapacity,
   heroNames,
   location,
+  recruitCost,
   warehouseCapacity,
 } from "../src/index.js";
 
@@ -57,6 +58,14 @@ describe("static content", () => {
         expect(l.sharedFacilities).not.toContain(kind);
       }
     }
+  });
+
+  it("prices Millbrook's recruits by the first progression, with the villager free when no hero is alive", () => {
+    const [villager, fighter] = location(STARTING_LOCATION)?.recruits ?? [];
+    expect(recruitCost(villager!, 0)).toEqual([]);
+    expect(recruitCost(villager!, 1)).toEqual([{ material: "timber", amount: 20 }]);
+    expect(recruitCost(fighter!, 0)).toEqual([{ material: "ore", amount: 40 }]);
+    expect(recruitCost(fighter!, 2)).toEqual([{ material: "ore", amount: 40 }]);
   });
 
   it("caps a level-1 camp at 4 heroes and 100 of each resource", () => {

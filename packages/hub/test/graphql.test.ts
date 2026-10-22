@@ -135,7 +135,7 @@ describe("the camp through the graph", () => {
     expect(after.data?.me.heroes).toEqual([made.data?.recruitHero]);
 
     const second = await gql(recruit, { id: randomUUID() }, p);
-    expect((second.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("NOT_FREE");
+    expect((second.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("INSUFFICIENT_RESOURCES");
   });
 
   it("retires the villager, which frees the next villager", async () => {

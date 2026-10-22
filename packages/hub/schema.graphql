@@ -143,7 +143,7 @@ type Mutation {
   joinGame: Player!
 
   """
-  Recruits a hero of the unit type at the heroes hall of the starting camp. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Only the free villager for now: a camp with no living hero and a free slot.
+  Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Refused with HALL_LEVEL, HALL_FULL, INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance), BAD_USER_INPUT or CONFLICT.
   """
   recruitHero(requestId: String!, unitType: String!): Hero!
 

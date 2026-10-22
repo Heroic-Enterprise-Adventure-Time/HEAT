@@ -17,10 +17,15 @@ const villager: HeroView = {
   retiredAt: null,
 };
 
-function playerWith(heroes: HeroView[], activeHeroes = heroes.length, livingHeroes = heroes.length): PlayerView {
+function playerWith(
+  heroes: HeroView[],
+  activeHeroes = heroes.length,
+  livingHeroes = heroes.length,
+  holdings: readonly { readonly material: string; readonly balance: number }[] = [],
+): PlayerView {
   return {
     id: 'p1',
-    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings: [], resourceCapacity: 100 }],
+    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings, resourceCapacity: 100 }],
     heroes,
     openAdventure: null,
   };
@@ -39,9 +44,14 @@ function fakeApi(start: PlayerView) {
       if (query.includes('joinGame')) return { joinGame: { id: player.id } };
       if (query.includes('heroesSeenAt')) return { heroesSeenAt: variables['at'] === 'millbrook' ? [moss] : [] };
       if (query.includes('recruitHero')) {
-        if (player.camps[0]!.livingHeroes > 0) throw new ApiError('the villager is free only when no hero at the camp is alive', 'NOT_FREE');
-        const hero = { ...villager, id: variables['id'] as string };
-        player = playerWith([...player.heroes, hero]);
+        // The hub's price, on the fake's holdings: a villager is free with no hero alive, 20 timber otherwise.
+        const camp = player.camps[0]!;
+        const timber = camp.holdings.find((h) => h.material === 'timber')?.balance ?? 0;
+        const price = camp.livingHeroes > 0 ? 20 : 0;
+        if (timber < price) throw new ApiError('a villager costs 20 timber, and the camp has 0', 'INSUFFICIENT_RESOURCES');
+        const hero = { ...villager, id: variables['id'] as string, unitType: variables['unitType'] as string };
+        const holdings = price > 0 ? [{ material: 'timber', balance: timber - price }] : camp.holdings;
+        player = playerWith([...player.heroes, hero], camp.activeHeroes + 1, camp.livingHeroes + 1, holdings);
         return { recruitHero: hero };
       }
       if (query.includes('retireHero')) {
@@ -99,7 +109,7 @@ describe('Game', () => {
     const { api, game } = setup(playerWith([]));
     TestBed.tick();
     await vi.waitFor(() => expect(game.seenHere()).toEqual([moss]));
-    await game.recruitVillager();
+    await game.recruit('villager');
     expect(api.calls.filter((c) => c.query.includes('heroesSeenAt')).map((c) => c.variables['at'])).toEqual(['millbrook']);
 
     game.location.set('elsewhere');
@@ -116,28 +126,42 @@ describe('Game', () => {
     expect(game.player()).toBeNull();
   });
 
-  it('offers the free villager to an empty camp, recruits it with a fresh request id, and then stops offering it', async () => {
+  it('offers the free villager to an empty camp, recruits it with a fresh request id, and then prices the next', async () => {
     const { api, game } = setup(playerWith([]));
     TestBed.tick();
     await vi.waitFor(() => expect(game.player()).not.toBeNull());
-    expect(game.freeVillager()).toEqual({ offered: true, reason: null });
+    expect(game.recruits()).toEqual([
+      { unitType: 'villager', cost: [], reason: null },
+      { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
+    ]);
 
-    const hero = await game.recruitVillager();
+    const hero = await game.recruit('villager');
     const recruit = api.calls.find((c) => c.query.includes('recruitHero'));
+    expect(recruit?.variables['unitType']).toBe('villager');
     expect(recruit?.variables['id']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    expect(hero?.id).toBe(recruit?.variables['id']);
-    expect(game.heroesHere().map((h) => h.id)).toEqual([hero?.id]);
-    expect(game.freeVillager()).toEqual({ offered: false, reason: 'The villager is free only when no hero here is alive.' });
+    expect(hero.id).toBe(recruit?.variables['id']);
+    expect(game.heroesHere().map((h) => h.id)).toEqual([hero.id]);
+    expect(game.recruits()[0]).toEqual({ unitType: 'villager', cost: [{ material: 'timber', amount: 20, balance: 0 }], reason: 'Not enough timber.' });
   });
 
-  it('says the hall is full when every slot holds a dead hero', async () => {
+  it('recruits a paid villager from the timber the camp holds', async () => {
+    const { game } = setup(playerWith([villager], 1, 1, [{ material: 'timber', balance: 40 }]));
+    TestBed.tick();
+    await vi.waitFor(() => expect(game.player()).not.toBeNull());
+    expect(game.recruits()[0]).toEqual({ unitType: 'villager', cost: [{ material: 'timber', amount: 20, balance: 40 }], reason: null });
+    await game.recruit('villager');
+    expect(game.heroesHere()).toHaveLength(2);
+    expect(game.recruits()[0]?.cost).toEqual([{ material: 'timber', amount: 20, balance: 20 }]);
+  });
+
+  it('says the hall is full when every slot holds a dead hero, before what it costs', async () => {
     const { game } = setup(playerWith([], 4, 0));
     TestBed.tick();
     await vi.waitFor(() => expect(game.player()).not.toBeNull());
-    expect(game.freeVillager()).toEqual({ offered: false, reason: 'The hall is full.' });
+    expect(game.recruits().map((r) => r.reason)).toEqual(['The hall is full.', 'The hall is full.']);
   });
 
-  it('retires a hero, which moves it to the retired and offers the free villager again', async () => {
+  it('retires a hero, which moves it to the retired and makes the villager free again', async () => {
     const { api, game } = setup(playerWith([villager]));
     TestBed.tick();
     await vi.waitFor(() => expect(game.player()).not.toBeNull());
@@ -146,15 +170,17 @@ describe('Game', () => {
     expect(hero?.status).toBe('RETIRED');
     expect(game.heroesHere()).toEqual([]);
     expect(game.retiredHere().map((h) => h.id)).toEqual([villager.id]);
-    expect(game.freeVillager()).toEqual({ offered: true, reason: null });
+    expect(game.recruits()[0]).toEqual({ unitType: 'villager', cost: [], reason: null });
   });
 
-  it('records the hub refusal instead of throwing', async () => {
-    const { game } = setup(playerWith([villager]));
+  it("throws the hub's refusal of a recruit with its code, for the hall to show in place, and reads the camp again", async () => {
+    const { api, game } = setup(playerWith([villager]));
     TestBed.tick();
     await vi.waitFor(() => expect(game.player()).not.toBeNull());
-    expect(await game.recruitVillager()).toBeNull();
-    expect(game.error()).toContain('free only when no hero');
+    const loads = api.calls.filter((c) => c.query.includes('me {')).length;
+    await expect(game.recruit('villager')).rejects.toMatchObject({ code: 'INSUFFICIENT_RESOURCES' });
+    expect(api.calls.filter((c) => c.query.includes('me {')).length).toBe(loads + 1);
+    expect(game.busy()).toBe(false);
   });
 
   it('starts a job with a party, and then knows the open adventure', async () => {

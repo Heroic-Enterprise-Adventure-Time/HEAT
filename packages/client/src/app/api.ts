@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { Config } from './config';
 import { Session } from './session';
 
-/** A GraphQL error, with the hub's refusal code where it gave one (`NOT_FREE`, `HALL_FULL`, ...). */
+/** A GraphQL error, with the hub's refusal code where it gave one (`HALL_FULL`, `INSUFFICIENT_RESOURCES`, ...). */
 export class ApiError extends Error {
   constructor(
     message: string,

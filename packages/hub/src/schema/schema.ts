@@ -308,7 +308,7 @@ builder.mutationFields((t) => ({
   recruitHero: t.field({
     type: HeroRef,
     authScopes: { authenticated: true },
-    description: "Recruits a hero of the unit type at the heroes hall of the starting camp. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Only the free villager for now: a camp with no living hero and a free slot.",
+    description: "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Refused with HALL_LEVEL, HALL_FULL, INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance), BAD_USER_INPUT or CONFLICT.",
     args: {
       unitType: t.arg.string({ required: true }),
       requestId: t.arg.string({ required: true }),
