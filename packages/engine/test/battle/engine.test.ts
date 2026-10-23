@@ -10,6 +10,7 @@
 import { describe, expect, it } from "vitest";
 import { CombatEngine, chargeMs, findNextUnit, resolveBattle, type UnitState } from "../../src/index.js";
 import { contentWith, hero, ofKind, opponent, runAll, setup } from "./helpers.js";
+import { must } from "../must.js";
 
 function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = {}): UnitState {
   return {
@@ -225,7 +226,7 @@ describe("Guard", () => {
   });
   const weakestWolf = {
     ...content,
-    abilities: { ...content.abilities, bite: { ...content.abilities["bite"]!, targeting: { side: "enemy" as const, reach: [{ actorLine: "front" as const, targetLines: ["front" as const] }], selection: "weakest" as const } } },
+    abilities: { ...content.abilities, bite: { ...must(content.abilities["bite"], "the bite ability"), targeting: { side: "enemy" as const, reach: [{ actorLine: "front" as const, targetLines: ["front" as const] }], selection: "weakest" as const } } },
   };
   const run = () =>
     resolveBattle(setup([hero("fighter-1", "fighter"), hero("villager-1", "villager", 10)], [opponent("wolf-1", "wolf"), opponent("wolf-2", "wolf")], "guard"), weakestWolf);

@@ -1,9 +1,9 @@
 # Build and test
 #
-# The gate on every pull request and on main: does the repository build, do
-# its tests pass, does the client build for production, is the committed
-# GraphQL schema current, does every function bundle, and is every Terraform
-# root formatted and valid. It runs
+# The gate on every pull request and on main: does the repository build, does
+# it lint clean, do its tests pass, does the client build for production, is
+# the committed GraphQL schema current, does every function bundle, and is
+# every Terraform root formatted and valid. It runs
 # with no AWS credentials; the integration tests start their own containers
 # (decision 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
@@ -45,6 +45,11 @@ jobs:
 
       - name: Typecheck every package
         run: npm run typecheck
+
+      # The deterministic floor of review (docs/standards/typescript.md,
+      # rule 16): one flat config for every workspace, with type information.
+      - name: Lint every package
+        run: npm run lint
 
       - name: Run every package's tests (integration tests start containers)
         run: npm test

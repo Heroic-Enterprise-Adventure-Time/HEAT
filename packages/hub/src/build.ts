@@ -57,7 +57,9 @@ export async function buildFacility(repo: Repository, playerId: string, location
   if (from >= level) return camp;
   if (level !== from + 1) refuse(`the ${FACILITIES[facility].name.toLowerCase()} is at level ${from}; level ${level} is not the next`, "BAD_USER_INPUT");
   refuseIfBarred(camp, facility);
-  const next = nextLevel(facility, from)!; // refuseIfBarred refuses MAX_LEVEL when there is none
+  const next = nextLevel(facility, from);
+  // refuseIfBarred refuses MAX_LEVEL when there is no next level.
+  if (!next) throw new Error(`no level ${from + 1} of ${facility} to build`);
 
   try {
     await repo.build(playerId, camp, { kind: facility, from, cost: next.cost, requires: next.requires });

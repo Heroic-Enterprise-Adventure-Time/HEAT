@@ -28,12 +28,16 @@ export const builder = new SchemaBuilder<{
   plugins: [ScopeAuthPlugin],
   defaultFieldNullability: false,
   scopeAuth: {
-    authScopes: async (ctx) => ({
+    authScopes: (ctx) => ({
       authenticated: ctx.playerId !== undefined,
       self: (ownerId: string) => ctx.playerId === ownerId,
     }),
   },
 });
 
-builder.queryType({});
-builder.mutationType({});
+builder.queryType({
+  description: "What a signed-in player reads: a player by id, themselves, the deploy's version, an adventure, and the heroes other players have left at a location.",
+});
+builder.mutationType({
+  description: "What a signed-in player does: joins the game, recruits and retires heroes, builds a facility, and starts, submits and discards an adventure.",
+});

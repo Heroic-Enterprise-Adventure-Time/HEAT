@@ -18,18 +18,18 @@ export async function setup(): Promise<void> {
     .start();
 
   const endpoint = `http://${container.getHost()}:${container.getMappedPort(8000)}`;
-  process.env.DYNAMODB_ENDPOINT = endpoint;
-  process.env.HEAT_PLAYER_TABLE = "heat-test-player";
-  process.env.HEAT_LOCATION_TABLE = "heat-test-location";
-  process.env.AWS_REGION = "us-east-1";
-  process.env.AWS_ACCESS_KEY_ID = "test";
-  process.env.AWS_SECRET_ACCESS_KEY = "test";
-  process.env.POWERTOOLS_LOG_LEVEL = "SILENT";
-  process.env.HEAT_VERSION = "0123456789abcdef0123456789abcdef01234567";
-  process.env.HEAT_PREVIOUS_VERSION = "fedcba9876543210fedcba9876543210fedcba98";
+  process.env["DYNAMODB_ENDPOINT"] = endpoint;
+  process.env["HEAT_PLAYER_TABLE"] = "heat-test-player";
+  process.env["HEAT_LOCATION_TABLE"] = "heat-test-location";
+  process.env["AWS_REGION"] = "us-east-1";
+  process.env["AWS_ACCESS_KEY_ID"] = "test";
+  process.env["AWS_SECRET_ACCESS_KEY"] = "test";
+  process.env["POWERTOOLS_LOG_LEVEL"] = "SILENT";
+  process.env["HEAT_VERSION"] = "0123456789abcdef0123456789abcdef01234567";
+  process.env["HEAT_PREVIOUS_VERSION"] = "fedcba9876543210fedcba9876543210fedcba98";
   // Named only: the handler's tests never reach S3. Submit is proven
   // against the in-memory store, and the bucket by the stack test.
-  process.env.HEAT_REPLAY_BUCKET = "heat-test-replays";
+  process.env["HEAT_REPLAY_BUCKET"] = "heat-test-replays";
 
   const client = new DynamoDBClient({ region: "us-east-1", endpoint });
   await ensureTable(client, "heat-test-player");

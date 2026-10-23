@@ -21,6 +21,7 @@ import {
   nextLevel,
   type FacilityKind,
 } from "../src/index.js";
+import { must } from "./must.js";
 
 const heroes = new URL("../../../art/heroes/", import.meta.url);
 const facilities = new URL("../../../art/facilities/", import.meta.url);
@@ -68,11 +69,13 @@ describe("static content", () => {
   });
 
   it("prices Millbrook's recruits by the first progression, with the villager free when no hero is alive", () => {
-    const [villager, fighter] = location(STARTING_LOCATION)?.recruits ?? [];
-    expect(recruitCost(villager!, 0)).toEqual([]);
-    expect(recruitCost(villager!, 1)).toEqual([{ material: "timber", amount: 20 }]);
-    expect(recruitCost(fighter!, 0)).toEqual([{ material: "ore", amount: 40 }]);
-    expect(recruitCost(fighter!, 2)).toEqual([{ material: "ore", amount: 40 }]);
+    const recruits = must(location(STARTING_LOCATION), "the starting location").recruits;
+    const villager = must(recruits[0], "the villager recruit");
+    const fighter = must(recruits[1], "the fighter recruit");
+    expect(recruitCost(villager, 0)).toEqual([]);
+    expect(recruitCost(villager, 1)).toEqual([{ material: "timber", amount: 20 }]);
+    expect(recruitCost(fighter, 0)).toEqual([{ material: "ore", amount: 40 }]);
+    expect(recruitCost(fighter, 2)).toEqual([{ material: "ore", amount: 40 }]);
   });
 
   it("caps a camp's heroes and stock by its hall's and warehouse's levels", () => {

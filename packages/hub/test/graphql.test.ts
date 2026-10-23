@@ -198,7 +198,7 @@ describe("the adventure loop through the graph", () => {
       {}, p,
     );
     expect(me.errors).toBeUndefined();
-    const version = process.env.HEAT_VERSION;
+    const version = process.env["HEAT_VERSION"];
     expect(me.data?.me.openAdventure).toEqual({
       id: adventureId, seed, location: "millbrook", version,
       job: { id: "wolves-on-the-mill-road", name: "Wolves on the mill road", location: "millbrook" },
@@ -238,7 +238,7 @@ describe("the deploy's version", () => {
   it("flags outdated on a response to a client of another version, errors included, and never otherwise", async () => {
     const p = `p-${randomUUID()}`;
     await gql(`mutation { joinGame { id } }`, {}, p);
-    const version = process.env.HEAT_VERSION!;
+    const version = process.env["HEAT_VERSION"]!;
 
     const asked = await gql<{ version: string }>(`{ version }`, {}, p);
     expect(asked.data?.version).toBe(version);

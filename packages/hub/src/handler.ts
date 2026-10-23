@@ -23,7 +23,7 @@ const config = configFromEnv();
 const version = versionFromEnv();
 const previousVersion = previousVersionFromEnv();
 const db = createDocumentClient(config, (client) => tracer.captureAWSv3Client(client));
-const replayBucket = process.env.HEAT_REPLAY_BUCKET;
+const replayBucket = process.env["HEAT_REPLAY_BUCKET"];
 if (!replayBucket) throw new Error("HEAT_REPLAY_BUCKET is not set");
 const timelines = new S3Timelines(tracer.captureAWSv3Client(new S3Client({ region: config.region ?? "us-east-1" })), replayBucket);
 
