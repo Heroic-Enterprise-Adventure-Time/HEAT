@@ -47,6 +47,7 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
       resourceCapacity: 100,
     }),
     recruits: signal([]),
+    upgrade: () => null,
     location: signal('millbrook'),
     player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
     adventure: open,
@@ -95,7 +96,7 @@ async function render(game: ReturnType<typeof fakeGame>, url: string) {
       { provide: BATTLE_SCENE_FACTORY, useValue: async () => Promise.reject(new Error('no WebGL in jsdom')) },
       {
         provide: CAMP_SCENE_FACTORY,
-        useValue: async () => ({ setHeroes: () => undefined, destroy: () => undefined }),
+        useValue: async () => ({ setHeroes: () => undefined, setLevels: () => undefined, destroy: () => undefined }),
       },
     ],
   });

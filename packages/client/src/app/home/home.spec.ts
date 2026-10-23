@@ -36,7 +36,7 @@ async function render(session: ReturnType<typeof fakeSession>, configError: stri
       { provide: Config, useValue: config },
       // The camp's own collaborators, standing in: no hub and no WebGL in a test.
       { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), recruits: signal([]), busy: signal(false), error: signal(null) } },
-      { provide: CAMP_SCENE_FACTORY, useValue: async () => ({ setHeroes: () => undefined, destroy: () => undefined }) },
+      { provide: CAMP_SCENE_FACTORY, useValue: async () => ({ setHeroes: () => undefined, setLevels: () => undefined, destroy: () => undefined }) },
     ],
   }).compileComponents();
   const fixture = TestBed.createComponent(Home);

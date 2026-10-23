@@ -3,24 +3,26 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
+import { FacilityBuild } from './facility-build';
 
 /**
  * Any other facility's panel, `/camp/<location>/<facility>`: what it does,
- * and for one not built yet, that it is not (building is Issue-93). The
- * hall and the job board have panels of their own; the warehouse lists the
- * camp's stock against its cap (Issue-15). A facility the camp does not
- * have sends the address back to the hall.
+ * its level, and the build of it or of its next level (Issue-93). The hall
+ * and the job board have panels of their own; the warehouse lists the camp's
+ * stock against its cap (Issue-15). A facility the camp does not have sends
+ * the address back to the hall.
  */
 @Component({
   selector: 'heat-facility-panel',
+  imports: [FacilityBuild],
   template: `
     @if (facility(); as facility) {
       <h2 id="panel-title">{{ facility.name }}</h2>
       @if (facility.level === 0) {
         <p class="status">Not built yet.</p>
         <p>{{ facility.description }}</p>
-        <p class="note">Building opens in a later update.</p>
       } @else {
+        <p class="status">Level {{ facility.level }}.</p>
         <p>{{ facility.description }}</p>
         @switch (facility.kind) {
           @case ('warehouse') {
@@ -36,6 +38,7 @@ import { CampState } from '../camp-state';
           }
         }
       }
+      <heat-facility-build [kind]="facility.kind" />
     }
   `,
   styleUrl: './panel.css',

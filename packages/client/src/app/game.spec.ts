@@ -25,7 +25,7 @@ function playerWith(
 ): PlayerView {
   return {
     id: 'p1',
-    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings, resourceCapacity: 100 }],
+    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings, resourceCapacity: 100, warehouseLevel: 1, facilities: [] }],
     heroes,
     openAdventure: null,
   };

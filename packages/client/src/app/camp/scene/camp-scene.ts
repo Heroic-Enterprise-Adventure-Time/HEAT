@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
-import type { FacilityKind } from '@heat/engine';
+import { facilityArtLevel, type FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
 import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
 import { lowestOpaqueRow } from '../../pixel-art';
@@ -33,6 +33,8 @@ export interface SceneCallbacks {
 export interface CampSceneHandle {
   /** Shows these heroes: `arriving` walks out of the hall, `leaving`, no longer listed, walks back in. */
   setHeroes(heroes: readonly SceneHero[], arriving?: string, leaving?: string): void;
+  /** Shows each facility at its level, swapping its picture in place when a build changes it (Issue-93). */
+  setLevels(levels: Readonly<Partial<Record<FacilityKind, number>>>): void;
   destroy(): void;
 }
 
@@ -205,10 +207,26 @@ export async function createCampScene(
   watchRatio();
   resize();
 
+  let destroyed = false;
+
+  // Each facility shows the picture of its level, or of the highest level
+  // below it that has one (assets.md, rule 17), standing by its base.
+  const facilities = new Map<FacilityKind, { sprite: Sprite; art: number }>();
+  const picture = async (kind: FacilityKind, level: number) => {
+    const art = facilityArtLevel(kind, level);
+    const shown = facilities.get(kind);
+    if (shown?.art === art) return;
+    const texture = await Assets.load<Texture>(`/art/facilities/${kind}/level-${art}.png`);
+    const now = facilities.get(kind);
+    if (!now || destroyed) return;
+    now.art = art;
+    now.sprite.texture = texture;
+    now.sprite.pivot.set(texture.width / 2, lowestOpaqueRow(texture) + 1);
+  };
   for (const spot of layout.facilities) {
-    const texture = await Assets.load<Texture>(`/art/facilities/${spot.kind}/level-${levels[spot.kind] ?? 1}.png`);
-    const sprite = new Sprite(texture);
-    sprite.pivot.set(texture.width / 2, lowestOpaqueRow(texture) + 1);
+    const sprite = new Sprite(Texture.EMPTY);
+    facilities.set(spot.kind, { sprite, art: -1 });
+    await picture(spot.kind, levels[spot.kind] ?? 1);
     sprite.position.set(spot.at.x, spot.at.y);
     sprite.zIndex = spot.at.y;
     // Every facility opens its panel, as its entry in the menu does (Issue-89).
@@ -219,7 +237,6 @@ export async function createCampScene(
   }
 
   const heroes = new Map<string, HeroOnScreen>();
-  let destroyed = false;
 
   app.ticker.add((ticker) => {
     // A hero's size against the map, and its stroll in map pixels, which keeps
@@ -249,6 +266,9 @@ export async function createCampScene(
   });
 
   return {
+    setLevels(levels) {
+      for (const kind of facilities.keys()) void picture(kind, levels[kind] ?? 1);
+    },
     setHeroes(list, arriving, leaving) {
       const wanted = new Set(list.map((h) => h.id));
       for (const [id, hero] of heroes) {

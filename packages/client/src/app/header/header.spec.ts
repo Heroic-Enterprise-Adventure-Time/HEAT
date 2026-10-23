@@ -7,7 +7,7 @@ import { Header } from './header';
 
 const player: PlayerView = {
   id: 'p1',
-  camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: 0, livingHeroes: 0, holdings: [], resourceCapacity: 100 }],
+  camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: 0, livingHeroes: 0, holdings: [], resourceCapacity: 100, warehouseLevel: 1, facilities: [] }],
   heroes: [],
   openAdventure: {
     id: 'a1',

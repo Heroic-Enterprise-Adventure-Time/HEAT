@@ -4,7 +4,8 @@ import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from '../app.routes';
 import { ApiError } from '../api';
-import { Game, type HeroView, type RecruitOffer, type SeenHeroView } from '../game';
+import type { FacilityKind } from '@heat/engine';
+import { Game, upgradeOffer, type CampView, type HeroView, type RecruitOffer, type SeenHeroView } from '../game';
 import { Session } from '../session';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
 import { CAMP_SCENE_FACTORY } from './camp';
@@ -46,7 +47,25 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
         { material: 'ore', balance: 0 },
       ],
       resourceCapacity: 100,
+      warehouseLevel: 1,
+      facilities: [
+        { kind: 'heroes-hall', level: 1 },
+        { kind: 'warehouse', level: 1 },
+        { kind: 'mine', level: 0 },
+        { kind: 'lumber-camp', level: 0 },
+        { kind: 'caravan-hub', level: 0 },
+      ] as CampView['facilities'],
     }),
+    upgrade: (kind: FacilityKind) => upgradeOffer(fake.camp(), kind),
+    built: [] as [string, number][],
+    /** A refusal the next build throws, as the hub would. */
+    refuseBuild: null as ApiError | null,
+    build: async (kind: FacilityKind, level: number) => {
+      fake.built.push([kind, level]);
+      if (fake.refuseBuild) throw fake.refuseBuild;
+      const camp = fake.camp();
+      fake.camp.set({ ...camp, facilities: camp.facilities.map((f) => (f.kind === kind ? { kind, level } : f)) });
+    },
     livingHere: computed(() => here().filter((h) => h.status === 'ALIVE')),
     recruits: computed((): RecruitOffer[] => [
       {
@@ -93,6 +112,9 @@ function fakeScene() {
       return {
         setHeroes: (heroes: readonly SceneHero[], arriving?: string, leaving?: string) =>
           scene.shown.push({ heroes, arriving, leaving }),
+        setLevels: (levels: Readonly<Record<string, number>>) => {
+          scene.levels = levels;
+        },
         destroy: () => undefined,
       };
     },
@@ -172,7 +194,7 @@ describe('Camp', () => {
   it('groups the roster into the living and the dead', async () => {
     const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
     const { page } = await render(fakeGame([wren, dead]));
-    expect([...page.querySelectorAll('aside h3')].map((h) => h.textContent)).toEqual(['Living', 'Dead', 'Recruit']);
+    expect([...page.querySelectorAll('aside h3')].map((h) => h.textContent)).toEqual(['Living', 'Dead', 'Recruit', 'Upgrade to level 2']);
     expect(page.querySelector('.roster.living')?.textContent).toContain('Wren');
     expect(page.querySelector('.roster.living')?.textContent).not.toContain('Hob');
     expect(page.querySelector('.roster.dead')?.textContent).toContain('Hob');
@@ -298,6 +320,47 @@ describe('Camp', () => {
     expect(page.querySelector('aside')?.textContent).toContain('Not built yet.');
     expect(page.querySelector('aside')?.textContent).toContain('mining runs');
     expect(current(page)).toBe('Mine');
+  });
+
+  it("builds the mine with its cost beside the camp's balance, and draws it built", async () => {
+    const game = fakeGame([]);
+    const { page, scene, settle } = await render(game, '/camp/millbrook/mine');
+    const build = () => page.querySelector('.build') as HTMLElement;
+    expect(build().querySelector('h3')?.textContent).toBe('Build');
+    expect(build().querySelector('.price')?.textContent).toBe('60 timber, you have 60; 3 cloth, you have 3');
+    (build().querySelector('button') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(game.built).toEqual([['mine', 1]]));
+    await settle();
+    expect(page.querySelector('aside')?.textContent).toContain('Level 1.');
+    expect(page.querySelector('aside')?.textContent).toContain('At its highest level here.');
+    await vi.waitFor(() => expect(scene.levels?.['mine']).toBe(1));
+  });
+
+  it("shows the hub's refusal of a build in place", async () => {
+    const game = fakeGame([]);
+    game.refuseBuild = new ApiError('level 1 costs 60 timber', 'INSUFFICIENT_RESOURCES');
+    const { page, settle } = await render(game, '/camp/millbrook/mine');
+    (page.querySelector('.build button') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(game.built).toHaveLength(1));
+    await settle();
+    expect(page.querySelector('.build .refusal')?.textContent).toBe('The camp cannot pay for this now.');
+  });
+
+  it('disables a build the camp cannot have, and says why', async () => {
+    const { page } = await render(fakeGame([]), '/camp/millbrook/caravan-hub');
+    expect((page.querySelector('.build button') as HTMLButtonElement).disabled).toBe(true);
+    expect(page.querySelector('.build .note')?.textContent).toBe('Needs a level 2 warehouse first.');
+  });
+
+  it("offers the warehouse's and the hall's next level, with what it holds", async () => {
+    const { page } = await render(fakeGame([]), '/camp/millbrook/warehouse');
+    expect(page.querySelector('.build h3')?.textContent).toBe('Upgrade to level 2');
+    expect(page.querySelector('.build')?.textContent).toContain('Holds 200 of each resource.');
+    expect(page.querySelector('.build .note')?.textContent).toBe('Not enough timber or ore.');
+    TestBed.resetTestingModule();
+    const hall = await render(fakeGame([]));
+    expect(hall.page.querySelector('.build')?.textContent).toContain('Holds 6 heroes.');
+    expect(hall.page.querySelector('.build .note')?.textContent).toBe('Not enough timber or cloth.');
   });
 
   it('sends a facility the camp does not have back to the hall', async () => {

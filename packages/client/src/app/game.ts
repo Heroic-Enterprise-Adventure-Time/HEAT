@@ -1,5 +1,17 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { STARTING_LOCATION, location, recruitCost, type AdventureLogEntry, type AdventureTimeline, type UnitType } from '@heat/engine';
+import {
+  STARTING_LOCATION,
+  buildRefusal,
+  hallCapacity,
+  location,
+  nextLevel,
+  recruitCost,
+  warehouseCapacity,
+  type AdventureLogEntry,
+  type AdventureTimeline,
+  type FacilityKind,
+  type UnitType,
+} from '@heat/engine';
 import { Api, ApiError, PREVIOUS } from './api';
 import { Session } from './session';
 
@@ -29,6 +41,7 @@ export interface CampView {
   readonly location: string;
   readonly name: string;
   readonly hallLevel: number;
+  readonly warehouseLevel: number;
   readonly heroCapacity: number;
   readonly activeHeroes: number;
   readonly livingHeroes: number;
@@ -36,6 +49,8 @@ export interface CampView {
   readonly holdings: readonly { readonly material: string; readonly balance: number }[];
   /** The stock of each resource the warehouse holds at its level. */
   readonly resourceCapacity: number;
+  /** Each of the camp's own facilities and its level, 0 for one not built (Issue-93). */
+  readonly facilities: readonly { readonly kind: FacilityKind; readonly level: number }[];
 }
 
 /** A hero as the adventure took it at the start, from the snapshot, with the numbers the engine runs it by. */
@@ -91,7 +106,8 @@ export interface PlayerView {
 }
 
 const HERO_FIELDS = 'id name unitType spriteSet location recruitedAt level xp status retiredAt';
-const CAMP_FIELDS = 'location name hallLevel heroCapacity activeHeroes livingHeroes holdings { material balance } resourceCapacity';
+const CAMP_FIELDS =
+  'location name hallLevel warehouseLevel heroCapacity activeHeroes livingHeroes holdings { material balance } resourceCapacity facilities { kind level }';
 const ADVENTURE_FIELDS =
   'id startedAt location seed version job { id name description } ' +
   'snapshot { version jobId heroes { heroId name unitType spriteSet level stats { maxHealth speed damage gathering } } }';
@@ -104,6 +120,7 @@ const SUBMIT = `mutation($id: String!, $overrides: [OverrideInput!]!) { submitAd
 const TIMELINE = `query($id: String!) { adventure(id: $id) { timeline } }`;
 const DISCARD = `mutation($id: String!) { discardAdventure(adventureId: $id) { id } }`;
 const START = `mutation($at: String!, $job: String!, $heroes: [String!]!) { startAdventure(location: $at, jobId: $job, heroIds: $heroes) { ${ADVENTURE_FIELDS} } }`;
+const BUILD = `mutation($at: String!, $kind: String!, $level: Int!) { buildFacility(location: $at, kind: $kind, level: $level) { location } }`;
 const RECRUIT = `mutation($unitType: String!, $id: String!) { recruitHero(unitType: $unitType, requestId: $id) { ${HERO_FIELDS} } }`;
 
 /** A unit type the hall recruits, its price to the camp, and why it cannot be had now, or null when it can. */
@@ -115,9 +132,48 @@ export interface RecruitOffer {
 }
 
 /**
+ * The next level of a facility the camp can build, what it gives, its cost
+ * beside the camp's balance, and why it cannot be built now, or null when it
+ * can (Issue-93).
+ */
+export interface UpgradeOffer {
+  readonly kind: FacilityKind;
+  readonly level: number;
+  /** What the level changes, in words, where it changes a number; null for a facility's first level. */
+  readonly gives: string | null;
+  readonly cost: readonly { readonly material: string; readonly amount: number; readonly balance: number }[];
+  readonly reason: string | null;
+}
+
+/**
+ * The next level of one of a camp's own facilities, by the hub's rules
+ * (`buildRefusal`, which the hub checks too), or null at its highest.
+ */
+export function upgradeOffer(camp: CampView, kind: FacilityKind): UpgradeOffer | null {
+  const levels = Object.fromEntries(camp.facilities.map((f) => [f.kind, f.level]));
+  const next = nextLevel(kind, levels[kind] ?? 0);
+  if (!next) return null;
+  const cost = next.cost.map(({ material, amount }) => ({
+    material,
+    amount,
+    balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0,
+  }));
+  const gives =
+    kind === 'heroes-hall'
+      ? `Holds ${hallCapacity(next.level)} heroes.`
+      : kind === 'warehouse'
+        ? `Holds ${warehouseCapacity(next.level)} of each resource.`
+        : null;
+  const refusal = buildRefusal({ levels, holdings: camp.holdings }, kind);
+  const reason =
+    refusal?.code === 'INSUFFICIENT_RESOURCES' ? `Not enough ${refusal.short.map((s) => s.material).join(' or ')}.` : (refusal?.message ?? null);
+  return { kind, level: next.level, gives, cost, reason };
+}
+
+/**
  * The signed-in player's game: their camps, their heroes and the open
- * adventure, loaded from the hub after every sign-in, and the three things
- * they can do yet, recruit a hero, retire one and start a job
+ * adventure, loaded from the hub after every sign-in, and what
+ * they can do yet: recruit a hero, retire one, build a facility and start a job
  * from the job board. Joining comes
  * first, because the profile is made on first sign-in (joinGame, Issue-81).
  * Beside them, a few of other players' heroes seen at the camp's location,
@@ -180,6 +236,12 @@ export class Game {
     });
   });
 
+  /** The next level of one of the camp on screen's own facilities, or null at its highest (`upgradeOffer`). */
+  upgrade(kind: FacilityKind): UpgradeOffer | null {
+    const camp = this.camp();
+    return camp && upgradeOffer(camp, kind);
+  }
+
   constructor() {
     effect(() => {
       if (this.session.user()) void this.join();
@@ -231,6 +293,23 @@ export class Game {
       return data.recruitHero;
     } finally {
       // A failed read leaves the view as it was; the recruit's own answer is what matters here.
+      await this.load().catch(() => undefined);
+      this.busy.set(false);
+    }
+  }
+
+  /**
+   * Builds the facility's next level at the camp on screen. Answers when it
+   * is built, or throws the hub's refusal, an `ApiError` with its code, for
+   * the panel to show in place. The player is read again either way, since
+   * a refusal means the view was stale.
+   */
+  async build(kind: FacilityKind, level: number): Promise<void> {
+    this.busy.set(true);
+    try {
+      await this.api.request(BUILD, { at: this.location(), kind, level });
+    } finally {
+      // A failed read leaves the view as it was; the build's own answer is what matters here.
       await this.load().catch(() => undefined);
       this.busy.set(false);
     }
