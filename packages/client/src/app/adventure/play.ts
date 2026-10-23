@@ -1,6 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import type { AdventureEvent, AdventureSnapshot, AdventureTimeline, PartyOrder } from '@heat/engine';
 import { Game, type AdventureView } from '../game';
+import { must } from '../must';
 import { applyEvent, emptyField, isEntry, type Field } from './field';
 import { AdventureRun, TimelineRun, forgetRun, loadRun, saveRun, type Run } from './run';
 
@@ -85,7 +86,7 @@ export class Play {
     if (!run || run.complete || this.paused() || this.entering()) return [];
     const events = run.advanceTo(run.simTime + Math.round(wallMs * this.speed()));
     if (events.length > 0) {
-      this.field.update((field) => events.reduce(applyEvent, field!));
+      this.field.update((field) => events.reduce(applyEvent, must(field, 'the field while events play')));
       this.settleQueue(events);
       if (this.holdEntries && events.some(isEntry)) this.entering.set(true);
     }

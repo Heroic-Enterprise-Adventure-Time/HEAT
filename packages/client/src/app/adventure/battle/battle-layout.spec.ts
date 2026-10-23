@@ -1,3 +1,4 @@
+import { must } from '../../must';
 import { STAGE_HEIGHT, STAGE_WIDTH, battleView, entryOffset, spot, spots, stackedBattleHeight } from './battle-layout';
 
 describe('Battle layout', () => {
@@ -8,7 +9,7 @@ describe('Battle layout', () => {
     expect(opponents).toEqual([...opponents].sort((a, b) => a - b));
     expect(party[0]).toBeLessThan(STAGE_WIDTH / 2);
     expect(opponents[0]).toBeGreaterThan(STAGE_WIDTH / 2);
-    expect(STAGE_WIDTH / 2 - party[0]!).toBe(opponents[0]! - STAGE_WIDTH / 2);
+    expect(STAGE_WIDTH / 2 - must(party[0], 'the front line')).toBe(must(opponents[0], 'the front line') - STAGE_WIDTH / 2);
     expect(party[3]).toBeGreaterThan(0);
     expect(opponents[3]).toBeLessThan(STAGE_WIDTH);
   });
@@ -20,10 +21,11 @@ describe('Battle layout', () => {
       { unitId: 'c', side: 'party' as const, line: 'front' as const },
     ];
     const at = spots(units);
-    expect(at.get('a')!.x).toBeLessThan(at.get('b')!.x);
-    expect(at.get('a')!.y).toBeLessThan(at.get('b')!.y);
-    expect(at.get('a')!.x + at.get('b')!.x).toBe(2 * spot('party', 'near', 0, 1).x);
-    expect(at.get('c')!.y).toBe(spot('party', 'front', 0, 1).y);
+    const spotOf = (id: string) => must(at.get(id), `the spot of ${id}`);
+    expect(spotOf('a').x).toBeLessThan(spotOf('b').x);
+    expect(spotOf('a').y).toBeLessThan(spotOf('b').y);
+    expect(spotOf('a').x + spotOf('b').x).toBe(2 * spot('party', 'near', 0, 1).x);
+    expect(spotOf('c').y).toBe(spot('party', 'front', 0, 1).y);
     expect(spots([...units].reverse())).toEqual(at);
   });
 

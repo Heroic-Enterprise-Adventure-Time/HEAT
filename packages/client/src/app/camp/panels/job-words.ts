@@ -48,7 +48,13 @@ export interface Credit {
 
 export function credits(job: Job): Credit[] {
   const byMaterial = new Map<string, { pay: number; cargo: number }>();
-  const entry = (material: string) => byMaterial.get(material) ?? byMaterial.set(material, { pay: 0, cargo: 0 }).get(material)!;
+  const entry = (material: string) => {
+    const found = byMaterial.get(material);
+    if (found) return found;
+    const fresh = { pay: 0, cargo: 0 };
+    byMaterial.set(material, fresh);
+    return fresh;
+  };
   for (const reward of job.pay) entry(reward.material).pay += reward.amount;
   for (const stage of job.stages) {
     if (stage.kind !== 'gather') continue;
@@ -78,11 +84,10 @@ export function yieldWords(job: Job): string {
 
 /** A job's retreat penalty in words: "A retreat forfeits the pay, keeps the timber gathered, and earns half the XP." */
 export function retreatWords(job: Job): string {
-  const parts = [job.retreat.keepsPay ? 'keeps the pay' : 'forfeits the pay'];
+  const pay = job.retreat.keepsPay ? 'keeps the pay' : 'forfeits the pay';
   const cargo = [...new Set(job.stages.flatMap((s) => (s.kind === 'gather' ? gathered(s) : [])))];
-  if (cargo.length > 0) parts.push(`${job.retreat.keepsCargo ? 'keeps' : 'abandons'} the ${cargo.join(' and ')} gathered`);
+  const carried = cargo.length > 0 ? `${job.retreat.keepsCargo ? 'keeps' : 'abandons'} the ${cargo.join(' and ')} gathered` : null;
   const xp = job.retreat.xpPercent;
-  parts.push(xp === 100 ? 'earns the full XP' : xp === 50 ? 'earns half the XP' : xp === 0 ? 'earns no XP' : `earns ${xp}% of the XP`);
-  const last = parts.pop()!;
-  return `A retreat ${parts.length > 1 ? `${parts.join(', ')}, and ${last}` : `${parts[0]} and ${last}`}.`;
+  const earns = xp === 100 ? 'earns the full XP' : xp === 50 ? 'earns half the XP' : xp === 0 ? 'earns no XP' : `earns ${xp}% of the XP`;
+  return `A retreat ${carried ? `${pay}, ${carried}, and ${earns}` : `${pay} and ${earns}`}.`;
 }

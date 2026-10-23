@@ -2,18 +2,12 @@
 // rule 16). One flat config for every workspace, run by `npm run lint` at the
 // root and by "Build and test" beside the typecheck. A rule is turned off here
 // only with its reason; a rule the code cannot meet yet is held back by file
-// pattern at the end, naming the issue that removes the hold-back.
+// pattern at the end, naming the issue that removes the hold-back (none today).
 import js from '@eslint/js';
 import graphql from '@graphql-eslint/eslint-plugin';
 import angular from 'angular-eslint';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-
-const heldBack = (files, issue, rules) => ({
-  name: `held back until Issue-${issue}`,
-  files,
-  rules: Object.fromEntries(rules.map((rule) => [rule, 'off'])),
-});
 
 export default tseslint.config(
   // Build output, Angular's cache and the client's copy of the art.
@@ -64,11 +58,13 @@ export default tseslint.config(
     extends: [...angular.configs.tsRecommended],
     processor: angular.processInlineTemplates,
     rules: {
+      // A decorated class is instantiated by the framework from its decorator,
+      // so a component whose whole content is its template has no members.
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true }],
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'heat', style: 'kebab-case' }],
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'heat', style: 'camelCase' }],
-      // Templates and styles live in their own files beside the component;
-      // Issue-149 moves the inline ones and writes the sentence into
-      // docs/standards/typescript.md.
+      // Templates and styles live in their own files beside the component
+      // (docs/standards/typescript.md, rule 13).
       '@angular-eslint/component-max-inline-declarations': ['error', { template: 0, styles: 0, animations: 0 }],
     },
   },
@@ -90,22 +86,4 @@ export default tseslint.config(
       '@graphql-eslint/strict-id-in-types': 'off',
     },
   },
-
-  // Held back: the rules each area cannot meet yet, off for that area only,
-  // and listed under "Held back" in docs/standards/typescript.md. The issue
-  // named removes the block and fixes the findings it uncovers.
-  heldBack(['packages/client/**/*.ts', 'packages/client/**/*.html'], 149, [
-    '@angular-eslint/component-max-inline-declarations',
-    '@typescript-eslint/dot-notation',
-    '@typescript-eslint/no-base-to-string',
-    '@typescript-eslint/no-confusing-void-expression',
-    '@typescript-eslint/no-extraneous-class',
-    '@typescript-eslint/no-meaningless-void-operator',
-    '@typescript-eslint/no-non-null-assertion',
-    '@typescript-eslint/no-unnecessary-condition',
-    '@typescript-eslint/no-unsafe-assignment',
-    'no-useless-assignment',
-    '@typescript-eslint/require-await',
-    '@typescript-eslint/use-unknown-in-catch-callback-variable',
-  ]),
 );

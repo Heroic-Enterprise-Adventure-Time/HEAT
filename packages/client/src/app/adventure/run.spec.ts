@@ -1,9 +1,10 @@
 import { UNIT_PROFILES, replay, type AdventureSnapshot } from '@heat/engine';
 import { isEntry } from './field';
+import { must } from '../must';
 import { AdventureRun, SAVED_RUN_PREFIX, TimelineRun, forgetRun, loadRun, saveRun } from './run';
 
-const villager = UNIT_PROFILES.villager!;
-const fighter = UNIT_PROFILES.fighter!;
+const villager = must(UNIT_PROFILES.villager, 'the villager profile');
+const fighter = must(UNIT_PROFILES.fighter, 'the fighter profile');
 
 export const SNAPSHOT: AdventureSnapshot = {
   version: 'v1',
@@ -24,7 +25,7 @@ function playLive(run: AdventureRun, until = Infinity): void {
 }
 
 describe('AdventureRun', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => { localStorage.clear(); });
 
   it("keeps the log the engine keeps, so the hub's replay of it gives the same timeline and result", () => {
     const run = new AdventureRun(SNAPSHOT, 'seed-1');

@@ -11,20 +11,7 @@ import { yieldWords } from './job-words';
 @Component({
   selector: 'heat-job-list',
   imports: [RouterLink],
-  template: `
-    @if (jobs().length > 0) {
-      <ul class="jobs">
-        @for (job of jobs(); track job.id) {
-          <li>
-            <a class="link" [routerLink]="['jobs', job.id]">{{ job.name }}</a>
-            <span>{{ brings(job) }}</span>
-          </li>
-        }
-      </ul>
-    } @else {
-      <p>No jobs are posted here.</p>
-    }
-  `,
+  templateUrl: './job-list.html',
   styleUrl: './panel.css',
 })
 export class JobList {

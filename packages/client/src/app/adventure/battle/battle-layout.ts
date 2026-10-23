@@ -1,4 +1,5 @@
 import type { Line, Side } from '@heat/engine';
+import { must } from '../../must';
 
 /**
  * Where the battle scene puts things (game.md, "How the game looks" and
@@ -45,7 +46,7 @@ export function spots(units: readonly { readonly unitId: string; readonly side: 
   }
   const out = new Map<string, { x: number; y: number }>();
   for (const u of units) {
-    const line = [...byLine.get(`${u.side}/${u.line}`)!].sort();
+    const line = [...must(byLine.get(`${u.side}/${u.line}`), `the line ${u.side}/${u.line}`)].sort();
     out.set(u.unitId, spot(u.side, u.line, line.indexOf(u.unitId), line.length));
   }
   return out;

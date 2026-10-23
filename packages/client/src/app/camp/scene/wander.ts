@@ -1,3 +1,4 @@
+import { must } from '../../must';
 import type { Point, Rect } from './layout';
 
 /**
@@ -34,19 +35,15 @@ export type Random = () => number;
 
 /** A random spot on the walkable ground, each rectangle weighted by its area. */
 export function randomSpot(areas: readonly Rect[], random: Random): Point {
-  // `areas` is never empty (a layout has walkable ground) and `sizes` is
-  // index for index the same length, so the assertions below hold.
-  const sizes = areas.map((a) => (a.x1 - a.x0) * (a.y1 - a.y0));
-  let pick = random() * sizes.reduce((s, n) => s + n, 0);
-  let area = areas[areas.length - 1]!;
-  for (let i = 0; i < areas.length; i++) {
-    if (pick < sizes[i]!) {
-      area = areas[i]!;
-      break;
-    }
-    pick -= sizes[i]!;
+  const weighted = areas.map((area) => ({ area, size: (area.x1 - area.x0) * (area.y1 - area.y0) }));
+  const within = (area: Rect): Point => ({ x: area.x0 + random() * (area.x1 - area.x0), y: area.y0 + random() * (area.y1 - area.y0) });
+  let pick = random() * weighted.reduce((s, w) => s + w.size, 0);
+  for (const { area, size } of weighted) {
+    if (pick < size) return within(area);
+    pick -= size;
   }
-  return { x: area.x0 + random() * (area.x1 - area.x0), y: area.y0 + random() * (area.y1 - area.y0) };
+  // Rounding can leave `pick` at the very end; a layout always has walkable ground.
+  return within(must(areas.at(-1), 'a walkable area'));
 }
 
 /** The way a walker faces when moving by (dx, dy): the larger axis wins. */

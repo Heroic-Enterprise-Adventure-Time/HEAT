@@ -1,3 +1,4 @@
+import { must } from '../../must';
 import { layGround, type Terrain, type TilesetJson } from './ground';
 import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK, cornersAround } from './layout';
 import { WALK_SPEED, facingFor, gone, leave, newWalker, randomSpot, step } from './wander';
@@ -20,7 +21,7 @@ function fullTileset(): TilesetJson {
 /** A random source that plays back the given numbers in a loop. */
 function sequence(...values: number[]) {
   let i = 0;
-  return () => values[i++ % values.length]!;
+  return () => must(values[i++ % values.length], 'a value of the sequence');
 }
 
 describe('the ground', () => {
@@ -34,8 +35,8 @@ describe('the ground', () => {
       [1, 0],
     ]);
     // upper/upper/upper/lower is index 14 in the order above; upper/lower/lower/lower is 8.
-    expect(tiles[0]!.box).toEqual({ x: 32, y: 48, width: 16, height: 16 });
-    expect(tiles[1]!.box).toEqual({ x: 0, y: 32, width: 16, height: 16 });
+    expect(tiles[0]?.box).toEqual({ x: 32, y: 48, width: 16, height: 16 });
+    expect(tiles[1]?.box).toEqual({ x: 0, y: 32, width: 16, height: 16 });
   });
 
   it('says which corners the tileset lacks', () => {
@@ -53,7 +54,7 @@ describe('the ground', () => {
   it('runs the ground on past the map as grass, and keeps the corners of the map inside it', () => {
     const window = cornersAround(MILLBROOK, -2, -1, 4, 3);
     expect(window[0]).toEqual(['upper', 'upper', 'upper', 'upper', 'upper']);
-    expect(window[1]![2]).toBe(MILLBROOK.corners[0]![0]);
+    expect(must(window[1], 'row 1')[2]).toBe(must(MILLBROOK.corners[0], 'the first corner row')[0]);
     const road = cornersAround(MILLBROOK, 0, 8, 1, 1);
     expect(road[0]).toEqual(['lower', 'lower']);
   });

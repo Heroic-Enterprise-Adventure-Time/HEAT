@@ -1,0 +1,12 @@
+@if (jobs().length > 0) {
+  <ul class="jobs">
+    @for (job of jobs(); track job.id) {
+      <li>
+        <a class="link" [routerLink]="['jobs', job.id]">{{ job.name }}</a>
+        <span>{{ brings(job) }}</span>
+      </li>
+    }
+  </ul>
+} @else {
+  <p>No jobs are posted here.</p>
+}

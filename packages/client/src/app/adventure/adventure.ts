@@ -2,6 +2,7 @@ import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, com
 import { NgTemplateOutlet } from '@angular/common';
 import { Router } from '@angular/router';
 import { ABILITIES, JOBS, UNIT_PROFILES, location, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
+import { must } from '../must';
 import { Game, type AdventureResultView } from '../game';
 import { isSideBySide } from '../camp/page-layout';
 import { stackedBattleHeight } from './battle/battle-layout';
@@ -25,7 +26,7 @@ export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.adventure.frames',
       last = now;
       id = requestAnimationFrame(frame);
     });
-    return () => cancelAnimationFrame(id);
+    return () => { cancelAnimationFrame(id); };
   },
 });
 
@@ -127,7 +128,7 @@ export class Adventure {
       untracked(() => {
         this.startedId = adventure.id;
         this.play.start(adventure);
-        this.scene?.reset(this.play.field()!, new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
+        this.scene?.reset(must(this.play.field(), 'the field'), new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
       });
     });
     effect(() => {
@@ -141,7 +142,7 @@ export class Adventure {
     let destroyed = false;
     afterNextRender(() => {
       void this.mount().then(() => {
-        if (!destroyed) destroyRef.onDestroy(frames((ms) => this.frame(ms)));
+        if (!destroyed) destroyRef.onDestroy(frames((ms) => { this.frame(ms); }));
       });
     });
     destroyRef.onDestroy(() => {
@@ -157,7 +158,7 @@ export class Adventure {
   /** Loads the scene; without one, as where WebGL is missing, the run plays with the controls alone. */
   private async mount(): Promise<void> {
     try {
-      this.scene = await this.createScene(this.box().nativeElement, { onEntered: () => this.play.entered() });
+      this.scene = await this.createScene(this.box().nativeElement, { onEntered: () => { this.play.entered(); } });
       this.play.holdEntries = true;
     } catch {
       this.scene = null;
@@ -186,7 +187,7 @@ export class Adventure {
     }
     this.replayState.set('idle');
     this.play.replay(timeline);
-    this.scene?.reset(this.play.field()!, new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
+    this.scene?.reset(must(this.play.field(), 'the field'), new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */

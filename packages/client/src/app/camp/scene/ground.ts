@@ -6,6 +6,8 @@
  * so a grid of cols × rows tiles needs (cols + 1) × (rows + 1) corners.
  */
 
+import { must } from '../../must';
+
 export type Terrain = 'lower' | 'upper';
 
 export interface Box {
@@ -46,12 +48,13 @@ export function tilesByCorners(tileset: TilesetJson): Map<string, Box> {
 export function layGround(tileset: TilesetJson, corners: readonly (readonly Terrain[])[]): GroundTile[] {
   const tiles = tilesByCorners(tileset);
   const out: GroundTile[] = [];
-  // The loop bounds keep every index in range, which the assertions say.
+  // The loop bounds keep every index in range; `must` says so where the types cannot.
   for (let row = 0; row + 1 < corners.length; row++) {
-    const top = corners[row]!;
-    const bottom = corners[row + 1]!;
+    const top = must(corners[row], `corner row ${row}`);
+    const bottom = must(corners[row + 1], `corner row ${row + 1}`);
     for (let col = 0; col + 1 < top.length; col++) {
-      const k = key(top[col]!, top[col + 1]!, bottom[col]!, bottom[col + 1]!);
+      const corner = (cells: readonly Terrain[], index: number) => must(cells[index], `corner ${index} of a row`);
+      const k = key(corner(top, col), corner(top, col + 1), corner(bottom, col), corner(bottom, col + 1));
       const box = tiles.get(k);
       if (!box) throw new Error(`the tileset has no tile with corners ${k}`);
       out.push({ col, row, box });
