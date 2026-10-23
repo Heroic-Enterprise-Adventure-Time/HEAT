@@ -75,7 +75,7 @@ function refuse(message: string, code: string, extensions: Record<string, unknow
 /** The caller's adventure, or NO_SUCH_ADVENTURE: another player's is not said to exist. */
 export async function ownAdventure(repo: Repository, playerId: string, adventureId: string): Promise<AdventureRecord> {
   const record = await repo.getAdventure(adventureId);
-  if (!record || record.playerId !== playerId) refuse(`no adventure ${adventureId}`, "NO_SUCH_ADVENTURE");
+  if (record?.playerId !== playerId) refuse(`no adventure ${adventureId}`, "NO_SUCH_ADVENTURE");
   return record;
 }
 

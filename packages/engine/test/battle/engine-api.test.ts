@@ -137,7 +137,11 @@ describe("CombatEngine player overrides", () => {
 
   it("refuses an override for a unit that is not in the party", () => {
     const engine = engineFor();
-    expect(() => engine.submitOverride("wolf-1", { kind: "force-action", abilityId: "bite" })).toThrow();
-    expect(() => engine.submitOverride("nobody", { kind: "force-action", abilityId: "strike" })).toThrow();
+    expect(() => {
+      engine.submitOverride("wolf-1", { kind: "force-action", abilityId: "bite" });
+    }).toThrow();
+    expect(() => {
+      engine.submitOverride("nobody", { kind: "force-action", abilityId: "strike" });
+    }).toThrow();
   });
 });

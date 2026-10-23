@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MONSTER_SPRITE_SETS, MONSTER_TYPES, PROP_SPRITE_SETS, RESOURCE_TYPES } from "../src/index.js";
+import { must } from "./must.js";
 
 const art = new URL("../../../art/", import.meta.url);
 
@@ -10,7 +11,7 @@ function setsByProvenance(kind: "monsters" | "props"): Record<string, string[]> 
   const sets: Record<string, string[]> = {};
   for (const set of readdirSync(dir).sort()) {
     const provenance = JSON.parse(readFileSync(new URL(`${set}/provenance.json`, dir), "utf8")) as Record<string, string[]>;
-    for (const type of provenance[kind]) (sets[type] ??= []).push(set);
+    for (const type of must(provenance[kind], `${set}'s ${kind}`)) (sets[type] ??= []).push(set);
   }
   return sets;
 }

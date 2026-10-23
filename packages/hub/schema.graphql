@@ -43,6 +43,9 @@ type AdventureResult {
   stages: [StageResult!]!
 }
 
+"""
+Open while the player plays it; settled once the hub verified it and paid out; discarded when no deploy could verify it any more.
+"""
 enum AdventureStatus {
   DISCARDED
   OPEN
@@ -117,12 +120,14 @@ type HeroOutcome {
   xpGained: Int!
 }
 
+"""Alive or dead at the camp, or retired for good."""
 enum HeroStatus {
   ALIVE
   DEAD
   RETIRED
 }
 
+"""A camp's stock of one resource."""
 type Holding {
   balance: Int!
   material: String!
@@ -148,6 +153,9 @@ type Job {
   name: String!
 }
 
+"""
+What a signed-in player does: joins the game, recruits and retires heroes, builds a facility, and starts, submits and discards an adventure.
+"""
 type Mutation {
   """
   Builds the next level of one of the camp's own facilities, at once, paid in resources from the camp's holdings, and answers the camp. The client names the level it is building, so a repeat finds it built and is answered with the camp, charging nothing. Refused with BAD_USER_INPUT, MAX_LEVEL, REQUIRES (extensions.missing lists each facility and the level it needs), INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance) or CONFLICT.
@@ -203,16 +211,25 @@ input OverrideInput {
   unitId: String
 }
 
+"""
+What a log entry is: a hero's forced action, or an order to the whole party.
+"""
 enum OverrideKind {
   PARTY
   UNIT
 }
 
+"""
+The orders a party takes: press on into the next stage, or retreat home.
+"""
 enum PartyOrder {
   PRESS_ON
   RETREAT
 }
 
+"""
+A player: the id and name anyone may read, and the camps, heroes and open adventure only the player may.
+"""
 type Player {
   """
   Private: only the player may read their own camps. Null, with an error on this field, for anyone else.
@@ -226,6 +243,9 @@ type Player {
   openAdventure: Adventure
 }
 
+"""
+What a signed-in player reads: a player by id, themselves, the deploy's version, an adventure, and the heroes other players have left at a location.
+"""
 type Query {
   """
   An adventure by id: any settled one, for its replay; an open or discarded one only for its own player. Null otherwise.
@@ -249,6 +269,7 @@ type Query {
   version: String!
 }
 
+"""An amount of one resource."""
 type Reward {
   amount: Int!
   material: String!
@@ -302,6 +323,7 @@ type StageResult {
   startedAtMs: Int!
 }
 
+"""A unit's numbers in battle."""
 type UnitStats {
   damage: Int!
 

@@ -293,12 +293,12 @@ export class Repository {
         ReturnValues: "ALL_NEW",
       }),
     );
-    return { id: r.Attributes?.["id"], name: r.Attributes?.["name"] };
+    return { id: r.Attributes?.["id"] as string, name: r.Attributes?.["name"] as string };
   }
 
   async getPlayer(id: string): Promise<Player | undefined> {
     const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.profile(id) }));
-    return r.Item ? { id: r.Item["id"], name: r.Item["name"] } : undefined;
+    return r.Item ? { id: r.Item["id"] as string, name: r.Item["name"] as string } : undefined;
   }
 
   async setBalance(playerId: string, location: string, material: string, balance: number): Promise<void> {
@@ -363,7 +363,7 @@ export class Repository {
   async openAdventure(playerId: string): Promise<OpenAdventure | undefined> {
     const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.open(playerId) }));
     return r.Item
-      ? { adventureId: r.Item["adventureId"], seed: r.Item["seed"], startedAt: r.Item["startedAt"] }
+      ? { adventureId: r.Item["adventureId"] as string, seed: r.Item["seed"] as string, startedAt: r.Item["startedAt"] as string }
       : undefined;
   }
 
@@ -741,12 +741,16 @@ export class Repository {
     const level = b.from + 1;
     const campKey = playerKeys.camp(playerId, camp.location);
     const onCamp = ON_CAMP[b.kind];
-    const campChecks = b.requires.filter((r) => ON_CAMP[r.kind] && r.level > 1);
+    // The requirements on the camp item itself, each as its attribute and the level it needs.
+    const campChecks = b.requires.flatMap((r) => {
+      const attribute = ON_CAMP[r.kind];
+      return attribute && r.level > 1 ? [{ attribute, level: r.level }] : [];
+    });
     const facilityChecks = b.requires.filter((r) => !ON_CAMP[r.kind]);
     const campCondition = (names: Record<string, string>, values: Record<string, unknown>): string[] =>
-      campChecks.map((r, n) => {
-        names[`#r${n}`] = ON_CAMP[r.kind]!; // filtered to the camp's own above
-        values[`:r${n}`] = r.level;
+      campChecks.map((check, n) => {
+        names[`#r${n}`] = check.attribute;
+        values[`:r${n}`] = check.level;
         return `#r${n} >= :r${n}`;
       });
 

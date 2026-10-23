@@ -21,14 +21,14 @@ export interface DbConfig {
 }
 
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): DbConfig {
-  const player = env.HEAT_PLAYER_TABLE;
-  const location = env.HEAT_LOCATION_TABLE;
+  const player = env["HEAT_PLAYER_TABLE"];
+  const location = env["HEAT_LOCATION_TABLE"];
   if (!player) throw new Error("HEAT_PLAYER_TABLE is not set");
   if (!location) throw new Error("HEAT_LOCATION_TABLE is not set");
   return {
     tables: { player, location },
-    endpoint: env.DYNAMODB_ENDPOINT,
-    region: env.AWS_REGION ?? "us-east-1",
+    endpoint: env["DYNAMODB_ENDPOINT"],
+    region: env["AWS_REGION"] ?? "us-east-1",
   };
 }
 

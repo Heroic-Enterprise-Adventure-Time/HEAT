@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ABILITIES, ABILITY_EFFECTS, MONSTER_TYPES, UNIT_TYPES, WEAPON_SPRITES } from "../src/index.js";
+import { must } from "./must.js";
 
 const art = new URL("../../../art/", import.meta.url);
 
@@ -10,7 +11,7 @@ function setByProvenance(kind: "weapons" | "effects", field: "wielders" | "abili
   const sets: Record<string, string> = {};
   for (const set of readdirSync(dir).sort()) {
     const provenance = JSON.parse(readFileSync(new URL(`${set}/provenance.json`, dir), "utf8")) as Record<string, string[]>;
-    for (const key of provenance[field]) {
+    for (const key of must(provenance[field], `${set}'s ${field}`)) {
       expect(sets[key], `${key} is served by two sets`).toBeUndefined();
       sets[key] = set;
     }

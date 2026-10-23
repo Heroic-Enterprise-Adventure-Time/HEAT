@@ -70,13 +70,13 @@ export class S3Timelines implements Timelines {
 export class MemoryTimelines implements Timelines {
   readonly objects = new Map<string, string>();
 
-  async putIfAbsent(adventureId: string, body: string): Promise<boolean> {
-    if (this.objects.has(adventureId)) return false;
+  putIfAbsent(adventureId: string, body: string): Promise<boolean> {
+    if (this.objects.has(adventureId)) return Promise.resolve(false);
     this.objects.set(adventureId, body);
-    return true;
+    return Promise.resolve(true);
   }
 
-  async get(adventureId: string): Promise<string | undefined> {
-    return this.objects.get(adventureId);
+  get(adventureId: string): Promise<string | undefined> {
+    return Promise.resolve(this.objects.get(adventureId));
   }
 }

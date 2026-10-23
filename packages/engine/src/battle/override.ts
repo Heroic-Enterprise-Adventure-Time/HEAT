@@ -10,7 +10,10 @@
  * unit's next turn, uses the ability's own target rule, and is dropped
  * silently if the ability is not usable then.
  */
-export type PlayerOverride = { readonly kind: "force-action"; readonly abilityId: string };
+export interface PlayerOverride {
+  readonly kind: "force-action";
+  readonly abilityId: string;
+}
 
 /**
  * One entry of the battle's override log. `acceptedAtSimTime` is the battle
