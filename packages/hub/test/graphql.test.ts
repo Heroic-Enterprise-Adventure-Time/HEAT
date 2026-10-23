@@ -3,6 +3,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext 
 import { beforeAll, describe, expect, it } from "vitest";
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
+import { must } from "./must.js";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
@@ -58,14 +59,27 @@ function event(
   };
 }
 
-async function gql<T = unknown>(query: string, variables: Record<string, unknown> = {}, playerId?: string, headers: Record<string, string> = {}) {
+/** The handler's reply: the data the query selected, the errors, and the extensions. */
+interface Reply<T> {
+  data?: T;
+  errors?: { message: string; path?: (string | number)[]; extensions?: Record<string, unknown> }[];
+  extensions?: Record<string, unknown>;
+}
+
+/**
+ * A query with the shape of the data it selects, `QUERY as Query<{ me: { id: string } }>`,
+ * so that the reply is typed by the query that asked for it and not by the call.
+ * The brand exists only in the type: the query is a string at run time.
+ */
+type Query<T> = string & { readonly selects: T };
+
+function gql<T>(query: Query<T>, variables?: Record<string, unknown>, playerId?: string, headers?: Record<string, string>): Promise<Reply<T>>;
+/** A plain string asks for nothing in particular, and its data is `unknown`. */
+function gql(query: string, variables?: Record<string, unknown>, playerId?: string, headers?: Record<string, string>): Promise<Reply<unknown>>;
+async function gql(query: string, variables: Record<string, unknown> = {}, playerId?: string, headers: Record<string, string> = {}): Promise<Reply<unknown>> {
   const res = await handler(event(query, variables, playerId, headers), {} as LambdaContext);
   expect(res.statusCode).toBe(200);
-  return JSON.parse(res.body ?? "{}") as {
-    data?: T;
-    errors?: { message: string; path?: (string | number)[]; extensions?: Record<string, unknown> }[];
-    extensions?: Record<string, unknown>;
-  };
+  return JSON.parse(res.body ?? "{}") as Reply<unknown>;
 }
 
 const START = `mutation($heroIds: [String!]!) { startAdventure(location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds) { id seed } }`;
@@ -79,17 +93,17 @@ describe("authorization at the field level", () => {
 
     const q = `query($id: String!) { player(id: $id) { id name camps { location holdings { material balance } } heroes { id } } }`;
 
-    const asOther = await gql<{ player: { name: string; camps: unknown; heroes: unknown } }>(q, { id: owner }, other);
+    const asOther = await gql(q as Query<{ player: { name: string; camps: unknown; heroes: unknown } }>, { id: owner }, other);
     expect(asOther.data?.player.name).toBe("Owner");
     expect(asOther.data?.player.camps).toBeNull();
     expect(asOther.data?.player.heroes).toBeNull();
     expect(asOther.errors?.map((e) => e.path)).toEqual(expect.arrayContaining([["player", "camps"], ["player", "heroes"]]));
 
-    const asOwner = await gql<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>(q, { id: owner }, owner);
+    const asOwner = await gql(q as Query<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>, { id: owner }, owner);
     expect(asOwner.errors).toBeUndefined();
     expect(asOwner.data?.player.camps).toEqual([{ location: "millbrook", holdings: [{ material: "timber", balance: 5 }] }]);
 
-    const anonymous = await gql<{ me: unknown }>(`{ me { id } }`);
+    const anonymous = await gql(`{ me { id } }` as Query<{ me: unknown }>);
     expect(anonymous.data?.me).toBeNull();
     expect(anonymous.errors?.[0]?.path).toEqual(["me"]);
   });
@@ -101,13 +115,13 @@ describe("first sign-in", () => {
     await gql(START, { heroIds: [randomUUID()] }, p);
     expect(await repo.getPlayer(p)).toBeUndefined();
 
-    const joined = await gql<{ joinGame: { id: string; name: string } }>(`mutation { joinGame { id name } }`, {}, p);
+    const joined = await gql(`mutation { joinGame { id name } }` as Query<{ joinGame: { id: string; name: string } }>, {}, p);
     expect(joined.errors).toBeUndefined();
     // No email claim in the synthesized token, so the name falls back to the subject.
     expect(joined.data?.joinGame).toEqual({ id: p, name: p });
 
     await repo.putPlayer({ id: p, name: "Renamed in the table" });
-    const again = await gql<{ joinGame: { name: string } }>(`mutation { joinGame { name } }`, {}, p);
+    const again = await gql(`mutation { joinGame { name } }` as Query<{ joinGame: { name: string } }>, {}, p);
     expect(again.data?.joinGame.name).toBe("Renamed in the table");
   });
 });
@@ -118,7 +132,7 @@ describe("the camp through the graph", () => {
     await gql(`mutation { joinGame { id } }`, {}, p);
     const camp = `{ me { camps { location name hallLevel heroCapacity resourceCapacity activeHeroes livingHeroes } heroes { id name unitType spriteSet status } } }`;
 
-    const before = await gql<{ me: { camps: unknown[]; heroes: unknown[] } }>(camp, {}, p);
+    const before = await gql(camp as Query<{ me: { camps: unknown[]; heroes: unknown[] } }>, {}, p);
     expect(before.data?.me).toEqual({
       camps: [{ location: "millbrook", name: "Millbrook", hallLevel: 1, heroCapacity: 4, resourceCapacity: 100, activeHeroes: 0, livingHeroes: 0 }],
       heroes: [],
@@ -126,11 +140,11 @@ describe("the camp through the graph", () => {
 
     const requestId = randomUUID();
     const recruit = `mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id name unitType spriteSet status } }`;
-    const made = await gql<{ recruitHero: { id: string; unitType: string; status: string } }>(recruit, { id: requestId }, p);
+    const made = await gql(recruit as Query<{ recruitHero: { id: string; unitType: string; status: string } }>, { id: requestId }, p);
     expect(made.errors).toBeUndefined();
     expect(made.data?.recruitHero).toMatchObject({ id: requestId, unitType: "villager", status: "ALIVE" });
 
-    const after = await gql<{ me: { camps: { activeHeroes: number }[]; heroes: unknown[] } }>(camp, {}, p);
+    const after = await gql(camp as Query<{ me: { camps: { activeHeroes: number }[]; heroes: unknown[] } }>, {}, p);
     expect(after.data?.me.camps[0]?.activeHeroes).toBe(1);
     expect(after.data?.me.heroes).toEqual([made.data?.recruitHero]);
 
@@ -146,12 +160,12 @@ describe("the camp through the graph", () => {
     const id = randomUUID();
     await gql(recruit, { id }, p);
 
-    const retired = await gql<{ retireHero: { id: string; status: string; retiredAt: string | null } }>(retire, { id }, p);
+    const retired = await gql(retire as Query<{ retireHero: { id: string; status: string; retiredAt: string | null } }>, { id }, p);
     expect(retired.errors).toBeUndefined();
     expect(retired.data?.retireHero).toMatchObject({ id, status: "RETIRED" });
     expect(retired.data?.retireHero.retiredAt).toEqual(expect.any(String));
 
-    const counts = await gql<{ me: { camps: unknown[] } }>(`{ me { camps { activeHeroes livingHeroes } } }`, {}, p);
+    const counts = await gql(`{ me { camps { activeHeroes livingHeroes } } }` as Query<{ me: { camps: unknown[] } }>, {}, p);
     expect(counts.data?.me.camps).toEqual([{ activeHeroes: 0, livingHeroes: 0 }]);
     const next = await gql(recruit, { id: randomUUID() }, p);
     expect(next.errors).toBeUndefined();
@@ -167,12 +181,12 @@ describe("the camp through the graph", () => {
     await gql(`mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id } }`, { id: mine }, p);
 
     const seen = `query($at: String!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
-    const r = await gql<{ heroesSeenAt: { id: string }[] }>(seen, { at: "millbrook" }, p);
+    const r = await gql(seen as Query<{ heroesSeenAt: { id: string }[] }>, { at: "millbrook" }, p);
     expect(r.errors).toBeUndefined();
     expect(r.data?.heroesSeenAt.length).toBeLessThanOrEqual(6);
     expect(r.data?.heroesSeenAt.map((h) => h.id)).not.toContain(mine);
 
-    const fields = await gql<{ __type: { fields: { name: string }[] } }>(`{ __type(name: "SeenHero") { fields { name } } }`);
+    const fields = await gql(`{ __type(name: "SeenHero") { fields { name } } }` as Query<{ __type: { fields: { name: string }[] } }>);
     expect(fields.data?.__type.fields.map((f) => f.name).sort()).toEqual(["id", "level", "name", "spriteSet", "unitType"]);
 
     const anonymous = await gql(seen, { at: "millbrook" });
@@ -189,12 +203,12 @@ describe("the adventure loop through the graph", () => {
     const villager = randomUUID();
     await gql(`mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id } }`, { id: villager }, p);
 
-    const start = await gql<{ startAdventure: { id: string; seed: string } }>(START, { heroIds: [villager] }, p);
+    const start = await gql(START as Query<{ startAdventure: { id: string; seed: string } }>, { heroIds: [villager] }, p);
     expect(start.errors).toBeUndefined();
-    const { id: adventureId, seed } = start.data!.startAdventure;
+    const { id: adventureId, seed } = must(start.data, "the start's data").startAdventure;
 
-    const me = await gql<{ me: { openAdventure: unknown } }>(
-      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gathering } } } } } }`,
+    const me = await gql(
+      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gathering } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
       {}, p,
     );
     expect(me.errors).toBeUndefined();
@@ -227,9 +241,9 @@ describe("the adventure loop through the graph", () => {
 
     // The record, open: its player reads it with no result and no timeline; nobody else does.
     const read = `query($id: String!) { adventure(id: $id) { id status result { outcome } timeline } }`;
-    const own = await gql<{ adventure: unknown }>(read, { id: adventureId }, p);
+    const own = await gql(read as Query<{ adventure: unknown }>, { id: adventureId }, p);
     expect(own.data?.adventure).toEqual({ id: adventureId, status: "OPEN", result: null, timeline: null });
-    const other = await gql<{ adventure: unknown }>(read, { id: adventureId }, `p-${randomUUID()}`);
+    const other = await gql(read as Query<{ adventure: unknown }>, { id: adventureId }, `p-${randomUUID()}`);
     expect(other.data?.adventure).toBeNull();
   });
 });
@@ -238,9 +252,9 @@ describe("the deploy's version", () => {
   it("flags outdated on a response to a client of another version, errors included, and never otherwise", async () => {
     const p = `p-${randomUUID()}`;
     await gql(`mutation { joinGame { id } }`, {}, p);
-    const version = process.env["HEAT_VERSION"]!;
+    const version = must(process.env["HEAT_VERSION"], "HEAT_VERSION");
 
-    const asked = await gql<{ version: string }>(`{ version }`, {}, p);
+    const asked = await gql(`{ version }` as Query<{ version: string }>, {}, p);
     expect(asked.data?.version).toBe(version);
 
     const same = await gql(`{ me { id } }`, {}, p, { "heat-version": version });
@@ -248,7 +262,7 @@ describe("the deploy's version", () => {
     const none = await gql(`{ me { id } }`, {}, p);
     expect(none.extensions?.["outdated"]).toBeUndefined();
 
-    const other = await gql<{ me: { id: string } }>(`{ me { id } }`, {}, p, { "heat-version": "0".repeat(40) });
+    const other = await gql(`{ me { id } }` as Query<{ me: { id: string } }>, {}, p, { "heat-version": "0".repeat(40) });
     expect(other.data?.me.id).toBe(p);
     expect(other.extensions?.["outdated"]).toBe(true);
     const refused = await gql(START, { heroIds: [] }, p, { "heat-version": "0".repeat(40) });
