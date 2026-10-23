@@ -27,6 +27,13 @@ permissions:
   id-token: write
   contents: read
 
+# Every run step runs as `bash --noprofile --norc -eo pipefail {0}`. With no
+# shell named, GitHub runs `bash -e {0}`, where a pipe's status is its last
+# command's: a stack test that failed into tee left the run green (Issue-137).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   verify:
     name: Assume the ${{ inputs.role_environment || inputs.environment }} apply role under ${{ inputs.environment }}
