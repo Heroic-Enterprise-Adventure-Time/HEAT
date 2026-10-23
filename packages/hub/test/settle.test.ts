@@ -10,6 +10,7 @@ import { discardAdventure } from "../src/discard.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { must } from "./must.js";
 
 /**
  * Submit, settlement and discard against DynamoDB Local, with the replay
@@ -116,7 +117,7 @@ describe("a party that completes the job", () => {
     }
     expect(settled.result?.heroes.map((h) => [h.xpGained, h.level, h.dead])).toEqual(heroes.map(() => [wolves.xp, level, false]));
 
-    const stored = JSON.parse(timelines.objects.get(started.adventureId)!) as AdventureTimeline;
+    const stored = JSON.parse(must(timelines.objects.get(started.adventureId), "the stored timeline")) as AdventureTimeline;
     expect(stored).toEqual(JSON.parse(JSON.stringify(replay(started.snapshot, started.seed, []).timeline)));
     expect(stored.version).toBe(version);
   });
@@ -194,17 +195,17 @@ describe("the warehouse's cap", () => {
 describe("a death", () => {
   it("sets the hero dead, counts it out of the living, deletes its sighting and credits nothing", async () => {
     const p = player();
-    const [villager] = await putParty(p, ["villager"]);
-    const started = await start(p, [villager!]);
-    expect(replay(started.snapshot, started.seed, []).result.dead).toEqual([villager!.id]);
+    const villager = must((await putParty(p, ["villager"]))[0], "the villager");
+    const started = await start(p, [villager]);
+    expect(replay(started.snapshot, started.seed, []).result.dead).toEqual([villager.id]);
 
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(settled.result?.outcome).toBe("defeat");
     expect(settled.result?.credited).toEqual([]);
-    expect(settled.result?.heroes).toEqual([expect.objectContaining({ heroId: villager!.id, dead: true, xpGained: 0, health: 0 })]);
-    expect(await repo.getHero(p, villager!.id)).toMatchObject({ status: "DEAD", xp: 0, level: 1, adventureId: null });
+    expect(settled.result?.heroes).toEqual([expect.objectContaining({ heroId: villager.id, dead: true, xpGained: 0, health: 0 })]);
+    expect(await repo.getHero(p, villager.id)).toMatchObject({ status: "DEAD", xp: 0, level: 1, adventureId: null });
     expect(await repo.camp(p, at)).toMatchObject({ livingHeroes: 0, activeHeroes: 1 });
-    expect(await item(tables.location, locationKeys.seen(at, villager!.id))).toBeUndefined();
+    expect(await item(tables.location, locationKeys.seen(at, villager.id))).toBeUndefined();
     expect(await repo.holdings(p, at)).toEqual([]);
   });
 });
@@ -296,7 +297,7 @@ describe("discard", () => {
 describe("the level table", () => {
   it("raises a level at each threshold and never past the last", () => {
     expect(levelForXp(0)).toBe(1);
-    expect(levelForXp(LEVEL_XP[1]!)).toBe(2);
+    expect(levelForXp(must(LEVEL_XP[1], "the second level's threshold"))).toBe(2);
     expect(levelForXp(1_000_000)).toBe(LEVEL_XP.length);
   });
 });
