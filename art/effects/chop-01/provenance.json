@@ -1,0 +1,47 @@
+{
+  "set": "chop-01",
+  "kind": "action effect",
+  "abilities": ["chop"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "effectId": "0fd7f460-ba1e-42f4-b257-454ffab0c870",
+    "name": "HEAT chop 01",
+    "imageId": "f5530ca1-ab0d-4ff0-87fe-cb41f6332065"
+  },
+  "effect": {
+    "tool": "vfx_workbench",
+    "via": "MCP",
+    "createdAt": "2026-10-22",
+    "madeAround": "object:5ce90c11-3e48-4a83-8327-9a5826be9085 (Tree 01)",
+    "parts": [
+      {
+        "name": "debris_burst",
+        "around": "subject",
+        "anchor": "feet",
+        "offset": [-3, -11],
+        "size": 0.8,
+        "amount": 1.4,
+        "colour": ["#2a160e", "#5a3420", "#9a6a3c", "#d8b07a", "#f4e0b8"],
+        "core": true
+      }
+    ],
+    "edits": [
+      "first placed with at [21, 46], which is the canvas's coordinates, not the sprite's; moved onto the trunk by the feet and an offset"
+    ],
+    "export": ["export", "--name", "HEAT chop 01", "--game-pack"],
+    "generations": 0
+  },
+  "files": {
+    "whole.png": "the game pack's whole clip: the effect without the sprite, a sheet of frames",
+    "manifest.json": "the game pack's manifest: the frame size, the sheet's layout, the fps and the offset from the target's feet"
+  },
+  "frames": 9,
+  "fps": 14,
+  "verified": "whole.png and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded 2026-10-23."
+}

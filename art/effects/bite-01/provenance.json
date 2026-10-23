@@ -1,0 +1,42 @@
+{
+  "set": "bite-01",
+  "kind": "action effect",
+  "abilities": ["bite"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "effectId": "ff7930e3-7399-44f8-8cc0-ff2ca7ba94ef",
+    "name": "HEAT bite 01",
+    "imageId": "3c1fc827-eb44-4713-be78-1f1c1653c20c"
+  },
+  "effect": {
+    "tool": "vfx_workbench",
+    "via": "MCP",
+    "createdAt": "2026-10-22",
+    "madeAround": "character:49d7d277-c201-4c58-be11-2727b4a86c0e:east (Villager 01, the villager's east rotation)",
+    "parts": [
+      {
+        "name": "claw_marks",
+        "around": "subject (centre)",
+        "size": 0.42,
+        "colour": ["#4a1410", "#9a2a1c", "#e0604a", "#ffd0b0", "#ffffff"],
+        "core": true
+      }
+    ],
+    "edits": ["set_part size 0.6 to 0.42: at 0.6 the marks covered half the figure"],
+    "export": ["export", "--name", "HEAT bite 01", "--game-pack"],
+    "generations": 0
+  },
+  "files": {
+    "whole.png": "the game pack's whole clip: the effect without the sprite, a sheet of frames",
+    "manifest.json": "the game pack's manifest: the frame size, the sheet's layout, the fps and the offset from the target's feet"
+  },
+  "frames": 6,
+  "fps": 16,
+  "verified": "whole.png and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded 2026-10-23."
+}

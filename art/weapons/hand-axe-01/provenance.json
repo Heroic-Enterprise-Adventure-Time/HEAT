@@ -1,0 +1,88 @@
+{
+  "set": "hand-axe-01",
+  "kind": "weapon sprite set",
+  "wielders": ["villager"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "objectId": "ef8a9390-8323-4af1-b112-87ba96839923",
+    "name": "Hand Axe 01",
+    "tags": ["heat", "weapon", "hand-axe"]
+  },
+  "object": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-10-22",
+    "pick": {
+      "reviewObjectId": "e0442a88-0596-4682-8144-07065192681c",
+      "index": 9,
+      "itemDescription": "hand axe: villager's hand axe, short wooden haft, grey iron bit"
+    },
+    "parameters": {
+      "description": "single weapon on a transparent background, held by its grip at the lower left, blade or head pointing up and to the right, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat weapons 01",
+      "view": "top-down",
+      "size": null,
+      "styleImages": ["art/icons/adventure.png (32x32, which sets the output size)"],
+      "itemDescriptions": ["sword: plain iron short sword with a brown leather grip and a simple crossguard", "sword: steel arming sword with a brass crossguard and round pommel", "sword: broad iron sword with a dark wooden grip", "sword: simple knight's sword, grey blade, gold crossguard", "sword: worn iron sword with a cloth-wrapped grip", "sword: straight longsword with a brown grip and iron pommel", "sword: short gladius with a wooden hilt", "sword: plain sword with a red leather grip", "hand axe: small woodcutter's hatchet with a wooden handle and an iron head", "hand axe: villager's hand axe, short wooden haft, grey iron bit", "hand axe: rough wood axe with a curved handle", "hand axe: small felling axe, iron head, ash handle", "hand axe: hatchet with a leather-wrapped handle", "hand axe: farmer's axe with a worn wooden handle", "hand axe: short camp axe with a dark iron head", "hand axe: simple bearded hand axe", "dagger: plain iron dagger with a brown leather grip", "dagger: curved bandit's knife with a wooden handle", "dagger: rusty short dagger with a cloth-wrapped grip", "dagger: thin stiletto with a brass crossguard", "dagger: broad hunting knife with a bone handle", "dagger: rogue's dagger with a dark grip", "dagger: simple steel dirk", "dagger: wide-bladed knife with a short guard", "staff: plain wooden walking staff with a knotted top", "staff: villager's quarterstaff, long brown pole", "staff: gnarled wooden staff", "staff: wooden staff bound with iron at the top"],
+      "packGenerations": 10,
+      "packNote": "One call returned 64 candidates (review object e0442a88-0596-4682-8144-07065192681c, tagged heat, weapon, rejected); the owner picked 0, 9 and 18 from a numbered sheet at 3x. The pack's 10 generations are counted once, on sword-01."
+    },
+    "canvas": [32, 32],
+    "generations": 0
+  },
+  "files": {
+    "icon": {
+      "file": "icon.png",
+      "canvas": [32, 32],
+      "from": "the object's one rotation; also the weapon's icon in the inventory"
+    }
+  },
+  "animations": {
+    "swing": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "b5d99793-9cbc-495d-af0a-6f5b98325053",
+      "animationDescription": "a chop: the hand axe turns about the bottom end of its handle, which stays in place, from pointing up and to the right, through pointing straight ahead to the right, to pointing down and to the right; the same axe the whole time, no particles, no effects, no motion trail",
+      "frameCount": 4,
+      "frames": 5,
+      "canvas": [32, 32],
+      "endFrame": {
+        "from": "icon.png turned a right angle clockwise (lossless), so the head points down and to the right; passed as end_frame_base64",
+        "generations": 0
+      },
+      "holdFrame": 2,
+      "grips": [
+        [6, 25],
+        [6, 23],
+        [5, 12],
+        [6, 6],
+        [7, 7]
+      ],
+      "files": "swing-<0..4>.png",
+      "generations": 1,
+      "replaced": [
+        {
+          "groupId": "e5e57811-75a1-496d-8fb7-2f1c6c0343e0",
+          "description": "the hand axe swings in a short chopping arc: tilted back and up, then swung forward and down to the right until the handle points ahead, then on down, the same axe the whole time, no particles, no effects, no motion trail",
+          "generations": 1,
+          "why": "Turned about its head, not the hand, and swung backwards on frames 3 and 4."
+        },
+        {
+          "groupId": "e5e57811-75a1-496d-8fb7-2f1c6c0343e0",
+          "description": "a chop seen from the side: the axe is held by the bottom end of its handle, which stays at the same spot in every frame; the head starts raised high above, then swings forward and down to the right in an arc until the handle points straight ahead to the right, then a little further down; the same axe the whole time, no particles, no effects, no motion trail",
+          "generations": 1,
+          "why": "Made again in the same group (replace_existing): turned about the hand but only rocked up and back, never forward."
+        }
+      ]
+    }
+  },
+  "animationGenerations": 3,
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-10-23."
+}

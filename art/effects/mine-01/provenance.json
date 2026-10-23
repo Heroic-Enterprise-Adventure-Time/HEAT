@@ -1,0 +1,54 @@
+{
+  "set": "mine-01",
+  "kind": "action effect",
+  "abilities": ["mine"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "effectId": "6a2e499b-4c04-4819-adba-4fb5490708f3",
+    "name": "HEAT mine 01",
+    "imageId": "20d6916b-2c27-428b-87f9-3e7c14309bfe"
+  },
+  "effect": {
+    "tool": "vfx_workbench",
+    "via": "MCP",
+    "createdAt": "2026-10-22",
+    "madeAround": "object:5ce90c11-3e48-4a83-8327-9a5826be9085 (Tree 01), standing in for the ore vein, which has no art yet, so that the effect is anchored at a node's feet at the same spot as chop",
+    "parts": [
+      {
+        "name": "debris_burst",
+        "around": "subject",
+        "anchor": "feet",
+        "offset": [-3, -11],
+        "size": 0.8,
+        "amount": 1.2,
+        "colour": ["#1c1a18", "#4a4640", "#7c766c", "#b0a898", "#e0d8c8"],
+        "core": true
+      },
+      {
+        "name": "spark_burst",
+        "around": "subject",
+        "anchor": "feet",
+        "offset": [-3, -11],
+        "size": 0.5,
+        "end": 0.4,
+        "colour": ["#7a3a10", "#d07a20", "#f8c050", "#fff0b0", "#ffffff"]
+      }
+    ],
+    "edits": ["first made with no sprite, anchored at the effect's origin; made again around the tree and exported with --replace into the same effect"],
+    "export": ["export", "--name", "HEAT mine 01", "--game-pack"],
+    "generations": 0
+  },
+  "files": {
+    "whole.png": "the game pack's whole clip: the effect without the sprite, a sheet of frames",
+    "manifest.json": "the game pack's manifest: the frame size, the sheet's layout, the fps and the offset from the target's feet"
+  },
+  "frames": 9,
+  "fps": 14,
+  "verified": "whole.png and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded 2026-10-23."
+}

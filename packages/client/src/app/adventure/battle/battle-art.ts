@@ -1,5 +1,6 @@
-import { Assets, type Texture } from 'pixi.js';
+import { Assets, Rectangle, Texture } from 'pixi.js';
 import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
+import { effectLayout, type EffectLayout, type EffectManifest } from './action-sprites';
 
 /**
  * A battle unit's pictures, read from its sprite set's files and its
@@ -7,7 +8,8 @@ import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
  * monster by its east-facing animations, drawn mirrored for the other side,
  * and a prop such as a tree by its standing picture, its hit and its down.
  * Each animation stands on the foot row of its first frame, so a figure
- * keeps its ground whatever the canvas.
+ * keeps its ground whatever the canvas. Beside them, an action's two sprites:
+ * a weapon's swing and an ability's effect (rules 32 to 35).
  */
 
 export interface Frames {
@@ -59,6 +61,60 @@ async function propArt(base: string): Promise<UnitArt> {
   const [hit, down] = await Promise.all(['hit', 'down'].map((a) => frames(range(count(a)).map((i) => `${base}/${a}-${i}.png`), standing)));
   const fades = provenance.animations?.['down']?.fadeAboveEnd === true;
   return { stance: still, walk: still, act: still, actHold: 0, hit: hit!, down: down!, fadeAbove: fades ? highestOpaqueRow(down!.textures.at(-1)!) : null };
+}
+
+/** A weapon's swing, drawn beside its wielder while it acts (rules 32 and 33). */
+export interface WeaponArt {
+  readonly swing: readonly Texture[];
+  /** The swing's frame held until the action resolves, in step with the act's own. */
+  readonly holdFrame: number;
+  /** Each frame's grip, the pixel in the wielder's hand, from the provenance: PixelLab draws the swing turning about the canvas, not the hand. */
+  readonly grips: readonly { readonly x: number; readonly y: number }[];
+}
+
+/** An ability's effect, cut from its game pack's sheet (rule 34). */
+export interface EffectArt {
+  readonly layout: EffectLayout;
+  readonly frames: readonly Texture[];
+}
+
+interface WeaponProvenance {
+  animations: { swing: { frames: number; holdFrame: number; grips: [number, number][] } };
+}
+
+const weapons = new Map<string, Promise<WeaponArt>>();
+const effects = new Map<string, Promise<EffectArt>>();
+
+/** A weapon's art, loaded once: `<set>` under `/art/weapons`. */
+export function loadWeaponArt(set: string): Promise<WeaponArt> {
+  let art = weapons.get(set);
+  if (!art) {
+    const base = `/art/weapons/${set}`;
+    art = (async () => {
+      const provenance = (await (await fetch(`${base}/provenance.json`)).json()) as WeaponProvenance;
+      const { frames, holdFrame, grips } = provenance.animations.swing;
+      const swing = await Promise.all(range(frames).map((i) => Assets.load<Texture>(`${base}/swing-${i}.png`)));
+      return { swing, holdFrame, grips: grips.map(([x, y]) => ({ x, y })) };
+    })();
+    weapons.set(set, art);
+  }
+  return art;
+}
+
+/** An effect's art, loaded once: `<set>` under `/art/effects`. */
+export function loadEffectArt(set: string): Promise<EffectArt> {
+  let art = effects.get(set);
+  if (!art) {
+    const base = `/art/effects/${set}`;
+    art = (async () => {
+      const layout = effectLayout((await (await fetch(`${base}/manifest.json`)).json()) as EffectManifest);
+      const sheet = await Assets.load<Texture>(`${base}/${layout.sheet}`);
+      const frames = layout.frames.map((r) => new Texture({ source: sheet.source, frame: new Rectangle(r.x, r.y, r.width, r.height) }));
+      return { layout, frames };
+    })();
+    effects.set(set, art);
+  }
+  return art;
 }
 
 const loaded = new Map<string, Promise<UnitArt>>();

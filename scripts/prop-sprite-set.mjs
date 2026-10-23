@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// Writes a prop's sprite set from PixelLab's export of an object, the
-// standing frame and its animations, and its provenance (docs/process/assets.md,
-// rules 30 and 31).
+// Writes a prop's sprite set, or a weapon's, from PixelLab's export of an
+// object, the still frame and its animations, and its provenance
+// (docs/process/assets.md, rules 30, 31 and 32 to 33). A weapon's record says
+// `"kind": "weapon"`: its still frame is `icon.png`, also its inventory icon,
+// and it names the `wielders` and the review pack it was picked from.
 //
 //   node scripts/prop-sprite-set.mjs --object <id> --out art/props/<set> --record <file> [--zip <file>]
 //
@@ -19,6 +21,8 @@
 //                              "endFrame"?: { "objectId": "...", "stateName": "...", "editDescription": "...", "generations": 1 },
 //                              "replaced"?: [{ "groupId": "...", "description": "...", "generations": 1, "why": "..." }] } },
 //     "rejected"?: [{ "name": "...", "objectId": "...", "description": "..." }] }
+//   A weapon's has "kind": "weapon", "wielders": [...] in place of "props", and
+//   "pick": { "reviewObjectId": "...", "index": 0, "itemDescription": "..." }.
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -82,7 +86,9 @@ const write = (file, from) => {
   report.files++;
 };
 
-write("standing.png", "rotations/unknown.png");
+const weapon = record.kind === "weapon";
+const still = weapon ? "icon.png" : "standing.png";
+write(still, "rotations/unknown.png");
 for (const [name, a] of Object.entries(record.animations)) {
   const frames = [...zip.keys()].filter((k) => k.startsWith(`animations/${a.folder}/unknown/`)).sort();
   report.animations[name] = frames.length;
@@ -112,6 +118,8 @@ const animations = Object.fromEntries(
     ...(a.endFrame ? { endFrame: a.endFrame } : {}),
     ...(a.heldLast ? { heldLast: true } : {}),
     ...(a.fadeAboveEnd ? { fadeAboveEnd: true } : {}),
+    ...(a.holdFrame !== undefined ? { holdFrame: a.holdFrame } : {}),
+    ...(a.grips ? { grips: a.grips } : {}),
     files: `${name}-<0..${a.frames - 1}>.png`,
     generations: a.generations,
     ...(a.replaced ? { replaced: a.replaced } : {}),
@@ -119,19 +127,26 @@ const animations = Object.fromEntries(
 );
 const provenance = {
   set,
-  kind: "prop sprite set",
-  props: record.props,
+  kind: weapon ? "weapon sprite set" : "prop sprite set",
+  ...(weapon ? { wielders: record.wielders } : { props: record.props }),
   service: SERVICE,
-  pixellab: { objectId: values.object, name: record.name, tags: ["heat", "prop", ...record.props] },
+  pixellab: { objectId: values.object, name: record.name, tags: weapon ? record.tags : ["heat", "prop", ...record.props] },
   object: {
-    tool: "create_map_object",
+    tool: weapon ? "create_1_direction_object" : "create_map_object",
     via: "MCP",
     createdAt: record.createdAt,
+    ...(record.pick ? { pick: record.pick } : {}),
     parameters: { description: record.description, ...record.parameters },
     canvas: record.canvas,
     generations: record.generations,
   },
-  files: { standing: { file: "standing.png", canvas: record.canvas, from: "the object's one rotation" } },
+  files: {
+    [weapon ? "icon" : "standing"]: {
+      file: still,
+      canvas: record.canvas,
+      from: weapon ? "the object's one rotation; also the weapon's icon in the inventory" : "the object's one rotation",
+    },
+  },
   animations,
   // Everything the animations cost, the end states and the replaced takes too.
   animationGenerations: Object.values(animations).reduce(
