@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import { ApiError } from '../../api';
 import { Game, type RecruitOffer } from '../../game';
 import { CampState } from '../camp-state';
+import { FacilityBuild } from './facility-build';
 
 /** The hub's refusals of a recruit, in the player's words; any other is shown as the hub put it. */
 const REFUSALS: Readonly<Record<string, string>> = {
@@ -24,11 +25,11 @@ export function priceWords(offer: RecruitOffer): string {
  * roster grouped living, dead and retired, the retired collapsed; and every
  * unit type the location recruits, its price beside the camp's balance and
  * why it cannot be had now. A refusal from the hub is shown in place, on
- * the recruit it refused.
+ * the recruit it refused. Last, the hall's next level (Issue-93).
  */
 @Component({
   selector: 'heat-hall-panel',
-  imports: [RouterLink],
+  imports: [RouterLink, FacilityBuild],
   template: `
     <h2 id="panel-title">Heroes hall</h2>
     @if (game.camp(); as camp) {
@@ -94,6 +95,8 @@ export function priceWords(offer: RecruitOffer): string {
         </li>
       }
     </ul>
+
+    <heat-facility-build [kind]="'heroes-hall'" />
   `,
   styleUrl: './panel.css',
 })

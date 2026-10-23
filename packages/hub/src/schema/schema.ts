@@ -12,19 +12,20 @@ import {
 } from "@heat/engine";
 import { GraphQLError } from "graphql";
 import { builder } from "./builder.js";
+import { buildFacility } from "../build.js";
 import { recruitHero } from "../recruit.js";
 import { retireHero } from "../retire.js";
 import { startAdventure } from "../start.js";
 import { submitAdventure, type OverrideInput } from "../submit.js";
 import { discardAdventure } from "../discard.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
-import type { AdventureRecord, Camp, Hero, HeroOutcome, Holding, Player, SettledResult } from "../db/repository.js";
+import { campLevels, type AdventureRecord, type Camp, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 
 /**
  * The graph: a public player; their camps, heroes and the open adventure
  * behind the `self` scope; other players' heroes seen at a location, by
  * their public fields only; a settled adventure, with its result and its
- * timeline; the deploy's version; joining, recruiting, retiring, and an
+ * timeline; the deploy's version; joining, recruiting, retiring, building, and an
  * adventure started from the job board, submitted for verification and
  * settlement, or discarded when no deploy can verify it.
  */
@@ -39,6 +40,14 @@ const HoldingRef = builder.objectRef<Holding>("Holding").implement({
   fields: (t) => ({
     material: t.exposeString("material"),
     balance: t.exposeInt("balance"),
+  }),
+});
+
+const FacilityLevelRef = builder.objectRef<{ kind: string; level: number }>("FacilityLevel").implement({
+  description: "One of a camp's own facilities and its level.",
+  fields: (t) => ({
+    kind: t.exposeString("kind", { description: "The facility's kind in the static content." }),
+    level: t.exposeInt("level"),
   }),
 });
 
@@ -60,6 +69,15 @@ const CampRef = builder.objectRef<Camp>("Camp").implement({
     activeHeroes: t.exposeInt("activeHeroes", { description: "Living and dead heroes; retired ones are not active." }),
     livingHeroes: t.exposeInt("livingHeroes"),
     holdings: t.expose("holdings", { type: [HoldingRef] }),
+    facilities: t.field({
+      type: [FacilityLevelRef],
+      description: "Each of the camp's own facilities, those every camp has and those it may build, with its level: 0 for one not built.",
+      resolve: (camp) => {
+        const at = location(camp.location);
+        const levels = campLevels(camp);
+        return [...(at?.ownFacilities ?? []), ...(at?.buildableFacilities ?? [])].map((kind) => ({ kind, level: levels[kind] ?? 0 }));
+      },
+    }),
   }),
 });
 
@@ -314,6 +332,17 @@ builder.mutationFields((t) => ({
       requestId: t.arg.string({ required: true }),
     },
     resolve: (_root, args, ctx) => recruitHero(ctx.repo, ctx.playerId!, args.unitType, args.requestId),
+  }),
+  buildFacility: t.field({
+    type: CampRef,
+    authScopes: { authenticated: true },
+    description: "Builds the next level of one of the camp's own facilities, at once, paid in resources from the camp's holdings, and answers the camp. The client names the level it is building, so a repeat finds it built and is answered with the camp, charging nothing. Refused with BAD_USER_INPUT, MAX_LEVEL, REQUIRES (extensions.missing lists each facility and the level it needs), INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance) or CONFLICT.",
+    args: {
+      location: t.arg.string({ required: true }),
+      kind: t.arg.string({ required: true }),
+      level: t.arg.int({ required: true }),
+    },
+    resolve: (_root, args, ctx) => buildFacility(ctx.repo, ctx.playerId!, args.location, args.kind, args.level),
   }),
   retireHero: t.field({
     type: HeroRef,

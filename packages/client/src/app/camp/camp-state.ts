@@ -7,7 +7,7 @@ export interface FacilityEntry {
   readonly kind: FacilityKind;
   readonly name: string;
   readonly description: string;
-  /** 0 until the camp builds it; building is Issue-93, so every buildable facility is 0 for now. */
+  /** 0 until the camp builds it; a shared facility is at 1. */
   readonly level: number;
 }
 
@@ -23,11 +23,21 @@ export class CampState {
   private readonly game = inject(Game);
 
   readonly layout = computed(() => LAYOUTS[this.game.location()] ?? null);
-  /** The camp's facilities in the layout's order, each with its level: built ones at 1, the rest at 0. */
+  /**
+   * The camp's facilities in the layout's order, each with its level as the
+   * hub reads it (Issue-93). Before the camp is read, the facilities every
+   * camp has stand at 1 and the rest at 0.
+   */
   readonly facilities = computed((): FacilityEntry[] => {
     const content = location(this.game.location());
     const unbuilt = new Set(content?.buildableFacilities ?? []);
-    return (this.layout()?.facilities ?? []).map((f) => ({ kind: f.kind, ...FACILITIES[f.kind], level: unbuilt.has(f.kind) ? 0 : 1 }));
+    const levels = new Map((this.game.camp()?.facilities ?? []).map((f) => [f.kind, f.level]));
+    return (this.layout()?.facilities ?? []).map((f) => ({
+      kind: f.kind,
+      name: FACILITIES[f.kind].name,
+      description: FACILITIES[f.kind].description,
+      level: levels.get(f.kind) ?? (unbuilt.has(f.kind) ? 0 : 1),
+    }));
   });
   /** The hero the hall just recruited, whom the scene walks out of the hall's door. */
   readonly arriving = signal<string | undefined>(undefined);

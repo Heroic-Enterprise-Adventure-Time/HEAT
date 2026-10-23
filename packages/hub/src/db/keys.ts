@@ -10,12 +10,15 @@
  *
  *   PLAYER#<id>    | PROFILE                           the player
  *   PLAYER#<id>    | AT#<location>#CAMP                hall and warehouse levels, the counts of active and living heroes
+ *   PLAYER#<id>    | AT#<location>#FACILITY#<kind>     a facility the camp builds, and its level; the hall's and the
+ *                                                       warehouse's levels are on the camp's item (decision 0032)
  *   PLAYER#<id>    | AT#<location>#HOLDING#<material>  a resource balance at that location
- *   PLAYER#<id>    | HERO#<heroId>                     a hero, its location an attribute, since a hero can move, and
+ *   PLAYER#<id>    | HERO#<heroId>                    a hero, its location an attribute, since a hero can move, and
  *                                                       adventureId while it is on the open adventure
  *   PLAYER#<id>    | OPEN                              the one open adventure: its id, seed and start time
- *   PLAYER#<id>    | LEDGER#<causeId>#<entry>          append-only; the cause is an adventure or a hero id, and the
- *                                                       entry can exist once, which is what makes settle pay once
+ *   PLAYER#<id>    | LEDGER#<causeId>#<entry>          append-only; the cause is an adventure id, a hero id or a
+ *                                                       build-<location>-<kind>-<level>, and the entry can exist
+ *                                                       once, which is what makes settle pay and a build charge once
  *
  * The keys and their reasons are decision 0026. The spike's HOLDING#<material>
  * items in dev and prod are no longer read and are left in place.
@@ -34,6 +37,7 @@ export const KEY = { pk: "PK", sk: "SK" } as const;
 export const playerKeys = {
   profile: (id: string) => ({ PK: `PLAYER#${id}`, SK: "PROFILE" }),
   camp: (id: string, location: string) => ({ PK: `PLAYER#${id}`, SK: `AT#${location}#CAMP` }),
+  facility: (id: string, location: string, kind: string) => ({ PK: `PLAYER#${id}`, SK: `AT#${location}#FACILITY#${kind}` }),
   holding: (id: string, location: string, material: string) => ({
     PK: `PLAYER#${id}`,
     SK: `AT#${location}#HOLDING#${material}`,

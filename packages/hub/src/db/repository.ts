@@ -12,7 +12,9 @@ import {
   type AdventureOutcome,
   type AdventureSnapshot,
   type Cost,
+  type FacilityKind,
   type Material,
+  type Requirement,
   type Reward,
   type StageResult,
   type UnitType,
@@ -28,9 +30,10 @@ import { locationKeys, playerKeys } from "./keys.js";
  * on the adventure id, with the credits capped at the warehouse, the XP and
  * the deaths), discard (an adventure closed with nothing credited), recruit
  * (the hall's cap and the free-villager rule, on the camp's counts, and the
- * cost's debits with their ledger entries) and
+ * cost's debits with their ledger entries),
  * retire (the hero's status and the camp's counts together, never while the
- * hero is adventuring). Each is one
+ * hero is adventuring) and build (a facility's next level, the facilities it
+ * needs, and the cost's debits with their ledger entries). Each is one
  * TransactWriteItems call with condition checks; a failed condition cancels
  * the whole write and the cancellation reasons say which item failed.
  *
@@ -48,6 +51,8 @@ export class TransactionConflict extends Error {}
 export class HeroExists extends Error {}
 export class RecruitRefused extends Error {}
 export class HeroChanged extends Error {}
+/** A facility's level, or a facility it needs, is not as the build read it. */
+export class BuildRefused extends Error {}
 /** A balance or the warehouse changed between settlement's read and its write: read again and retry. */
 export class CampChanged extends Error {}
 /** The open item is gone or the record is no longer open: settled or discarded already. */
@@ -76,7 +81,37 @@ export interface Camp {
   activeHeroes: number;
   livingHeroes: number;
   holdings: Holding[];
+  /** The facilities the camp has built, by kind, from their `AT#<location>#FACILITY#<kind>` items; one missing is at level 0. */
+  facilities: Partial<Record<FacilityKind, number>>;
   stored: boolean;
+}
+
+/**
+ * The hall's and the warehouse's levels live on the camp's item, which the
+ * recruit and settle transactions already condition on; every other own
+ * facility has an item of its own (decision 0032).
+ */
+const ON_CAMP: Partial<Record<FacilityKind, "hallLevel" | "warehouseLevel">> = {
+  "heroes-hall": "hallLevel",
+  warehouse: "warehouseLevel",
+};
+
+/** Every own facility's level at the camp: the hall and the warehouse from the camp, the rest from their items. */
+export function campLevels(camp: Camp): Partial<Record<FacilityKind, number>> {
+  return { ...camp.facilities, "heroes-hall": camp.hallLevel, warehouse: camp.warehouseLevel };
+}
+
+/** A build of one level: the facility, the level it is at as read, and what the next costs and needs. */
+export interface Build {
+  kind: FacilityKind;
+  from: number;
+  cost: Cost;
+  requires: readonly Requirement[];
+}
+
+/** The ledger's cause for a build: each level of each facility at a camp is built once. */
+export function buildCause(location: string, kind: FacilityKind, level: number): string {
+  return `build-${location}-${kind}-${level}`;
 }
 
 export type HeroStatus = "ALIVE" | "DEAD" | "RETIRED";
@@ -193,7 +228,7 @@ function toSighting(i: Item): Sighting {
 }
 
 function emptyCamp(location: string): Camp {
-  return { location, hallLevel: 1, warehouseLevel: 1, activeHeroes: 0, livingHeroes: 0, holdings: [], stored: false };
+  return { location, hallLevel: 1, warehouseLevel: 1, activeHeroes: 0, livingHeroes: 0, holdings: [], facilities: {}, stored: false };
 }
 
 function toHero(i: Item): Hero {
@@ -286,7 +321,7 @@ export class Repository {
       return camp;
     };
     for (const i of items) {
-      const [, location, kind] = (i["SK"] as string).split("#");
+      const [, location, kind, facility] = (i["SK"] as string).split("#");
       if (!location) continue;
       const camp = campAt(location);
       if (kind === "CAMP") {
@@ -299,6 +334,8 @@ export class Repository {
         });
       } else if (kind === "HOLDING") {
         camp.holdings.push({ material: i["material"] as string, balance: i["balance"] as number });
+      } else if (kind === "FACILITY" && facility) {
+        camp.facilities[facility as FacilityKind] = i["level"] as number;
       }
     }
     return [...camps.values()];
@@ -665,6 +702,111 @@ export class Repository {
       // A ledger entry under the hero's id exists only if the hero does, so its failure is a repeat too.
     ], [HeroExists, RecruitRefused, ...cost.flatMap(() => [InsufficientBalance, HeroExists])]);
     return hero;
+  }
+
+  /**
+   * Build one level of a facility, in one transaction (Issue-93, decision
+   * 0032): set the facility's level to the next only if it is still the
+   * level read, so two builds of one level charge once and a repeat fails;
+   * check each facility it needs first is at its level or above; and for
+   * each resource in the cost, debit the holding only if its balance covers
+   * the amount, with a ledger entry under the build's cause that can exist
+   * once. The hall's and the warehouse's levels are the camp's item, which
+   * an absent camp creates at level 1 with no heroes; a requirement on the
+   * item being built is folded into its own condition, since a transaction
+   * touches an item once.
+   *
+   * Throws BuildRefused when the level or a requirement is not as read, and
+   * InsufficientBalance when a holding does not cover its debit.
+   */
+  async build(playerId: string, camp: Camp, b: Build): Promise<void> {
+    const level = b.from + 1;
+    const campKey = playerKeys.camp(playerId, camp.location);
+    const onCamp = ON_CAMP[b.kind];
+    const campChecks = b.requires.filter((r) => ON_CAMP[r.kind] && r.level > 1);
+    const facilityChecks = b.requires.filter((r) => !ON_CAMP[r.kind]);
+    const campCondition = (names: Record<string, string>, values: Record<string, unknown>): string[] =>
+      campChecks.map((r, n) => {
+        names[`#r${n}`] = ON_CAMP[r.kind]!; // filtered to the camp's own above
+        values[`:r${n}`] = r.level;
+        return `#r${n} >= :r${n}`;
+      });
+
+    const items: TransactItems = [];
+    if (onCamp) {
+      const names: Record<string, string> = { "#location": "location", "#level": onCamp };
+      const values: Record<string, unknown> = { ":location": camp.location, ":level": level, ":one": 1, ":zero": 0 };
+      const other = onCamp === "hallLevel" ? "warehouseLevel" : "hallLevel";
+      // No item is a camp at level 1 with no heroes, which no requirement above level 1 is met by.
+      const conditions = camp.stored ? [`#level = :from`, ...campCondition(names, values)] : ["attribute_not_exists(PK)"];
+      if (camp.stored) values[":from"] = b.from;
+      if (!camp.stored && campChecks.length > 0) throw new BuildRefused("a requirement is not met");
+      items.push({
+        Update: {
+          TableName: this.tables.player,
+          Key: campKey,
+          UpdateExpression: `SET #location = :location, #level = :level, ${other} = if_not_exists(${other}, :one), activeHeroes = if_not_exists(activeHeroes, :zero), livingHeroes = if_not_exists(livingHeroes, :zero)`,
+          ConditionExpression: conditions.join(" AND "),
+          ExpressionAttributeNames: names,
+          ExpressionAttributeValues: values,
+        },
+      });
+    } else {
+      items.push({
+        Update: {
+          TableName: this.tables.player,
+          Key: playerKeys.facility(playerId, camp.location, b.kind),
+          UpdateExpression: "SET #location = :location, #kind = :kind, #level = :level",
+          ConditionExpression: b.from === 0 ? "attribute_not_exists(PK)" : "#level = :from",
+          ExpressionAttributeNames: { "#location": "location", "#kind": "kind", "#level": "level" },
+          ExpressionAttributeValues: { ":location": camp.location, ":kind": b.kind, ":level": level, ...(b.from === 0 ? {} : { ":from": b.from }) },
+        },
+      });
+      if (campChecks.length > 0) {
+        const names: Record<string, string> = {};
+        const values: Record<string, unknown> = {};
+        const conditions = campCondition(names, values);
+        items.push({
+          ConditionCheck: { TableName: this.tables.player, Key: campKey, ConditionExpression: conditions.join(" AND "), ExpressionAttributeNames: names, ExpressionAttributeValues: values },
+        });
+      }
+    }
+    for (const r of facilityChecks) {
+      items.push({
+        ConditionCheck: {
+          TableName: this.tables.player,
+          Key: playerKeys.facility(playerId, camp.location, r.kind),
+          ConditionExpression: "#level >= :need",
+          ExpressionAttributeNames: { "#level": "level" },
+          ExpressionAttributeValues: { ":need": r.level },
+        },
+      });
+    }
+    const checks = items.length;
+
+    const cause = buildCause(camp.location, b.kind, level);
+    for (const { material, amount } of b.cost) {
+      items.push(
+        {
+          Update: {
+            TableName: this.tables.player,
+            Key: playerKeys.holding(playerId, camp.location, material),
+            UpdateExpression: "SET balance = balance - :amount",
+            ConditionExpression: "balance >= :amount",
+            ExpressionAttributeValues: { ":amount": amount },
+          },
+        },
+        {
+          Put: {
+            TableName: this.tables.player,
+            Item: { ...playerKeys.ledger(playerId, cause, `debit#${material}`), location: camp.location, material, delta: -amount },
+            ConditionExpression: "attribute_not_exists(PK)",
+          },
+        },
+      );
+    }
+    // A ledger entry under the build's cause exists only if the level was built, so its failure is a repeat too.
+    await this.transact(items, [...Array.from({ length: checks }, () => BuildRefused), ...b.cost.flatMap(() => [InsufficientBalance, BuildRefused])]);
   }
 
   /**

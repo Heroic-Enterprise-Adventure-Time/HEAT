@@ -71,6 +71,8 @@ export class Camp {
     return this.game.heroesHere().filter((h) => !away.has(h.id));
   });
 
+  /** Each facility's level, which picks its picture in the scene. */
+  private readonly levels = computed(() => Object.fromEntries(this.state.facilities().map((f) => [f.kind, f.level])));
   private readonly ratioWatch = new AbortController();
   private scene: CampSceneHandle | null = null;
   private rendered = false;
@@ -98,6 +100,12 @@ export class Camp {
       });
     });
     effect(() => this.showHeroes(this.campHeroes(), this.game.seenHere(), this.state.arriving(), this.state.leaving()));
+    // A build changes a facility's picture in place (Issue-93).
+    effect(() => {
+      // Read first, so the effect follows the levels even before the scene exists.
+      const levels = this.levels();
+      this.scene?.setLevels(levels);
+    });
     this.watchRatio();
     inject(DestroyRef).onDestroy(() => {
       this.ratioWatch.abort();
@@ -129,8 +137,7 @@ export class Camp {
     this.scene = null;
     const layout = this.state.layout();
     if (!layout) return;
-    const levels = Object.fromEntries(this.state.facilities().map((f) => [f.kind, f.level]));
-    const scene = await this.createScene(this.stage().nativeElement, layout, levels, {
+    const scene = await this.createScene(this.stage().nativeElement, layout, untracked(this.levels), {
       onFacility: (kind) => void this.router.navigate(['/camp', this.location(), kind]),
       onHero: (id) =>
         void this.router.navigate(
@@ -144,6 +151,7 @@ export class Camp {
       return;
     }
     this.scene = scene;
+    scene.setLevels(untracked(this.levels));
     this.showHeroes(this.campHeroes(), this.game.seenHere(), this.state.arriving(), this.state.leaving());
   }
 
