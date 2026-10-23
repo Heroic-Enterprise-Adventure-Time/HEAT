@@ -26,7 +26,7 @@ import { campLevels, type AdventureRecord, type Camp, type Hero, type HeroOutcom
  * behind the `self` scope; other players' heroes seen at a location, by
  * their public fields only; a settled adventure, with its result and its
  * timeline; the deploy's version; joining, recruiting, retiring, building, and an
- * adventure started from the job board, submitted for verification and
+ * adventure started from the job board or a facility, submitted for verification and
  * settlement, or discarded when no deploy can verify it.
  */
 
@@ -111,12 +111,17 @@ const SeenHeroRef = builder.objectRef<Sighting>("SeenHero").implement({
 });
 
 const JobRef = builder.objectRef<Job>("Job").implement({
-  description: "A job on a location's job board, from the static content; the client reads its stages from the engine it loaded.",
+  description: "A job a location posts, on its job board or at a facility, from the static content; the client reads its stages from the engine it loaded.",
   fields: (t) => ({
     id: t.exposeString("id"),
     name: t.exposeString("name"),
     description: t.exposeString("description"),
-    location: t.exposeString("location", { description: "The location whose job board posts it." }),
+    location: t.exposeString("location", { description: "The location that posts it." }),
+    facility: t.string({
+      nullable: true,
+      description: "The own facility that posts it, which the camp must have built to start it; null for a job on the job board.",
+      resolve: (job) => job.facility ?? null,
+    }),
   }),
 });
 
@@ -354,7 +359,7 @@ builder.mutationFields((t) => ({
   startAdventure: t.field({
     type: AdventureRef,
     authScopes: { authenticated: true },
-    description: "Starts a job from the location's job board with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.",
+    description: "Starts a job the location posts, on its job board or at a facility the camp has built (refused otherwise with REQUIRES, the facility in extensions.missing), with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.",
     args: {
       location: t.arg.string({ required: true }),
       jobId: t.arg.string({ required: true }),

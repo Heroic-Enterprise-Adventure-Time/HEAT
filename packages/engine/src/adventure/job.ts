@@ -8,7 +8,7 @@
  * content.ts.
  */
 
-import type { MonsterType, ResourceType } from "../content.js";
+import type { FacilityKind, MonsterType, ResourceType } from "../content.js";
 import type { Reward } from "../index.js";
 import type { BattleContent } from "../battle/index.js";
 
@@ -51,8 +51,13 @@ export interface Job {
   readonly id: string;
   readonly name: string;
   readonly description: string;
-  /** The location whose job board posts it. */
+  /** The location that posts it. */
   readonly location: string;
+  /**
+   * The own facility that posts it, which the camp must have built to start
+   * it; a job with none is on the location's job board (Issue-133).
+   */
+  readonly facility?: FacilityKind;
   readonly stages: readonly Stage[];
   /** The reward from whoever posted the job, paid on arrival. */
   readonly pay: readonly Reward[];

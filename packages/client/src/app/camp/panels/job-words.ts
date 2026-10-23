@@ -1,12 +1,12 @@
-import { JOBS, MONSTERS, RESOURCE_NODES, type Job, type Stage } from '@heat/engine';
+import { MONSTERS, RESOURCE_NODES, jobsPostedBy, type FacilityKind, type Job, type Stage } from '@heat/engine';
 
-/** The jobs a location's job board posts, in the content's order. */
-export function jobsAt(location: string): Job[] {
-  return Object.values(JOBS).filter((job) => job.location === location);
+/** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133). */
+export function jobsAt(location: string, poster: FacilityKind): Job[] {
+  return jobsPostedBy(location, poster);
 }
 
-export function jobAt(location: string, id: string | null | undefined): Job | undefined {
-  return jobsAt(location).find((job) => job.id === id);
+export function jobAt(location: string, poster: FacilityKind, id: string | null | undefined): Job | undefined {
+  return jobsAt(location, poster).find((job) => job.id === id);
 }
 
 /** "a wolf", "2 wolves", "3 trees", "2 ore veins". */

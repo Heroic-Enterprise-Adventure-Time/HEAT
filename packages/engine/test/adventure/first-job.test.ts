@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AdventureEngine, JOBS, location, replay, STARTING_LOCATION, type AdventureResult } from "../../src/index.js";
+import { AdventureEngine, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION, type AdventureResult } from "../../src/index.js";
 import { hero, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 // The first progression (decision 0031): a new player's free villager cannot
@@ -24,7 +24,7 @@ function swingingEveryTurn(seed: string): AdventureResult {
 
 describe("Pick up sticks", () => {
   it("is first on Millbrook's board, before the timber and the wolves jobs", () => {
-    const board = Object.values(JOBS).filter((j) => j.location === STARTING_LOCATION).map((j) => j.id);
+    const board = jobsPostedBy(STARTING_LOCATION, "job-board").map((j) => j.id);
     expect(board).toEqual([STICKS, TIMBER, WOLVES]);
   });
 

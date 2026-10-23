@@ -439,12 +439,14 @@ export const BATTLE_CONTENT: BattleContent = {
 
 // ── Jobs and advancement ───────────────────────────────────────────
 
-export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road";
+export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road" | "ore-from-the-hill";
 
 /**
- * The jobs, by id, in the order the board lists them, easiest first
- * (game.md, "The battle"; decision 0031). A retreat forfeits the pay; from a
- * gathering job it keeps what was gathered. A retreat earns half the XP.
+ * The jobs, by id, in the order their poster lists them, easiest first
+ * (game.md, "The battle"; decision 0031). A job that names a facility is
+ * posted by it, not by the job board (Issue-133). A retreat forfeits the
+ * pay; from a gathering job it keeps what was gathered. A retreat earns half
+ * the XP.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
   // A lone villager cannot fail it: no monster, and its time limit is beyond
@@ -494,7 +496,34 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     xp: 20,
     retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
   },
+  // The mine's first job, which pays for a fighter (decision 0031). It
+  // mirrors the timber job; a lone villager completes it on every seed tried.
+  "ore-from-the-hill": {
+    id: "ore-from-the-hill",
+    name: "Ore from the hill",
+    description: "Two veins show at the mine's mouth. Dig out what you can carry; a wolf dens in the old workings.",
+    location: "millbrook",
+    facility: "mine",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", nodes: [{ type: "ore-vein", count: 2 }], carry: 40, timeLimitMs: 90_000 },
+      { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    xp: 15,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
 };
+
+/**
+ * The jobs a poster at a location lists, in the content's order: the job
+ * board's are those that name no facility, and a facility's those that name
+ * it (Issue-133). The hub starts only these, and the panels list them.
+ */
+export function jobsPostedBy(locationId: string, poster: FacilityKind): Job[] {
+  return Object.values(JOBS).filter((job) => job.location === locationId && (job.facility ?? "job-board") === poster);
+}
 
 /** A retreat in a fight: an attempt every 2 s, 30% at first, 20 points more after each failure. */
 export const RETREAT: RetreatRule = { intervalMs: 2000, firstChancePercent: 30, risePercent: 20 };

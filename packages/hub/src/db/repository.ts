@@ -53,6 +53,8 @@ export class RecruitRefused extends Error {}
 export class HeroChanged extends Error {}
 /** A facility's level, or a facility it needs, is not as the build read it. */
 export class BuildRefused extends Error {}
+/** A facility the job needs is not built, though the start read it built. */
+export class FacilityMissing extends Error {}
 /** A balance or the warehouse changed between settlement's read and its write: read again and retry. */
 export class CampChanged extends Error {}
 /** The open item is gone or the record is no longer open: settled or discarded already. */
@@ -379,10 +381,17 @@ export class Repository {
    * adventure record only if the id is new, and mark each hero of the party
    * with the adventure's id only if it is still alive, at the adventure's
    * location and on no adventure, so a retire, a death or a move that races
-   * the start fails one side or the other. Throws AdventureAlreadyOpen when
-   * the first condition fails and HeroChanged when a hero's does.
+   * the start fails one side or the other; and check that each facility the
+   * job needs, the one that posts it, is built at its level or above
+   * (Issue-133). Throws AdventureAlreadyOpen when the first condition fails,
+   * HeroChanged when a hero's does and FacilityMissing when a facility's does.
+   * A job's facility is one a camp builds, so it has an item of its own.
    */
-  async startAdventure(playerId: string, record: Omit<AdventureRecord, "playerId" | "status">): Promise<AdventureRecord> {
+  async startAdventure(
+    playerId: string,
+    record: Omit<AdventureRecord, "playerId" | "status">,
+    needs: readonly Requirement[] = [],
+  ): Promise<AdventureRecord> {
     const started: AdventureRecord = { ...record, playerId, status: "OPEN" };
     const open: OpenAdventure = { adventureId: record.adventureId, seed: record.seed, startedAt: record.startedAt };
     const heroIds = record.snapshot.heroes.map((h) => h.heroId);
@@ -411,7 +420,16 @@ export class Repository {
           ExpressionAttributeValues: { ":id": record.adventureId, ":alive": "ALIVE", ":location": record.location, ":string": "S" },
         },
       })),
-    ], [AdventureAlreadyOpen, AlreadyApplied, ...heroIds.map(() => HeroChanged)]);
+      ...needs.map((r) => ({
+        ConditionCheck: {
+          TableName: this.tables.player,
+          Key: playerKeys.facility(playerId, record.location, r.kind),
+          ConditionExpression: "#level >= :need",
+          ExpressionAttributeNames: { "#level": "level" },
+          ExpressionAttributeValues: { ":need": r.level },
+        },
+      })),
+    ], [AdventureAlreadyOpen, AlreadyApplied, ...heroIds.map(() => HeroChanged), ...needs.map(() => FacilityMissing)]);
     return started;
   }
 
