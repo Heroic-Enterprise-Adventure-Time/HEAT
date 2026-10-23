@@ -4,17 +4,20 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
 import { FacilityBuild } from './facility-build';
+import { JobList } from './job-list';
+import { jobsAt } from './job-words';
 
 /**
  * Any other facility's panel, `/camp/<location>/<facility>`: what it does,
- * its level, and the build of it or of its next level (Issue-93). The hall
+ * its level, the jobs it posts once built (Issue-133), and the build of it
+ * or of its next level (Issue-93). The hall
  * and the job board have panels of their own; the warehouse lists the camp's
  * stock against its cap (Issue-15). A facility the camp does not have sends
  * the address back to the hall.
  */
 @Component({
   selector: 'heat-facility-panel',
-  imports: [FacilityBuild],
+  imports: [FacilityBuild, JobList],
   template: `
     @if (facility(); as facility) {
       <h2 id="panel-title">{{ facility.name }}</h2>
@@ -37,6 +40,10 @@ import { FacilityBuild } from './facility-build';
             }
           }
         }
+        @if (jobs().length > 0) {
+          <h3>Jobs</h3>
+          <heat-job-list [jobs]="jobs()" />
+        }
       }
       <heat-facility-build [kind]="facility.kind" />
     }
@@ -51,6 +58,10 @@ export class FacilityPanel {
   private readonly route = inject(ActivatedRoute);
   private readonly params = toSignal(this.route.paramMap);
   protected readonly facility = computed(() => this.camp.facility(this.params()?.get('facility')));
+  protected readonly jobs = computed(() => {
+    const facility = this.facility();
+    return facility ? jobsAt(this.game.location(), facility.kind) : [];
+  });
 
   constructor() {
     const router = inject(Router);

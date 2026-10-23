@@ -45,6 +45,7 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
       livingHeroes: heroes.length,
       holdings: [{ material: 'timber', balance: 90 }],
       resourceCapacity: 100,
+      facilities: [{ kind: 'mine', level: 1 }],
     }),
     recruits: signal([]),
     upgrade: () => null,
@@ -194,6 +195,18 @@ describe('Job board', () => {
     expect(page.querySelector('.refusal')?.textContent).toBe('A hero in the party is dead.');
     expect(page.querySelector('.refusal')?.getAttribute('role')).toBe('alert');
     expect(router.url).toBe('/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
+  });
+
+  it("says to build the facility when the hub refuses a facility's job with REQUIRES (Issue-133)", async () => {
+    const game = fakeGame(party, () => new ApiError('Ore from the hill needs a level 1 mine first', 'REQUIRES'));
+    const { page, settle } = await render(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    boxes(page)[0]!.click();
+    await settle();
+    depart(page)!.click();
+    await vi.waitFor(() => expect(game.started).toHaveLength(1));
+    await settle();
+    expect(game.started[0]?.jobId).toBe('ore-from-the-hill');
+    expect(page.querySelector('.refusal')?.textContent).toBe('Build the mine first.');
   });
 
   it("shows a refusal it has no words for as the hub put it", async () => {

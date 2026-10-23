@@ -132,13 +132,18 @@ type Holding {
 scalar JSON
 
 """
-A job on a location's job board, from the static content; the client reads its stages from the engine it loaded.
+A job a location posts, on its job board or at a facility, from the static content; the client reads its stages from the engine it loaded.
 """
 type Job {
   description: String!
+
+  """
+  The own facility that posts it, which the camp must have built to start it; null for a job on the job board.
+  """
+  facility: String
   id: String!
 
-  """The location whose job board posts it."""
+  """The location that posts it."""
   location: String!
   name: String!
 }
@@ -170,7 +175,7 @@ type Mutation {
   retireHero(heroId: String!): Hero!
 
   """
-  Starts a job from the location's job board with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.
+  Starts a job the location posts, on its job board or at a facility the camp has built (refused otherwise with REQUIRES, the facility in extensions.missing), with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.
   """
   startAdventure(heroIds: [String!]!, jobId: String!, location: String!): Adventure!
 

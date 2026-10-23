@@ -1,27 +1,32 @@
 import { randomUUID } from "node:crypto";
 import { GraphQLError } from "graphql";
 import {
+  FACILITIES,
   JOBS,
   MAX_PARTY,
   UNIT_PROFILES,
   location,
   type AdventureSnapshot,
   type Job,
+  type Requirement,
   type SnapshotHero,
 } from "@heat/engine";
 import {
   AdventureAlreadyOpen,
+  FacilityMissing,
   HeroChanged,
   TransactionConflict,
+  campLevels,
   type AdventureRecord,
   type Hero,
   type Repository,
 } from "./db/repository.js";
 
 /**
- * Starting an adventure from a location's job board (overview, "The
- * adventure loop"; decision 0030). The client names the location, the job
- * and the party; the hub checks them, issues the seed and the frozen
+ * Starting an adventure from a location's job board, or from a facility the
+ * camp has built (overview, "The adventure loop"; decision 0030; Issue-133).
+ * The client names the location, the job and the party; the hub checks
+ * them, issues the seed and the frozen
  * snapshot of the party, stamped with the deploy's version, and opens the
  * player's one adventure.
  *
@@ -40,8 +45,8 @@ function refuseOpen(adventureId: string): never {
   refuse("an adventure is already open", "ADVENTURE_OPEN", { adventureId });
 }
 
-/** The job, if it is on the location's board: every job names the location that posts it. */
-export function jobOnBoard(locationId: string, jobId: string): Job | undefined {
+/** The job, if the location posts it, on its board or at one of its facilities: every job names the location. */
+export function jobAt(locationId: string, jobId: string): Job | undefined {
   const job = Object.hasOwn(JOBS, jobId) ? JOBS[jobId as keyof typeof JOBS] : undefined;
   return job?.location === locationId ? job : undefined;
 }
@@ -90,8 +95,21 @@ export async function startAdventure(
 
   const at = location(locationId);
   if (!at) refuse(`no location ${locationId}`, "BAD_USER_INPUT");
-  const job = jobOnBoard(at.id, jobId);
-  if (!job) refuse(`${at.name}'s job board has no job ${jobId}`, "NO_SUCH_JOB");
+  const job = jobAt(at.id, jobId);
+  if (!job) refuse(`${at.name} has no job ${jobId}`, "NO_SUCH_JOB");
+
+  // A facility's job needs the facility built (game.md, "Locations and camps").
+  const needs: Requirement[] = job.facility ? [{ kind: job.facility, level: 1 }] : [];
+  const checkFacilities = async (): Promise<void> => {
+    if (needs.length === 0) return;
+    const levels = campLevels(await repo.camp(playerId, at.id));
+    const missing = needs.filter((r) => (levels[r.kind] ?? 0) < r.level);
+    if (missing.length === 0) return;
+    const words = missing.map((r) => `a level ${r.level} ${FACILITIES[r.kind].name.toLowerCase()}`).join(" and ");
+    refuse(`${job.name} needs ${words} first`, "REQUIRES", { missing });
+  };
+  await checkFacilities();
+
   if (heroIds.length < 1 || heroIds.length > MAX_PARTY) refuse(`a party is 1 to ${MAX_PARTY} heroes`, "PARTY_SIZE");
   const ids = heroIds.map((id) => id.toLowerCase());
   if (new Set(ids).size !== ids.length) refuse("a hero is in the party twice", "BAD_USER_INPUT");
@@ -123,13 +141,14 @@ export async function startAdventure(
       snapshot,
       version,
       startedAt: now.toISOString(),
-    });
+    }, needs);
   } catch (e) {
-    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof TransactionConflict)) throw e;
+    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof FacilityMissing || e instanceof TransactionConflict)) throw e;
     // Another request got there first: answer with what it changed.
     const winner = await repo.openAdventure(playerId);
     if (winner) refuseOpen(winner.adventureId);
     await checkParty();
+    await checkFacilities();
     refuse("the party changed while starting; no adventure was started", "CONFLICT");
   }
 }

@@ -34,3 +34,4 @@ export function ofKind<K extends AdventureEvent["kind"]>(events: readonly Advent
 export const STICKS = "pick-up-sticks";
 export const WOLVES = "wolves-on-the-mill-road";
 export const TIMBER = "timber-from-the-near-woods";
+export const ORE = "ore-from-the-hill";

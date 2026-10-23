@@ -1,9 +1,10 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import type { Stage } from '@heat/engine';
+import { FACILITIES, type FacilityKind, type Stage } from '@heat/engine';
 import { ApiError } from '../../api';
 import { Game } from '../../game';
+import { CampState } from '../camp-state';
 import { creditWords, credits, jobAt, retreatWords, stageWords } from './job-words';
 
 /** The most heroes a party takes (game.md, "The battle"); the hub refuses more with PARTY_SIZE. */
@@ -23,9 +24,10 @@ const REFUSALS: Readonly<Record<string, string>> = {
 };
 
 /**
- * A job's detail on the job board, `/camp/<location>/job-board/jobs/<id>`,
- * under the board so the menu keeps it marked (Issue-115, refined by
- * Issue-109): its stages in order; what it credits, each beside the camp's
+ * A job's detail under the poster that lists it, the job board,
+ * `/camp/<location>/job-board/jobs/<id>`, or a facility the camp has built,
+ * such as `/camp/<location>/mine/jobs/<id>`, so the menu keeps the poster
+ * marked (Issue-115, refined by Issue-109; Issue-133): its stages in order; what it credits, each beside the camp's
  * balance and the room left under the warehouse's cap ("Resources"); its
  * retreat penalty in words; then the party pick, one to four of the camp's
  * living heroes in no order, since a unit type's home line places it; and
@@ -36,7 +38,7 @@ const REFUSALS: Readonly<Record<string, string>> = {
   selector: 'heat-job-panel',
   imports: [RouterLink],
   template: `
-    <a class="back" routerLink="../..">← Job board</a>
+    <a class="back" routerLink="../..">← {{ posterName() }}</a>
     @if (job(); as job) {
       <h2 id="panel-title">{{ job.name }}</h2>
       <p>{{ job.description }}</p>
@@ -94,18 +96,34 @@ const REFUSALS: Readonly<Record<string, string>> = {
       }
     } @else {
       <h2 id="panel-title">Job</h2>
-      <p>The job board has no such job.</p>
+      <p>The {{ posterName().toLowerCase() }} has no such job.</p>
     }
   `,
   styleUrl: './panel.css',
 })
 export class JobPanel {
   protected readonly game = inject(Game);
+  private readonly camp = inject(CampState);
   private readonly router = inject(Router);
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
   protected readonly maxParty = MAX_PARTY;
 
-  protected readonly job = computed(() => jobAt(this.game.location(), this.params()?.get('job')));
+  /** The poster: the job board, whose route names no facility, or the facility in the address; null for no such facility. */
+  private readonly poster = computed((): FacilityKind | null => {
+    const facility = this.params()?.get('facility');
+    if (!facility) return 'job-board';
+    return Object.hasOwn(FACILITIES, facility) ? (facility as FacilityKind) : null;
+  });
+  protected readonly posterName = computed(() => {
+    const poster = this.poster();
+    return poster ? FACILITIES[poster].name : 'Camp';
+  });
+  /** A facility posts its jobs only once built (game.md, "Locations and camps"). */
+  protected readonly job = computed(() => {
+    const poster = this.poster();
+    if (!poster || (poster !== 'job-board' && (this.camp.facility(poster)?.level ?? 0) < 1)) return undefined;
+    return jobAt(this.game.location(), poster, this.params()?.get('job'));
+  });
   protected readonly reward = computed(() => {
     const job = this.job();
     const camp = this.game.camp();
@@ -147,7 +165,10 @@ export class JobPanel {
       await this.router.navigate(['/adventure']);
     } catch (e) {
       const code = e instanceof ApiError ? e.code : null;
-      this.refusal.set((code && REFUSALS[code]) ?? (e instanceof Error ? e.message : String(e)));
+      const facility = this.job()?.facility;
+      // The facility that posts the job is not built: the hub's rule, as Issue-133 gave it.
+      const words = code === 'REQUIRES' && facility ? `Build the ${FACILITIES[facility].name.toLowerCase()} first.` : code && REFUSALS[code];
+      this.refusal.set(words ?? (e instanceof Error ? e.message : String(e)));
     }
   }
 }

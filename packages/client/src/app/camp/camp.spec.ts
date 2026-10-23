@@ -76,6 +76,8 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
       { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
     ]),
     location: signal('millbrook'),
+    // Not read yet: a job's detail waits for it before offering the party.
+    player: signal(null),
     adventure: signal<{ snapshot: { heroes: { heroId: string }[] } } | null>(null),
     busy: signal(false),
     error: signal<string | null>(null),
@@ -334,6 +336,39 @@ describe('Camp', () => {
     expect(page.querySelector('aside')?.textContent).toContain('Level 1.');
     expect(page.querySelector('aside')?.textContent).toContain('At its highest level here.');
     await vi.waitFor(() => expect(scene.levels?.['mine']).toBe(1));
+  });
+
+  it("lists the mine's jobs once it is built, each leading to its detail under the mine (Issue-133)", async () => {
+    const game = fakeGame([]);
+    const { page, settle } = await render(game, '/camp/millbrook/mine');
+    expect(page.querySelector('aside .jobs')).toBeNull();
+    (page.querySelector('.build button') as HTMLButtonElement).click();
+    await vi.waitFor(() => expect(game.built).toEqual([['mine', 1]]));
+    await settle();
+    const jobs = [...page.querySelectorAll('aside .jobs li')].map((li) => [...li.children].map((c) => c.textContent?.trim()));
+    expect(jobs).toEqual([['Ore from the hill', 'up to 40 ore']]);
+    expect(page.querySelector('aside .jobs a')?.getAttribute('href')).toBe('/camp/millbrook/mine/jobs/ore-from-the-hill');
+  });
+
+  it("shows a mine's job under the mine once built, keeping the mine marked, and no such job before", async () => {
+    const game = fakeGame([wren]);
+    const built = game.camp();
+    game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'mine' ? { kind: 'mine', level: 1 } : f)) });
+    const { page } = await render(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    expect(page.querySelector('aside h2')?.textContent).toBe('Ore from the hill');
+    expect([...page.querySelectorAll('.stages li')].map((li) => li.textContent?.trim())).toContain('Gather ore from 2 ore veins, up to 40');
+    expect(page.querySelector('aside .back')?.textContent?.trim()).toBe('← Mine');
+    expect(page.querySelector('aside .back')?.getAttribute('href')).toBe('/camp/millbrook/mine');
+    expect(current(page)).toBe('Mine');
+
+    TestBed.resetTestingModule();
+    const unbuilt = await render(fakeGame([wren]), '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    expect(unbuilt.page.querySelector('aside')?.textContent).toContain('The mine has no such job.');
+  });
+
+  it('keeps a job off any poster but its own', async () => {
+    const { page } = await render(fakeGame([wren]), '/camp/millbrook/job-board/jobs/ore-from-the-hill');
+    expect(page.querySelector('aside')?.textContent).toContain('The job board has no such job.');
   });
 
   it("shows the hub's refusal of a build in place", async () => {

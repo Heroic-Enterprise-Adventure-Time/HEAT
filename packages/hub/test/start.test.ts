@@ -5,7 +5,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { UNIT_PROFILES } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { Repository, type Hero, type HeroStatus } from "../src/db/repository.js";
+import { Repository, type Camp, type Hero, type HeroStatus } from "../src/db/repository.js";
+import { buildFacility } from "../src/build.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
@@ -14,7 +15,7 @@ import { MemoryTimelines } from "../src/timelines.js";
 
 /**
  * startAdventure against DynamoDB Local: the job on the location's board,
- * the party validated, the snapshot issued and stamped, and the one-adventure
+ * or at a facility the camp has built, the party validated, the snapshot issued and stamped, and the one-adventure
  * rule and the adventuring mark under concurrent starts and retires.
  */
 
@@ -171,6 +172,62 @@ describe("startAdventure", () => {
     });
     const lost = await startAdventure(late, p, version, at, wolves, [hero!.id]).catch((e: GraphQLError) => e);
     expect((lost as GraphQLError).extensions).toEqual({ code: "ADVENTURE_OPEN", adventureId: winner.adventureId });
+  });
+});
+
+describe("a facility's job (Issue-133)", () => {
+  const ore = "ore-from-the-hill";
+
+  /** The mine built as a player builds it: paid for with the timber run's 60 timber and 3 cloth. */
+  async function buildMine(p: string): Promise<void> {
+    await repo.setBalance(p, at, "timber", 60);
+    await repo.setBalance(p, at, "cloth", 3);
+    await buildFacility(repo, p, at, "mine", 1);
+  }
+
+  it("refuses the mine's job while the camp has not built the mine, and writes nothing", async () => {
+    const p = player();
+    const [hero] = await putHeroes(p, ["ALIVE"]);
+    const refused = await refusal(startAdventure(repo, p, version, at, ore, [hero!.id]));
+    expect(refused).toEqual({ code: "REQUIRES", missing: [{ kind: "mine", level: 1 }] });
+    expect(await repo.openAdventure(p)).toBeUndefined();
+    expect((await repo.getHero(p, hero!.id))?.adventureId).toBeNull();
+  });
+
+  it("starts the mine's job once the camp has built the mine", async () => {
+    const p = player();
+    const [hero] = await putHeroes(p, ["ALIVE"]);
+    await buildMine(p);
+    const started = await startAdventure(repo, p, version, at, ore, [hero!.id]);
+    expect(started).toMatchObject({ location: at, jobId: ore, status: "OPEN" });
+    expect((await repo.openAdventure(p))?.adventureId).toBe(started.adventureId);
+    expect((await repo.getHero(p, hero!.id))?.adventureId).toBe(started.adventureId);
+  });
+
+  it("holds the rule in the transaction, against a camp read with the mine built", async () => {
+    const p = player();
+    const [hero] = await putHeroes(p, ["ALIVE"]);
+    // The first read of the camp sees a mine, as no camp yet can lose one; the transaction finds no mine item.
+    let reads = 0;
+    const stale = new Proxy(repo, {
+      get: (target, key, receiver) =>
+        key === "camp"
+          ? async (id: string, location: string): Promise<Camp> => {
+              const camp = await target.camp(id, location);
+              return reads++ === 0 ? { ...camp, facilities: { ...camp.facilities, mine: 1 } } : camp;
+            }
+          : Reflect.get(target, key, receiver),
+    });
+    const refused = await refusal(startAdventure(stale, p, version, at, ore, [hero!.id]));
+    expect(refused).toEqual({ code: "REQUIRES", missing: [{ kind: "mine", level: 1 }] });
+    expect(await repo.openAdventure(p)).toBeUndefined();
+    expect((await repo.getHero(p, hero!.id))?.adventureId).toBeNull();
+  });
+
+  it("needs nothing built for a job on the job board", async () => {
+    const p = player();
+    const [hero] = await putHeroes(p, ["ALIVE"]);
+    expect((await startAdventure(repo, p, version, at, wolves, [hero!.id])).jobId).toBe(wolves);
   });
 });
 
