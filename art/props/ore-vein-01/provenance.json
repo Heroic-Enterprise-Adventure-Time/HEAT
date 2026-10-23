@@ -1,0 +1,88 @@
+{
+  "set": "ore-vein-01",
+  "kind": "prop sprite set",
+  "props": ["ore-vein"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "objectId": "4cf55ac8-4a5d-4040-a042-ea3a1180c498",
+    "name": "Ore vein 01",
+    "tags": ["heat", "prop", "ore-vein"]
+  },
+  "object": {
+    "tool": "create_map_object",
+    "via": "MCP",
+    "createdAt": "2026-10-23T06:05Z",
+    "parameters": {
+      "description": "boulder of dark stone with chunks of copper-brown ore embedded in it, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "view": "low top-down",
+      "outline": "single color outline",
+      "shading": "flat shading",
+      "detail": "low detail"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "standing": {
+      "file": "standing.png",
+      "canvas": [48, 48],
+      "from": "the object's one rotation"
+    }
+  },
+  "animations": {
+    "hit": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "1d1d6efb-7a2d-4ee2-ab3b-6c76aa80fc62",
+      "animationDescription": "the boulder shudders and rocks slightly to one side and back from a pick blow, settling still, no particles, no effects",
+      "frameCount": 6,
+      "frames": 7,
+      "canvas": [48, 48],
+      "files": "hit-<0..6>.png",
+      "generations": 1
+    },
+    "down": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "98631dd5-960e-49b6-869c-017616e058c6",
+      "animationDescription": "the boulder cracks and slowly settles and sinks down into a low heap of broken dark stone rubble on the ground, the ore keeping its copper colour as it breaks up, no flash, no particles, no effects",
+      "frameCount": 8,
+      "frames": 9,
+      "canvas": [48, 48],
+      "endFrame": {
+        "objectId": "f01825ec-056a-4b5e-9128-eeb52420884c",
+        "stateName": "rubble",
+        "editDescription": "the boulder has been mined away: only a low heap of broken dark stone rubble remains on the ground, with no ore left in it; empty transparent space above the heap",
+        "generations": 1
+      },
+      "heldLast": true,
+      "files": "down-<0..8>.png",
+      "generations": 1,
+      "replaced": [
+        {
+          "groupId": "98631dd5-960e-49b6-869c-017616e058c6",
+          "description": "the boulder cracks apart and its upper part crumbles down into a low heap of broken dark stone rubble on the ground, the ore chunks breaking away, no particles, no effects",
+          "generations": 1,
+          "why": "Frame 2 flashed the ore white, an effect by another name, and frames 6 and 7 left stray pixels detached from the heap. Made again in the same group (animation 5cacf91c-5515-4d6c-b650-983cdfe92cf8, replaced by 6b77f3bc-f502-4c68-9561-6c0188c2f64b); the kept take still lightens the ore on frames 1 and 2 and leaves one stray pixel on frame 7, accepted by the agent and flagged to the owner."
+        }
+      ]
+    }
+  },
+  "animationGenerations": 4,
+  "rejected": [
+    {
+      "name": "spire",
+      "objectId": "d6d39a81-65eb-4581-bb64-cefdd74eb362",
+      "description": "grey rock outcrop with veins of rusty orange iron ore showing through cracks, black outline, warm earthy tones, NES-era retro pixel art, few colors"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-10-23."
+}
