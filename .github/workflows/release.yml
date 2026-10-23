@@ -51,6 +51,13 @@ env:
   ROOT: prod
   STACK: heat-prod
 
+# Every run step runs as `bash --noprofile --norc -eo pipefail {0}`. With no
+# shell named, GitHub runs `bash -e {0}`, where a pipe's status is its last
+# command's: a stack test that failed into tee left the run green (Issue-137).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # -------------------------------------------------------- pull request --
   guard:
@@ -295,9 +302,16 @@ jobs:
       # https://heat.dcg-games.com. Nothing signs in and nothing is written;
       # the authenticated check on prod is the owner's own Google sign-in.
       - name: Call prod anonymously
+        id: e2e
         run: |
           set -eu
           node scripts/e2e.mjs --stack "$STACK" --anonymous | tee -a "$RUNNER_TEMP/e2e.log"
+
+      # Its own step, so the log reaches the run's page when the test fails,
+      # which ends the step above at the failing line.
+      - name: Put the stack test's log on the run's page
+        if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
+        run: |
           {
             echo
             echo '```text'

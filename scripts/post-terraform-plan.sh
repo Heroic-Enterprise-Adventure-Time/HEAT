@@ -28,8 +28,10 @@ pr_number="${5:-}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-terraform -chdir="terraform/environment/$root" show -no-color "$plan_file" \
-  | sed "s/$ACCOUNT_ID/<account id>/g" > "$work/plan.txt"
+# Two commands, not a pipe: sh has no pipefail, and a failed show piped
+# into sed would post an empty plan (Issue-137).
+terraform -chdir="terraform/environment/$root" show -no-color "$plan_file" > "$work/show.txt"
+sed "s/$ACCOUNT_ID/<account id>/g" "$work/show.txt" > "$work/plan.txt"
 
 summary="$(grep -E '^(Plan:|No changes\.)' "$work/plan.txt" | head -n 1 || true)"
 : "${summary:=Plan written below.}"

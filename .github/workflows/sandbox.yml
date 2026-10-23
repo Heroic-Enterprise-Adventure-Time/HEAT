@@ -77,6 +77,13 @@ env:
 permissions:
   contents: read
 
+# Every run step runs as `bash --noprofile --norc -eo pipefail {0}`. With no
+# shell named, GitHub runs `bash -e {0}`, where a pipe's status is its last
+# command's: a stack test that failed into tee left the run green (Issue-137).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # ---------------------------------------------------------------- push --
   checks:
@@ -121,7 +128,7 @@ jobs:
         run: npm run bundle
 
       - name: Upload the bundles for the apply job
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: bundles
           path: dist/
@@ -134,7 +141,7 @@ jobs:
         run: npm run build --workspace @heat/client
 
       - name: Upload the client for the apply job
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: client
           path: packages/client/dist/client/browser/
@@ -189,13 +196,13 @@ jobs:
           terraform_wrapper: false
 
       - name: Download the bundles
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: bundles
           path: dist/
 
       - name: Download the client
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: client
           path: client/
@@ -283,6 +290,12 @@ jobs:
           set -eu
           echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
           node scripts/e2e.mjs --issue "$ISSUE" --username "e2e-$ISSUE@heat-sb.dcg-games.com" | tee -a "$RUNNER_TEMP/e2e.log"
+
+      # Its own step, so the log reaches the run's page when the test fails,
+      # which ends the step above at the failing line.
+      - name: Put the stack test's log on the run's page
+        if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
+        run: |
           {
             echo
             echo '```text'
