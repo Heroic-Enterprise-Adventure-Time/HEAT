@@ -21,7 +21,7 @@ export function costWords(offer: UpgradeOffer): string {
  * hall's (Issue-93): what the level gives, its cost beside the camp's
  * balance, and the control, disabled with the reason when the camp cannot
  * build it. A refusal from the hub is shown in place. At the facility's
- * highest level here, it says so.
+ * highest level here, it says so; before the camp is read, it shows nothing.
  */
 @Component({
   selector: 'heat-facility-build',
@@ -42,7 +42,7 @@ export function costWords(offer: UpgradeOffer): string {
           <p class="note">{{ offer.reason }}</p>
         }
       </section>
-    } @else {
+    } @else if (game.camp()) {
       <p class="note">At its highest level here.</p>
     }
   `,
