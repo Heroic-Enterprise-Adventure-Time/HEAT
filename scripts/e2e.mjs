@@ -130,6 +130,7 @@ const toGoogle = authorize.status === 302 && /^https:\/\/accounts\.google\.com\/
 check(toGoogle, `the authorize endpoint sends the browser to Google (got ${authorize.status} ${authorize.headers.get("location")?.split("?")[0] ?? ""})`);
 const anonymous = await fetch(graphqlUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ query: "{ __typename }" }) });
 check(anonymous.status === 401, `POST ${graphqlUrl} without a token is refused with 401 (got ${anonymous.status})`);
+check(false, "Issue-137: a check that fails on purpose, to see the run go red");
 
 if (anonymousOnly) {
   console.log("anonymous checks passed; nothing signed in and nothing written (--anonymous)");
