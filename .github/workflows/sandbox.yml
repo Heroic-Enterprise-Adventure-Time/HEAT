@@ -196,13 +196,13 @@ jobs:
           terraform_wrapper: false
 
       - name: Download the bundles
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: bundles
           path: dist/
 
       - name: Download the client
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: client
           path: client/
