@@ -7,6 +7,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { playerKeys } from "../src/db/keys.js";
 import { InsufficientBalance, RecruitRefused, Repository, type Hero } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
+import { must } from "./must.js";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;
@@ -32,12 +33,17 @@ async function putCamp(p: string, activeHeroes: number, livingHeroes: number) {
   );
 }
 
+/** The code of a GraphQLError, which is how the hub refuses; anything else is rethrown. */
+function codeOf(e: unknown): string {
+  if (e instanceof GraphQLError) return e.extensions["code"] as string;
+  throw e;
+}
+
 async function refusal(promise: Promise<unknown>): Promise<string | undefined> {
   try {
     await promise;
   } catch (e) {
-    if (e instanceof GraphQLError) return e.extensions["code"] as string;
-    throw e;
+    return codeOf(e);
   }
   return undefined;
 }
@@ -223,8 +229,8 @@ describe("recruitHero: paid", () => {
       await putPaidCamp(p, 3, { timber: 100 });
       const results = await Promise.allSettled([1, 2].map(() => recruitHero(repo, p, "villager", randomUUID())));
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-      const lost = results.find((r) => r.status === "rejected");
-      expect(await refusal(Promise.reject(lost?.reason))).toBe("HALL_FULL");
+      const lost = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+      expect(codeOf(must(lost, "the refused recruit").reason)).toBe("HALL_FULL");
       expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 80 }]);
       expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 4, livingHeroes: 4 });
     }
@@ -236,8 +242,8 @@ describe("recruitHero: paid", () => {
       await putPaidCamp(p, 1, { timber: 30 });
       const results = await Promise.allSettled([1, 2].map(() => recruitHero(repo, p, "villager", randomUUID())));
       expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-      const lost = results.find((r) => r.status === "rejected");
-      expect(await refusal(Promise.reject(lost?.reason))).toBe("INSUFFICIENT_RESOURCES");
+      const lost = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+      expect(codeOf(must(lost, "the refused recruit").reason)).toBe("INSUFFICIENT_RESOURCES");
       expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 10 }]);
       expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
     }

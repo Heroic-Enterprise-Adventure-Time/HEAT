@@ -94,14 +94,6 @@ export default tseslint.config(
   // Held back: the rules each area cannot meet yet, off for that area only,
   // and listed under "Held back" in docs/standards/typescript.md. The issue
   // named removes the block and fixes the findings it uncovers.
-  heldBack(['packages/hub/test/**/*.ts'], 148, [
-    '@typescript-eslint/no-non-null-assertion',
-    '@typescript-eslint/no-unnecessary-type-parameters',
-    '@typescript-eslint/no-unsafe-member-access',
-    '@typescript-eslint/no-unsafe-return',
-    '@typescript-eslint/prefer-promise-reject-errors',
-    '@typescript-eslint/use-unknown-in-catch-callback-variable',
-  ]),
   heldBack(['packages/client/**/*.ts', 'packages/client/**/*.html'], 149, [
     '@angular-eslint/component-max-inline-declarations',
     '@typescript-eslint/dot-notation',
