@@ -55,6 +55,11 @@ One player's view of one location: their facilities, resources and heroes there.
 type Camp {
   """Living and dead heroes; retired ones are not active."""
   activeHeroes: Int!
+
+  """
+  Each of the camp's own facilities, those every camp has and those it may build, with its level: 0 for one not built.
+  """
+  facilities: [FacilityLevel!]!
   hallLevel: Int!
 
   """Active heroes the heroes hall holds at its level."""
@@ -69,6 +74,13 @@ type Camp {
   """Stock of each resource the warehouse holds at its level."""
   resourceCapacity: Int!
   warehouseLevel: Int!
+}
+
+"""One of a camp's own facilities and its level."""
+type FacilityLevel {
+  """The facility's kind in the static content."""
+  kind: String!
+  level: Int!
 }
 
 """
@@ -132,6 +144,11 @@ type Job {
 }
 
 type Mutation {
+  """
+  Builds the next level of one of the camp's own facilities, at once, paid in resources from the camp's holdings, and answers the camp. The client names the level it is building, so a repeat finds it built and is answered with the camp, charging nothing. Refused with BAD_USER_INPUT, MAX_LEVEL, REQUIRES (extensions.missing lists each facility and the level it needs), INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance) or CONFLICT.
+  """
+  buildFacility(kind: String!, level: Int!, location: String!): Camp!
+
   """
   Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. Refused with ADVENTURE_VERIFIABLE while this deploy or the previous one could still verify it.
   """

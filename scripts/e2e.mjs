@@ -287,6 +287,37 @@ check(balance(paidFor, "timber") === balance(unchanged, "timber") - 20, `the cam
 const dismissed = await graphql(token, `mutation($id: String!) { retireHero(heroId: $id) { status } }`, { id: bought.id });
 check(dismissed.data?.retireHero?.status === "RETIRED", `the paid villager retired, leaving the hall as it was (${dismissed.ms} ms)`);
 
+// Building (Issue-93): the mine costs one timber run, 60 timber and 3 cloth.
+// The test user keeps its camp from run to run, so a run that cannot pay yet
+// checks the refusal, the run that can builds it, and every run after checks
+// that a repeat charges nothing and that the mine has no second level here.
+const campQuery = `{ me { camps { location holdings { material balance } facilities { kind level } } } }`;
+const buildMutation = `mutation($level: Int!) { buildFacility(location: "millbrook", kind: "mine", level: $level) { location holdings { material balance } facilities { kind level } } }`;
+const millbrook = (me) => me?.camps?.find((c) => c.location === "millbrook");
+const mineLevel = (camp) => camp?.facilities?.find((f) => f.kind === "mine")?.level;
+const stockOf = (camp, material) => camp?.holdings?.find((h) => h.material === material)?.balance ?? 0;
+const before = millbrook((await graphql(token, campQuery)).data?.me);
+const [timberBefore, clothBefore] = [stockOf(before, "timber"), stockOf(before, "cloth")];
+if (mineLevel(before) === 0 && (timberBefore < 60 || clothBefore < 3)) {
+  const poor = await graphql(token, buildMutation, { level: 1 });
+  check(poor.errors?.[0]?.extensions?.code === "INSUFFICIENT_RESOURCES", `the mine is refused for want of resources, with ${timberBefore} timber and ${clothBefore} cloth; a later run builds it (${poor.ms} ms)`);
+} else {
+  if (mineLevel(before) === 0) {
+    const built = await graphql(token, buildMutation, { level: 1 });
+    const camp = built.data?.buildFacility;
+    check(!built.errors && mineLevel(camp) === 1, `buildFacility built the mine (${built.ms} ms)`);
+    check(
+      stockOf(camp, "timber") === timberBefore - 60 && stockOf(camp, "cloth") === clothBefore - 3,
+      `the camp paid 60 timber and 3 cloth for it: timber ${timberBefore} to ${stockOf(camp, "timber")}, cloth ${clothBefore} to ${stockOf(camp, "cloth")}`,
+    );
+  }
+  const now = millbrook((await graphql(token, campQuery)).data?.me);
+  const repeat = await graphql(token, buildMutation, { level: 1 });
+  check(!repeat.errors && JSON.stringify(repeat.data?.buildFacility?.holdings) === JSON.stringify(now.holdings), `a repeat of the build answers the camp and charges nothing (${repeat.ms} ms)`);
+  const higher = await graphql(token, buildMutation, { level: 2 });
+  check(higher.errors?.[0]?.extensions?.code === "MAX_LEVEL", `the mine has no second level here (${higher.ms} ms)`);
+}
+
 // The timeline, read back through the hub from the replay bucket.
 const read = await graphql(token, `query($id: String!) { adventure(id: $id) { id status timeline } }`, { id });
 const timeline = read.data?.adventure?.timeline;

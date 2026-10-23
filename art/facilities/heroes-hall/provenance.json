@@ -1,7 +1,10 @@
 {
   "set": "heroes-hall",
   "kind": "facility",
-  "facility": { "kind": "heroes hall", "owner": "player" },
+  "facility": {
+    "kind": "heroes hall",
+    "owner": "player"
+  },
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",
@@ -12,8 +15,18 @@
   "levels": {
     "1": {
       "file": "level-1.png",
-      "canvas": [64, 64],
-      "pixellab": { "mapObjectId": "96347301-4725-4e8b-82b8-ab025ed9b3e1", "tags": ["heat", "facility", "heroes-hall"] },
+      "canvas": [
+        64,
+        64
+      ],
+      "pixellab": {
+        "mapObjectId": "96347301-4725-4e8b-82b8-ab025ed9b3e1",
+        "tags": [
+          "heat",
+          "facility",
+          "heroes-hall"
+        ]
+      },
       "tool": "create_map_object",
       "via": "MCP",
       "createdAt": "2026-10-20T05:09Z",
@@ -28,12 +41,97 @@
         "background_image": null
       },
       "generations": 1
+    },
+    "2": {
+      "file": "level-2.png",
+      "canvas": [
+        64,
+        64
+      ],
+      "pixellab": {
+        "mapObjectId": "c7d703ef-d945-4318-aea0-69139e5c5a74",
+        "tags": [
+          "heat",
+          "facility",
+          "heroes-hall"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-23T03:28Z",
+      "parameters": {
+        "description": "larger wooden adventurers' hall with a thatched roof, a second storey, a front door, a hanging sign and a banner, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 64,
+        "height": 64,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    },
+    "3": {
+      "file": "level-3.png",
+      "canvas": [
+        64,
+        64
+      ],
+      "pixellab": {
+        "mapObjectId": "06f19613-a62e-4c81-95a4-34dc5e18e8b1",
+        "tags": [
+          "heat",
+          "facility",
+          "heroes-hall"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-23T03:28Z",
+      "parameters": {
+        "description": "grand timber and stone adventurers' guild hall with a tiled roof, two storeys, a tower, a front door, a hanging sign and banners, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 64,
+        "height": 64,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
     }
   },
   "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
   "rejected": [
-    { "mapObjectId": "f0f9eae4-05cf-4381-acf0-f882d4362ba7", "why": "The same call: a log hall drawn on its own patch of ground, which clashed with the tileset." }
+    {
+      "mapObjectId": "f0f9eae4-05cf-4381-acf0-f882d4362ba7",
+      "why": "The same call: a log hall drawn on its own patch of ground, which clashed with the tileset."
+    },
+    {
+      "mapObjectId": "b31623a9-9bb1-4b6b-b9ae-3b04e583c21d",
+      "why": "Level 2, the same call as the kept one: on a patch of ground, and not the owner's pick."
+    },
+    {
+      "mapObjectId": "74935c9f-23db-44d6-84d5-07c242ededfe",
+      "why": "Level 2, worded for nothing under it: clean, not the owner's pick."
+    },
+    {
+      "mapObjectId": "64b9177c-664d-4a20-9d87-efb79fa6c182",
+      "why": "Level 2, the same call: reads smaller than level 1."
+    },
+    {
+      "mapObjectId": "86cf6191-ac88-4b48-bc18-ddc53c0b1676",
+      "why": "Level 2, worded after the pick with nothing under it (larger wooden adventurers' hall with a golden thatched roof, a stone chimney, a second storey, a front door, a hanging sign and a red banner on the wall, standing alone with nothing under it, seen at a slight angle so its side wall shows, three-quarter view, no ground, no base, no grass patch, black outline, warm earthy tones, NES-era retro pixel art, few colors): lost the angle, reads head-on."
+    },
+    {
+      "mapObjectId": "f4a98b90-cecb-4fb6-a8e4-ea6df8c46a3f",
+      "why": "Level 2, the same call: on a grass patch again."
+    },
+    {
+      "mapObjectId": "d2dfbbb8-822a-4ac4-8ed8-b124341436b4",
+      "why": "Level 3, the same call as the kept one: a pink roof, out of the palette."
+    }
   ],
-  "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png). Its three-quarter angle, the front wall facing down-right, is the angle every facility follows (docs/process/assets.md, rule 16).",
-  "verified": "level-1.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
+  "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png). Its three-quarter angle, the front wall facing down-right, is the angle every facility follows (docs/process/assets.md, rule 16). Levels 2 and 3: the owner, 2026-10-22 (Issue-93), from a mock-up of each candidate beside level 1 and a villager on the meadow-01 ground, rolled two at a time: level 3 once, level 2 three times, the third round worded after the pick, which it did not beat. Level 2 stands on a small patch of grass, which the owner accepted; no wording removed it.",
+  "verified": "level-1.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20. level-2.png and level-3.png are byte-identical to a second download, 2026-10-22."
 }
