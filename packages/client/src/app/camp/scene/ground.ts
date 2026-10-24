@@ -6,7 +6,7 @@
  * so a grid of cols × rows tiles needs (cols + 1) × (rows + 1) corners.
  */
 
-import { must } from '../../must';
+import { must } from '@heat/engine';
 
 export type Terrain = 'lower' | 'upper';
 

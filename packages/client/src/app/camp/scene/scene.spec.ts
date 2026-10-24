@@ -1,7 +1,7 @@
-import { must } from '../../must';
 import { layGround, type Terrain, type TilesetJson } from './ground';
 import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK, cornersAround } from './layout';
 import { WALK_SPEED, facingFor, gone, leave, newWalker, randomSpot, step } from './wander';
+import { must } from '@heat/engine';
 
 /** A tileset with one tile for each of the sixteen corner combinations, as PixelLab's tileset15 has. */
 function fullTileset(): TilesetJson {

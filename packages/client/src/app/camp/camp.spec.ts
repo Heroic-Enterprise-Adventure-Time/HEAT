@@ -8,8 +8,8 @@ import type { FacilityKind } from '@heat/engine';
 import { Game, upgradeOffer, type CampView, type HeroView, type RecruitOffer, type SeenHeroView } from '../game';
 import { Session } from '../session';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
-import { must } from '../must';
 import { CAMP_SCENE_FACTORY } from './camp';
+import { must } from '@heat/engine';
 
 const wren: HeroView = {
   id: 'h1',

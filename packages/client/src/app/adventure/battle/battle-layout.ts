@@ -1,5 +1,5 @@
 import type { Line, Side } from '@heat/engine';
-import { must } from '../../must';
+import { must } from '@heat/engine';
 
 /**
  * Where the battle scene puts things (game.md, "How the game looks" and

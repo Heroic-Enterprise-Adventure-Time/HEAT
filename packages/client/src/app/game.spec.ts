@@ -2,8 +2,8 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Api, ApiError, type Route } from './api';
 import { Game, overrideInput, type AdventureResultView, type AdventureView, type HeroView, type PlayerView, type SeenHeroView } from './game';
-import { must } from './must';
 import { Session, type SessionUser } from './session';
+import { must } from '@heat/engine';
 
 const villager: HeroView = {
   id: '6f1c2b52-8f8a-4d55-9a5e-2d3f4a1b0c9d',

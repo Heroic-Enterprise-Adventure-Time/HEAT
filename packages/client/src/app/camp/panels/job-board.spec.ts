@@ -6,9 +6,9 @@ import { ApiError } from '../../api';
 import { routes } from '../../app.routes';
 import { Game, type AdventureView, type HeroView } from '../../game';
 import { Session } from '../../session';
-import { must } from '../../must';
 import { CAMP_SCENE_FACTORY } from '../camp';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
+import { must } from '@heat/engine';
 
 function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): HeroView {
   return {

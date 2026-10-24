@@ -1,6 +1,5 @@
-import { UNIT_PROFILES, replay, type AdventureSnapshot } from '@heat/engine';
+import { UNIT_PROFILES, replay, must, type AdventureSnapshot } from '@heat/engine';
 import { isEntry } from './field';
-import { must } from '../must';
 import { AdventureRun, SAVED_RUN_PREFIX, TimelineRun, forgetRun, loadRun, saveRun } from './run';
 
 const villager = must(UNIT_PROFILES.villager, 'the villager profile');

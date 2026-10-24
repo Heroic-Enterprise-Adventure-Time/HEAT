@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
-import { UNIT_PROFILES } from "@heat/engine";
+import { UNIT_PROFILES, must } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
 import { Repository, type Camp, type Hero, type HeroStatus } from "../src/db/repository.js";
@@ -12,7 +12,6 @@ import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { must } from "./must.js";
 
 /**
  * startAdventure against DynamoDB Local: the job on the location's board,

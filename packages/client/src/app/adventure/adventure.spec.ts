@@ -2,14 +2,13 @@ import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { UNIT_PROFILES, replay, type AdventureEvent, type AdventureLogEntry, type AdventureSnapshot } from '@heat/engine';
+import { UNIT_PROFILES, replay, must, type AdventureEvent, type AdventureLogEntry, type AdventureSnapshot } from '@heat/engine';
 import { ApiError } from '../api';
 import { Game, type AdventureResultView, type AdventureView, type SettledView } from '../game';
 import { Adventure, BATTLE_SCENE_FACTORY, FRAME_LOOP } from './adventure';
 import type { BattleSceneCallbacks } from './battle/battle-scene';
 import { isEntry, type Field } from './field';
 import { AdventureRun, loadRun, saveRun } from './run';
-import { must } from '../must';
 import { Blank } from '../testing/blank';
 
 const adventure: AdventureView = {

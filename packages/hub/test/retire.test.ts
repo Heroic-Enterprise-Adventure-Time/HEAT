@@ -7,7 +7,7 @@ import { playerKeys } from "../src/db/keys.js";
 import { HeroChanged, Repository, type Hero, type HeroStatus } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
-import { must } from "./must.js";
+import { must } from "@heat/engine";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;

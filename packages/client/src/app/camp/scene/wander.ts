@@ -1,5 +1,5 @@
-import { must } from '../../must';
 import type { Point, Rect } from './layout';
+import { must } from '@heat/engine';
 
 /**
  * How a hero mills about the camp, for flavour (game.md, "Locations and

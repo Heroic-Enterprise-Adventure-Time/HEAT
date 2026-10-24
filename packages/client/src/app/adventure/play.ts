@@ -1,9 +1,9 @@
 import { Injectable, inject, signal } from '@angular/core';
 import type { AdventureEvent, AdventureSnapshot, AdventureTimeline, PartyOrder } from '@heat/engine';
 import { Game, type AdventureView } from '../game';
-import { must } from '../must';
 import { applyEvent, emptyField, isEntry, type Field } from './field';
 import { AdventureRun, TimelineRun, forgetRun, loadRun, saveRun, type Run } from './run';
+import { must } from '@heat/engine';
 
 /** The speeds the player can pick (decision 0002): simulated milliseconds per wall-clock millisecond. */
 export const SPEEDS = [1, 2, 4] as const;

@@ -1,8 +1,7 @@
 import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router } from '@angular/router';
-import { ABILITIES, JOBS, UNIT_PROFILES, location, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
-import { must } from '../must';
+import { ABILITIES, JOBS, UNIT_PROFILES, location, must, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
 import { Game, type AdventureResultView } from '../game';
 import { isSideBySide } from '../camp/page-layout';
 import { stackedBattleHeight } from './battle/battle-layout';
