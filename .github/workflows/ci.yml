@@ -68,7 +68,7 @@ jobs:
         run: npm run bundle
 
   terraform:
-    name: Terraform format and validate
+    name: Terraform format, validate and lint
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -97,3 +97,19 @@ jobs:
             terraform -chdir="$root" init -backend=false -input=false
             terraform -chdir="$root" validate
           done
+
+      # tflint, pinned, with the rulesets terraform/.tflint.hcl names; the
+      # token is for downloading the AWS ruleset from GitHub without hitting
+      # the anonymous rate limit (docs/standards/terraform.md, rule 17).
+      - name: Set up tflint
+        uses: terraform-linters/setup-tflint@v6
+        with:
+          tflint_version: v0.65.0
+
+      - name: Lint every root and module
+        run: |
+          tflint --init
+          tflint --recursive
+        working-directory: terraform
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

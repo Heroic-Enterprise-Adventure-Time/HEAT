@@ -49,12 +49,12 @@
         </li>
       }
     </ul>
-    <button type="button" (click)="depart(job.id)" [disabled]="picked().size === 0 || game.busy()">Depart</button>
+    <button type="button" [disabled]="picked().size === 0 || game.busy()" (click)="depart(job.id)">Depart</button>
   }
   @if (refusal(); as refusal) {
     <p class="refusal" role="alert">{{ refusal }}</p>
   }
 } @else {
   <h2 id="panel-title">Job</h2>
-  <p>The {{ posterName().toLowerCase() }} has no such job.</p>
+  <p>The {{ posterName() | lowercase }} has no such job.</p>
 }

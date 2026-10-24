@@ -1,4 +1,5 @@
 import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { NgOptimizedImage } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { STARTING_LOCATION, type FacilityKind } from '@heat/engine';
@@ -38,7 +39,7 @@ export const CAMP_SCENE_FACTORY = new InjectionToken<CampSceneFactory>('heat.cam
  */
 @Component({
   selector: 'heat-camp',
-  imports: [RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [NgOptimizedImage, RouterLink, RouterLinkActive, RouterOutlet],
   templateUrl: './camp.html',
   styleUrl: './camp.css',
   providers: [CampState],
@@ -51,8 +52,8 @@ export class Camp {
   protected readonly state = inject(CampState);
   private readonly router = inject(Router);
   private readonly createScene = inject(CAMP_SCENE_FACTORY);
-  private readonly stage = viewChild.required<ElementRef<HTMLElement>>('stage');
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
+  private readonly stage = viewChild.required<ElementRef<HTMLElement>>('stage');
 
   protected readonly location = computed(() => this.params()?.get('location') ?? STARTING_LOCATION);
 

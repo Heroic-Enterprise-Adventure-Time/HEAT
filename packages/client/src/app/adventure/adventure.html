@@ -54,7 +54,7 @@
           }
         </ul>
         <div class="after">
-          <button type="button" (click)="replay()" [disabled]="replayState() === 'loading'">Watch the replay</button>
+          <button type="button" [disabled]="replayState() === 'loading'" (click)="replay()">Watch the replay</button>
           <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
         </div>
         @if (replayState() === 'failed') {
@@ -88,9 +88,9 @@
                 <span>{{ hero.type }}</span>
                 <span class="health">{{ hero.health }}/{{ hero.maxHealth }}</span>
               </div>
-              <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="hero.name + ' health'"></meter>
+              <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="`${hero.name} health`"></meter>
               @if (hero.health > 0) {
-                <div class="abilities" role="group" [attr.aria-label]="hero.name + ' next action'">
+                <div class="abilities" role="group" [attr.aria-label]="`${hero.name} next action`">
                   @for (ability of abilities(hero.type); track ability.id) {
                     <button
                       type="button"
@@ -124,21 +124,18 @@
         @if (field.cargo.length > 0) {
           <p class="cargo">
             Carrying
-            @for (load of field.cargo; track load.material; let last = $last) {
-              {{ load.amount }} {{ load.material }}{{ last ? '' : ', ' }}
+            @for (load of field.cargo; track load.material) {
+              {{ load.amount }} {{ load.material }}{{ $last ? '' : ', ' }}
             }
           </p>
         }
       }
 
-      @switch (play.submit().state) {
-        @case ('submitting') {
-          <p class="note">Sending the run to be checked…</p>
-        }
-        @case ('failed') {
-          <p class="lost" role="alert">The run could not be sent: {{ play.submit().reason }}</p>
-          <button type="button" (click)="play.retry()">Try again</button>
-        }
+      @if (play.submit().state === 'submitting') {
+        <p class="note">Sending the run to be checked…</p>
+      } @else if (play.submit().state === 'failed') {
+        <p class="lost" role="alert">The run could not be sent: {{ play.submit().reason }}</p>
+        <button type="button" (click)="play.retry()">Try again</button>
       }
     } @else {
       <p>Loading…</p>
@@ -148,11 +145,11 @@
 
 <ng-template #playback>
   <div class="playback" role="group" aria-label="Playback">
-    <button type="button" (click)="play.togglePause()" [attr.aria-pressed]="play.paused()">
+    <button type="button" [attr.aria-pressed]="play.paused()" (click)="play.togglePause()">
       {{ play.paused() ? 'Resume' : 'Pause' }}
     </button>
     @for (speed of speeds; track speed) {
-      <button type="button" (click)="play.setSpeed(speed)" [attr.aria-pressed]="play.speed() === speed">{{ speed }}×</button>
+      <button type="button" [attr.aria-pressed]="play.speed() === speed" (click)="play.setSpeed(speed)">{{ speed }}×</button>
     }
   </div>
 </ng-template>
@@ -166,7 +163,7 @@
             <strong>{{ hero.name }}</strong>
             <span class="health">{{ hero.health }}/{{ hero.maxHealth }}</span>
           </div>
-          <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="hero.name + ' health'"></meter>
+          <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="`${hero.name} health`"></meter>
         </li>
       }
     </ul>

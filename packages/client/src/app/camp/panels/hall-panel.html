@@ -47,7 +47,7 @@
 <ul class="recruits">
   @for (offer of game.recruits(); track offer.unitType) {
     <li>
-      <button type="button" (click)="recruit(offer)" [disabled]="game.busy() || offer.reason !== null">
+      <button type="button" [disabled]="game.busy() || offer.reason !== null" (click)="recruit(offer)">
         Recruit a {{ offer.unitType }}
       </button>
       <span class="price">{{ price(offer) }}</span>
@@ -63,4 +63,4 @@
   }
 </ul>
 
-<heat-facility-build [kind]="'heroes-hall'" />
+<heat-facility-build kind="heroes-hall" />

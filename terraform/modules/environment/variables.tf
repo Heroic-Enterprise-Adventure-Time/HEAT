@@ -14,16 +14,6 @@ variable "name_prefix" {
   }
 }
 
-variable "environment" {
-  description = "The environment this stack belongs to: sandbox, dev or prod. Tags and the parameter path."
-  type        = string
-
-  validation {
-    condition     = contains(["sandbox", "dev", "prod"], var.environment)
-    error_message = "environment must be sandbox, dev or prod."
-  }
-}
-
 variable "functions" {
   description = "The functions of manifest.json, keyed by name: the exported handler, memory, timeout and HTTP routes, each route integrated with the function's live alias or the alias it names. The root passes jsondecode(file(manifest.json)).functions; nothing declares a function or route anywhere else (docs/standards/typescript.md, rule 4)."
   type = map(object({

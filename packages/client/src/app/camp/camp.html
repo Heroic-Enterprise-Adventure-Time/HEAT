@@ -5,19 +5,19 @@
     @for (facility of state.facilities(); track facility.kind) {
       <a
         class="entry"
-        [class.unbuilt]="facility.level === 0"
-        [routerLink]="['/camp', location(), facility.kind]"
         routerLinkActive="active"
         ariaCurrentWhenActive="page"
+        [class.unbuilt]="facility.level === 0"
+        [routerLink]="['/camp', location(), facility.kind]"
         [attr.title]="labels() ? null : facility.name"
       >
-        <img [src]="'art/icons/' + facility.kind + '.png'" [width]="iconPx()" [height]="iconPx()" alt="" />
+        <img alt="" [ngSrc]="`art/icons/${facility.kind}.png`" [width]="iconPx()" [height]="iconPx()" />
         <span class="label">{{ facility.name }}</span>
       </a>
     }
     @if (game.adventure()) {
       <a class="entry" routerLink="/adventure" [attr.title]="labels() ? null : 'Adventure'">
-        <img src="art/icons/adventure.png" [width]="iconPx()" [height]="iconPx()" alt="" />
+        <img ngSrc="art/icons/adventure.png" alt="" [width]="iconPx()" [height]="iconPx()" />
         <span class="label">Adventure</span>
       </a>
     }

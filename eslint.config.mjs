@@ -2,7 +2,7 @@
 // rule 16). One flat config for every workspace, run by `npm run lint` at the
 // root and by "Build and test" beside the typecheck. A rule is turned off here
 // only with its reason; a rule the code cannot meet yet is held back by file
-// pattern at the end, naming the issue that removes the hold-back (none today).
+// pattern at the end, naming the issue that removes the hold-back.
 import js from '@eslint/js';
 import graphql from '@graphql-eslint/eslint-plugin';
 import angular from 'angular-eslint';
@@ -51,11 +51,20 @@ export default tseslint.config(
     },
   },
 
-  // The client: Angular's rules for components, and its template rules for
-  // templates in .html files and, through the processor, inline ones.
+  // The hub logs through the Powertools logger, one JSON line per request
+  // and nothing that could hold a player's data (docs/standards/graphql.md,
+  // rule 16); nothing in it writes to the console.
+  {
+    files: ['packages/hub/src/**/*.ts'],
+    rules: { 'no-console': 'error' },
+  },
+
+  // The client: every one of Angular's component rules, and every one of its
+  // template rules for templates in .html files and, through the processor,
+  // inline ones (docs/standards/angular.md).
   {
     files: ['packages/client/**/*.ts'],
-    extends: [...angular.configs.tsRecommended],
+    extends: [...angular.configs.tsAll],
     processor: angular.processInlineTemplates,
     rules: {
       // A decorated class is instantiated by the framework from its decorator,
@@ -64,26 +73,68 @@ export default tseslint.config(
       '@angular-eslint/component-selector': ['error', { type: 'element', prefix: 'heat', style: 'kebab-case' }],
       '@angular-eslint/directive-selector': ['error', { type: 'attribute', prefix: 'heat', style: 'camelCase' }],
       // Templates and styles live in their own files beside the component
-      // (docs/standards/typescript.md, rule 13).
+      // (docs/standards/angular.md, rule 12).
       '@angular-eslint/component-max-inline-declarations': ['error', { template: 0, styles: 0, animations: 0 }],
+      // Angular's style guide dropped the Component and Directive suffixes
+      // with v20: a class is named for what it shows, `Camp`, not
+      // `CampComponent`.
+      '@angular-eslint/component-class-suffix': 'off',
+      '@angular-eslint/directive-class-suffix': 'off',
+      // A root service is `@Service()` (prefer-service-decorator); an
+      // `@Injectable()` with no providedIn is one a component provides, so
+      // that it lives as long as the component does.
+      '@angular-eslint/use-injectable-provided-in': 'off',
     },
   },
   {
     files: ['packages/client/**/*.html'],
-    extends: [...angular.configs.templateRecommended, ...angular.configs.templateAccessibility],
+    extends: [...angular.configs.templateAll],
+    rules: {
+      // A signal is read by calling it.
+      '@angular-eslint/template/no-call-expression': 'off',
+      // The game has one language.
+      '@angular-eslint/template/i18n': 'off',
+      // Counts the @if and @for blocks a list panel is made of; the logic a
+      // template must not hold lives in computed signals instead.
+      '@angular-eslint/template/cyclomatic-complexity': 'off',
+      // A size the page computes is bound to style; a literal style attribute
+      // is still refused, since styles live in the component's stylesheet.
+      '@angular-eslint/template/no-inline-styles': ['error', { allowBindToStyle: true }],
+    },
   },
 
-  // The committed schema, printed from the Pothos builder (rule 11).
+  // The committed schema, printed from the Pothos builder (rule 11), under
+  // every schema rule (docs/standards/graphql.md).
   {
     files: ['**/*.graphql'],
     languageOptions: { parser: graphql.parser, parserOptions: { graphQLConfig: { schema: 'packages/hub/schema.graphql' } } },
     plugins: { '@graphql-eslint': graphql },
     rules: {
-      ...graphql.configs['flat/schema-recommended'].rules,
+      ...graphql.configs['flat/schema-all'].rules,
+      // One input object per mutation, named for it (graphql.md, rule 5).
+      '@graphql-eslint/input-name': ['error', { checkInputType: true }],
       // Relay's convention, `id: ID!` on every object type. The API's value
       // types (Reward, Holding, UnitStats) have no identity, and its ids are
       // strings keyed by the hub, not global ids.
       '@graphql-eslint/strict-id-in-types': 'off',
+      // Relay's `query: Query` field on every mutation payload, for
+      // refetching through it; the client reads the player again instead.
+      '@graphql-eslint/require-field-of-type-query-in-mutation-result': 'off',
+      // The all tier forbids a Mutation root; the API has mutations by design.
+      '@graphql-eslint/no-root-type': 'off',
+      // The file is printed by Pothos, so its order is the printer's.
+      '@graphql-eslint/alphabetize': 'off',
+    },
+  },
+
+  // Held back: the committed schema until Issue-155 reshapes the API with one
+  // input object per mutation and a nullable result union at the root
+  // (docs/standards/graphql.md, "Held back").
+  {
+    files: ['packages/hub/schema.graphql'],
+    rules: {
+      '@graphql-eslint/input-name': 'off',
+      '@graphql-eslint/require-nullable-result-in-root': 'off',
     },
   },
 );

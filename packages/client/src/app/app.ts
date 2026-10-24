@@ -5,8 +5,8 @@ import { Updates } from './updates';
 
 /** The root component: the header bar, then the page the route shows; and the watch for a newer deploy. */
 @Component({
-  imports: [Header, RouterOutlet],
   selector: 'heat-root',
+  imports: [Header, RouterOutlet],
   templateUrl: './app.html',
 })
 export class App {
