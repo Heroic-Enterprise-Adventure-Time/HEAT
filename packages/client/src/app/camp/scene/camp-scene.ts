@@ -1,5 +1,5 @@
 import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
-import { facilityArtLevel, type FacilityKind } from '@heat/engine';
+import { facilityArtLevel, must, type FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
 import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
 import { lowestOpaqueRow } from '../../pixel-art';
@@ -77,7 +77,7 @@ function loadHeroFrames(set: string): Promise<HeroFrames> {
           ] as const),
         ),
       ) as Record<WalkDirection, Texture[]>;
-      const walkFoot = Object.fromEntries(WALK_DIRECTIONS.map((d) => [d, lowestOpaqueRow(walk[d][0]!)])) as Record<WalkDirection, number>;
+      const walkFoot = Object.fromEntries(WALK_DIRECTIONS.map((d) => [d, lowestOpaqueRow(must(walk[d][0], `the first ${d} walk frame`))])) as Record<WalkDirection, number>;
       return { still, walk, stillFoot: lowestOpaqueRow(still.south), walkFoot };
     })();
     heroFrames.set(set, frames);
@@ -175,7 +175,8 @@ export async function createCampScene(
     if (!entry) return;
     const ratio = window.devicePixelRatio;
     const css = entry.contentBoxSize[0];
-    const device = entry.devicePixelContentBoxSize?.[0];
+    // Safari has no devicePixelContentBoxSize, though the DOM types say every browser does.
+    const device = 'devicePixelContentBoxSize' in entry ? entry.devicePixelContentBoxSize[0] : undefined;
     const cssWidth = css?.inlineSize ?? entry.contentRect.width;
     const cssHeight = css?.blockSize ?? entry.contentRect.height;
     box = {
@@ -232,7 +233,7 @@ export async function createCampScene(
     // Every facility opens its panel, as its entry in the menu does (Issue-89).
     sprite.eventMode = 'static';
     sprite.cursor = 'pointer';
-    sprite.on('pointertap', () => callbacks.onFacility(spot.kind));
+    sprite.on('pointertap', () => { callbacks.onFacility(spot.kind); });
     things.addChild(sprite);
   }
 
@@ -254,7 +255,7 @@ export async function createCampScene(
         hero.clockMs += ticker.deltaMS;
         const direction: WalkDirection = facing === 'west' ? 'east' : facing;
         const frame = Math.floor(hero.clockMs / WALK_FRAME_MS) % WALK_FRAMES;
-        show(hero.sprite, hero.frames.walk[direction][frame]!, hero.frames.walkFoot[direction], facing === 'west', size);
+        show(hero.sprite, must(hero.frames.walk[direction][frame], `walk frame ${frame}`), hero.frames.walkFoot[direction], facing === 'west', size);
       } else {
         hero.clockMs = 0;
         show(hero.sprite, hero.frames.still[facing], hero.frames.stillFoot, false, size);
@@ -295,7 +296,7 @@ export async function createCampScene(
           const sprite = new Sprite(frames.still.south);
           sprite.eventMode = 'static';
           sprite.cursor = 'pointer';
-          sprite.on('pointertap', () => callbacks.onHero(h.id));
+          sprite.on('pointertap', () => { callbacks.onHero(h.id); });
           things.addChild(sprite);
           heroes.set(h.id, { sprite, walker, frames, clockMs: 0 });
         });

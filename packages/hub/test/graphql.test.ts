@@ -3,7 +3,7 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext 
 import { beforeAll, describe, expect, it } from "vitest";
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
-import { must } from "./must.js";
+import { must } from "@heat/engine";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,

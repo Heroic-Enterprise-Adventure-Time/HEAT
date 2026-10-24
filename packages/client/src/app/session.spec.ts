@@ -65,7 +65,7 @@ describe('inAppPath', () => {
       42,
       { path: '/camp/millbrook/mine' },
     ]) {
-      expect(inAppPath(value, origin), String(value)).toBeNull();
+      expect(inAppPath(value, origin), JSON.stringify(value)).toBeNull();
     }
   });
 });
@@ -76,13 +76,19 @@ function fakeManager(user: User | null) {
   const fake = {
     settings: null as UserManagerSettings | null,
     calls: [] as string[],
-    getUser: async () => user,
-    signinRedirect: async (args?: unknown) => void fake.calls.push(args ? `signinRedirect ${JSON.stringify(args)}` : 'signinRedirect'),
-    signinCallback: async (url?: string) => {
-      fake.calls.push(`signinCallback ${url}`);
-      return user ?? undefined;
+    getUser: () => Promise.resolve(user),
+    signinRedirect: (args?: unknown) => {
+      fake.calls.push(args ? `signinRedirect ${JSON.stringify(args)}` : 'signinRedirect');
+      return Promise.resolve();
     },
-    removeUser: async () => void fake.calls.push('removeUser'),
+    signinCallback: (url?: string) => {
+      fake.calls.push(`signinCallback ${url}`);
+      return Promise.resolve(user ?? undefined);
+    },
+    removeUser: () => {
+      fake.calls.push('removeUser');
+      return Promise.resolve();
+    },
     events: {
       addUserLoaded: (h: (u: User) => void) => void (handlers['loaded'] = [...(handlers['loaded'] ?? []), h]),
       addUserUnloaded: (h: () => void) => void (handlers['unloaded'] = [...(handlers['unloaded'] ?? []), h]),
@@ -194,11 +200,11 @@ describe('Session', () => {
     const manager = fakeManager(signedInUser());
     const { session } = await sessionWith(manager, config, 'https://46.heat-sb.dcg-games.com/');
     expect(session.user()?.email).toBe('player@example.com');
-    manager.handlers['unloaded']?.forEach((h) => h());
+    manager.handlers['unloaded']?.forEach((h) => { h(); });
     expect(session.user()).toBeNull();
-    manager.handlers['loaded']?.forEach((h) => (h as (u: User) => void)(signedInUser()));
+    manager.handlers['loaded']?.forEach((h) => { (h as (u: User) => void)(signedInUser()); });
     expect(session.user()?.email).toBe('player@example.com');
-    manager.handlers['renewError']?.forEach((h) => (h as (e: Error) => void)(new Error('invalid_grant')));
+    manager.handlers['renewError']?.forEach((h) => { (h as (e: Error) => void)(new Error('invalid_grant')); });
     expect(session.user()).toBeNull();
     expect(session.error()).toBe('the session could not be renewed: invalid_grant');
   });

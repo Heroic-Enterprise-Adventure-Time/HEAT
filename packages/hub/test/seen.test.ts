@@ -7,7 +7,7 @@ import { Repository, type Hero } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, heroesSeenAt, sightingOf, type Random } from "../src/seen.js";
-import { must } from "./must.js";
+import { must } from "@heat/engine";
 
 /**
  * The heroes seen at a location (decision 0029): recruit writes a sighting

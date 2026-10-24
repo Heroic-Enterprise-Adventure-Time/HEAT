@@ -5,6 +5,7 @@ import {
   PROP_SPRITE_SETS,
   UNIT_PROFILES,
   WEAPON_SPRITES,
+  must,
   type AbilityId,
   type AdventureEvent,
   type Line,
@@ -125,7 +126,7 @@ function artPath(unit: FieldUnit, heroSets: ReadonlyMap<string, string>): string
     return set ? `heroes/${set}` : null;
   }
   if (unit.kind === 'monster') {
-    const set = MONSTER_SPRITE_SETS[unit.type as MonsterType]?.[0];
+    const set = MONSTER_SPRITE_SETS[unit.type as MonsterType][0];
     return set ? `monsters/${set}` : null;
   }
   const set = PROP_SPRITE_SETS[unit.type as ResourceType]?.[0];
@@ -137,7 +138,7 @@ function lineOf(unit: FieldUnit): Line {
   return unit.line ?? UNIT_PROFILES[unit.type as UnitType]?.homeLine ?? 'near';
 }
 
-const frameOf = (frames: Frames, index: number) => frames.textures[Math.max(0, Math.min(frames.textures.length - 1, index))]!;
+const frameOf = (frames: Frames, index: number) => must(frames.textures[Math.max(0, Math.min(frames.textures.length - 1, index))], 'a frame');
 
 export async function createBattleScene(host: HTMLElement, callbacks: BattleSceneCallbacks): Promise<BattleSceneHandle> {
   TextureStyle.defaultOptions.scaleMode = 'nearest';
@@ -194,7 +195,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     if (!entry) return;
     const ratio = window.devicePixelRatio;
     const css = entry.contentBoxSize[0];
-    const device = entry.devicePixelContentBoxSize?.[0];
+    // Safari has no devicePixelContentBoxSize, though the DOM types say every browser does.
+    const device = 'devicePixelContentBoxSize' in entry ? entry.devicePixelContentBoxSize[0] : undefined;
     const cssWidth = css?.inlineSize ?? entry.contentRect.width;
     const cssHeight = css?.blockSize ?? entry.contentRect.height;
     resize(device?.inlineSize ?? Math.round(cssWidth * ratio), device?.blockSize ?? Math.round(cssHeight * ratio), cssWidth, cssHeight);
@@ -297,7 +299,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       sprite.visible = index >= 0;
       if (index < 0) continue;
       const { offset } = art.layout;
-      sprite.texture = art.frames[index]!;
+      sprite.texture = must(art.frames[index], `frame ${index} of the effect`);
       sprite.scale.set(effect.mirrored ? -1 : 1, 1);
       sprite.position.set(Math.round(target.x) + (effect.mirrored ? -offset.x : offset.x), Math.round(target.y) + offset.y);
       sprite.zIndex = target.y + 0.4;
@@ -372,8 +374,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     const index = weapon && act && unitView.downAt === null ? heldFrame(simTime, act, weapon.holdFrame, weapon.swing.length, ACT_MS) : null;
     weaponSprite.visible = index !== null;
     if (index === null || !weapon) return;
-    const grip = weapon.grips[index]!;
-    weaponSprite.texture = weapon.swing[index]!;
+    const grip = must(weapon.grips[index], `grip ${index} of the weapon`);
+    weaponSprite.texture = must(weapon.swing[index], `frame ${index} of the weapon`);
     weaponSprite.position.set(HAND.x - grip.x, HAND.y - grip.y);
   };
 
@@ -426,10 +428,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       sync(field);
       const at = targets(field);
       // Running on, the party keeps its order and starts with its front hero just beyond the window's left edge.
-      const front = Math.max(...field.party.map((u) => at.get(u.unitId)!.x));
+      const front = Math.max(...field.party.map((u) => must(at.get(u.unitId), `the spot of ${u.unitId}`).x));
       const runOn = front + view.stageX + 16;
       for (const unitView of units.values()) {
-        const spot = at.get(unitView.unit.unitId)!;
+        const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
         unitView.y = spot.y;
         unitView.x = enter && !unitView.opponent ? spot.x - runOn : spot.x;
         if (unitView.unit.health <= 0) unitView.downAt = -Infinity;
@@ -454,10 +456,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       sync(field);
       if (beginning) {
         const at = targets(field);
-        const fresh = field.opponents.map((u) => units.get(u.unitId)!).filter((v) => !v.behind);
-        offset = entryOffset(fresh.map((v) => at.get(v.unit.unitId)!.x));
+        const fresh = field.opponents.map((u) => must(units.get(u.unitId), `the view of ${u.unitId}`)).filter((v) => !v.behind);
+        offset = entryOffset(fresh.map((v) => must(at.get(v.unit.unitId), `the spot of ${v.unit.unitId}`).x));
         for (const unitView of fresh) {
-          const spot = at.get(unitView.unit.unitId)!;
+          const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
           unitView.x = spot.x + offset;
           unitView.y = spot.y;
         }
@@ -520,9 +522,9 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           drawBar(unitView);
           continue;
         }
-        const spot = at.get(unitView.unit.unitId)!;
+        const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
         let moving = false;
-        let rushing = false;
+        let rushing: boolean;
         let mirrored = unitView.opponent;
         if (unitView.opponent && entering === 'opponents') {
           unitView.x = spot.x + offset;

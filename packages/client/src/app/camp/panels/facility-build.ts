@@ -25,27 +25,7 @@ export function costWords(offer: UpgradeOffer): string {
  */
 @Component({
   selector: 'heat-facility-build',
-  template: `
-    @if (offer(); as offer) {
-      <section class="build" aria-labelledby="build-title">
-        <h3 id="build-title">{{ offer.level === 1 ? 'Build' : 'Upgrade to level ' + offer.level }}</h3>
-        @if (offer.gives) {
-          <p>{{ offer.gives }}</p>
-        }
-        <p class="price">{{ cost() }}</p>
-        <button type="button" (click)="build(offer)" [disabled]="game.busy() || offer.reason !== null">
-          {{ offer.level === 1 ? 'Build' : 'Upgrade' }}
-        </button>
-        @if (refused(); as refused) {
-          <p class="refusal" role="alert">{{ refused }}</p>
-        } @else if (offer.reason) {
-          <p class="note">{{ offer.reason }}</p>
-        }
-      </section>
-    } @else if (game.camp()) {
-      <p class="note">At its highest level here.</p>
-    }
-  `,
+  templateUrl: './facility-build.html',
   styleUrl: './panel.css',
 })
 export class FacilityBuild {

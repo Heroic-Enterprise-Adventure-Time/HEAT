@@ -1,0 +1,60 @@
+<a class="back" routerLink="../..">← {{ posterName() }}</a>
+@if (job(); as job) {
+  <h2 id="panel-title">{{ job.name }}</h2>
+  <p>{{ job.description }}</p>
+
+  <h3>Stages</h3>
+  <ol class="stages">
+    @for (stage of job.stages; track $index) {
+      <li>{{ words(stage) }}</li>
+    }
+  </ol>
+
+  <h3>Reward</h3>
+  <ul class="credits">
+    @for (credit of reward(); track credit.material) {
+      <li>
+        {{ credit.words }}. {{ game.camp()?.name }} holds {{ credit.balance }}, with room for {{ credit.room }} more.
+      </li>
+    }
+    <li>{{ job.xp }} XP to each hero who comes back.</li>
+  </ul>
+  <p class="retreat">{{ retreat() }}</p>
+
+  <h3>Party</h3>
+  @if (!game.player()) {
+    <p>Loading…</p>
+  } @else if (game.adventure(); as adventure) {
+    <p class="note">An adventure is under way: <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>.</p>
+  } @else if (game.livingHere().length === 0) {
+    <p>
+      No hero here is alive. Recruit one at the
+      <a class="link" [routerLink]="['/camp', game.location(), 'heroes-hall']">heroes hall</a>.
+    </p>
+  } @else {
+    <p>Pick one to {{ maxParty }} heroes.</p>
+    <ul class="party">
+      @for (hero of game.livingHere(); track hero.id) {
+        <li>
+          <label>
+            <input
+              type="checkbox"
+              [checked]="picked().has(hero.id)"
+              [disabled]="!picked().has(hero.id) && picked().size >= maxParty"
+              (change)="toggle(hero.id)"
+            />
+            {{ hero.name }}
+          </label>
+          <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+        </li>
+      }
+    </ul>
+    <button type="button" (click)="depart(job.id)" [disabled]="picked().size === 0 || game.busy()">Depart</button>
+  }
+  @if (refusal(); as refusal) {
+    <p class="refusal" role="alert">{{ refusal }}</p>
+  }
+} @else {
+  <h2 id="panel-title">Job</h2>
+  <p>The {{ posterName().toLowerCase() }} has no such job.</p>
+}

@@ -94,8 +94,8 @@ export function inAppPath(value: unknown, origin: string): string | null {
 
 function toSessionUser(user: User | null): SessionUser | null {
   if (!user || user.expired) return null;
-  const email = user.profile['email'];
-  const name = user.profile['name'];
+  const email = user.profile.email;
+  const name = user.profile.name;
   return {
     email: typeof email === 'string' ? email : null,
     name: typeof name === 'string' ? name : null,
@@ -140,8 +140,8 @@ export class Session {
     }
     const manager = this.createManager(sessionSettings(config, this.origin));
     this.manager = manager;
-    manager.events.addUserLoaded((user) => this.user.set(toSessionUser(user)));
-    manager.events.addUserUnloaded(() => this.user.set(null));
+    manager.events.addUserLoaded((user) => { this.user.set(toSessionUser(user)); });
+    manager.events.addUserUnloaded(() => { this.user.set(null); });
     manager.events.addSilentRenewError((e) => {
       this.user.set(null);
       this.error.set(`the session could not be renewed: ${e.message}`);

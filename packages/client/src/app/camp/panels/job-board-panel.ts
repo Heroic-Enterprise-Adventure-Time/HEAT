@@ -14,14 +14,7 @@ import { jobsAt } from './job-words';
 @Component({
   selector: 'heat-job-board-panel',
   imports: [RouterLink, JobList],
-  template: `
-    <h2 id="panel-title">Job board</h2>
-    <p>{{ description }}</p>
-    @if (game.adventure(); as adventure) {
-      <p class="note">An adventure is under way: <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>.</p>
-    }
-    <heat-job-list [jobs]="jobs()" />
-  `,
+  templateUrl: './job-board-panel.html',
   styleUrl: './panel.css',
 })
 export class JobBoardPanel {

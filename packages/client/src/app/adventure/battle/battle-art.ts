@@ -1,6 +1,7 @@
 import { Assets, Rectangle, Texture } from 'pixi.js';
 import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
 import { effectLayout, type EffectLayout, type EffectManifest } from './action-sprites';
+import { must } from '@heat/engine';
 
 /**
  * A battle unit's pictures, read from its sprite set's files and its
@@ -40,7 +41,7 @@ interface Provenance {
 
 async function frames(paths: readonly string[], footOf?: Texture): Promise<Frames> {
   const textures = await Promise.all(paths.map((p) => Assets.load<Texture>(p)));
-  return { textures, foot: lowestOpaqueRow(footOf ?? textures[0]!) };
+  return { textures, foot: lowestOpaqueRow(footOf ?? must(textures[0], 'the first frame')) };
 }
 
 const range = (n: number) => Array.from({ length: n }, (_, i) => i);
@@ -49,8 +50,8 @@ async function figureArt(base: string): Promise<UnitArt> {
   const provenance = (await (await fetch(`${base}/provenance.json`)).json()) as Provenance;
   const count = (anim: string) => provenance.animations?.[anim]?.framesPerDirection ?? 1;
   const east = (anim: string) => range(count(anim)).map((i) => `${base}/${anim}-east-${i}.png`);
-  const [stance, walk, act, hit, down] = await Promise.all(['stance', 'walk', 'act', 'hit', 'down'].map((a) => frames(east(a))));
-  return { stance: stance!, walk: walk!, act: act!, actHold: provenance.animations?.['act']?.holdFrame ?? 0, hit: hit!, down: down!, fadeAbove: null };
+  const [stance, walk, act, hit, down] = await Promise.all([frames(east('stance')), frames(east('walk')), frames(east('act')), frames(east('hit')), frames(east('down'))]);
+  return { stance, walk, act, actHold: provenance.animations?.['act']?.holdFrame ?? 0, hit, down, fadeAbove: null };
 }
 
 async function propArt(base: string): Promise<UnitArt> {
@@ -58,9 +59,10 @@ async function propArt(base: string): Promise<UnitArt> {
   const standing = await Assets.load<Texture>(`${base}/standing.png`);
   const still = { textures: [standing], foot: lowestOpaqueRow(standing) };
   const count = (anim: string) => provenance.animations?.[anim]?.frames ?? 1;
-  const [hit, down] = await Promise.all(['hit', 'down'].map((a) => frames(range(count(a)).map((i) => `${base}/${a}-${i}.png`), standing)));
+  const animation = (a: string) => frames(range(count(a)).map((i) => `${base}/${a}-${i}.png`), standing);
+  const [hit, down] = await Promise.all([animation('hit'), animation('down')]);
   const fades = provenance.animations?.['down']?.fadeAboveEnd === true;
-  return { stance: still, walk: still, act: still, actHold: 0, hit: hit!, down: down!, fadeAbove: fades ? highestOpaqueRow(down!.textures.at(-1)!) : null };
+  return { stance: still, walk: still, act: still, actHold: 0, hit, down, fadeAbove: fades ? highestOpaqueRow(must(down.textures.at(-1), 'the last down frame')) : null };
 }
 
 /** A weapon's swing, drawn beside its wielder while it acts (rules 32 and 33). */

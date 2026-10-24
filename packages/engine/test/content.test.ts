@@ -19,9 +19,9 @@ import {
   buildRefusal,
   facilityArtLevel,
   nextLevel,
+  must,
   type FacilityKind,
 } from "../src/index.js";
-import { must } from "./must.js";
 
 const heroes = new URL("../../../art/heroes/", import.meta.url);
 const facilities = new URL("../../../art/facilities/", import.meta.url);

@@ -6,7 +6,7 @@ import { Game } from './game';
 /** Reloads the page; a test provides one that counts. */
 export const RELOAD = new InjectionToken<() => void>('heat.reload', {
   providedIn: 'root',
-  factory: () => () => window.location.reload(),
+  factory: () => () => { window.location.reload(); },
 });
 
 /** The version this tab last reloaded away from, in session storage. */
@@ -39,7 +39,7 @@ export class Updates {
       if (!player || player.openAdventure || this.game.settled()) return;
       const version = this.config.value()?.version;
       if (!version) return;
-      untracked(() => this.reloadOnce(version));
+      untracked(() => { this.reloadOnce(version); });
     });
   }
 
