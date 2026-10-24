@@ -1,0 +1,28 @@
+@if (facility(); as facility) {
+  <h2 id="panel-title">{{ facility.name }}</h2>
+  @if (facility.level === 0) {
+    <p class="status">Not built yet.</p>
+    <p>{{ facility.description }}</p>
+  } @else {
+    <p class="status">Level {{ facility.level }}.</p>
+    <p>{{ facility.description }}</p>
+    @switch (facility.kind) {
+      @case ('warehouse') {
+        @if (stock().length === 0) {
+          <p>The warehouse is empty.</p>
+        } @else {
+          <ul class="stock">
+            @for (holding of stock(); track holding.material) {
+              <li>{{ holding.balance }} of {{ game.camp()?.resourceCapacity }} {{ holding.material }}</li>
+            }
+          </ul>
+        }
+      }
+    }
+    @if (jobs().length > 0) {
+      <h3>Jobs</h3>
+      <heat-job-list [jobs]="jobs()" />
+    }
+  }
+  <heat-facility-build [kind]="facility.kind" />
+}

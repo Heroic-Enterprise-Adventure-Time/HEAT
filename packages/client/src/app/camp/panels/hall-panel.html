@@ -1,0 +1,66 @@
+<h2 id="panel-title">Heroes hall</h2>
+@if (game.camp(); as camp) {
+  <p>Level {{ camp.hallLevel }}: {{ camp.activeHeroes }} of {{ camp.heroCapacity }} heroes.</p>
+}
+
+<h3>Living</h3>
+@if (game.livingHere().length > 0) {
+  <ul class="roster living">
+    @for (hero of game.livingHere(); track hero.id) {
+      <li>
+        <a class="link" [routerLink]="['heroes', hero.id]">{{ hero.name }}</a>
+        <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+      </li>
+    }
+  </ul>
+} @else {
+  <p>No living heroes.</p>
+}
+
+@if (dead().length > 0) {
+  <h3>Dead</h3>
+  <ul class="roster dead">
+    @for (hero of dead(); track hero.id) {
+      <li>
+        <a class="link" [routerLink]="['heroes', hero.id]">{{ hero.name }}</a>
+        <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+      </li>
+    }
+  </ul>
+}
+
+@if (game.retiredHere().length > 0) {
+  <details class="retired">
+    <summary>Retired ({{ game.retiredHere().length }})</summary>
+    <ul class="roster">
+      @for (hero of game.retiredHere(); track hero.id) {
+        <li>
+          <a class="link" [routerLink]="['heroes', hero.id]">{{ hero.name }}</a>
+          <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+        </li>
+      }
+    </ul>
+  </details>
+}
+
+<h3>Recruit</h3>
+<ul class="recruits">
+  @for (offer of game.recruits(); track offer.unitType) {
+    <li>
+      <button type="button" (click)="recruit(offer)" [disabled]="game.busy() || offer.reason !== null">
+        Recruit a {{ offer.unitType }}
+      </button>
+      <span class="price">{{ price(offer) }}</span>
+      @if (refused(); as refused) {
+        @if (refused.unitType === offer.unitType) {
+          <p class="refusal" role="alert">{{ refused.words }}</p>
+        }
+      }
+      @if (offer.reason && refused()?.unitType !== offer.unitType) {
+        <p class="note">{{ offer.reason }}</p>
+      }
+    </li>
+  }
+</ul>
+
+<heat-facility-build [kind]="'heroes-hall'" />

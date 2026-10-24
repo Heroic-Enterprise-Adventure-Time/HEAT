@@ -24,10 +24,10 @@ function setup(body: unknown) {
   const api = TestBed.inject(Api);
   const headers: Record<string, string>[] = [];
   const paths: string[] = [];
-  api.fetchFn = async (input, init) => {
+  api.fetchFn = (input, init) => {
     paths.push(input);
     headers.push(init.headers as Record<string, string>);
-    return new Response(JSON.stringify(body), { status: 200 });
+    return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
   };
   return { api, headers, paths };
 }

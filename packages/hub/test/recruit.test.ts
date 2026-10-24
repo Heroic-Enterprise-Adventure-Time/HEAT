@@ -2,12 +2,11 @@ import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
-import { SPRITE_SETS, SPRITE_SET_PRESENTATION, heroNames } from "@heat/engine";
+import { SPRITE_SETS, SPRITE_SET_PRESENTATION, heroNames, must } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
 import { InsufficientBalance, RecruitRefused, Repository, type Hero } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
-import { must } from "./must.js";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;

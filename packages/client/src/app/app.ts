@@ -7,7 +7,7 @@ import { Updates } from './updates';
 @Component({
   imports: [Header, RouterOutlet],
   selector: 'heat-root',
-  template: '<heat-header /><router-outlet />',
+  templateUrl: './app.html',
 })
 export class App {
   constructor() {

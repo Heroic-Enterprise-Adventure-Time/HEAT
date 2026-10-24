@@ -99,7 +99,7 @@ export class Camp {
         if (this.rendered) void this.mount();
       });
     });
-    effect(() => this.showHeroes(this.campHeroes(), this.game.seenHere(), this.state.arriving(), this.state.leaving()));
+    effect(() => { this.showHeroes(this.campHeroes(), this.game.seenHere(), this.state.arriving(), this.state.leaving()); });
     // A build changes a facility's picture in place (Issue-93).
     effect(() => {
       // Read first, so the effect follows the levels even before the scene exists.
@@ -120,8 +120,9 @@ export class Camp {
 
   /** Measures again when the device pixel ratio changes, browser zoom or another screen, which a resize alone may not report. */
   private watchRatio(): void {
-    const query = window.matchMedia?.(`(resolution: ${window.devicePixelRatio}dppx)`);
-    query?.addEventListener(
+    // jsdom, where the tests run, has the name matchMedia but no function behind it, though the DOM types say every window has one.
+    if (typeof window.matchMedia !== 'function') return;
+    window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener(
       'change',
       () => {
         this.measure();

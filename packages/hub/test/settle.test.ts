@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
-import { JOBS, LEVEL_XP, levelForXp, replay, warehouseCapacity, type AdventureTimeline, type UnitType } from "@heat/engine";
+import { JOBS, LEVEL_XP, levelForXp, replay, warehouseCapacity, must, type AdventureTimeline, type UnitType } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { locationKeys, playerKeys } from "../src/db/keys.js";
 import { Repository, type Hero, type Settlement } from "../src/db/repository.js";
@@ -10,7 +10,6 @@ import { discardAdventure } from "../src/discard.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { must } from "./must.js";
 
 /**
  * Submit, settlement and discard against DynamoDB Local, with the replay

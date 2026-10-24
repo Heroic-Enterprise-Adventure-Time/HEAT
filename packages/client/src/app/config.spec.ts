@@ -28,9 +28,9 @@ describe('Config.load', () => {
   it('loads config.json without caching it', async () => {
     const config = new Config();
     const calls: [string, RequestInit | undefined][] = [];
-    await config.load(async (input, init) => {
-      calls.push([String(input), init]);
-      return new Response(JSON.stringify(sample), { status: 200 });
+    await config.load((input, init) => {
+      calls.push([input instanceof Request ? input.url : String(input), init]);
+      return Promise.resolve(new Response(JSON.stringify(sample), { status: 200 }));
     });
     expect(config.value()).toEqual(sample);
     expect(config.error()).toBeNull();
@@ -39,7 +39,7 @@ describe('Config.load', () => {
 
   it('records a failure instead of throwing', async () => {
     const config = new Config();
-    await config.load(async () => new Response('', { status: 404 }));
+    await config.load(() => Promise.resolve(new Response('', { status: 404 })));
     expect(config.value()).toBeNull();
     expect(config.error()).toBe('GET /config.json answered 404');
   });

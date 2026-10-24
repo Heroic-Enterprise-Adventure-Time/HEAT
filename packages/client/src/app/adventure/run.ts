@@ -156,10 +156,10 @@ export class TimelineRun implements Run {
   advanceTo(simTime: number): readonly AdventureEvent[] {
     const { events } = this.timeline;
     const from = this.next;
-    while (this.next < events.length && events[this.next]!.timestamp <= simTime) {
-      const event = events[this.next++]!;
+    for (let event = events[this.next]; event && event.timestamp <= simTime; event = events[this.next]) {
+      this.next++;
       if (isEntry(event)) {
-        while (this.next < events.length && events[this.next]!.timestamp === event.timestamp) this.next++;
+        while (events[this.next]?.timestamp === event.timestamp) this.next++;
         this.time = event.timestamp;
         return events.slice(from, this.next);
       }
