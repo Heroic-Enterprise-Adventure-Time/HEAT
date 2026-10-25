@@ -1,4 +1,4 @@
-import { Injectable, signal } from '@angular/core';
+import { Service, signal } from '@angular/core';
 
 /**
  * What the client knows about the stack it runs in, read from `/config.json`
@@ -53,7 +53,7 @@ export function parseStackConfig(value: unknown): StackConfig {
 }
 
 /** The loaded configuration, or the reason it could not be loaded. */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class Config {
   readonly value = signal<StackConfig | null>(null);
   readonly error = signal<string | null>(null);

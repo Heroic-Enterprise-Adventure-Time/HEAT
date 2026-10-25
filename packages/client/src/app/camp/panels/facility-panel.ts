@@ -24,9 +24,9 @@ import { jobsAt } from './job-words';
 export class FacilityPanel {
   private readonly camp = inject(CampState);
   protected readonly game = inject(Game);
+  private readonly route = inject(ActivatedRoute);
   /** The camp's stock against the warehouse's cap ("The page"): what an adventure's settlement credits. */
   protected readonly stock = computed(() => (this.game.camp()?.holdings ?? []).filter((h) => h.balance > 0));
-  private readonly route = inject(ActivatedRoute);
   private readonly params = toSignal(this.route.paramMap);
   protected readonly facility = computed(() => this.camp.facility(this.params()?.get('facility')));
   protected readonly jobs = computed(() => {

@@ -8,7 +8,7 @@
     <dd>{{ hero.level }} ({{ hero.xp }} XP)</dd>
     <dt>Status</dt>
     @if (hero.status === 'RETIRED') {
-      <dd>retired{{ hero.retiredAt ? ' on ' + (hero.retiredAt | date: 'mediumDate') : '' }}</dd>
+      <dd>retired{{ hero.retiredAt ? ` on ${hero.retiredAt | date: 'mediumDate'}` : '' }}</dd>
     } @else {
       <dd>{{ hero.status === 'ALIVE' ? 'alive' : 'dead' }}</dd>
     }
@@ -23,8 +23,8 @@
           Retire <strong>{{ hero.name }}</strong>? Retiring is permanent. {{ hero.name }} leaves the hall for good and
           frees a slot; the record stays.
         </p>
-        <button type="button" (click)="retire(hero.id)" [disabled]="game.busy()">Retire {{ hero.name }}</button>
-        <button type="button" (click)="confirming.set(null)" [disabled]="game.busy()">Keep</button>
+        <button type="button" [disabled]="game.busy()" (click)="retire(hero.id)">Retire {{ hero.name }}</button>
+        <button type="button" [disabled]="game.busy()" (click)="confirming.set(null)">Keep</button>
       </div>
     } @else {
       <button type="button" class="retire" (click)="confirming.set(hero.id)">Retire</button>

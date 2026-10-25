@@ -1,5 +1,5 @@
 import { DOCUMENT } from '@angular/common';
-import { Injectable, InjectionToken, inject, signal } from '@angular/core';
+import { Service, InjectionToken, inject, signal } from '@angular/core';
 import { UserManager, type User, type UserManagerSettings } from 'oidc-client-ts';
 import { Config, type StackConfig } from './config';
 
@@ -111,7 +111,7 @@ function toSessionUser(user: User | null): SessionUser | null {
  * at sign-in, or by the bare path; then whoever the
  * stored tokens belong to is the user.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class Session {
   private readonly config = inject(Config);
   private readonly document = inject(DOCUMENT);

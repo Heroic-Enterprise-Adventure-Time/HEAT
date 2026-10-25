@@ -79,6 +79,7 @@ export class Adventure {
   protected readonly game = inject(Game);
   protected readonly play = inject(Play);
   private readonly router = inject(Router);
+  private readonly createScene = inject(BATTLE_SCENE_FACTORY);
   protected readonly speeds = SPEEDS;
   protected readonly endings = ENDINGS;
   protected readonly outcomes = OUTCOMES;
@@ -90,7 +91,6 @@ export class Adventure {
     this.side() ? null : stackedBattleHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
   );
   private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
-  private readonly createScene = inject(BATTLE_SCENE_FACTORY);
   private scene: BattleSceneHandle | null = null;
   /** Set once the scene has loaded, or failed to, and the run may start. */
   private readonly sceneReady = signal(false);

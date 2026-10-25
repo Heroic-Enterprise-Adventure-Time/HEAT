@@ -22,7 +22,8 @@ provider "aws" {
 }
 
 # Forces the default provider to be configured, and so the account check to
-# run, even though no resource uses it.
+# run, even though no resource uses it, which is why tflint is told so.
+# tflint-ignore: terraform_unused_declarations
 data "aws_caller_identity" "platform" {}
 
 # The workload account, reached by assuming the role the organization layer

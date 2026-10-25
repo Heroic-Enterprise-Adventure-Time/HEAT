@@ -29,8 +29,8 @@ export function costWords(offer: UpgradeOffer): string {
   styleUrl: './panel.css',
 })
 export class FacilityBuild {
-  readonly kind = input.required<FacilityKind>();
   protected readonly game = inject(Game);
+  readonly kind = input.required<FacilityKind>();
   protected readonly offer = computed(() => this.game.upgrade(this.kind()));
   protected readonly cost = computed(() => {
     const offer = this.offer();

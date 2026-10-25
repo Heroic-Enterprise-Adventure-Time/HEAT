@@ -1,11 +1,11 @@
 @if (offer(); as offer) {
   <section class="build" aria-labelledby="build-title">
-    <h3 id="build-title">{{ offer.level === 1 ? 'Build' : 'Upgrade to level ' + offer.level }}</h3>
+    <h3 id="build-title">{{ offer.level === 1 ? 'Build' : `Upgrade to level ${offer.level}` }}</h3>
     @if (offer.gives) {
       <p>{{ offer.gives }}</p>
     }
     <p class="price">{{ cost() }}</p>
-    <button type="button" (click)="build(offer)" [disabled]="game.busy() || offer.reason !== null">
+    <button type="button" [disabled]="game.busy() || offer.reason !== null" (click)="build(offer)">
       {{ offer.level === 1 ? 'Build' : 'Upgrade' }}
     </button>
     @if (refused(); as refused) {

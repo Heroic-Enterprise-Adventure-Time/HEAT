@@ -1,14 +1,12 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { LowerCasePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FACILITIES, type FacilityKind, type Stage } from '@heat/engine';
+import { FACILITIES, MAX_PARTY, type FacilityKind, type Stage } from '@heat/engine';
 import { ApiError } from '../../api';
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
 import { creditWords, credits, jobAt, retreatWords, stageWords } from './job-words';
-
-/** The most heroes a party takes (game.md, "The battle"); the hub refuses more with PARTY_SIZE. */
-export const MAX_PARTY = 4;
 
 /** The hub's refusals of a start, in the player's words; any other is shown as the hub put it. */
 const REFUSALS: Readonly<Record<string, string>> = {
@@ -36,7 +34,7 @@ const REFUSALS: Readonly<Record<string, string>> = {
  */
 @Component({
   selector: 'heat-job-panel',
-  imports: [RouterLink],
+  imports: [LowerCasePipe, RouterLink],
   templateUrl: './job-panel.html',
   styleUrl: './panel.css',
 })

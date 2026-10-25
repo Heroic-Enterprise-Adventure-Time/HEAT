@@ -1,4 +1,4 @@
-import { Injectable, InjectionToken, effect, inject, untracked } from '@angular/core';
+import { Service, InjectionToken, effect, inject, untracked } from '@angular/core';
 import { Api } from './api';
 import { Config } from './config';
 import { Game } from './game';
@@ -24,7 +24,7 @@ export const RELOADED_FROM = 'heat.reloadedFrom';
  * a deploy, it stays as it is rather than reloading in a loop; the next load
  * by any other means picks the deploy up.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class Updates {
   private readonly api = inject(Api);
   private readonly config = inject(Config);

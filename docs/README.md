@@ -23,7 +23,10 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [../terraform/environment/sandbox/README.md](../terraform/environment/sandbox/README.md) | The per-issue sandbox stacks: the one root, the environment module, the workflow, the cap and the sweep | When the agent reads it |
 | [../terraform/environment/dev/README.md](../terraform/environment/dev/README.md) | The dev environment: one root for the base, the environment and the login domain, applied on every merge to `main` with its smoke test; the first apply and the delegation | When the agent reads it |
 | [../terraform/environment/prod/README.md](../terraform/environment/prod/README.md) | The prod environment: the same root shape without a password-flow client or test users, applied on every merge to `release` through the release pull request, the guard, the token-free smoke test, the tag and the Release; the first release and the delegation | When the agent reads it |
-| [standards/typescript.md](standards/typescript.md) | Versions, dependencies, modules, testing, the hub's libraries, bundling, the client | When the agent works under `packages/`, through that directory's `AGENTS.md` |
+| [standards/typescript.md](standards/typescript.md) | Versions, dependencies, modules, testing, the hub's libraries, bundling, the client's versions and build, lint | When the agent works under `packages/`, through that directory's `AGENTS.md` |
+| [standards/angular.md](standards/angular.md) | How the client is written: components, signals and injection, where the data lives, pages and panels, the PixiJS boundary, templates, accessibility, tests | When the agent works under `packages/client/`, through that directory's `AGENTS.md` |
+| [standards/graphql.md](standards/graphql.md) | How the API and the hub are written: the schema's shape, resolvers, authorization, input, errors, logging, the data layer, tests | When the agent works under `packages/hub/`, through that directory's `AGENTS.md` |
+| [standards/terraform.md](standards/terraform.md) | How a stack is written: roots and modules, what never enters git, naming and tags, the guardrails, versions and state, comments, the Terraform floor, when a change needs a decision record | When the agent works under `terraform/`, through that directory's `AGENTS.md` |
 
 ## Planned
 
@@ -31,7 +34,7 @@ These are part of the structure and are not written yet. Each is written when th
 
 | Document | Written when |
 | --- | --- |
-| `standards/<language>.md` | The first code in that language lands; `standards/typescript.md` is the first |
+| `standards/<area>.md` | The first code in that language or area lands; `typescript.md`, `angular.md`, `graphql.md` and `terraform.md` exist |
 | More of `runbooks/` | A multi-step procedure has been done more than once; `runbooks/hero-sprite-set.md` is the first |
 
 ## How documents are written

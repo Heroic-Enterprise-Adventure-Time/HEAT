@@ -1,4 +1,4 @@
-import { Injectable, inject, signal } from '@angular/core';
+import { Service, inject, signal } from '@angular/core';
 import { Config } from './config';
 import { Session } from './session';
 
@@ -39,7 +39,7 @@ export type Fetch = (input: string, init: RequestInit) => Promise<Response>;
  * and a response flagged `outdated`, errors included, means a newer deploy
  * is live (decision 0030); what the client does about it is `Updates`'.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class Api {
   private readonly config = inject(Config);
   private readonly session = inject(Session);

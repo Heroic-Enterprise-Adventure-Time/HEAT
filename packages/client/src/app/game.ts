@@ -1,4 +1,4 @@
-import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Service, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
   STARTING_LOCATION,
   buildRefusal,
@@ -180,7 +180,7 @@ export function upgradeOffer(camp: CampView, kind: FacilityKind): UpgradeOffer |
  * read again when the player signs in or changes camps, not after each
  * change of their own, so the passers-by do not shuffle on every recruit.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class Game {
   private readonly api = inject(Api);
   private readonly session = inject(Session);
