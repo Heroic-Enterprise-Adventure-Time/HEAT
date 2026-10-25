@@ -5,8 +5,8 @@ description: Review a HEAT pull request against the written standards, from a se
 
 # Review a pull request
 
-Follow `docs/runbooks/review-change.md`, step by step, on the pull request's head: it holds the rules, the table of documents by path, how findings are posted and the brief this session works from. Decision 0033 is why the review runs in a session of its own and not in CI. What this file adds is only how Claude Code runs it:
+Follow `docs/runbooks/review-change.md`, step by step, on the pull request's head: it holds the rules, the table of documents by path, how findings are posted and the brief this session works from. Decision 0033 is why the review runs in a session of its own and not in CI. What this file adds is only how Claude Code's arguments map onto the runbook:
 
 - The pull request is `$ARGUMENTS`, a number. This session must not be the one that wrote the change, nor a fork of it (runbook, rule 1); if it is, stop and say so.
 - Read the runbook from the pull request's head, `git show origin/<head>:docs/runbooks/review-change.md`, after `git fetch origin <head>`, so a change to the procedure on the branch is the one followed; the standards documents the same way.
-- Post the review with `gh api` as rule 7 says, event `COMMENT` only; then the Skill tool: `code-review`, arguments `medium --max-findings 10 --comment $ARGUMENTS` (rule 9). Never approve, request changes or merge.
+- The built-in code review of the runbook's rule 9 is the Skill tool, `code-review`, with `$ARGUMENTS` as its target.

@@ -18,7 +18,7 @@
 
 **The pull request is the review surface.** A finding is a thread with its rule, the writing session's reply and the owner's resolution, which the `main` ruleset requires before a merge; a person reads it on GitHub now and a session finds it later. The review posts under the owner's login, because the agent uses the owner's `gh` credentials, so every comment opens with "Review skill" and the rule and closes with a line saying it was posted by the skill. A GitHub App identity for the agent would remove that caveat and is a change of its own, not made here.
 
-**A finding cites a rule, or it is a candidate rule.** The review is bound to what the owner wrote; a reviewer that cannot cite a sentence proposes one, and the owner decides whether the documents grow.
+**A finding cites a rule, or it is a candidate rule.** The review is bound to what the owner wrote; a reviewer that cannot cite a sentence proposes one, and the owner decides whether the documents grow. The first run, on the pull request that introduced the skill (PR-162, 2026-10-25), posted one finding and three candidate rules and found six places where the runbook's text and the run differed, all fixed on that pull request; one candidate became `docs/README.md` rule 10, a procedure lives in one document, after the run found its own procedure restated in five.
 
 ## Considered and not chosen
 

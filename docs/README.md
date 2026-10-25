@@ -36,7 +36,7 @@ These are part of the structure and are not written yet. Each is written when th
 | Document | Written when |
 | --- | --- |
 | `standards/<area>.md` | The first code in that language or area lands; `typescript.md`, `angular.md`, `graphql.md` and `terraform.md` exist |
-| More of `runbooks/` | A multi-step procedure has been done more than once; `runbooks/hero-sprite-set.md` and `runbooks/review-change.md` exist |
+| More of `runbooks/` | A multi-step procedure will run more than once and an agent must follow it without the conversation that shaped it; `runbooks/hero-sprite-set.md` and `runbooks/review-change.md` exist |
 
 ## How documents are written
 
@@ -49,6 +49,7 @@ These are part of the structure and are not written yet. Each is written when th
 7. **Mark the status of design items.** Each item in a design or architecture document is labeled Decided, Working assumption or Open. The labels are defined at the top of each of those documents.
 8. **Design and process documents say what is true now.** When a decision changes, edit the document and add a decision record. The record keeps what was rejected and the history; in the document, how a rule got there is one sentence pointing at the record. At the pauses that rule 9 of `process/best-practices.md` names, a checkpoint merged or a step of the build order begun, the documents are swept for history that has crept in, and it is moved to a record or cut.
 9. **AWS account ids do not appear in committed files.** Documents and code name accounts by name (`heat-dev`, `heat-platform`) and never by id. Credentials never appear anywhere. This repository is written to be safe to publish; the organization-level `dcg-platform` repository takes the opposite rule, for reasons recorded there as its decision 0001.
+10. **A procedure lives in one document.** Another document that needs it names it and points at it; it does not restate the steps. A process rule says that the procedure is followed and where it is; a decision record says why it has the shape it has; a skill says how Claude Code's arguments map onto it. From the review skill's first run (decision 0033).
 
 ## Not documents
 
@@ -56,7 +57,7 @@ These are part of the structure and are not written yet. Each is written when th
 
 ## Where documents live
 
-Content that a person or another tool might need lives under `docs/`, in plain Markdown. Nothing of that kind lives under `.claude/`, which holds only what is specific to Claude Code: `settings.json`, and skills that point at files in `docs/runbooks/`.
+Content that a person or another tool might need lives under `docs/`, in plain Markdown. Nothing of that kind lives under `.claude/`, which holds only what is specific to Claude Code: `settings.json`, and skills that point at files in `docs/runbooks/`. A skill holds its frontmatter and how Claude Code's arguments map onto the runbook it points at, and nothing the runbook already says (rule 10).
 
 ## How agents load these documents
 
