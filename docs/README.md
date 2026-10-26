@@ -11,6 +11,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
 | [process/assets.md](process/assets.md) | Generated art and audio: the services, the connectors, the hero sprite set, a camp's ground and facilities, the page's icons, monsters and props, the provenance beside each set | When the agent reads it |
 | [runbooks/hero-sprite-set.md](runbooks/hero-sprite-set.md) | Making a hero or monster sprite set: the order of work, the script that writes and checks the files and the provenance; the skill `.claude/skills/hero-sprite-set/` points at it | When the agent makes art |
+| [runbooks/review-change.md](runbooks/review-change.md) | Reviewing a pull request against the standards from a session that did not write it: the range from the pull request, the documents by the paths touched, one numbered rule per finding, findings as review threads, candidate rules, the built-in code review; the skill `.claude/skills/review-change/` points at it | When a session is started to review a pull request, from `code-changes.md` rule 23 |
 | [process/development.md](process/development.md) | Running and seeing a change: the branch's sandbox stack, the fast loop on the laptop, logs, the cap | When the agent reads it |
 | [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
@@ -35,7 +36,7 @@ These are part of the structure and are not written yet. Each is written when th
 | Document | Written when |
 | --- | --- |
 | `standards/<area>.md` | The first code in that language or area lands; `typescript.md`, `angular.md`, `graphql.md` and `terraform.md` exist |
-| More of `runbooks/` | A multi-step procedure has been done more than once; `runbooks/hero-sprite-set.md` is the first |
+| More of `runbooks/` | A multi-step procedure will run more than once and an agent must follow it without the conversation that shaped it; `runbooks/hero-sprite-set.md` and `runbooks/review-change.md` exist |
 
 ## How documents are written
 
@@ -48,6 +49,7 @@ These are part of the structure and are not written yet. Each is written when th
 7. **Mark the status of design items.** Each item in a design or architecture document is labeled Decided, Working assumption or Open. The labels are defined at the top of each of those documents.
 8. **Design and process documents say what is true now.** When a decision changes, edit the document and add a decision record. The record keeps what was rejected and the history; in the document, how a rule got there is one sentence pointing at the record. At the pauses that rule 9 of `process/best-practices.md` names, a checkpoint merged or a step of the build order begun, the documents are swept for history that has crept in, and it is moved to a record or cut.
 9. **AWS account ids do not appear in committed files.** Documents and code name accounts by name (`heat-dev`, `heat-platform`) and never by id. Credentials never appear anywhere. This repository is written to be safe to publish; the organization-level `dcg-platform` repository takes the opposite rule, for reasons recorded there as its decision 0001.
+10. **A procedure lives in one document.** Another document that needs it names it and points at it; it does not restate the steps. A process rule says that the procedure is followed and where it is; a decision record says why it has the shape it has; a skill says how Claude Code's arguments map onto it. From the review skill's first run (decision 0033).
 
 ## Not documents
 
@@ -55,7 +57,7 @@ These are part of the structure and are not written yet. Each is written when th
 
 ## Where documents live
 
-Content that a person or another tool might need lives under `docs/`, in plain Markdown. Nothing of that kind lives under `.claude/`, which holds only what is specific to Claude Code: `settings.json`, and later skills that point at files in `docs/runbooks/`.
+Content that a person or another tool might need lives under `docs/`, in plain Markdown. Nothing of that kind lives under `.claude/`, which holds only what is specific to Claude Code: `settings.json`, and skills that point at files in `docs/runbooks/`. A skill holds its frontmatter and how Claude Code's arguments map onto the runbook it points at, and nothing the runbook already says (rule 10).
 
 ## How agents load these documents
 
