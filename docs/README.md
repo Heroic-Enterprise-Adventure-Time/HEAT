@@ -12,6 +12,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/assets.md](process/assets.md) | Generated art and audio: the services, the connectors, the hero sprite set, a camp's ground and facilities, the page's icons, monsters and props, the provenance beside each set | When the agent reads it |
 | [runbooks/hero-sprite-set.md](runbooks/hero-sprite-set.md) | Making a hero or monster sprite set: the order of work, the script that writes and checks the files and the provenance; the skill `.claude/skills/hero-sprite-set/` points at it | When the agent makes art |
 | [runbooks/review-change.md](runbooks/review-change.md) | Reviewing a pull request against the standards from a session that did not write it: the range from the pull request, the documents by the paths touched, one numbered rule per finding, findings as review threads, candidate rules, the built-in code review; the skill `.claude/skills/review-change/` points at it | When a session is started to review a pull request, from `code-changes.md` rule 23 |
+| [runbooks/checkup.md](runbooks/checkup.md) | Reviewing the whole tree on `main` against the standards at a pause, from a session of its own: one pass per area under its documents, the documents' sweep and the drift questions, one numbered rule per finding, findings deduplicated against the `finding` issues and filed as issues under a cap, candidate rules to the owner; the skill `.claude/skills/checkup/` points at it | When a session is started for the checkup, from `code-changes.md` rule 28 |
 | [process/development.md](process/development.md) | Running and seeing a change: the branch's sandbox stack, the fast loop on the laptop, logs, the cap | When the agent reads it |
 | [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
@@ -36,7 +37,7 @@ These are part of the structure and are not written yet. Each is written when th
 | Document | Written when |
 | --- | --- |
 | `standards/<area>.md` | The first code in that language or area lands; `typescript.md`, `angular.md`, `graphql.md` and `terraform.md` exist |
-| More of `runbooks/` | A multi-step procedure will run more than once and an agent must follow it without the conversation that shaped it; `runbooks/hero-sprite-set.md` and `runbooks/review-change.md` exist |
+| More of `runbooks/` | A multi-step procedure will run more than once and an agent must follow it without the conversation that shaped it; `runbooks/hero-sprite-set.md`, `runbooks/review-change.md` and `runbooks/checkup.md` exist |
 
 ## How documents are written
 
