@@ -115,7 +115,7 @@ docs/                design, architecture, decisions, process, standards, runboo
 Fifteen minutes, in this order:
 
 1. [packages/hub/src/schema/builder.ts](packages/hub/src/schema/builder.ts), 2 minutes: the two authorization scopes, `authenticated` and `self`, resolved once per request.
-2. [packages/hub/src/schema/schema.ts](packages/hub/src/schema/schema.ts), 4 minutes, skimmed: the graph, and where each scope is declared on a type or a field.
+2. [packages/hub/src/schema/schema.ts](packages/hub/src/schema/schema.ts), 3 minutes, skimmed: the graph, and where each scope is declared on a type or a field.
 3. [packages/engine/src/adventure/replay.ts](packages/engine/src/adventure/replay.ts), 2 minutes: the one entry point the hub verifies with.
 4. [packages/engine/test/adventure/determinism.test.ts](packages/engine/test/adventure/determinism.test.ts), 3 minutes: a run stepped by wall-clock time and the replay of its override log produce the same timeline.
 5. [docs/decisions/0014-verification-in-the-submit-request.md](docs/decisions/0014-verification-in-the-submit-request.md), 2 minutes: why verification is in the request and not behind a queue.
