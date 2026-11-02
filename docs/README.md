@@ -6,7 +6,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 
 | Document | Covers | Reaches an agent |
 | --- | --- | --- |
-| [../README.md](../README.md) | The front page for a person arriving at the repository: what HEAT is, where it runs, what it shows, how it is built, where to read next | Never by itself; a person's entry point, where `AGENTS.md` is an agent's |
+| [../README.md](../README.md) | The front page for a person arriving at the repository: what HEAT is, where it runs, what it shows, the system and the adventure loop as diagrams, how it is built, a reviewer's fifteen-minute path, where to read next | Never by itself; a person's entry point, where `AGENTS.md` is an agent's |
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
@@ -18,7 +18,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
-| [architecture/overview.md](architecture/overview.md) | The system: services, data, flows, build order | When the agent reads it |
+| [architecture/overview.md](architecture/overview.md) | The system: three diagrams, then services, data, flows, build order | When the agent reads it |
 | [decisions/](decisions/README.md) | One record per significant decision, including what was rejected | When the agent reads it |
 | [../terraform/backend/README.md](../terraform/backend/README.md) | The state bucket, who applies it, and the one-time bootstrap | When the agent reads it |
 | [../terraform/bootstrap/README.md](../terraform/bootstrap/README.md) | The pipeline's plan and apply roles, their boundary and the budget action in each workload account, who applies, what waits on what | When the agent reads it |
