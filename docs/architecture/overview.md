@@ -48,9 +48,9 @@ sequenceDiagram
   participant D as DynamoDB
   participant S as Replay bucket
   B->>H: startAdventure(location, job, heroes)
-  H->>D: one transaction: the record with seed, snapshot and version; the open item; each hero's mark
+  H->>D: one transaction: the record with seed, snapshot and version, the open item, and each hero's mark
   H-->>B: seed, frozen snapshot, version
-  Note over B: runs the engine on wall-clock time and keeps the override log in localStorage; no request until the end
+  Note over B: runs the engine on wall-clock time and keeps the override log in localStorage, with no request until the end
   B->>H: submitAdventure(id, overrides)
   alt issued by this deploy
     H->>H: replay(snapshot, seed, overrides) with the engine
