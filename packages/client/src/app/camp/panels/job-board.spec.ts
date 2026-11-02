@@ -2,7 +2,7 @@ import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { Refusal } from '../../api';
+import { Refusal } from '../../hub';
 import { routes } from '../../app.routes';
 import { Game, type AdventureView, type HeroView } from '../../game';
 import { Session } from '../../session';
@@ -56,7 +56,6 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
     adventure: open,
     settled: signal(null),
-    busy: signal(false),
     error: signal<string | null>(null),
     started: [] as { location: string; jobId: string; heroIds: readonly string[] }[],
     startAdventure: (location: string, jobId: string, heroIds: readonly string[]) => {

@@ -1,6 +1,6 @@
 # 0038: Refusals as data in a result union per mutation, one input object per mutation, and the engine's sets as enums
 
-- **Status:** Decided
+- **Status:** Decided; amended 2026-11-02 by Issue-156: the client's mapping back is typed from the enums GraphQL Code Generator emits, not by its `enumValues`, which sets the runtime value of a generated TypeScript enum that Apollo does not translate on the wire
 - **Date:** 2026-11-02
 - **Settles:** Issue-155: how a mutation refuses, how it takes its arguments, and how ids, timestamps and the engine's closed sets appear in the API; agreed in shape on 2026-10-24 (Issue-145), when `docs/standards/graphql.md` stated the accepted practice as rules 4 to 6 and held the code back until this issue.
 
@@ -29,4 +29,4 @@
 
 ## Where it is described
 
-`docs/standards/graphql.md`, rules 4 to 6 and 15; `docs/architecture/overview.md`, "Services and data"; `packages/hub/schema.graphql`, the printed contract; `packages/hub/src/refusals.ts`, `packages/hub/src/schema/`; `packages/client/src/app/game.ts` and `api.ts`.
+`docs/standards/graphql.md`, rules 4 to 6 and 15; `docs/architecture/overview.md`, "Services and data"; `packages/hub/schema.graphql`, the printed contract; `packages/hub/src/refusals.ts`, `packages/hub/src/schema/`; `packages/client/src/app/game.ts` and `hub.ts`.

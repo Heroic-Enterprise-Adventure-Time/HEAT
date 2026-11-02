@@ -1,6 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Refusal } from '../../api';
+import { Refusal } from '../../hub';
 import { Game, type RecruitOffer } from '../../game';
 import { CampState } from '../camp-state';
 import { FacilityBuild } from './facility-build';
@@ -37,18 +37,23 @@ export class HallPanel {
   protected readonly game = inject(Game);
   private readonly camp = inject(CampState);
   protected readonly dead = computed(() => this.game.heroesHere().filter((h) => h.status === 'DEAD'));
+  /** The unit type being recruited while the hub answers; every recruit waits for it. */
+  protected readonly pending = signal<string | null>(null);
   /** The hub's last refusal, on the recruit it refused; cleared by the next try. */
   protected readonly refused = signal<{ unitType: string; words: string } | null>(null);
   protected readonly price = priceWords;
 
   protected async recruit(offer: RecruitOffer): Promise<void> {
     this.refused.set(null);
+    this.pending.set(offer.unitType);
     try {
       const hero = await this.game.recruit(offer.unitType);
       this.camp.arriving.set(hero.id);
     } catch (e) {
       const kind = e instanceof Refusal ? e.kind : null;
       this.refused.set({ unitType: offer.unitType, words: (kind && REFUSALS[kind]) ?? (e instanceof Error ? e.message : String(e)) });
+    } finally {
+      this.pending.set(null);
     }
   }
 }

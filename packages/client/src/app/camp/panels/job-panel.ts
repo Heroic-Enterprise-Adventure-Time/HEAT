@@ -4,7 +4,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FACILITIES, MAX_PARTY, type FacilityKind, type Stage } from '@heat/engine';
 import { upperFirst } from 'es-toolkit';
-import { Refusal } from '../../api';
+import { Refusal } from '../../hub';
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
 import { creditWords, credits, jobAt, retreatWords, stageWords } from './job-words';
@@ -85,6 +85,8 @@ export class JobPanel {
     const living = new Set(this.game.livingHere().map((h) => h.id));
     return new Set([...this.chosen()].filter((id) => living.has(id)));
   });
+  /** Whether the party is setting out, while the hub answers. */
+  protected readonly pending = signal(false);
   protected readonly refusal = signal<string | null>(null);
 
   protected words(stage: Stage): string {
@@ -100,6 +102,7 @@ export class JobPanel {
 
   protected async depart(jobId: string): Promise<void> {
     this.refusal.set(null);
+    this.pending.set(true);
     try {
       await this.game.startAdventure(this.game.location(), jobId, [...this.picked()]);
       await this.router.navigate(['/adventure']);
@@ -109,6 +112,8 @@ export class JobPanel {
       // The facility that posts the job is not built: the hub's rule, as Issue-133 gave it.
       const words = kind === 'Requires' && facility ? `Build the ${FACILITIES[facility].name.toLowerCase()} first.` : kind && REFUSALS[kind];
       this.refusal.set(words ?? (e instanceof Error ? e.message : String(e)));
+    } finally {
+      this.pending.set(false);
     }
   }
 }

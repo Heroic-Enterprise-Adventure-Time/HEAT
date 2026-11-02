@@ -2,10 +2,11 @@
 #
 # The gate on every pull request and on main: does the repository build, does
 # it lint clean, do its tests pass, does the client build for production, is
-# the committed GraphQL schema current, does every function bundle, is
-# every Terraform root formatted and valid, and does every workflow lint
-# clean under actionlint. It runs with no AWS credentials; the integration tests start their own containers
-# (decision 0009) and the Terraform roots are initialised without a backend.
+# the committed GraphQL schema current and the client's generated code with
+# it, does every function bundle, is every Terraform root formatted and valid,
+# and does every workflow lint clean under actionlint. It runs with no AWS
+# credentials; the integration tests start their own containers (decision
+# 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
 # roots, under their GitHub environments, and sandbox.yml the per-issue
 # stacks (decision 0017).
@@ -63,6 +64,13 @@ jobs:
         run: |
           npm run schema:print
           git diff --exit-code -- packages/hub/schema.graphql
+
+      # The client's operations and types are generated from that schema
+      # (codegen.mjs); a stale file fails here as a stale schema does.
+      - name: Check that the client's generated GraphQL code matches the schema and its operations
+        run: |
+          npm run codegen
+          git diff --exit-code -- packages/client/src/app/graphql/generated
 
       - name: Bundle every function for Lambda
         run: npm run bundle

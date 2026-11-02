@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from '../app.routes';
-import { Refusal } from '../api';
+import { Refusal } from '../hub';
 import type { FacilityKind } from '@heat/engine';
 import { Game, upgradeOffer, type CampView, type HeroView, type RecruitOffer, type SeenHeroView } from '../game';
 import { Session } from '../session';
@@ -83,7 +83,6 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
     // Not read yet: a job's detail waits for it before offering the party.
     player: signal(null),
     adventure: signal<{ snapshot: { heroes: { heroId: string }[] } } | null>(null),
-    busy: signal(false),
     error: signal<string | null>(null),
     recruited: [] as string[],
     /** A refusal the next recruit throws, as the hub would. */

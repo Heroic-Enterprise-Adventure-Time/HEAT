@@ -1,0 +1,15 @@
+#import "./adventure-fields.graphql"
+
+mutation StartAdventure($input: StartAdventureInput!) {
+  startAdventure(input: $input) {
+    __typename
+    ... on Error {
+      message
+    }
+    ... on StartAdventureSuccess {
+      adventure {
+        ...AdventureFields
+      }
+    }
+  }
+}

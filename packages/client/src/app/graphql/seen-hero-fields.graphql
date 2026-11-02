@@ -1,0 +1,7 @@
+fragment SeenHeroFields on SeenHero {
+  id
+  level
+  name
+  spriteSet
+  unitType
+}

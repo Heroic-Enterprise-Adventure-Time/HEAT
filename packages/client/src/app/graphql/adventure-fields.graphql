@@ -1,0 +1,29 @@
+fragment AdventureFields on Adventure {
+  id
+  location
+  seed
+  startedAt
+  version
+  job {
+    id
+    description
+    name
+  }
+  snapshot {
+    jobId
+    version
+    heroes {
+      heroId
+      level
+      name
+      spriteSet
+      unitType
+      stats {
+        damage
+        gathering
+        maxHealth
+        speed
+      }
+    }
+  }
+}
