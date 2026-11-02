@@ -6,6 +6,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 
 | Document | Covers | Reaches an agent |
 | --- | --- | --- |
+| [../README.md](../README.md) | The front page for a person arriving at the repository: what HEAT is, where it runs, what it shows, how it is built, where to read next | Never by itself; a person's entry point, where `AGENTS.md` is an agent's |
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
