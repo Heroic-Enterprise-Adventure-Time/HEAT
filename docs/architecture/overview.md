@@ -1,6 +1,97 @@
 # Architecture
 
-How the system delivers the game described in `docs/design/game.md`: services, data, and the flows between them. Nothing described here is built yet unless it says so. What exists on 2026-10-15 is the spike under `packages/`: the engine as a package, the hub with start and a spike-only settle mutation, the single-table layout and the three transactions, proven by integration tests against DynamoDB Local under forced conflicts. Nothing is deployed before the sandbox base of Issue-37; each stack's README under `terraform/` says whether it is applied.
+How the system delivers the game described in `docs/design/game.md`: services, data, and the flows between them. The platform and the core loop, steps 1 and 2 of the build order at the end of this document, are built and run in production at `heat.dcg-games.com`; an item marked **Built** names the issue that built it, and each stack's README under `terraform/` says whether it is applied. Everything else here is design to build to, with the status its item carries.
+
+## The shape in three diagrams
+
+Each diagram draws the system as of commit `1d2a55c` on `main`, 2026-11-02. The prose below is the authority where they differ.
+
+**The system.** One environment, whether a branch's sandbox stack, `dev` or `prod`: the browser reaches one hostname, sign-in goes through Cognito to Google, every request for data goes through the hub, and the hub is the only identity that reads or writes the tables and the replay bucket.
+
+```mermaid
+flowchart LR
+  browser["Browser: the Angular client, the PixiJS scene, the engine"]
+  google["Google"]
+  subgraph env["One environment: a sandbox stack, dev or prod"]
+    cognito["Cognito user pool, managed login on the auth. hostname"]
+    cf["CloudFront distribution: the environment's one hostname"]
+    site[("Site bucket: the client build and config.json")]
+    api["HTTP API with a JWT authorizer"]
+    live["Hub Lambda, live alias: Apollo Server, Pothos schema, the engine"]
+    previous["Hub Lambda, previous alias: the deploy before"]
+    role["The hub's execution role"]
+    player[("Player table: private, one item collection per player")]
+    location[("Location table: public, one collection per location")]
+    replays[("Replay bucket: one timeline per adventure")]
+  end
+  browser -- "code grant with PKCE" --> cognito
+  cognito -- "identity provider" --> google
+  browser -- "https, bearer token on /graphql" --> cf
+  cf -- "the page and its routes" --> site
+  cf -- "/graphql and /previous/graphql" --> api
+  api -- "/graphql" --> live
+  api -- "/previous/graphql" --> previous
+  live --> role
+  previous --> role
+  role --> player
+  role --> location
+  role --> replays
+```
+
+**The adventure loop.** The server issues the seed and a frozen snapshot, the browser plays and submits only its override log, and the deploy that issued the adventure replays it and settles the result in one transaction (decisions 0014 and 0030).
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant H as Hub, live
+  participant P as Hub, previous
+  participant D as DynamoDB
+  participant S as Replay bucket
+  B->>H: startAdventure(location, job, heroes)
+  H->>D: one transaction: the record with seed, snapshot and version, the open item, and each hero's mark
+  H-->>B: seed, frozen snapshot, version
+  Note over B: runs the engine on wall-clock time and keeps the override log in localStorage, with no request until the end
+  B->>H: submitAdventure(id, overrides)
+  alt issued by this deploy
+    H->>H: replay(snapshot, seed, overrides) with the engine
+    H->>S: the timeline, written once
+    H->>D: one transaction: open item deleted, record settled, XP, rewards up to the cap, deaths
+    H-->>B: the result
+  else issued by the deploy before
+    H-->>B: ENGINE_UPDATED
+    B->>P: submitAdventure(id, overrides) at /previous/graphql
+    P-->>B: the result, verified by the deploy that issued it
+  end
+```
+
+**The pipeline.** Terraform is applied by the workflows and by nothing else; a branch's stack is created by its first push, and production is reached only through a pull request to `release` (decisions 0017, 0018 and 0021).
+
+```mermaid
+flowchart TB
+  subgraph branch["A working branch"]
+    push["Push"] --> sandbox["Sandbox stacks: checks, bundle, the cap, plan, the allow-list, apply the branch's stack, publish the client, the stack test at its hostname"]
+    pr["Pull request to main"] --> ci["Build and test: typecheck, lint, tests, schema currency, bundle, Terraform format, validate and tflint"]
+    pr --> devplan["Deploy: the dev plan under the plan role, posted on the pull request"]
+  end
+  subgraph mainb["main"]
+    merge["Merge to main"] --> dev["Deploy: plan, the allow-list, apply dev under the apply role, publish the client, the smoke test"]
+    rpr["Pull request main to release"] --> guard["Release: the source guard, the prod plan posted on the pull request"]
+  end
+  subgraph releaseb["release"]
+    rmerge["Merge to release"] --> prod["Release: apply prod, publish the client, the token-free smoke test, then the v tag and the GitHub Release"]
+  end
+  subgraph account["In each workload account, created by the bootstrap stack"]
+    planrole["Plan role: read only, configuration and never data"]
+    applyrole["Apply role: administrator inside a permissions boundary, carried by every role it creates"]
+    budget["Budget action: a deny-all policy on the apply role when the account's budget is exceeded"]
+  end
+  devplan -. assumes .-> planrole
+  guard -. assumes .-> planrole
+  sandbox -. assumes .-> applyrole
+  dev -. assumes .-> applyrole
+  prod -. assumes .-> applyrole
+  budget -. attaches to .-> applyrole
+```
 
 Each item carries a status. **Decided** items are settled by the project owner. **Working assumption** items were proposed during design and not yet objected to: build on them, but expect them to be revisited. **Open** items are not yet answered.
 
