@@ -17,6 +17,7 @@
  * The job's penalty says what a retreat keeps.
  */
 
+import { range } from "es-toolkit";
 import { ADVENTURE_CONTENT } from "../content.js";
 import { MATERIALS, type Material, type Reward } from "../index.js";
 import { CombatEngine, SeededRng, type BattleEvent, type Opponent, type PlayerOverride } from "../battle/index.js";
@@ -64,7 +65,7 @@ function addTo(amounts: Partial<Record<Material, number>>, rewards: readonly Rew
 /** The battle a fight or gather stage runs: its opponents, ids unique on the whole timeline. */
 function opponentsOf(stage: Stage, index: number): Opponent[] {
   const groups = stage.kind === "fight" ? stage.monsters : stage.kind === "gather" ? stage.nodes : [];
-  return groups.flatMap(({ type, count }) => Array.from({ length: count }, (_, n) => ({ unitId: `s${String(index)}-${type}-${String(n + 1)}`, type })));
+  return groups.flatMap(({ type, count }) => range(count).map((n) => ({ unitId: `s${String(index)}-${type}-${String(n + 1)}`, type })));
 }
 
 /**

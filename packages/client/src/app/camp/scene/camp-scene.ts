@@ -1,3 +1,4 @@
+import { range } from 'es-toolkit';
 import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
 import { facilityArtLevel, must, type FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
@@ -73,7 +74,7 @@ function loadHeroFrames(set: string): Promise<HeroFrames> {
         await Promise.all(
           WALK_DIRECTIONS.map(async (d) => [
             d,
-            await Promise.all(Array.from({ length: WALK_FRAMES }, (_, i) => Assets.load<Texture>(`${base}/walk-${d}-${i}.png`))),
+            await Promise.all(range(WALK_FRAMES).map((i) => Assets.load<Texture>(`${base}/walk-${d}-${i}.png`))),
           ] as const),
         ),
       ) as Record<WalkDirection, Texture[]>;

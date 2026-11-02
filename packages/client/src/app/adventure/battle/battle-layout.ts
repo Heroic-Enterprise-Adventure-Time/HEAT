@@ -1,5 +1,6 @@
 import type { Line, Side } from '@heat/engine';
 import { must } from '@heat/engine';
+import { groupBy, mapValues } from 'es-toolkit';
 
 /**
  * Where the battle scene puts things (game.md, "How the game looks" and
@@ -39,14 +40,13 @@ export function spot(side: Side, line: Line, index: number, count: number): { x:
  * keeps its place while its line does not change.
  */
 export function spots(units: readonly { readonly unitId: string; readonly side: Side; readonly line: Line }[]): Map<string, { x: number; y: number }> {
-  const byLine = new Map<string, string[]>();
-  for (const u of units) {
-    const key = `${u.side}/${u.line}`;
-    byLine.set(key, [...(byLine.get(key) ?? []), u.unitId]);
-  }
+  const byLine = mapValues(
+    groupBy(units, (u) => `${u.side}/${u.line}`),
+    (line) => line.map((u) => u.unitId).sort(),
+  );
   const out = new Map<string, { x: number; y: number }>();
   for (const u of units) {
-    const line = [...must(byLine.get(`${u.side}/${u.line}`), `the line ${u.side}/${u.line}`)].sort();
+    const line = must(byLine[`${u.side}/${u.line}`], `the line ${u.side}/${u.line}`);
     out.set(u.unitId, spot(u.side, u.line, line.indexOf(u.unitId), line.length));
   }
   return out;

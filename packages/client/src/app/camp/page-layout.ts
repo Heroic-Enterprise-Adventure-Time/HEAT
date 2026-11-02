@@ -1,3 +1,4 @@
+import { clamp } from 'es-toolkit';
 import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH } from './scene/layout';
 
 /**
@@ -31,7 +32,7 @@ export function sceneScale(width: number, height: number): number {
 
 /** The panel beside the scene: 26% of the window, held between 17rem and 28rem. Matches the CSS's `clamp(17rem, 26vw, 28rem)`. */
 export function panelPx(width: number): number {
-  return Math.min(448, Math.max(272, width * 0.26));
+  return clamp(width * 0.26, 272, 448);
 }
 
 /** The scene's scale with the regions side by side and the given menu width. */
@@ -78,7 +79,7 @@ export function stackedStageHeight(width: number, height: number, ratio = 1): nu
  * never above the scene's own scale (Issue-95).
  */
 export function heroScale(sceneScale: number, ratio = 1): number {
-  return Math.min(sceneScale, Math.max(Math.ceil(sceneScale / 2), Math.round(ratio)));
+  return clamp(Math.round(ratio), Math.ceil(sceneScale / 2), sceneScale);
 }
 
 export interface SceneView {

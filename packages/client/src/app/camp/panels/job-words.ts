@@ -1,4 +1,5 @@
 import { MONSTERS, RESOURCE_NODES, jobsPostedBy, type FacilityKind, type Job, type Stage } from '@heat/engine';
+import { uniq } from 'es-toolkit';
 
 /** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133). */
 export function jobsAt(location: string, poster: FacilityKind): Job[] {
@@ -18,7 +19,7 @@ function count(n: number, name: string): string {
 
 /** The materials a gather stage yields, from its nodes, in order and once each. */
 function gathered(stage: Extract<Stage, { kind: 'gather' }>): string[] {
-  return [...new Set(stage.nodes.map((n) => RESOURCE_NODES[n.type].material))];
+  return uniq(stage.nodes.map((n) => RESOURCE_NODES[n.type].material));
 }
 
 /**
@@ -85,7 +86,7 @@ export function yieldWords(job: Job): string {
 /** A job's retreat penalty in words: "A retreat forfeits the pay, keeps the timber gathered, and earns half the XP." */
 export function retreatWords(job: Job): string {
   const pay = job.retreat.keepsPay ? 'keeps the pay' : 'forfeits the pay';
-  const cargo = [...new Set(job.stages.flatMap((s) => (s.kind === 'gather' ? gathered(s) : [])))];
+  const cargo = uniq(job.stages.flatMap((s) => (s.kind === 'gather' ? gathered(s) : [])));
   const carried = cargo.length > 0 ? `${job.retreat.keepsCargo ? 'keeps' : 'abandons'} the ${cargo.join(' and ')} gathered` : null;
   const xp = job.retreat.xpPercent;
   const earns = xp === 100 ? 'earns the full XP' : xp === 50 ? 'earns half the XP' : xp === 0 ? 'earns no XP' : `earns ${xp}% of the XP`;

@@ -1,3 +1,4 @@
+import { clamp, range } from 'es-toolkit';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
 import {
   ABILITY_EFFECTS,
@@ -138,7 +139,7 @@ function lineOf(unit: FieldUnit): Line {
   return unit.line ?? UNIT_PROFILES[unit.type as UnitType]?.homeLine ?? 'near';
 }
 
-const frameOf = (frames: Frames, index: number) => must(frames.textures[Math.max(0, Math.min(frames.textures.length - 1, index))], 'a frame');
+const frameOf = (frames: Frames, index: number) => must(frames.textures[clamp(index, 0, frames.textures.length - 1)], 'a frame');
 
 export async function createBattleScene(host: HTMLElement, callbacks: BattleSceneCallbacks): Promise<BattleSceneHandle> {
   TextureStyle.defaultOptions.scaleMode = 'nearest';
@@ -167,10 +168,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     const row0 = Math.floor(-view.stageY / 16);
     const rows = Math.ceil((view.height - view.stageY) / 16) - row0;
     const cols = Math.ceil(view.width / 16) + 1;
-    const corners = Array.from({ length: rows + 1 }, (_, r): Terrain[] => {
+    const corners = range(rows + 1).map((r): Terrain[] => {
       const row = row0 + r;
       const terrain: Terrain = row >= ROAD_ROWS.from && row <= ROAD_ROWS.to ? 'lower' : 'upper';
-      return Array.from({ length: cols + 1 }, () => terrain);
+      return range(cols + 1).map(() => terrain);
     });
     for (const tile of layGround(tileset, corners)) {
       const sprite = new Sprite(new Texture({ source: sheet.source, frame: new Rectangle(tile.box.x, tile.box.y, tile.box.width, tile.box.height) }));
@@ -390,7 +391,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       show(unitView, art.down, index, mirrored, last > 0 ? 1 - index / last : null);
       // A fallen monster or a felled tree lies a moment, then fades away; a fallen hero stays down.
       if (unitView.unit.kind !== 'hero') {
-        unitView.body.alpha = Math.max(0, Math.min(1, 1 - (since - last * DOWN_MS - FADE_AFTER_MS) / FADE_MS));
+        unitView.body.alpha = clamp(1 - (since - last * DOWN_MS - FADE_AFTER_MS) / FADE_MS, 0, 1);
       }
       return;
     }

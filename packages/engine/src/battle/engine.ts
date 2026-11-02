@@ -22,6 +22,7 @@
  * can. Both get the same timeline.
  */
 
+import { sum } from "es-toolkit";
 import { BATTLE_CONTENT } from "../content.js";
 import type { Material } from "../index.js";
 import type { AbilityDefinition } from "./ability.js";
@@ -528,7 +529,7 @@ export class CombatEngine {
   /** What the party can still carry; unbounded without a carry limit. */
   private carryRoom(): number {
     if (this.setup.carryLimit === undefined) return Infinity;
-    const carried = Object.values(this.gathered).reduce((sum, n) => sum + n, 0);
+    const carried = sum(Object.values(this.gathered));
     return Math.max(0, this.setup.carryLimit - carried);
   }
 

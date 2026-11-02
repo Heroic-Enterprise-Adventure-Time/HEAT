@@ -1,3 +1,4 @@
+import { clamp } from "es-toolkit";
 import { GraphQLError } from "graphql";
 import {
   levelForXp,
@@ -124,7 +125,7 @@ export function settlement(
   const cap = warehouseCapacity(warehouseLevel);
   const holdings = [...byMaterial(result.rewards)].map(([material, amount]) => {
     const read = balances.get(material) ?? null;
-    const credit = Math.min(amount, Math.max(0, cap - (read ?? 0)));
+    const credit = clamp(cap - (read ?? 0), 0, amount);
     return { material, read, credit, lost: amount - credit };
   });
   const dead = new Set(result.dead);

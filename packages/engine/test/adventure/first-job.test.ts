@@ -1,3 +1,4 @@
+import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 import { AdventureEngine, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION, type AdventureResult } from "../../src/index.js";
 import { hero, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
@@ -6,7 +7,7 @@ import { hero, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 // fail "Pick up sticks", and one run pays for the next villager.
 
 const SEEDS = 500;
-const seeds = Array.from({ length: SEEDS }, (_, i) => `seed-${i}`);
+const seeds = range(SEEDS).map((i) => `seed-${i}`);
 const lone = [hero("villager-1", "villager")];
 const sticks = JOBS[STICKS];
 const gather = sticks.stages[1];
