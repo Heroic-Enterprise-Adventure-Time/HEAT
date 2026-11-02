@@ -1,16 +1,16 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { ApiError } from '../../api';
+import { Refusal } from '../../api';
 import { Game, type RecruitOffer } from '../../game';
 import { CampState } from '../camp-state';
 import { FacilityBuild } from './facility-build';
 
-/** The hub's refusals of a recruit, in the player's words; any other is shown as the hub put it. */
+/** The hub's refusals of a recruit, by type, in the player's words; any other is shown as the hub put it. */
 const REFUSALS: Readonly<Record<string, string>> = {
-  HALL_LEVEL: 'The hall is not at the level this needs.',
-  HALL_FULL: 'The hall is full.',
-  INSUFFICIENT_RESOURCES: 'The camp cannot pay for this now.',
-  CONFLICT: 'The camp changed while recruiting, and nobody was recruited. Try again.',
+  HallLevel: 'The hall is not at the level this needs.',
+  HallFull: 'The hall is full.',
+  InsufficientResources: 'The camp cannot pay for this now.',
+  Conflict: 'The camp changed while recruiting, and nobody was recruited. Try again.',
 };
 
 /** A recruit's price in words, each resource beside the camp's balance (game.md, "The page"). */
@@ -47,8 +47,8 @@ export class HallPanel {
       const hero = await this.game.recruit(offer.unitType);
       this.camp.arriving.set(hero.id);
     } catch (e) {
-      const code = e instanceof ApiError ? e.code : null;
-      this.refused.set({ unitType: offer.unitType, words: (code && REFUSALS[code]) ?? (e instanceof Error ? e.message : String(e)) });
+      const kind = e instanceof Refusal ? e.kind : null;
+      this.refused.set({ unitType: offer.unitType, words: (kind && REFUSALS[kind]) ?? (e instanceof Error ? e.message : String(e)) });
     }
   }
 }

@@ -2,13 +2,15 @@
 An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.
 """
 type Adventure {
-  id: String!
+  id: ID!
   job: Job!
-  location: String!
+
+  """The location's id in the static content."""
+  location: ID!
   result: AdventureResult
   seed: String!
   snapshot: Snapshot!
-  startedAt: String!
+  startedAt: DateTime!
   status: AdventureStatus!
 
   """
@@ -23,6 +25,32 @@ type Adventure {
 }
 
 """
+The adventure was discarded: no deploy could verify it, and nothing was credited.
+"""
+type AdventureDiscarded implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+}
+
+"""The player's one adventure is open (decision 0003)."""
+type AdventureOpen implements Error {
+  """The open one, which the client reads from me.openAdventure."""
+  adventureId: ID!
+
+  """In the player's words; the client may show it as it is."""
+  message: String!
+}
+
+"""
+How an adventure ended, the engine's `AdventureOutcome`: complete; retreat, ordered or forced by a time limit; defeat, the whole party down.
+"""
+enum AdventureOutcome {
+  COMPLETE
+  DEFEAT
+  RETREAT
+}
+
+"""
 What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, and each hero's XP and fate.
 """
 type AdventureResult {
@@ -33,14 +61,18 @@ type AdventureResult {
 
   """What the warehouse's cap turned away."""
   lost: [Reward!]!
-
-  """complete, retreat (ordered, or a time limit reached) or defeat."""
-  outcome: String!
+  outcome: AdventureOutcome!
   reachedStage: Int!
 
   """What the run yielded."""
   rewards: [Reward!]!
   stages: [StageResult!]!
+}
+
+"""The adventure is settled, so it cannot be discarded."""
+type AdventureSettled implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
 }
 
 """
@@ -50,6 +82,41 @@ enum AdventureStatus {
   DISCARDED
   OPEN
   SETTLED
+}
+
+"""
+The adventure can still be submitted, so it is not discarded: a player who dislikes how a run is going finishes it.
+"""
+type AdventureVerifiable implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+
+  """The version that issued the adventure and still verifies it."""
+  version: String!
+}
+
+"""Which facility to build at which camp, and the level being built."""
+input BuildFacilityInput {
+  """One of the camp's own facilities."""
+  kind: FacilityKind!
+
+  """
+  The level being built: the next one. A level already built answers the camp and charges nothing.
+  """
+  level: Int!
+
+  """The camp's location."""
+  location: ID!
+}
+
+"""
+What buildFacility answers: BuildFacilitySuccess, or one of the refusals the union lists, each an Error.
+"""
+union BuildFacilityResult = BuildFacilitySuccess | Conflict | InsufficientResources | MaxLevel | Requires
+
+"""The mutation did its work: the camp with the level built."""
+type BuildFacilitySuccess {
+  camp: Camp!
 }
 
 """
@@ -71,7 +138,7 @@ type Camp {
   livingHeroes: Int!
 
   """The location's id in the static content."""
-  location: String!
+  location: ID!
   name: String!
 
   """Stock of each resource the warehouse holds at its level."""
@@ -79,29 +146,133 @@ type Camp {
   warehouseLevel: Int!
 }
 
+"""
+The camp or the party changed while the request ran, and no rule explains the failure. Nothing was changed; try again.
+"""
+type Conflict implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+}
+
+"""
+A date-time string at UTC, such as 2007-12-03T10:15:30Z, compliant with the `date-time` format outlined in section 5.6 of the RFC 3339 profile of the ISO 8601 standard for representation of dates and times using the Gregorian calendar.
+"""
+scalar DateTime
+
+"""Which adventure to discard."""
+input DiscardAdventureInput {
+  adventureId: ID!
+}
+
+"""
+What discardAdventure answers: DiscardAdventureSuccess, or one of the refusals the union lists, each an Error.
+"""
+union DiscardAdventureResult = AdventureSettled | AdventureVerifiable | DiscardAdventureSuccess
+
+"""The mutation did its work: the adventure, discarded."""
+type DiscardAdventureSuccess {
+  adventure: Adventure!
+}
+
+"""
+Another version of the game issued the adventure, so this deploy cannot verify it: try /previous/graphql, and discard it when that deploy says the same (decision 0030).
+"""
+type EngineUpdated implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+
+  """This deploy's version."""
+  version: String!
+}
+
+"""
+A refusal: the game's rule the request failed, in the player's words. Every refusal type implements it; the type's name says which rule, and its own fields say what the client needs.
+"""
+interface Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+}
+
+"""
+A camp's own facilities, the engine's `FacilityKind`, those every camp has and those it may build.
+"""
+enum FacilityKind {
+  CARAVAN_HUB
+  HEROES_HALL
+  JOB_BOARD
+  LUMBER_CAMP
+  MINE
+  WAREHOUSE
+}
+
 """One of a camp's own facilities and its level."""
 type FacilityLevel {
-  """The facility's kind in the static content."""
-  kind: String!
+  kind: FacilityKind!
   level: Int!
+}
+
+"""The heroes hall holds no more active heroes at its level."""
+type HallFull implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+}
+
+"""The unit type needs a higher heroes hall."""
+type HallLevel implements Error {
+  """The hall level the unit type needs."""
+  level: Int!
+
+  """In the player's words; the client may show it as it is."""
+  message: String!
 }
 
 """
 A hero, drawn by the hub at recruitment: its sprite set and name are never the client's choice.
 """
 type Hero {
-  id: String!
+  id: ID!
   level: Int!
-  location: String!
+
+  """The location's id in the static content."""
+  location: ID!
   name: String!
-  recruitedAt: String!
-  retiredAt: String
+  recruitedAt: DateTime!
+  retiredAt: DateTime
 
   """The set's directory under art/heroes/."""
   spriteSet: String!
   status: HeroStatus!
-  unitType: String!
+  unitType: UnitType!
   xp: Int!
+}
+
+"""
+The hero is on an adventure: it can neither set out again nor retire until the adventure is settled.
+"""
+type HeroAdventuring implements Error {
+  """The hero the refusal is about."""
+  heroId: ID!
+
+  """In the player's words; the client may show it as it is."""
+  message: String!
+}
+
+"""A hero of the party is dead."""
+type HeroDead implements Error {
+  """The hero the refusal is about."""
+  heroId: ID!
+
+  """In the player's words; the client may show it as it is."""
+  message: String!
+}
+
+"""A hero of the party is not at this camp."""
+type HeroNotHere implements Error {
+  """The hero the refusal is about."""
+  heroId: ID!
+
+  """In the player's words; the client may show it as it is."""
+  message: String!
 }
 
 """One hero of the party at settlement."""
@@ -110,7 +281,7 @@ type HeroOutcome {
 
   """Health at the end of the adventure."""
   health: Int!
-  heroId: String!
+  heroId: ID!
 
   """The hero's level after settlement."""
   level: Int!
@@ -118,6 +289,15 @@ type HeroOutcome {
   """The hero's XP after settlement."""
   xp: Int!
   xpGained: Int!
+}
+
+"""A hero of the party has retired."""
+type HeroRetired implements Error {
+  """The hero the refusal is about."""
+  heroId: ID!
+
+  """In the player's words; the client may show it as it is."""
+  message: String!
 }
 
 """Alive or dead at the camp, or retired for good."""
@@ -130,7 +310,16 @@ enum HeroStatus {
 """A camp's stock of one resource."""
 type Holding {
   balance: Int!
-  material: String!
+  material: Material!
+}
+
+"""The camp cannot pay for it."""
+type InsufficientResources implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+
+  """Each resource the camp is short of."""
+  short: [Shortfall!]!
 }
 
 """A JSON value, served as it was stored."""
@@ -145,12 +334,33 @@ type Job {
   """
   The own facility that posts it, which the camp must have built to start it; null for a job on the job board.
   """
-  facility: String
-  id: String!
+  facility: FacilityKind
+  id: ID!
 
   """The location that posts it."""
-  location: String!
+  location: ID!
   name: String!
+}
+
+"""What joinGame answers: JoinGameSuccess, since nothing refuses it."""
+union JoinGameResult = JoinGameSuccess
+
+"""The mutation did its work: the player's profile, made or found."""
+type JoinGameSuccess {
+  player: Player!
+}
+
+"""The resources, the engine's `Material`: there is no currency."""
+enum Material {
+  CLOTH
+  ORE
+  TIMBER
+}
+
+"""The facility is at its highest level at this location."""
+type MaxLevel implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
 }
 
 """
@@ -158,39 +368,39 @@ What a signed-in player does: joins the game, recruits and retires heroes, build
 """
 type Mutation {
   """
-  Builds the next level of one of the camp's own facilities, at once, paid in resources from the camp's holdings, and answers the camp. The client names the level it is building, so a repeat finds it built and is answered with the camp, charging nothing. Refused with BAD_USER_INPUT, MAX_LEVEL, REQUIRES (extensions.missing lists each facility and the level it needs), INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance) or CONFLICT.
+  Builds the next level of one of the camp's own facilities, at once, paid in resources from the camp's holdings, and answers the camp. The client names the level it is building, so a repeat finds it built and is answered with the camp, charging nothing. Refused with MaxLevel, Requires, InsufficientResources or Conflict; a camp or facility the player has none of, or a level that is not the next, is BAD_USER_INPUT.
   """
-  buildFacility(kind: String!, level: Int!, location: String!): Camp!
+  buildFacility(input: BuildFacilityInput!): BuildFacilityResult
 
   """
-  Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. Refused with ADVENTURE_VERIFIABLE while this deploy or the previous one could still verify it.
+  Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. A discarded adventure answers as it is. Refused with AdventureVerifiable while this deploy or the previous one could still verify it, or AdventureSettled; an adventure that is not the player's is BAD_USER_INPUT.
   """
-  discardAdventure(adventureId: String!): Adventure!
+  discardAdventure(input: DiscardAdventureInput!): DiscardAdventureResult
 
   """
-  Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing.
+  Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.
   """
-  joinGame: Player!
+  joinGame: JoinGameResult
 
   """
-  Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Refused with HALL_LEVEL, HALL_FULL, INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance), BAD_USER_INPUT or CONFLICT.
+  Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit is BAD_USER_INPUT.
   """
-  recruitHero(requestId: String!, unitType: String!): Hero!
+  recruitHero(input: RecruitHeroInput!): RecruitHeroResult
 
   """
-  Retires one of the player's heroes, alive or dead: permanent, and the hero stays on the record. It frees a slot in the heroes hall. A hero already retired is answered as it is.
+  Retires one of the player's heroes, alive or dead: permanent, and the hero stays on the record. It frees a slot in the heroes hall. A hero already retired is answered as it is. Refused with HeroAdventuring or Conflict; a hero that is not the player's is BAD_USER_INPUT.
   """
-  retireHero(heroId: String!): Hero!
+  retireHero(input: RetireHeroInput!): RetireHeroResult
 
   """
-  Starts a job the location posts, on its job board or at a facility the camp has built (refused otherwise with REQUIRES, the facility in extensions.missing), with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.
+  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with AdventureOpen while one is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.
   """
-  startAdventure(heroIds: [String!]!, jobId: String!, location: String!): Adventure!
+  startAdventure(input: StartAdventureInput!): StartAdventureResult
 
   """
-  Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. Refused with ENGINE_UPDATED, and this deploy's version in extensions.version, when another version issued it: try /previous/graphql. A settled adventure answers as it is; nothing is paid twice.
+  Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. A settled adventure answers as it is; nothing is paid twice. Refused with EngineUpdated when another version issued it, AdventureDiscarded, or Conflict; an adventure that is not the player's, or a malformed log, is BAD_USER_INPUT.
   """
-  submitAdventure(adventureId: String!, overrides: [OverrideInput!]!): Adventure!
+  submitAdventure(input: SubmitAdventureInput!): SubmitAdventureResult
 }
 
 """
@@ -238,7 +448,7 @@ type Player {
 
   """Private: only the player may read their own heroes."""
   heroes: [Hero!]
-  id: String!
+  id: ID!
   name: String!
   openAdventure: Adventure
 }
@@ -250,42 +460,107 @@ type Query {
   """
   An adventure by id: any settled one, for its replay; an open or discarded one only for its own player. Null otherwise.
   """
-  adventure(id: String!): Adventure
+  adventure(id: ID!): Adventure
 
   """
   A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.
   """
-  heroesSeenAt(location: String!): [SeenHero!]!
+  heroesSeenAt(location: ID!): [SeenHero!]
 
   """The signed-in player, or null before joinGame has made their profile."""
   me: Player
 
   """Public: any caller may look a player up by id."""
-  player(id: String!): Player
+  player(id: ID!): Player
 
   """
   The deploy's version: the commit this route's deploy runs. /graphql answers the current deploy's, /previous/graphql the one before.
   """
-  version: String!
+  version: String
+}
+
+"""What to recruit, and the request's id."""
+input RecruitHeroInput {
+  """
+  A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made.
+  """
+  requestId: ID!
+
+  """A unit type on the location's recruitment list."""
+  unitType: UnitType!
+}
+
+"""
+What recruitHero answers: RecruitHeroSuccess, or one of the refusals the union lists, each an Error.
+"""
+union RecruitHeroResult = Conflict | HallFull | HallLevel | InsufficientResources | RecruitHeroSuccess
+
+"""
+The mutation did its work: the hero recruited, or already made by this request.
+"""
+type RecruitHeroSuccess {
+  hero: Hero!
+}
+
+"""A facility the camp needs first, at this level or above."""
+type Requirement {
+  kind: FacilityKind!
+  level: Int!
+}
+
+"""Another facility is needed first."""
+type Requires implements Error {
+  """In the player's words; the client may show it as it is."""
+  message: String!
+
+  """Each facility and the level it needs."""
+  missing: [Requirement!]!
+}
+
+"""Which hero to retire."""
+input RetireHeroInput {
+  heroId: ID!
+}
+
+"""
+What retireHero answers: RetireHeroSuccess, or one of the refusals the union lists, each an Error.
+"""
+union RetireHeroResult = Conflict | HeroAdventuring | RetireHeroSuccess
+
+"""The mutation did its work: the hero, retired."""
+type RetireHeroSuccess {
+  hero: Hero!
 }
 
 """An amount of one resource."""
 type Reward {
   amount: Int!
-  material: String!
+  material: Material!
 }
 
 """
 Another player's hero seen at a location: its public fields only, and nothing that says whose it is (decision 0029).
 """
 type SeenHero {
-  id: String!
+  id: ID!
   level: Int!
   name: String!
 
   """The set's directory under art/heroes/."""
   spriteSet: String!
-  unitType: String!
+  unitType: UnitType!
+}
+
+"""
+One resource the camp is short of: what the thing costs and what the camp has.
+"""
+type Shortfall {
+  """The amount the thing costs."""
+  amount: Int!
+
+  """The camp's balance."""
+  balance: Int!
+  material: Material!
 }
 
 """
@@ -293,7 +568,7 @@ The frozen snapshot the hub issued at the start, the engine's AdventureSnapshot 
 """
 type Snapshot {
   heroes: [SnapshotHero!]!
-  jobId: String!
+  jobId: ID!
   version: String!
 }
 
@@ -301,26 +576,84 @@ type Snapshot {
 A hero as the adventure took it at the start: its effective numbers, frozen for the run.
 """
 type SnapshotHero {
-  heroId: String!
+  heroId: ID!
   level: Int!
   name: String!
   spriteSet: String!
   stats: UnitStats!
-  unitType: String!
+  unitType: UnitType!
+}
+
+"""
+How a stage ended, the engine's `StageEnding`: DONE for travel and arrive; the rest are a battle's.
+"""
+enum StageEnding {
+  DONE
+  LOSS
+  RETREAT
+  TIMEOUT
+  WIN
+}
+
+"""What a stage of a job is, the engine's `StageKind`."""
+enum StageKind {
+  ARRIVE
+  FIGHT
+  GATHER
+  TRAVEL
 }
 
 """How one stage the party entered ended."""
 type StageResult {
-  """
-  done for travel and arrive; win, loss, timeout or retreat for a battle.
-  """
-  ended: String!
+  ended: StageEnding!
   endedAtMs: Int!
-
-  """travel, fight, gather or arrive."""
-  kind: String!
+  kind: StageKind!
   stage: Int!
   startedAtMs: Int!
+}
+
+"""Which job to start, where, and with whom."""
+input StartAdventureInput {
+  """The party: one to four of the player's living heroes at that camp."""
+  heroIds: [ID!]!
+
+  """
+  A job the location posts, on its job board or at a facility the camp has built.
+  """
+  jobId: ID!
+
+  """The camp's location, which posts the job."""
+  location: ID!
+}
+
+"""
+What startAdventure answers: StartAdventureSuccess, or one of the refusals the union lists, each an Error.
+"""
+union StartAdventureResult = AdventureOpen | Conflict | HeroAdventuring | HeroDead | HeroNotHere | HeroRetired | Requires | StartAdventureSuccess
+
+"""The mutation did its work: the adventure opened."""
+type StartAdventureSuccess {
+  adventure: Adventure!
+}
+
+"""Which adventure to submit, with its override log."""
+input SubmitAdventureInput {
+  adventureId: ID!
+
+  """
+  The override log, as the engine kept it; empty when the player forced nothing.
+  """
+  overrides: [OverrideInput!]!
+}
+
+"""
+What submitAdventure answers: SubmitAdventureSuccess, or one of the refusals the union lists, each an Error.
+"""
+union SubmitAdventureResult = AdventureDiscarded | Conflict | EngineUpdated | SubmitAdventureSuccess
+
+"""The mutation did its work: the adventure, settled, with its result."""
+type SubmitAdventureSuccess {
+  adventure: Adventure!
 }
 
 """A unit's numbers in battle."""
@@ -333,4 +666,16 @@ type UnitStats {
 
   """Turns per ten seconds."""
   speed: Int!
+}
+
+"""
+The unit types, the engine's `UnitType`: what a hero is and what the hall recruits.
+"""
+enum UnitType {
+  FIGHTER
+  KNIGHT
+  PRIEST
+  RANGER
+  VILLAGER
+  WIZARD
 }

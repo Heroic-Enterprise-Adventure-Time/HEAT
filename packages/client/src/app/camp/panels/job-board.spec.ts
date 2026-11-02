@@ -2,7 +2,7 @@ import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { ApiError } from '../../api';
+import { Refusal } from '../../api';
 import { routes } from '../../app.routes';
 import { Game, type AdventureView, type HeroView } from '../../game';
 import { Session } from '../../session';
@@ -30,7 +30,7 @@ function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): H
 const party = [hero('h1', 'Wren'), hero('h2', 'Moss'), hero('h3', 'Lark'), hero('h4', 'Fen'), hero('h5', 'Ash')];
 
 /** A game with settable heroes and adventure, and a start that answers as the test says, in place of the real one. */
-function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => AdventureView | ApiError = adventureOf) {
+function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => AdventureView | Refusal = adventureOf) {
   const all = signal(heroes);
   const open = signal<AdventureView | null>(null);
   const here = computed(() => all().filter((h) => h.status !== 'RETIRED'));
@@ -62,7 +62,7 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     startAdventure: (location: string, jobId: string, heroIds: readonly string[]) => {
       fake.started.push({ location, jobId, heroIds });
       const result = answer(heroIds);
-      if (result instanceof ApiError) return Promise.reject(result);
+      if (result instanceof Refusal) return Promise.reject(result);
       open.set(result);
       return Promise.resolve(result);
     },
@@ -190,7 +190,7 @@ describe('Job board', () => {
   });
 
   it("shows a start's refusal in place, in the player's words", async () => {
-    const game = fakeGame(party, () => new ApiError('hero h1 is dead', 'HERO_DEAD'));
+    const game = fakeGame(party, () => new Refusal('HeroDead', 'hero h1 is dead'));
     const { page, router, settle } = await render(game, '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
     box(page, 0).click();
     await settle();
@@ -202,8 +202,8 @@ describe('Job board', () => {
     expect(router.url).toBe('/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
   });
 
-  it("says to build the facility when the hub refuses a facility's job with REQUIRES (Issue-133)", async () => {
-    const game = fakeGame(party, () => new ApiError('Ore from the hill needs a level 1 mine first', 'REQUIRES'));
+  it("says to build the facility when the hub refuses a facility's job with Requires (Issue-133)", async () => {
+    const game = fakeGame(party, () => new Refusal('Requires', 'Ore from the hill needs a level 1 mine first'));
     const { page, settle } = await render(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
     box(page, 0).click();
     await settle();
@@ -215,7 +215,7 @@ describe('Job board', () => {
   });
 
   it("shows a refusal it has no words for as the hub put it", async () => {
-    const game = fakeGame(party, () => new ApiError('something new', 'SOMETHING_NEW'));
+    const game = fakeGame(party, () => new Refusal('SomethingNew', 'something new'));
     const { page, settle } = await render(game, '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
     box(page, 0).click();
     await settle();

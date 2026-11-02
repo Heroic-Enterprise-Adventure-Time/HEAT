@@ -82,8 +82,8 @@ sequenceDiagram
     H->>D: one transaction: open item deleted, record settled, XP, rewards up to the cap, deaths
     H-->>B: the result
   else issued by the deploy before
-    H-->>B: ENGINE_UPDATED
-    B->>P: submitAdventure(id, overrides) at /previous/graphql
+    H-->>B: EngineUpdated
+    B->>P: submitAdventure(input) at /previous/graphql
     P-->>B: the result, verified by the deploy that issued it
   end
 ```

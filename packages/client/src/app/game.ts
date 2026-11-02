@@ -1,9 +1,16 @@
 import { Service, computed, effect, inject, signal, untracked } from '@angular/core';
 import {
+  ADVENTURE_OUTCOMES,
+  FACILITY_KINDS,
+  MATERIALS,
+  STAGE_ENDINGS,
+  STAGE_KINDS,
   STARTING_LOCATION,
+  UNIT_TYPES,
   buildRefusal,
   hallCapacity,
   location,
+  must,
   nextLevel,
   recruitCost,
   warehouseCapacity,
@@ -12,7 +19,8 @@ import {
   type FacilityKind,
   type UnitType,
 } from '@heat/engine';
-import { Api, ApiError, PREVIOUS } from './api';
+import { constantCase, kebabCase } from 'es-toolkit';
+import { Api, ApiError, PREVIOUS, Refusal, type Route } from './api';
 import { Session } from './session';
 
 export interface HeroView {
@@ -105,6 +113,100 @@ export interface PlayerView {
   readonly openAdventure: AdventureView | null;
 }
 
+/**
+ * A view as the hub answers it: the same shape, every string widened, because
+ * the engine's closed sets travel as the schema's UPPER_CASE enum values
+ * (`VILLAGER`, `TIMBER`, `HEROES_HALL`) and are read back into the engine's
+ * own values at this boundary (docs/standards/graphql.md, rule 4). Nothing
+ * past this file sees a wire value.
+ */
+type Wire<T> = T extends string
+  ? string
+  : T extends readonly (infer U)[]
+    ? readonly Wire<U>[]
+    : T extends object
+      ? { readonly [K in keyof T]: Wire<T[K]> }
+      : T;
+
+/**
+ * The engine's value behind a schema enum name, `VILLAGER` for `villager`,
+ * looked up in a map built once per list. A name this client's engine lacks,
+ * sent by a newer deploy before the `outdated` reload (decision 0030), passes
+ * through in the engine's spelling rather than failing the whole read, as a
+ * string did before the enums: the page shows it as content it does not know
+ * (angular.md, rule 6).
+ */
+function engineValues<T extends string>(values: readonly T[]): (name: string) => T {
+  const byName = new Map(values.map((value) => [constantCase(value), value]));
+  return (name) => byName.get(name) ?? (kebabCase(name) as T);
+}
+
+/** The schema's enum name of an engine value: `heroes-hall` is sent as `HEROES_HALL`. */
+export function wireValue(value: string): string {
+  return constantCase(value);
+}
+
+const unitType = engineValues(UNIT_TYPES);
+const material = engineValues(MATERIALS);
+const facilityKind = engineValues(FACILITY_KINDS);
+const outcome = engineValues(ADVENTURE_OUTCOMES);
+const stageKind = engineValues(STAGE_KINDS);
+const stageEnding = engineValues(STAGE_ENDINGS);
+const materials = <T extends { readonly material: string }>(items: readonly T[]) => items.map((item) => ({ ...item, material: material(item.material) }));
+
+function heroFromWire(hero: Wire<HeroView>): HeroView {
+  return { ...hero, unitType: unitType(hero.unitType), status: hero.status as HeroView['status'] };
+}
+
+function campFromWire(camp: Wire<CampView>): CampView {
+  return {
+    ...camp,
+    holdings: materials(camp.holdings),
+    facilities: camp.facilities.map((f) => ({ ...f, kind: facilityKind(f.kind) })),
+  };
+}
+
+function adventureFromWire(adventure: Wire<AdventureView>): AdventureView {
+  return {
+    ...adventure,
+    snapshot: { ...adventure.snapshot, heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType) })) },
+  };
+}
+
+function resultFromWire(result: Wire<AdventureResultView>): AdventureResultView {
+  return {
+    ...result,
+    outcome: outcome(result.outcome),
+    stages: result.stages.map((s) => ({ ...s, kind: stageKind(s.kind), ended: stageEnding(s.ended) })),
+    rewards: materials(result.rewards),
+    credited: materials(result.credited),
+    lost: materials(result.lost),
+  };
+}
+
+function playerFromWire(player: Wire<PlayerView>): PlayerView {
+  return {
+    ...player,
+    camps: player.camps.map(campFromWire),
+    heroes: player.heroes.map(heroFromWire),
+    openAdventure: player.openAdventure ? adventureFromWire(player.openAdventure) : null,
+  };
+}
+
+/**
+ * A mutation's result union as the client selects it: the type's name, the
+ * success's one field when the mutation did its work, and the refusal's
+ * message otherwise (graphql.md, rule 6).
+ */
+type Answer<K extends string, T> = { readonly __typename: string; readonly message?: string } & Partial<Record<K, T>>;
+
+/** The success's field, or the refusal thrown as a `Refusal` named by its type, for the panel that asked to show. */
+function answered<K extends string, T>(answer: Answer<K, T>, success: string, field: K): T {
+  const fields: Partial<Record<K, T>> = answer;
+  if (answer.__typename === success) return must<T>(fields[field], `${success}.${field}`);
+  throw new Refusal(answer.__typename, answer.message ?? answer.__typename);
+}
+
 const HERO_FIELDS = 'id name unitType spriteSet location recruitedAt level xp status retiredAt';
 const CAMP_FIELDS =
   'location name hallLevel warehouseLevel heroCapacity activeHeroes livingHeroes holdings { material balance } resourceCapacity facilities { kind level }';
@@ -114,14 +216,18 @@ const ADVENTURE_FIELDS =
 const RESULT_FIELDS =
   'outcome stages { stage kind ended } rewards { material amount } credited { material amount } lost { material amount } ' +
   'heroes { heroId xpGained xp level dead }';
-const SEEN = `query($at: String!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
+const REFUSAL_FIELDS = '__typename ... on Error { message }';
+const SEEN = `query($at: ID!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
 const ME = `{ me { id camps { ${CAMP_FIELDS} } heroes { ${HERO_FIELDS} } openAdventure { ${ADVENTURE_FIELDS} } } }`;
-const SUBMIT = `mutation($id: String!, $overrides: [OverrideInput!]!) { submitAdventure(adventureId: $id, overrides: $overrides) { result { ${RESULT_FIELDS} } } }`;
-const TIMELINE = `query($id: String!) { adventure(id: $id) { timeline } }`;
-const DISCARD = `mutation($id: String!) { discardAdventure(adventureId: $id) { id } }`;
-const START = `mutation($at: String!, $job: String!, $heroes: [String!]!) { startAdventure(location: $at, jobId: $job, heroIds: $heroes) { ${ADVENTURE_FIELDS} } }`;
-const BUILD = `mutation($at: String!, $kind: String!, $level: Int!) { buildFacility(location: $at, kind: $kind, level: $level) { location } }`;
-const RECRUIT = `mutation($unitType: String!, $id: String!) { recruitHero(unitType: $unitType, requestId: $id) { ${HERO_FIELDS} } }`;
+// No `... on Error` here: nothing refuses joinGame, so its union has no Error member and the spread would not validate.
+const JOIN = `mutation { joinGame { __typename ... on JoinGameSuccess { player { id } } } }`;
+const SUBMIT = `mutation($input: SubmitAdventureInput!) { submitAdventure(input: $input) { ${REFUSAL_FIELDS} ... on SubmitAdventureSuccess { adventure { result { ${RESULT_FIELDS} } } } } }`;
+const TIMELINE = `query($id: ID!) { adventure(id: $id) { timeline } }`;
+const DISCARD = `mutation($input: DiscardAdventureInput!) { discardAdventure(input: $input) { ${REFUSAL_FIELDS} ... on DiscardAdventureSuccess { adventure { id } } } }`;
+const START = `mutation($input: StartAdventureInput!) { startAdventure(input: $input) { ${REFUSAL_FIELDS} ... on StartAdventureSuccess { adventure { ${ADVENTURE_FIELDS} } } } }`;
+const BUILD = `mutation($input: BuildFacilityInput!) { buildFacility(input: $input) { ${REFUSAL_FIELDS} ... on BuildFacilitySuccess { camp { location } } } }`;
+const RECRUIT = `mutation($input: RecruitHeroInput!) { recruitHero(input: $input) { ${REFUSAL_FIELDS} ... on RecruitHeroSuccess { hero { ${HERO_FIELDS} } } } }`;
+const RETIRE = `mutation($input: RetireHeroInput!) { retireHero(input: $input) { ${REFUSAL_FIELDS} ... on RetireHeroSuccess { hero { ${HERO_FIELDS} } } } }`;
 
 /** A unit type the hall recruits, its price to the camp, and why it cannot be had now, or null when it can. */
 export interface RecruitOffer {
@@ -179,6 +285,10 @@ export function upgradeOffer(camp: CampView, kind: FacilityKind): UpgradeOffer |
  * Beside them, a few of other players' heroes seen at the camp's location,
  * read again when the player signs in or changes camps, not after each
  * change of their own, so the passers-by do not shuffle on every recruit.
+ *
+ * Every mutation sends one input object and answers a result union; a
+ * refusal is a member of the union, thrown here as a `Refusal` named by its
+ * type for the panel to show in place (graphql.md, rules 5 and 6).
  */
 @Service()
 export class Game {
@@ -260,8 +370,8 @@ export class Game {
   /** The sample is flavor: if it cannot be read, the camp shows no passers-by and says nothing. */
   async loadSeen(location: string): Promise<void> {
     try {
-      const data = await this.api.request<{ heroesSeenAt: SeenHeroView[] }>(SEEN, { at: location });
-      if (this.location() === location) this.seenHere.set(data.heroesSeenAt);
+      const data = await this.api.request<{ heroesSeenAt: readonly Wire<SeenHeroView>[] | null }>(SEEN, { at: location });
+      if (this.location() === location) this.seenHere.set((data.heroesSeenAt ?? []).map((h) => ({ ...h, unitType: unitType(h.unitType) })));
     } catch {
       // Left empty.
     }
@@ -269,28 +379,30 @@ export class Game {
 
   async join(): Promise<void> {
     await this.run(async () => {
-      await this.api.request('mutation { joinGame { id } }');
+      const data = await this.api.request<{ joinGame: Answer<'player', { id: string }> }>(JOIN);
+      answered(data.joinGame, 'JoinGameSuccess', 'player');
       await this.load();
     });
   }
 
   async load(): Promise<void> {
-    const data = await this.api.request<{ me: PlayerView | null }>(ME);
-    this.player.set(data.me);
+    const data = await this.api.request<{ me: Wire<PlayerView> | null }>(ME);
+    this.player.set(data.me ? playerFromWire(data.me) : null);
   }
 
   /**
    * Recruits a hero of the unit type, with a fresh request id; the hub
    * draws its name and look, and debits its cost. Answers the new hero, or
-   * throws the hub's refusal, an `ApiError` with its code, for the hall to
+   * throws the hub's refusal, a `Refusal` named by its type, for the hall to
    * show in place. The player is read again either way, since a refusal
-   * such as `HALL_FULL` means the view was stale.
+   * such as `HallFull` means the view was stale.
    */
   async recruit(unitType: UnitType): Promise<HeroView> {
     this.busy.set(true);
     try {
-      const data = await this.api.request<{ recruitHero: HeroView }>(RECRUIT, { unitType, id: crypto.randomUUID() });
-      return data.recruitHero;
+      const input = { unitType: wireValue(unitType), requestId: crypto.randomUUID() };
+      const data = await this.api.request<{ recruitHero: Answer<'hero', Wire<HeroView>> }>(RECRUIT, { input });
+      return heroFromWire(answered(data.recruitHero, 'RecruitHeroSuccess', 'hero'));
     } finally {
       // A failed read leaves the view as it was; the recruit's own answer is what matters here.
       await this.load().catch(() => undefined);
@@ -300,14 +412,16 @@ export class Game {
 
   /**
    * Builds the facility's next level at the camp on screen. Answers when it
-   * is built, or throws the hub's refusal, an `ApiError` with its code, for
+   * is built, or throws the hub's refusal, a `Refusal` named by its type, for
    * the panel to show in place. The player is read again either way, since
    * a refusal means the view was stale.
    */
   async build(kind: FacilityKind, level: number): Promise<void> {
     this.busy.set(true);
     try {
-      await this.api.request(BUILD, { at: this.location(), kind, level });
+      const input = { location: this.location(), kind: wireValue(kind), level };
+      const data = await this.api.request<{ buildFacility: Answer<'camp', { location: string }> }>(BUILD, { input });
+      answered(data.buildFacility, 'BuildFacilitySuccess', 'camp');
     } finally {
       // A failed read leaves the view as it was; the build's own answer is what matters here.
       await this.load().catch(() => undefined);
@@ -319,11 +433,8 @@ export class Game {
   async retire(heroId: string): Promise<HeroView | null> {
     let hero: HeroView | null = null;
     await this.run(async () => {
-      const data = await this.api.request<{ retireHero: HeroView }>(
-        `mutation($id: String!) { retireHero(heroId: $id) { ${HERO_FIELDS} } }`,
-        { id: heroId },
-      );
-      hero = data.retireHero;
+      const data = await this.api.request<{ retireHero: Answer<'hero', Wire<HeroView>> }>(RETIRE, { input: { heroId } });
+      hero = heroFromWire(answered(data.retireHero, 'RetireHeroSuccess', 'hero'));
       await this.load();
     });
     return hero;
@@ -332,15 +443,16 @@ export class Game {
   /**
    * Starts a job from the location's job board with a party of the player's
    * heroes there. Answers the open adventure, or throws the hub's refusal,
-   * an `ApiError` with its code, for the job board to show in place. The
+   * a `Refusal` named by its type, for the job board to show in place. The
    * player is read again either way, since a refusal such as
-   * `ADVENTURE_OPEN` means the view was stale.
+   * `AdventureOpen` means the view was stale.
    */
   async startAdventure(location: string, jobId: string, heroIds: readonly string[]): Promise<AdventureView> {
     this.busy.set(true);
     try {
-      const data = await this.api.request<{ startAdventure: AdventureView }>(START, { at: location, job: jobId, heroes: heroIds });
-      return data.startAdventure;
+      const input = { location, jobId, heroIds };
+      const data = await this.api.request<{ startAdventure: Answer<'adventure', Wire<AdventureView>> }>(START, { input });
+      return adventureFromWire(answered(data.startAdventure, 'StartAdventureSuccess', 'adventure'));
     } finally {
       // A failed read leaves the view as it was; the start's own answer is what matters here.
       await this.load().catch(() => undefined);
@@ -351,24 +463,24 @@ export class Game {
   /**
    * Submits the adventure's override log and keeps what the hub answered in
    * `settled`, then reads the player again. An adventure another deploy
-   * issued is refused with ENGINE_UPDATED, and goes to the deploy before,
+   * issued is refused with EngineUpdated, and goes to the deploy before,
    * `/previous/graphql`; refused there too, no deploy can verify it, so
    * it is discarded and the result is null (decision 0030). Any other
-   * failure is thrown, and the log stays saved for another try.
+   * refusal or failure is thrown, and the log stays saved for another try.
    */
   async submitAdventure(adventure: AdventureView, log: readonly AdventureLogEntry[]): Promise<void> {
-    const variables = { id: adventure.id, overrides: log.map(overrideInput) };
+    const input = { adventureId: adventure.id, overrides: log.map(overrideInput) };
+    const submit = async (route: Route) =>
+      (await this.api.request<{ submitAdventure: Answer<'adventure', { result: Wire<AdventureResultView> | null }> }>(SUBMIT, { input }, route))
+        .submitAdventure;
     let result: AdventureResultView | null = null;
-    try {
-      result = (await this.api.request<{ submitAdventure: { result: AdventureResultView } }>(SUBMIT, variables)).submitAdventure.result;
-    } catch (e) {
-      if (!engineUpdated(e)) throw e;
-      try {
-        result = (await this.api.request<{ submitAdventure: { result: AdventureResultView } }>(SUBMIT, variables, PREVIOUS)).submitAdventure.result;
-      } catch (again) {
-        if (!engineUpdated(again)) throw again;
-        await this.api.request(DISCARD, { id: adventure.id });
-      }
+    let answer = await submit('current');
+    if (answer.__typename === 'EngineUpdated') answer = await submit(PREVIOUS);
+    if (answer.__typename === 'EngineUpdated') {
+      const data = await this.api.request<{ discardAdventure: Answer<'adventure', { id: string }> }>(DISCARD, { input: { adventureId: adventure.id } });
+      answered(data.discardAdventure, 'DiscardAdventureSuccess', 'adventure');
+    } else {
+      result = resultFromWire(must(answered(answer, 'SubmitAdventureSuccess', 'adventure').result, 'the settled result'));
     }
     this.settled.set({ adventure, result });
     // A failed read leaves the view as it was; the result is what the player sees now.
@@ -392,10 +504,6 @@ export class Game {
       this.busy.set(false);
     }
   }
-}
-
-function engineUpdated(e: unknown): boolean {
-  return e instanceof ApiError && e.code === 'ENGINE_UPDATED';
 }
 
 /** The engine's log entry as the hub's flat `OverrideInput`. */

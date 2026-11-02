@@ -4,22 +4,24 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FACILITIES, MAX_PARTY, type FacilityKind, type Stage } from '@heat/engine';
 import { upperFirst } from 'es-toolkit';
-import { ApiError } from '../../api';
+import { Refusal } from '../../api';
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
 import { creditWords, credits, jobAt, retreatWords, stageWords } from './job-words';
 
-/** The hub's refusals of a start, in the player's words; any other is shown as the hub put it. */
+/**
+ * The hub's refusals of a start, by type, in the player's words; any other is
+ * shown as the hub put it. A job the location does not post, a party of the
+ * wrong size or a hero that is not the player's are the client's own
+ * defects, refused as BAD_USER_INPUT, and this panel never sends them.
+ */
 const REFUSALS: Readonly<Record<string, string>> = {
-  ADVENTURE_OPEN: 'An adventure is already under way. Only one can be open at a time.',
-  NO_SUCH_JOB: 'This job is not on the board any more.',
-  PARTY_SIZE: `A party is one to ${MAX_PARTY} heroes.`,
-  NOT_YOUR_HERO: 'A hero in the party is not yours.',
-  HERO_NOT_HERE: 'A hero in the party is not at this camp.',
-  HERO_DEAD: 'A hero in the party is dead.',
-  HERO_RETIRED: 'A hero in the party has retired.',
-  HERO_ADVENTURING: 'A hero in the party is already on an adventure.',
-  CONFLICT: 'The party changed while setting out, and nobody left. Try again.',
+  AdventureOpen: 'An adventure is already under way. Only one can be open at a time.',
+  HeroNotHere: 'A hero in the party is not at this camp.',
+  HeroDead: 'A hero in the party is dead.',
+  HeroRetired: 'A hero in the party has retired.',
+  HeroAdventuring: 'A hero in the party is already on an adventure.',
+  Conflict: 'The party changed while setting out, and nobody left. Try again.',
 };
 
 /**
@@ -102,10 +104,10 @@ export class JobPanel {
       await this.game.startAdventure(this.game.location(), jobId, [...this.picked()]);
       await this.router.navigate(['/adventure']);
     } catch (e) {
-      const code = e instanceof ApiError ? e.code : null;
+      const kind = e instanceof Refusal ? e.kind : null;
       const facility = this.job()?.facility;
       // The facility that posts the job is not built: the hub's rule, as Issue-133 gave it.
-      const words = code === 'REQUIRES' && facility ? `Build the ${FACILITIES[facility].name.toLowerCase()} first.` : code && REFUSALS[code];
+      const words = kind === 'Requires' && facility ? `Build the ${FACILITIES[facility].name.toLowerCase()} first.` : kind && REFUSALS[kind];
       this.refusal.set(words ?? (e instanceof Error ? e.message : String(e)));
     }
   }

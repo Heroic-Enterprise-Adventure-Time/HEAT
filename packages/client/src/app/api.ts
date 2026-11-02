@@ -2,11 +2,31 @@ import { Service, inject, signal } from '@angular/core';
 import { Config } from './config';
 import { Session } from './session';
 
-/** A GraphQL error, with the hub's refusal code where it gave one (`HALL_FULL`, `INSUFFICIENT_RESOURCES`, ...). */
+/**
+ * An entry of a response's `errors` array, with its code where it has one:
+ * what is not the game's business, malformed input (`BAD_USER_INPUT`), a
+ * caller who is not signed in (`UNAUTHENTICATED`), a failure nobody expected
+ * (docs/standards/graphql.md, rule 6); or the hub not reached at all.
+ */
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly code: string | null,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * The game's refusal of a mutation, answered as data: a member of the
+ * mutation's result union, named by its type (`HallFull`,
+ * `InsufficientResources`, `AdventureOpen`, ...), with its message in the
+ * player's words. `Game` throws one for the panel that asked to show.
+ */
+export class Refusal extends Error {
+  constructor(
+    readonly kind: string,
+    message: string,
   ) {
     super(message);
   }
@@ -34,7 +54,8 @@ export type Fetch = (input: string, init: RequestInit) => Promise<Response>;
 /**
  * The hub, the one API (decision 0004), at the stack's GraphQL path on this
  * origin, with the signed-in player's access token. The first error of a
- * response is thrown, since every operation the client makes is one field.
+ * response is thrown, since every operation the client makes is one field;
+ * a refusal is not an error but data, which `Game` reads from the result.
  * Every request carries the version the client loaded from `config.json`,
  * and a response flagged `outdated`, errors included, means a newer deploy
  * is live (decision 0030); what the client does about it is `Updates`'.

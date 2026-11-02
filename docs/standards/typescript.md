@@ -45,9 +45,17 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 17. **A known library over our own.** For a common problem, a popular, well-known, current library is preferred over a solution of our own, and is adopted whole where it fits, as Angular, Apollo, Pothos, Powertools and PixiJS are: exact-pinned (rule 2), tracked by Dependabot (rule 1), and named here so that each idiom has one spelling. Writing our own is the exception, taken when no current library does the job or when what the code needs is smaller than the library's cost, and the code says so in a comment. The utility library is es-toolkit (decision 0036), a dependency of the engine, the hub and the client: where it has a named function for what the code does, `range`, `clamp`, `sortBy`, `uniq`, `sum`, `sumBy`, `upperFirst`, `groupBy`, `keyBy`, `mapValues`, that function is used, in source and tests alike; the standard library is used where it reads as plainly on its own, `flatMap`, `find`, a spread, `Object.fromEntries` over pairs, a numeric comparator on numbers. Not replaced by it: the engine's seeded random, which replay depends on (es-toolkit's `random` is `Math.random`); `must` (rule 6), which returns the narrowed value where `invariant` only asserts; a `Map` or `Set` that is a cache, a registry or a membership test; and a loop that re-reads between attempts, which `retry` does not express.
 
+### Closed sets
+
+18. **A list that enumerates a closed union is checked against it.** An exported list of a union's members, `UNIT_TYPES`, `MATERIALS`, `FACILITY_KINDS`, `MONSTER_TYPES`, `RESOURCE_TYPES`, `STAGE_ENDINGS`, `ADVENTURE_OUTCOMES`, is the one declaration: the list is `as const` and the union is `(typeof LIST)[number]`, so a member added to one is added to the other. Where the union is declared elsewhere, `StageKind` from `Stage`, the list `satisfies` it and a typed assignment beside it fails on a member the list lacks. A list annotated `readonly T[]` is not checked: a member added to the union alone compiles and is dropped from whatever the list feeds, the API's enums among them (graphql.md, rule 4). From the review of PR-192 (Issue-155).
+
+### Shared test helpers
+
+19. **A helper shared by a package's test files is written once**, in one module under the package's `test/` that every test file imports, never copied into each; `packages/hub/test/refusal.ts` holds `refusal` and `BAD_USER_INPUT`. From the review of PR-192, which found five copies.
+
 ## Held back
 
-Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none of this document's since Issue-149; two of `docs/standards/graphql.md`'s until Issue-155. Checked 2026-10-24.
+Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.
 
 - **graphql 17.** Apollo Server 5 declares graphql `^16.11.0` as its peer dependency; Pothos accepts 16 or 17. Released when Apollo Server accepts 17.
 - **Node 26.** Node 24 is the LTS line and 26 is Current. Released when 26 enters LTS, as rule 1 says.

@@ -12,11 +12,13 @@ import type { StageKind } from "./job.js";
 import type { AdventureLogEntry, PartyOrder } from "./override.js";
 import type { SnapshotHero } from "./snapshot.js";
 
-/** How a stage ended. `done` for travel and arrive; the rest are a battle's. */
-export type StageEnding = "done" | "win" | "loss" | "timeout" | "retreat";
+/** How a stage ended. `done` for travel and arrive; the rest are a battle's. The list declares the union (typescript.md, rule 18). */
+export const STAGE_ENDINGS = ["done", "win", "loss", "timeout", "retreat"] as const;
+export type StageEnding = (typeof STAGE_ENDINGS)[number];
 
 /** `retreat` covers a retreat ordered and a time limit reached; `defeat` is the whole party down. */
-export type AdventureOutcome = "complete" | "retreat" | "defeat";
+export const ADVENTURE_OUTCOMES = ["complete", "retreat", "defeat"] as const;
+export type AdventureOutcome = (typeof ADVENTURE_OUTCOMES)[number];
 
 export interface AdventureStartEvent {
   readonly kind: "adventure-start";

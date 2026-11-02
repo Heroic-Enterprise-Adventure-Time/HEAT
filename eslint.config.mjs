@@ -2,7 +2,7 @@
 // rule 16). One flat config for every workspace, run by `npm run lint` at the
 // root and by "Build and test" beside the typecheck. A rule is turned off here
 // only with its reason; a rule the code cannot meet yet is held back by file
-// pattern at the end, naming the issue that removes the hold-back.
+// pattern at the end, naming the issue that removes the hold-back (none today).
 import js from '@eslint/js';
 import graphql from '@graphql-eslint/eslint-plugin';
 import angular from 'angular-eslint';
@@ -111,8 +111,10 @@ export default tseslint.config(
     plugins: { '@graphql-eslint': graphql },
     rules: {
       ...graphql.configs['flat/schema-all'].rules,
-      // One input object per mutation, named for it (graphql.md, rule 5).
-      '@graphql-eslint/input-name': ['error', { checkInputType: true }],
+      // One input object per mutation, named for it (graphql.md, rule 5). The
+      // case-sensitive check wants the type named exactly `<field>Input`, in
+      // camelCase, which naming-convention's PascalCase for types contradicts.
+      '@graphql-eslint/input-name': ['error', { checkInputType: true, caseSensitiveInputType: false }],
       // Relay's convention, `id: ID!` on every object type. The API's value
       // types (Reward, Holding, UnitStats) have no identity, and its ids are
       // strings keyed by the hub, not global ids.
@@ -124,17 +126,6 @@ export default tseslint.config(
       '@graphql-eslint/no-root-type': 'off',
       // The file is printed by Pothos, so its order is the printer's.
       '@graphql-eslint/alphabetize': 'off',
-    },
-  },
-
-  // Held back: the committed schema until Issue-155 reshapes the API with one
-  // input object per mutation and a nullable result union at the root
-  // (docs/standards/graphql.md, "Held back").
-  {
-    files: ['packages/hub/schema.graphql'],
-    rules: {
-      '@graphql-eslint/input-name': 'off',
-      '@graphql-eslint/require-nullable-result-in-root': 'off',
     },
   },
 );
