@@ -9,6 +9,7 @@ One short record per significant decision: what was chosen, what was considered 
 3. A record is numbered with the next four-digit number and named `<number>-<short-title>.md`.
 4. A record uses the sections Decision, Considered and not chosen, and Where it is described. Its status is **Decided** or **Working assumption**, with the same meaning as in the design documents.
 5. A record is history and is not rewritten. When a decision changes, write a new record and change the old record's status to "Superseded by" the new number.
+6. A record's Status and Date lines and its "Where it is described" section may be amended to point at a later record, at the issue that amended a detail, or at where the decision is now described; its Decision and "Considered and not chosen" sections are never changed. From the review of PR-163 (Issue-147), which found the practice of 0008 to 0033 in no rule.
 
 ## Why
 
@@ -50,4 +51,5 @@ The design and architecture documents say what is true now. They are edited as t
 | [0030](0030-the-first-adventure.md) | The first adventure: the battle engine adapted from BattleScript Online with one fixed action list per unit type, a marching order of four lines that collapse, stage time limits that force a retreat, and one version per deploy with the previous deploy kept live to verify what it issued | Decided |
 | [0031](0031-the-first-progression.md) | The first progression: "Pick up sticks", a first job a lone villager cannot fail, then one run per step: a villager for 20 timber, the mine for 60 timber and 3 cloth, a fighter for 40 ore; building is instant | Decided |
 | [0032](0032-building-facilities.md) | Building facilities: one mutation naming the level being built, one transaction with the level, the prerequisites and the debits as conditions, the hall's and the warehouse's levels on the camp's item, and the first costs and caps | Decided |
-| [0033](0033-three-layers-of-review.md) | Three layers of review: lint in CI, the review skill on a pull request from a session of its own with findings as threads, the checkup skill at a pause; the model-driven layers run from sessions on the subscription, never in GitHub Actions or through an API key | Decided |
+| [0033](0033-three-layers-of-review.md) | Three layers of review: lint in CI, the review skill on a pull request from a session of its own with findings as threads, the checkup skill at a pause; the model-driven layers run from sessions on the subscription, never in GitHub Actions or through an API key | Decided; the checkup's surface in 0034 |
+| [0034](0034-checkup-findings-are-issues.md) | The checkup's findings are issues labeled `finding`, one per breach, capped per run; a closed issue labeled `excused` is the suppression record; candidate rules go to the owner in the session and are filed when accepted | Decided |
