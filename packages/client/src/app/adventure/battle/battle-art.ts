@@ -1,3 +1,4 @@
+import { range } from 'es-toolkit';
 import { Assets, Rectangle, Texture } from 'pixi.js';
 import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
 import { effectLayout, type EffectLayout, type EffectManifest } from './action-sprites';
@@ -43,8 +44,6 @@ async function frames(paths: readonly string[], footOf?: Texture): Promise<Frame
   const textures = await Promise.all(paths.map((p) => Assets.load<Texture>(p)));
   return { textures, foot: lowestOpaqueRow(footOf ?? must(textures[0], 'the first frame')) };
 }
-
-const range = (n: number) => Array.from({ length: n }, (_, i) => i);
 
 async function figureArt(base: string): Promise<UnitArt> {
   const provenance = (await (await fetch(`${base}/provenance.json`)).json()) as Provenance;

@@ -1,3 +1,4 @@
+import { sortBy } from "es-toolkit";
 import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GraphQLError } from "graphql";
@@ -166,7 +167,7 @@ async function shortOf(promise: Promise<unknown>): Promise<unknown> {
   return undefined;
 }
 
-const byMaterial = (holdings: { material: string; balance: number }[]) => [...holdings].sort((a, b) => a.material.localeCompare(b.material));
+const byMaterial = (holdings: { material: string; balance: number }[]) => sortBy(holdings, ["material"]);
 
 describe("recruitHero: paid", () => {
   it("recruits a villager for 20 timber while a hero is alive, with one debit and one ledger entry", async () => {

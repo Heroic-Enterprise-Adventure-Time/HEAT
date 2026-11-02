@@ -6,6 +6,7 @@
  * New in HEAT; BattleScript Online designed the replay and did not build it.
  */
 
+import { sortBy } from "es-toolkit";
 import { ADVENTURE_CONTENT } from "../content.js";
 import { AdventureEngine } from "./engine.js";
 import type { AdventureResult, AdventureTimeline } from "./events.js";
@@ -25,7 +26,7 @@ export function replay(
   content: AdventureContent = ADVENTURE_CONTENT,
 ): { readonly timeline: AdventureTimeline; readonly result: AdventureResult } {
   const engine = new AdventureEngine(snapshot, seed, content);
-  const log = [...overrides].sort((a, b) => a.acceptedAtSimTime - b.acceptedAtSimTime);
+  const log = sortBy(overrides, ["acceptedAtSimTime"]);
   let i = 0;
   while (!engine.isComplete()) {
     for (let entry = log[i]; entry && entry.acceptedAtSimTime <= engine.getNextEventTime(); entry = log[++i]) {

@@ -5,6 +5,7 @@
  * with it, shows at a time on the adventure's clock, and which frame of an
  * effect shows a while after it began, and where.
  */
+import { range } from 'es-toolkit';
 
 /** PixelLab's game pack manifest, as much of it as the battle reads: the whole effect, without the sprite. */
 export interface EffectManifest {
@@ -42,7 +43,7 @@ export function effectLayout(manifest: EffectManifest): EffectLayout {
   const sheet = whole?.sheets[0];
   if (!whole || !sheet) throw new Error('the effect has no whole clip');
   const { w, h } = whole.frame;
-  const frames = Array.from({ length: whole.frames }, (_, i) => ({
+  const frames = range(whole.frames).map((i) => ({
     x: (i % sheet.columns) * w,
     y: Math.floor(i / sheet.columns) * h,
     width: w,

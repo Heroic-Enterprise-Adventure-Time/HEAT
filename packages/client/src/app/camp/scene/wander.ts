@@ -1,5 +1,6 @@
 import type { Point, Rect } from './layout';
 import { must } from '@heat/engine';
+import { sumBy } from 'es-toolkit';
 
 /**
  * How a hero mills about the camp, for flavour (game.md, "Locations and
@@ -37,7 +38,7 @@ export type Random = () => number;
 export function randomSpot(areas: readonly Rect[], random: Random): Point {
   const weighted = areas.map((area) => ({ area, size: (area.x1 - area.x0) * (area.y1 - area.y0) }));
   const within = (area: Rect): Point => ({ x: area.x0 + random() * (area.x1 - area.x0), y: area.y0 + random() * (area.y1 - area.y0) });
-  let pick = random() * weighted.reduce((s, w) => s + w.size, 0);
+  let pick = random() * sumBy(weighted, (w) => w.size);
   for (const { area, size } of weighted) {
     if (pick < size) return within(area);
     pick -= size;

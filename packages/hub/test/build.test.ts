@@ -1,3 +1,4 @@
+import { range } from "es-toolkit";
 import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, QueryCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { GraphQLError } from "graphql";
@@ -96,7 +97,7 @@ describe("buildFacility: the mine", () => {
   it("builds once and charges once for five concurrent requests", async () => {
     const p = player();
     await stock(p, { timber: 100, cloth: 10 });
-    const results = await Promise.allSettled(Array.from({ length: 5 }, () => buildFacility(repo, p, at, "mine", 1)));
+    const results = await Promise.allSettled(range(5).map(() => buildFacility(repo, p, at, "mine", 1)));
     // Every request is answered with the built mine: the losers find it built when they read again.
     expect(results.every((r) => r.status === "fulfilled" && r.value.facilities.mine === 1)).toBe(true);
     expect(await balances(p)).toEqual({ timber: 40, cloth: 7 });

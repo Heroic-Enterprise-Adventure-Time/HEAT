@@ -1,3 +1,4 @@
+import { range } from "es-toolkit";
 import { TransactionCanceledException } from "@aws-sdk/client-dynamodb";
 import {
   GetCommand,
@@ -828,7 +829,7 @@ export class Repository {
       );
     }
     // A ledger entry under the build's cause exists only if the level was built, so its failure is a repeat too.
-    await this.transact(items, [...Array.from({ length: checks }, () => BuildRefused), ...b.cost.flatMap(() => [InsufficientBalance, BuildRefused])]);
+    await this.transact(items, [...range(checks).map(() => BuildRefused), ...b.cost.flatMap(() => [InsufficientBalance, BuildRefused])]);
   }
 
   /**

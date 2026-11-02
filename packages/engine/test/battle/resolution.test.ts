@@ -4,6 +4,7 @@
  * survive decision 0030, with the resource-node passes and guard new.
  */
 
+import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 import {
   ABILITIES,
@@ -172,7 +173,7 @@ describe("selectAction", () => {
     const pick = (seed: string): string | undefined =>
       selectAction([ABILITIES.strike], context(actor, [wolf("w1", "front"), wolf("w2", "front")]), new SeededRng(seed))?.target.unitId;
     expect(pick("s")).toBe(pick("s"));
-    const picks = new Set(Array.from({ length: 20 }, (_, i) => pick(`s${String(i)}`)));
+    const picks = new Set(range(20).map((i) => pick(`s${String(i)}`)));
     expect(picks).toEqual(new Set(["w1", "w2"]));
   });
 

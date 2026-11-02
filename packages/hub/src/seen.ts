@@ -1,3 +1,4 @@
+import { range } from "es-toolkit";
 import { randomInt } from "node:crypto";
 import type { UnitType } from "@heat/engine";
 import type { Hero, Repository } from "./db/repository.js";
@@ -46,7 +47,7 @@ export function sightingOf(hero: Hero, at: Date): Sighting {
 
 /** A random point among the sightings' keys: hero ids are random UUIDs, so this starts a random window. */
 function randomStart(random: Random): string {
-  return Array.from({ length: 8 }, () => random(16).toString(16)).join("");
+  return range(8).map(() => random(16).toString(16)).join("");
 }
 
 /**

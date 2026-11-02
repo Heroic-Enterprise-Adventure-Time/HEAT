@@ -1,3 +1,4 @@
+import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 import { FACILITIES, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION } from "../../src/index.js";
 import { hero, ORE, snapshot } from "./helpers.js";
@@ -6,7 +7,7 @@ import { hero, ORE, snapshot } from "./helpers.js";
 // the job board, and one run of it pays for a fighter.
 
 const SEEDS = 500;
-const seeds = Array.from({ length: SEEDS }, (_, i) => `seed-${i}`);
+const seeds = range(SEEDS).map((i) => `seed-${i}`);
 const ore = JOBS[ORE];
 const gather = ore.stages[1];
 if (gather?.kind !== "gather") throw new Error("The ore job gathers second");

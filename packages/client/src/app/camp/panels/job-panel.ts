@@ -3,6 +3,7 @@ import { LowerCasePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { FACILITIES, MAX_PARTY, type FacilityKind, type Stage } from '@heat/engine';
+import { upperFirst } from 'es-toolkit';
 import { ApiError } from '../../api';
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
@@ -68,7 +69,7 @@ export class JobPanel {
     return credits(job).map((credit) => {
       const balance = camp?.holdings.find((h) => h.material === credit.material)?.balance ?? 0;
       const words = creditWords(credit);
-      return { material: credit.material, words: words.charAt(0).toUpperCase() + words.slice(1), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
+      return { material: credit.material, words: upperFirst(words), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
     });
   });
   protected readonly retreat = computed(() => {
