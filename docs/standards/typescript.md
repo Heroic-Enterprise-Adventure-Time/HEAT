@@ -47,7 +47,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ## Held back
 
-Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none of this document's since Issue-149; two of `docs/standards/graphql.md`'s until Issue-155. Checked 2026-10-24.
+Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.
 
 - **graphql 17.** Apollo Server 5 declares graphql `^16.11.0` as its peer dependency; Pothos accepts 16 or 17. Released when Apollo Server accepts 17.
 - **Node 26.** Node 24 is the LTS line and 26 is Current. Released when 26 enters LTS, as rule 1 says.

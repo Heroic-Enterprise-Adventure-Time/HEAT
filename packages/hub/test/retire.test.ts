@@ -1,12 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
 import { HeroChanged, Repository, type Hero, type HeroStatus } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
+import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
 import { must } from "@heat/engine";
 
 let db: DynamoDBDocumentClient;
@@ -52,15 +52,18 @@ async function expectCountsAgree(p: string) {
   });
 }
 
-async function refusal(promise: Promise<unknown>): Promise<string | undefined> {
+/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
+async function refusal(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;
   } catch (e) {
-    if (e instanceof GraphQLError) return e.extensions["code"] as string;
-    throw e;
+    return e;
   }
   return undefined;
 }
+
+/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
+const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 describe("retireHero", () => {
   it("retires a living hero and counts it out of the active and the living heroes", async () => {
@@ -109,7 +112,7 @@ describe("retireHero", () => {
   it("makes the villager free again when the camp's only living hero retires", async () => {
     const p = player();
     const villager = await recruitHero(repo, p, "villager", randomUUID());
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBe("INSUFFICIENT_RESOURCES");
+    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(InsufficientResources);
     await retireHero(repo, p, villager.id);
     const next = await recruitHero(repo, p, "villager", randomUUID());
     expect(next.status).toBe("ALIVE");
@@ -119,7 +122,7 @@ describe("retireHero", () => {
   it("frees a slot in a hall full of dead heroes", async () => {
     const p = player();
     const dead = must((await putCamp(p, ["DEAD", "DEAD", "DEAD", "DEAD"]))[0], "the dead hero");
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBe("HALL_FULL");
+    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(HallFull);
     await retireHero(repo, p, dead.id);
     await recruitHero(repo, p, "villager", randomUUID());
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 4, livingHeroes: 1 });
@@ -159,7 +162,7 @@ describe("retireHero", () => {
       ]);
       expect(retire.status).toBe("fulfilled");
       const made = recruit.status === "fulfilled";
-      if (!made) expect(recruit.reason).toBeInstanceOf(GraphQLError);
+      if (!made) expect(recruit.reason).toBeInstanceOf(Refusal);
       expect(await repo.heroes(p)).toHaveLength(made ? 5 : 4);
       await expectCountsAgree(p);
       expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: made ? 20 : 40 }]);
@@ -172,8 +175,8 @@ describe("retireHero", () => {
     const p = player();
     const other = player();
     const theirs = must((await putCamp(other, ["ALIVE"]))[0], "their hero");
-    expect(await refusal(retireHero(repo, p, theirs.id))).toBe("NOT_FOUND");
-    expect(await refusal(retireHero(repo, p, randomUUID()))).toBe("NOT_FOUND");
+    expect(await refusal(retireHero(repo, p, theirs.id))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(retireHero(repo, p, randomUUID()))).toMatchObject(BAD_USER_INPUT);
     expect((await repo.getHero(other, theirs.id))?.status).toBe("ALIVE");
   });
 });

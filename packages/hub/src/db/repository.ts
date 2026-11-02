@@ -67,7 +67,7 @@ export interface Player {
 }
 
 export interface Holding {
-  material: string;
+  material: Material;
   balance: number;
 }
 
@@ -302,7 +302,7 @@ export class Repository {
     return r.Item ? { id: r.Item["id"] as string, name: r.Item["name"] as string } : undefined;
   }
 
-  async setBalance(playerId: string, location: string, material: string, balance: number): Promise<void> {
+  async setBalance(playerId: string, location: string, material: Material, balance: number): Promise<void> {
     await this.db.send(
       new PutCommand({
         TableName: this.tables.player,
@@ -336,7 +336,7 @@ export class Repository {
           stored: true,
         });
       } else if (kind === "HOLDING") {
-        camp.holdings.push({ material: i["material"] as string, balance: i["balance"] as number });
+        camp.holdings.push({ material: i["material"] as Material, balance: i["balance"] as number });
       } else if (kind === "FACILITY" && facility) {
         camp.facilities[facility as FacilityKind] = i["level"] as number;
       }

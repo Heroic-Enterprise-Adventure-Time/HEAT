@@ -1,9 +1,17 @@
+import { constantCase } from "es-toolkit";
 import {
+  ADVENTURE_OUTCOMES,
+  FACILITY_KINDS,
   JOBS,
+  MATERIALS,
+  STAGE_ENDINGS,
+  STAGE_KINDS,
+  UNIT_TYPES,
   hallCapacity,
   location,
   warehouseCapacity,
   type Job,
+  type Requirement,
   type Reward,
   type SnapshotHero,
   type StageResult,
@@ -20,6 +28,26 @@ import { startAdventure } from "../start.js";
 import { submitAdventure, type OverrideInput } from "../submit.js";
 import { discardAdventure } from "../discard.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
+import {
+  AdventureDiscarded,
+  AdventureOpen,
+  AdventureSettled,
+  AdventureVerifiable,
+  Conflict,
+  EngineUpdated,
+  HallFull,
+  HallLevel,
+  HeroAdventuring,
+  HeroDead,
+  HeroNotHere,
+  HeroRetired,
+  InsufficientResources,
+  MaxLevel,
+  Requires,
+  badInput,
+  type Refusal,
+  type Shortfall,
+} from "../refusals.js";
 import { campLevels, type AdventureRecord, type Camp, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 
 /**
@@ -29,6 +57,12 @@ import { campLevels, type AdventureRecord, type Camp, type Hero, type HeroOutcom
  * timeline; the deploy's version; joining, recruiting, retiring, building, and an
  * adventure started from the job board or a facility, submitted for verification and
  * settlement, or discarded when no deploy can verify it.
+ *
+ * The shape is docs/standards/graphql.md, rules 4 to 6: an id is an ID, a
+ * timestamp a DateTime, a set the engine closes an enum; a mutation takes
+ * one input object and answers a result union, its success wrapping what it
+ * changed and each refusal an object type implementing Error (Issue-155,
+ * decision 0038).
  */
 
 builder.scalarType("JSON", {
@@ -37,18 +71,49 @@ builder.scalarType("JSON", {
   parseValue: (value) => value,
 });
 
+// --- Enums: the engine's closed sets, their values in the API's UPPER_CASE,
+// mapped onto the engine's own strings so that nothing else changes. ---
+
+function enumOf<T extends string>(name: string, description: string, values: readonly T[]) {
+  const named: Record<string, { value: T }> = Object.fromEntries(values.map((value) => [constantCase(value), { value }]));
+  return builder.enumType(name, { description, values: named });
+}
+
+const UnitTypeRef = enumOf("UnitType", "The unit types, the engine's `UnitType`: what a hero is and what the hall recruits.", UNIT_TYPES);
+const MaterialRef = enumOf("Material", "The resources, the engine's `Material`: there is no currency.", MATERIALS);
+const FacilityKindRef = enumOf("FacilityKind", "A camp's own facilities, the engine's `FacilityKind`, those every camp has and those it may build.", FACILITY_KINDS);
+const AdventureOutcomeRef = enumOf(
+  "AdventureOutcome",
+  "How an adventure ended, the engine's `AdventureOutcome`: complete; retreat, ordered or forced by a time limit; defeat, the whole party down.",
+  ADVENTURE_OUTCOMES,
+);
+const StageKindRef = enumOf("StageKind", "What a stage of a job is, the engine's `StageKind`.", STAGE_KINDS);
+const StageEndingRef = enumOf("StageEnding", "How a stage ended, the engine's `StageEnding`: DONE for travel and arrive; the rest are a battle's.", STAGE_ENDINGS);
+
+const HeroStatusRef = builder.enumType("HeroStatus", {
+  description: "Alive or dead at the camp, or retired for good.",
+  values: ["ALIVE", "DEAD", "RETIRED"] as const,
+});
+
+const AdventureStatusRef = builder.enumType("AdventureStatus", {
+  description: "Open while the player plays it; settled once the hub verified it and paid out; discarded when no deploy could verify it any more.",
+  values: ["OPEN", "SETTLED", "DISCARDED"] as const,
+});
+
+// --- Object types. ---
+
 const HoldingRef = builder.objectRef<Holding>("Holding").implement({
   description: "A camp's stock of one resource.",
   fields: (t) => ({
-    material: t.exposeString("material"),
+    material: t.expose("material", { type: MaterialRef }),
     balance: t.exposeInt("balance"),
   }),
 });
 
-const FacilityLevelRef = builder.objectRef<{ kind: string; level: number }>("FacilityLevel").implement({
+const FacilityLevelRef = builder.objectRef<{ kind: (typeof FACILITY_KINDS)[number]; level: number }>("FacilityLevel").implement({
   description: "One of a camp's own facilities and its level.",
   fields: (t) => ({
-    kind: t.exposeString("kind", { description: "The facility's kind in the static content." }),
+    kind: t.expose("kind", { type: FacilityKindRef }),
     level: t.exposeInt("level"),
   }),
 });
@@ -56,7 +121,7 @@ const FacilityLevelRef = builder.objectRef<{ kind: string; level: number }>("Fac
 const CampRef = builder.objectRef<Camp>("Camp").implement({
   description: "One player's view of one location: their facilities, resources and heroes there.",
   fields: (t) => ({
-    location: t.exposeString("location", { description: "The location's id in the static content." }),
+    location: t.exposeID("location", { description: "The location's id in the static content." }),
     name: t.string({ resolve: (camp) => location(camp.location)?.name ?? camp.location }),
     hallLevel: t.exposeInt("hallLevel"),
     warehouseLevel: t.exposeInt("warehouseLevel"),
@@ -83,33 +148,28 @@ const CampRef = builder.objectRef<Camp>("Camp").implement({
   }),
 });
 
-const HeroStatusRef = builder.enumType("HeroStatus", {
-  description: "Alive or dead at the camp, or retired for good.",
-  values: ["ALIVE", "DEAD", "RETIRED"] as const,
-});
-
 const HeroRef = builder.objectRef<Hero>("Hero").implement({
   description: "A hero, drawn by the hub at recruitment: its sprite set and name are never the client's choice.",
   fields: (t) => ({
-    id: t.exposeString("id"),
+    id: t.exposeID("id"),
     name: t.exposeString("name"),
-    unitType: t.exposeString("unitType"),
+    unitType: t.expose("unitType", { type: UnitTypeRef }),
     spriteSet: t.exposeString("spriteSet", { description: "The set's directory under art/heroes/." }),
-    location: t.exposeString("location"),
-    recruitedAt: t.exposeString("recruitedAt"),
+    location: t.exposeID("location", { description: "The location's id in the static content." }),
+    recruitedAt: t.expose("recruitedAt", { type: "DateTime" }),
     level: t.exposeInt("level"),
     xp: t.exposeInt("xp"),
     status: t.field({ type: HeroStatusRef, resolve: (hero) => hero.status }),
-    retiredAt: t.exposeString("retiredAt", { nullable: true }),
+    retiredAt: t.expose("retiredAt", { type: "DateTime", nullable: true }),
   }),
 });
 
 const SeenHeroRef = builder.objectRef<Sighting>("SeenHero").implement({
   description: "Another player's hero seen at a location: its public fields only, and nothing that says whose it is (decision 0029).",
   fields: (t) => ({
-    id: t.exposeString("heroId"),
+    id: t.exposeID("heroId"),
     name: t.exposeString("name"),
-    unitType: t.exposeString("unitType"),
+    unitType: t.expose("unitType", { type: UnitTypeRef }),
     spriteSet: t.exposeString("spriteSet", { description: "The set's directory under art/heroes/." }),
     level: t.exposeInt("level"),
   }),
@@ -118,11 +178,12 @@ const SeenHeroRef = builder.objectRef<Sighting>("SeenHero").implement({
 const JobRef = builder.objectRef<Job>("Job").implement({
   description: "A job a location posts, on its job board or at a facility, from the static content; the client reads its stages from the engine it loaded.",
   fields: (t) => ({
-    id: t.exposeString("id"),
+    id: t.exposeID("id"),
     name: t.exposeString("name"),
     description: t.exposeString("description"),
-    location: t.exposeString("location", { description: "The location that posts it." }),
-    facility: t.string({
+    location: t.exposeID("location", { description: "The location that posts it." }),
+    facility: t.field({
+      type: FacilityKindRef,
       nullable: true,
       description: "The own facility that posts it, which the camp must have built to start it; null for a job on the job board.",
       resolve: (job) => job.facility ?? null,
@@ -143,8 +204,8 @@ const UnitStatsRef = builder.objectRef<UnitStats>("UnitStats").implement({
 const SnapshotHeroRef = builder.objectRef<SnapshotHero>("SnapshotHero").implement({
   description: "A hero as the adventure took it at the start: its effective numbers, frozen for the run.",
   fields: (t) => ({
-    heroId: t.exposeString("heroId"),
-    unitType: t.exposeString("unitType"),
+    heroId: t.exposeID("heroId"),
+    unitType: t.expose("unitType", { type: UnitTypeRef }),
     name: t.exposeString("name"),
     spriteSet: t.exposeString("spriteSet"),
     level: t.exposeInt("level"),
@@ -156,20 +217,15 @@ const SnapshotRef = builder.objectRef<AdventureSnapshot>("Snapshot").implement({
   description: "The frozen snapshot the hub issued at the start, the engine's AdventureSnapshot field for field: the party's effective numbers and the job by id (decision 0030).",
   fields: (t) => ({
     version: t.exposeString("version"),
-    jobId: t.exposeString("jobId"),
+    jobId: t.exposeID("jobId"),
     heroes: t.expose("heroes", { type: [SnapshotHeroRef] }),
   }),
-});
-
-const AdventureStatusRef = builder.enumType("AdventureStatus", {
-  description: "Open while the player plays it; settled once the hub verified it and paid out; discarded when no deploy could verify it any more.",
-  values: ["OPEN", "SETTLED", "DISCARDED"] as const,
 });
 
 const RewardRef = builder.objectRef<Reward>("Reward").implement({
   description: "An amount of one resource.",
   fields: (t) => ({
-    material: t.exposeString("material"),
+    material: t.expose("material", { type: MaterialRef }),
     amount: t.exposeInt("amount"),
   }),
 });
@@ -178,8 +234,8 @@ const StageResultRef = builder.objectRef<StageResult>("StageResult").implement({
   description: "How one stage the party entered ended.",
   fields: (t) => ({
     stage: t.exposeInt("stage"),
-    kind: t.exposeString("kind", { description: "travel, fight, gather or arrive." }),
-    ended: t.exposeString("ended", { description: "done for travel and arrive; win, loss, timeout or retreat for a battle." }),
+    kind: t.expose("kind", { type: StageKindRef }),
+    ended: t.expose("ended", { type: StageEndingRef }),
     startedAtMs: t.exposeInt("startedAtMs"),
     endedAtMs: t.exposeInt("endedAtMs"),
   }),
@@ -188,7 +244,7 @@ const StageResultRef = builder.objectRef<StageResult>("StageResult").implement({
 const HeroOutcomeRef = builder.objectRef<HeroOutcome>("HeroOutcome").implement({
   description: "One hero of the party at settlement.",
   fields: (t) => ({
-    heroId: t.exposeString("heroId"),
+    heroId: t.exposeID("heroId"),
     xpGained: t.exposeInt("xpGained"),
     xp: t.exposeInt("xp", { description: "The hero's XP after settlement." }),
     level: t.exposeInt("level", { description: "The hero's level after settlement." }),
@@ -200,7 +256,7 @@ const HeroOutcomeRef = builder.objectRef<HeroOutcome>("HeroOutcome").implement({
 const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").implement({
   description: "What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, and each hero's XP and fate.",
   fields: (t) => ({
-    outcome: t.exposeString("outcome", { description: "complete, retreat (ordered, or a time limit reached) or defeat." }),
+    outcome: t.expose("outcome", { type: AdventureOutcomeRef }),
     endedAtMs: t.exposeInt("endedAtMs"),
     reachedStage: t.exposeInt("reachedStage"),
     stages: t.expose("stages", { type: [StageResultRef] }),
@@ -214,10 +270,10 @@ const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").i
 const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
   description: "An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.",
   fields: (t) => ({
-    id: t.exposeString("adventureId"),
+    id: t.exposeID("adventureId"),
     seed: t.exposeString("seed"),
-    startedAt: t.exposeString("startedAt"),
-    location: t.exposeString("location"),
+    startedAt: t.expose("startedAt", { type: "DateTime" }),
+    location: t.exposeID("location", { description: "The location's id in the static content." }),
     job: t.field({
       type: JobRef,
       resolve: (adventure) => {
@@ -244,30 +300,10 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
   }),
 });
 
-const OverrideKindRef = builder.enumType("OverrideKind", {
-  description: "What a log entry is: a hero's forced action, or an order to the whole party.",
-  values: ["UNIT", "PARTY"] as const,
-});
-const PartyOrderRef = builder.enumType("PartyOrder", {
-  description: "The orders a party takes: press on into the next stage, or retreat home.",
-  values: ["PRESS_ON", "RETREAT"] as const,
-});
-
-const OverrideInputRef = builder.inputType("OverrideInput", {
-  description: "One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up.",
-  fields: (t) => ({
-    kind: t.field({ type: OverrideKindRef, required: true }),
-    acceptedAtSimTime: t.int({ required: true, description: "Milliseconds on the adventure's clock." }),
-    unitId: t.string({ description: "The hero, for a UNIT entry." }),
-    abilityId: t.string({ description: "The ability forced, for a UNIT entry." }),
-    order: t.field({ type: PartyOrderRef, description: "The order, for a PARTY entry." }),
-  }),
-});
-
 const PlayerRef = builder.objectRef<Player>("Player").implement({
   description: "A player: the id and name anyone may read, and the camps, heroes and open adventure only the player may.",
   fields: (t) => ({
-    id: t.exposeString("id"),
+    id: t.exposeID("id"),
     name: t.exposeString("name"),
     camps: t.field({
       type: [CampRef],
@@ -295,12 +331,210 @@ const PlayerRef = builder.objectRef<Player>("Player").implement({
   }),
 });
 
+// --- The refusals, as data: an Error interface and one object type per
+// refusal class (src/refusals.ts), shared by the unions that list them. ---
+
+const ErrorInterface = builder.interfaceRef<Refusal>("Error").implement({
+  description: "A refusal: the game's rule the request failed, in the player's words. Every refusal type implements it; the type's name says which rule, and its own fields say what the client needs.",
+  fields: (t) => ({
+    message: t.exposeString("message", { description: "In the player's words; the client may show it as it is." }),
+  }),
+});
+
+const ShortfallRef = builder.objectRef<Shortfall>("Shortfall").implement({
+  description: "One resource the camp is short of: what the thing costs and what the camp has.",
+  fields: (t) => ({
+    material: t.expose("material", { type: MaterialRef }),
+    amount: t.exposeInt("amount", { description: "The amount the thing costs." }),
+    balance: t.exposeInt("balance", { description: "The camp's balance." }),
+  }),
+});
+
+const RequirementRef = builder.objectRef<Requirement>("Requirement").implement({
+  description: "A facility the camp needs first, at this level or above.",
+  fields: (t) => ({
+    kind: t.expose("kind", { type: FacilityKindRef }),
+    level: t.exposeInt("level"),
+  }),
+});
+
+builder.objectType(HallLevel, {
+  name: "HallLevel",
+  description: "The unit type needs a higher heroes hall.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ level: t.exposeInt("hallLevel", { description: "The hall level the unit type needs." }) }),
+});
+builder.objectType(HallFull, {
+  name: "HallFull",
+  description: "The heroes hall holds no more active heroes at its level.",
+  interfaces: [ErrorInterface],
+});
+builder.objectType(InsufficientResources, {
+  name: "InsufficientResources",
+  description: "The camp cannot pay for it.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ short: t.expose("short", { type: [ShortfallRef], description: "Each resource the camp is short of." }) }),
+});
+builder.objectType(MaxLevel, {
+  name: "MaxLevel",
+  description: "The facility is at its highest level at this location.",
+  interfaces: [ErrorInterface],
+});
+builder.objectType(Requires, {
+  name: "Requires",
+  description: "Another facility is needed first.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ missing: t.expose("missing", { type: [RequirementRef], description: "Each facility and the level it needs." }) }),
+});
+builder.objectType(Conflict, {
+  name: "Conflict",
+  description: "The camp or the party changed while the request ran, and no rule explains the failure. Nothing was changed; try again.",
+  interfaces: [ErrorInterface],
+});
+builder.objectType(AdventureOpen, {
+  name: "AdventureOpen",
+  description: "The player's one adventure is open (decision 0003).",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ adventureId: t.exposeID("adventureId", { description: "The open one, which the client reads from me.openAdventure." }) }),
+});
+builder.objectType(HeroDead, {
+  name: "HeroDead",
+  description: "A hero of the party is dead.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ heroId: t.exposeID("heroId", { description: "The hero the refusal is about." }) }),
+});
+builder.objectType(HeroRetired, {
+  name: "HeroRetired",
+  description: "A hero of the party has retired.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ heroId: t.exposeID("heroId", { description: "The hero the refusal is about." }) }),
+});
+builder.objectType(HeroNotHere, {
+  name: "HeroNotHere",
+  description: "A hero of the party is not at this camp.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ heroId: t.exposeID("heroId", { description: "The hero the refusal is about." }) }),
+});
+builder.objectType(HeroAdventuring, {
+  name: "HeroAdventuring",
+  description: "The hero is on an adventure: it can neither set out again nor retire until the adventure is settled.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ heroId: t.exposeID("heroId", { description: "The hero the refusal is about." }) }),
+});
+builder.objectType(AdventureDiscarded, {
+  name: "AdventureDiscarded",
+  description: "The adventure was discarded: no deploy could verify it, and nothing was credited.",
+  interfaces: [ErrorInterface],
+});
+builder.objectType(AdventureSettled, {
+  name: "AdventureSettled",
+  description: "The adventure is settled, so it cannot be discarded.",
+  interfaces: [ErrorInterface],
+});
+builder.objectType(EngineUpdated, {
+  name: "EngineUpdated",
+  description: "Another version of the game issued the adventure, so this deploy cannot verify it: try /previous/graphql, and discard it when that deploy says the same (decision 0030).",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ version: t.exposeString("version", { description: "This deploy's version." }) }),
+});
+builder.objectType(AdventureVerifiable, {
+  name: "AdventureVerifiable",
+  description: "The adventure can still be submitted, so it is not discarded: a player who dislikes how a run is going finishes it.",
+  interfaces: [ErrorInterface],
+  fields: (t) => ({ version: t.exposeString("version", { description: "The version that issued the adventure and still verifies it." }) }),
+});
+
+/** The errors option of a mutation: its result union, its success type wrapping what it changed, and the refusals it lists. */
+function answers(verb: string, changed: { field: string; what: string }, types: (new (...args: never[]) => Refusal)[]) {
+  return {
+    types,
+    union: {
+      name: `${verb}Result`,
+      description: `What ${verb[0]?.toLowerCase() ?? ""}${verb.slice(1)} answers: ${verb}Success${types.length > 0 ? ", or one of the refusals the union lists, each an Error" : ", since nothing refuses it"}.`,
+    },
+    result: { name: `${verb}Success`, description: `The mutation did its work: ${changed.what}.` },
+    dataField: { name: changed.field },
+  };
+}
+
+// --- Inputs. ---
+
+const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implement({
+  description: "One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up.",
+  fields: (t) => ({
+    kind: t.field({
+      type: builder.enumType("OverrideKind", {
+        description: "What a log entry is: a hero's forced action, or an order to the whole party.",
+        values: ["UNIT", "PARTY"] as const,
+      }),
+      required: true,
+    }),
+    acceptedAtSimTime: t.int({ required: true, description: "Milliseconds on the adventure's clock." }),
+    unitId: t.string({ description: "The hero, for a UNIT entry." }),
+    abilityId: t.string({ description: "The ability forced, for a UNIT entry." }),
+    order: t.field({
+      type: builder.enumType("PartyOrder", {
+        description: "The orders a party takes: press on into the next stage, or retreat home.",
+        values: ["PRESS_ON", "RETREAT"] as const,
+      }),
+      description: "The order, for a PARTY entry.",
+    }),
+  }),
+});
+
+const RecruitHeroInput = builder.inputType("RecruitHeroInput", {
+  description: "What to recruit, and the request's id.",
+  fields: (t) => ({
+    unitType: t.field({ type: UnitTypeRef, required: true, description: "A unit type on the location's recruitment list." }),
+    requestId: t.id({ required: true, description: "A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made." }),
+  }),
+});
+
+const BuildFacilityInput = builder.inputType("BuildFacilityInput", {
+  description: "Which facility to build at which camp, and the level being built.",
+  fields: (t) => ({
+    location: t.id({ required: true, description: "The camp's location." }),
+    kind: t.field({ type: FacilityKindRef, required: true, description: "One of the camp's own facilities." }),
+    level: t.int({ required: true, description: "The level being built: the next one. A level already built answers the camp and charges nothing." }),
+  }),
+});
+
+const RetireHeroInput = builder.inputType("RetireHeroInput", {
+  description: "Which hero to retire.",
+  fields: (t) => ({ heroId: t.id({ required: true }) }),
+});
+
+const StartAdventureInput = builder.inputType("StartAdventureInput", {
+  description: "Which job to start, where, and with whom.",
+  fields: (t) => ({
+    location: t.id({ required: true, description: "The camp's location, which posts the job." }),
+    jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built." }),
+    heroIds: t.idList({ required: true, description: "The party: one to four of the player's living heroes at that camp." }),
+  }),
+});
+
+const SubmitAdventureInput = builder.inputType("SubmitAdventureInput", {
+  description: "Which adventure to submit, with its override log.",
+  fields: (t) => ({
+    adventureId: t.id({ required: true }),
+    overrides: t.field({ type: [OverrideInputRef], required: true, description: "The override log, as the engine kept it; empty when the player forced nothing." }),
+  }),
+});
+
+const DiscardAdventureInput = builder.inputType("DiscardAdventureInput", {
+  description: "Which adventure to discard.",
+  fields: (t) => ({ adventureId: t.id({ required: true }) }),
+});
+
+// --- The roots. Every root field is nullable (graphql.md, rule 6), so one
+// field's failure nulls that field and not the response. ---
+
 builder.queryFields((t) => ({
   player: t.field({
     type: PlayerRef,
     nullable: true,
     description: "Public: any caller may look a player up by id.",
-    args: { id: t.arg.string({ required: true }) },
+    args: { id: t.arg.id({ required: true }) },
     resolve: (_root, args, ctx) => ctx.repo.getPlayer(args.id),
   }),
   me: t.field({
@@ -311,6 +545,7 @@ builder.queryFields((t) => ({
     resolve: async (_root, _args, ctx) => (ctx.playerId ? ctx.repo.getPlayer(ctx.playerId) : undefined),
   }),
   version: t.string({
+    nullable: true,
     description: "The deploy's version: the commit this route's deploy runs. /graphql answers the current deploy's, /previous/graphql the one before.",
     resolve: (_root, _args, ctx) => ctx.version,
   }),
@@ -319,7 +554,7 @@ builder.queryFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description: "An adventure by id: any settled one, for its replay; an open or discarded one only for its own player. Null otherwise.",
-    args: { id: t.arg.string({ required: true }) },
+    args: { id: t.arg.id({ required: true }) },
     resolve: async (_root, args, ctx) => {
       const adventure = await ctx.repo.getAdventure(args.id);
       if (!adventure) return null;
@@ -328,11 +563,12 @@ builder.queryFields((t) => ({
   }),
   heroesSeenAt: t.field({
     type: [SeenHeroRef],
+    nullable: true,
     authScopes: { authenticated: true },
     description: "A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.",
-    args: { location: t.arg.string({ required: true }) },
+    args: { location: t.arg.id({ required: true }) },
     resolve: (_root, args, ctx) => {
-      if (!location(args.location)) throw new GraphQLError(`no location ${args.location}`, { extensions: { code: "BAD_USER_INPUT" } });
+      if (!location(args.location)) badInput(`no location ${args.location}`);
       return heroesSeenAt(ctx.repo, callerId(ctx), args.location);
     },
   }),
@@ -341,67 +577,72 @@ builder.queryFields((t) => ({
 builder.mutationFields((t) => ({
   joinGame: t.field({
     type: PlayerRef,
+    nullable: true,
     authScopes: { authenticated: true },
-    description: "Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing.",
+    description: "Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.",
+    errors: answers("JoinGame", { field: "player", what: "the player's profile, made or found" }, []),
     resolve: (_root, _args, ctx) => ctx.repo.joinPlayer({ id: callerId(ctx), name: ctx.playerName ?? callerId(ctx) }),
   }),
   recruitHero: t.field({
     type: HeroRef,
+    nullable: true,
     authScopes: { authenticated: true },
-    description: "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id, a UUID the client makes, becomes the hero's id, so a repeat answers with the hero already made. Refused with HALL_LEVEL, HALL_FULL, INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance), BAD_USER_INPUT or CONFLICT.",
-    args: {
-      unitType: t.arg.string({ required: true }),
-      requestId: t.arg.string({ required: true }),
-    },
-    resolve: (_root, args, ctx) => recruitHero(ctx.repo, callerId(ctx), args.unitType, args.requestId),
+    description:
+      "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit is BAD_USER_INPUT.",
+    errors: answers("RecruitHero", { field: "hero", what: "the hero recruited, or already made by this request" }, [HallLevel, HallFull, InsufficientResources, Conflict]),
+    args: { input: t.arg({ type: RecruitHeroInput, required: true }) },
+    resolve: (_root, { input }, ctx) => recruitHero(ctx.repo, callerId(ctx), input.unitType, input.requestId),
   }),
   buildFacility: t.field({
     type: CampRef,
+    nullable: true,
     authScopes: { authenticated: true },
-    description: "Builds the next level of one of the camp's own facilities, at once, paid in resources from the camp's holdings, and answers the camp. The client names the level it is building, so a repeat finds it built and is answered with the camp, charging nothing. Refused with BAD_USER_INPUT, MAX_LEVEL, REQUIRES (extensions.missing lists each facility and the level it needs), INSUFFICIENT_RESOURCES (extensions.short lists each material's amount and the camp's balance) or CONFLICT.",
-    args: {
-      location: t.arg.string({ required: true }),
-      kind: t.arg.string({ required: true }),
-      level: t.arg.int({ required: true }),
-    },
-    resolve: (_root, args, ctx) => buildFacility(ctx.repo, callerId(ctx), args.location, args.kind, args.level),
+    description:
+      "Builds the next level of one of the camp's own facilities, at once, paid in resources from the camp's holdings, and answers the camp. The client names the level it is building, so a repeat finds it built and is answered with the camp, charging nothing. Refused with MaxLevel, Requires, InsufficientResources or Conflict; a camp or facility the player has none of, or a level that is not the next, is BAD_USER_INPUT.",
+    errors: answers("BuildFacility", { field: "camp", what: "the camp with the level built" }, [MaxLevel, Requires, InsufficientResources, Conflict]),
+    args: { input: t.arg({ type: BuildFacilityInput, required: true }) },
+    resolve: (_root, { input }, ctx) => buildFacility(ctx.repo, callerId(ctx), input.location, input.kind, input.level),
   }),
   retireHero: t.field({
     type: HeroRef,
+    nullable: true,
     authScopes: { authenticated: true },
-    description: "Retires one of the player's heroes, alive or dead: permanent, and the hero stays on the record. It frees a slot in the heroes hall. A hero already retired is answered as it is.",
-    args: { heroId: t.arg.string({ required: true }) },
-    resolve: (_root, args, ctx) => retireHero(ctx.repo, callerId(ctx), args.heroId),
+    description:
+      "Retires one of the player's heroes, alive or dead: permanent, and the hero stays on the record. It frees a slot in the heroes hall. A hero already retired is answered as it is. Refused with HeroAdventuring or Conflict; a hero that is not the player's is BAD_USER_INPUT.",
+    errors: answers("RetireHero", { field: "hero", what: "the hero, retired" }, [HeroAdventuring, Conflict]),
+    args: { input: t.arg({ type: RetireHeroInput, required: true }) },
+    resolve: (_root, { input }, ctx) => retireHero(ctx.repo, callerId(ctx), input.heroId),
   }),
   startAdventure: t.field({
     type: AdventureRef,
+    nullable: true,
     authScopes: { authenticated: true },
-    description: "Starts a job the location posts, on its job board or at a facility the camp has built (refused otherwise with REQUIRES, the facility in extensions.missing), with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with ADVENTURE_OPEN, naming the open one in extensions.adventureId, while one is open.",
-    args: {
-      location: t.arg.string({ required: true }),
-      jobId: t.arg.string({ required: true }),
-      heroIds: t.arg.stringList({ required: true }),
-    },
-    resolve: (_root, args, ctx) => startAdventure(ctx.repo, callerId(ctx), ctx.version, args.location, args.jobId, args.heroIds),
+    description:
+      "Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with AdventureOpen while one is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.",
+    errors: answers("StartAdventure", { field: "adventure", what: "the adventure opened" }, [AdventureOpen, Requires, HeroDead, HeroRetired, HeroNotHere, HeroAdventuring, Conflict]),
+    args: { input: t.arg({ type: StartAdventureInput, required: true }) },
+    resolve: (_root, { input }, ctx) => startAdventure(ctx.repo, callerId(ctx), ctx.version, input.location, input.jobId, input.heroIds),
   }),
   submitAdventure: t.field({
     type: AdventureRef,
+    nullable: true,
     authScopes: { authenticated: true },
-    description: "Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. Refused with ENGINE_UPDATED, and this deploy's version in extensions.version, when another version issued it: try /previous/graphql. A settled adventure answers as it is; nothing is paid twice.",
-    args: {
-      adventureId: t.arg.string({ required: true }),
-      overrides: t.arg({ type: [OverrideInputRef], required: true }),
-    },
-    resolve: (_root, args, ctx) =>
-      submitAdventure(ctx.repo, ctx.timelines, callerId(ctx), ctx.version, args.adventureId, args.overrides as OverrideInput[]),
+    description:
+      "Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. A settled adventure answers as it is; nothing is paid twice. Refused with EngineUpdated when another version issued it, AdventureDiscarded, or Conflict; an adventure that is not the player's, or a malformed log, is BAD_USER_INPUT.",
+    errors: answers("SubmitAdventure", { field: "adventure", what: "the adventure, settled, with its result" }, [EngineUpdated, AdventureDiscarded, Conflict]),
+    args: { input: t.arg({ type: SubmitAdventureInput, required: true }) },
+    resolve: (_root, { input }, ctx) => submitAdventure(ctx.repo, ctx.timelines, callerId(ctx), ctx.version, input.adventureId, input.overrides),
   }),
   discardAdventure: t.field({
     type: AdventureRef,
+    nullable: true,
     authScopes: { authenticated: true },
-    description: "Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. Refused with ADVENTURE_VERIFIABLE while this deploy or the previous one could still verify it.",
-    args: { adventureId: t.arg.string({ required: true }) },
-    resolve: (_root, args, ctx) =>
-      discardAdventure(ctx.repo, callerId(ctx), { current: ctx.version, previous: ctx.previousVersion }, args.adventureId),
+    description:
+      "Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. A discarded adventure answers as it is. Refused with AdventureVerifiable while this deploy or the previous one could still verify it, or AdventureSettled; an adventure that is not the player's is BAD_USER_INPUT.",
+    errors: answers("DiscardAdventure", { field: "adventure", what: "the adventure, discarded" }, [AdventureVerifiable, AdventureSettled]),
+    args: { input: t.arg({ type: DiscardAdventureInput, required: true }) },
+    resolve: (_root, { input }, ctx) =>
+      discardAdventure(ctx.repo, callerId(ctx), { current: ctx.version, previous: ctx.previousVersion }, input.adventureId),
   }),
 }));
 

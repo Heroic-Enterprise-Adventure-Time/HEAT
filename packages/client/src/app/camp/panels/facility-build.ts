@@ -1,14 +1,14 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import type { FacilityKind } from '@heat/engine';
-import { ApiError } from '../../api';
+import { Refusal } from '../../api';
 import { Game, type UpgradeOffer } from '../../game';
 
-/** The hub's refusals of a build, in the player's words; any other is shown as the hub put it. */
+/** The hub's refusals of a build, by type, in the player's words; any other is shown as the hub put it. */
 const REFUSALS: Readonly<Record<string, string>> = {
-  MAX_LEVEL: 'This is already at its highest level here.',
-  REQUIRES: 'The camp needs another facility built first.',
-  INSUFFICIENT_RESOURCES: 'The camp cannot pay for this now.',
-  CONFLICT: 'The camp changed while building, and nothing was built. Try again.',
+  MaxLevel: 'This is already at its highest level here.',
+  Requires: 'The camp needs another facility built first.',
+  InsufficientResources: 'The camp cannot pay for this now.',
+  Conflict: 'The camp changed while building, and nothing was built. Try again.',
 };
 
 /** A level's cost in words, each resource beside the camp's balance (game.md, "The page"). */
@@ -44,8 +44,8 @@ export class FacilityBuild {
     try {
       await this.game.build(offer.kind, offer.level);
     } catch (e) {
-      const code = e instanceof ApiError ? e.code : null;
-      this.refused.set((code && REFUSALS[code]) ?? (e instanceof Error ? e.message : String(e)));
+      const kind = e instanceof Refusal ? e.kind : null;
+      this.refused.set((kind && REFUSALS[kind]) ?? (e instanceof Error ? e.message : String(e)));
     }
   }
 }

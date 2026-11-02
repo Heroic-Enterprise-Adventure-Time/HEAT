@@ -15,8 +15,12 @@ import type { SnapshotHero } from "./snapshot.js";
 /** How a stage ended. `done` for travel and arrive; the rest are a battle's. */
 export type StageEnding = "done" | "win" | "loss" | "timeout" | "retreat";
 
+export const STAGE_ENDINGS: readonly StageEnding[] = ["done", "win", "loss", "timeout", "retreat"];
+
 /** `retreat` covers a retreat ordered and a time limit reached; `defeat` is the whole party down. */
 export type AdventureOutcome = "complete" | "retreat" | "defeat";
+
+export const ADVENTURE_OUTCOMES: readonly AdventureOutcome[] = ["complete", "retreat", "defeat"];
 
 export interface AdventureStartEvent {
   readonly kind: "adventure-start";

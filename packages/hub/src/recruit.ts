@@ -1,5 +1,4 @@
 import { randomInt } from "node:crypto";
-import { GraphQLError } from "graphql";
 import {
   SPRITE_SETS,
   SPRITE_SET_PRESENTATION,
@@ -21,6 +20,7 @@ import {
   type Hero,
   type Repository,
 } from "./db/repository.js";
+import { Conflict, HallFull, HallLevel, InsufficientResources, badInput } from "./refusals.js";
 
 /**
  * Recruitment (decision 0026): the client names the unit type and a request
@@ -35,18 +35,16 @@ import {
  * race reads the camp again and is refused with the rule that now fails,
  * so the loser of a race for the last slot is told the hall is full.
  *
- * The refusals: BAD_USER_INPUT, HALL_LEVEL, HALL_FULL, INSUFFICIENT_RESOURCES
- * (with `extensions.short`, each material's amount and the camp's balance)
- * and CONFLICT, when the camp changed and no rule explains the failure.
+ * The refusals, answered as data (`refusals.ts`): HallLevel, HallFull,
+ * InsufficientResources (each material's amount and the camp's balance) and
+ * Conflict, when the camp changed and no rule explains the failure. A
+ * request id that is not a UUID, or a unit type the location does not
+ * recruit, is BAD_USER_INPUT.
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type Random = (max: number) => number;
-
-function refuse(message: string, code: string, extensions: Record<string, unknown> = {}): never {
-  throw new GraphQLError(message, { extensions: { code, ...extensions } });
-}
 
 function pick<T>(items: readonly T[], random: Random): T {
   const item = items[random(items.length)];
@@ -56,14 +54,14 @@ function pick<T>(items: readonly T[], random: Random): T {
 
 /** Refuses the recruit with the first rule the camp fails, in the order the hall shows them. */
 function refuseIfBarred(camp: Camp, recruit: Recruit): void {
-  if (camp.hallLevel < recruit.hallLevel) refuse(`a ${recruit.unitType} needs a level ${recruit.hallLevel} hall`, "HALL_LEVEL");
-  if (camp.activeHeroes >= hallCapacity(camp.hallLevel)) refuse("the heroes hall is full", "HALL_FULL");
+  if (camp.hallLevel < recruit.hallLevel) throw new HallLevel(`a ${recruit.unitType} needs a level ${recruit.hallLevel} hall`, recruit.hallLevel);
+  if (camp.activeHeroes >= hallCapacity(camp.hallLevel)) throw new HallFull("the heroes hall is full");
   const short = recruitCost(recruit, camp.livingHeroes)
     .map(({ material, amount }) => ({ material, amount, balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0 }))
     .filter((s) => s.balance < s.amount);
   if (short.length > 0) {
     const words = short.map((s) => `${s.amount} ${s.material}, and the camp has ${s.balance}`).join("; ");
-    refuse(`a ${recruit.unitType} costs ${words}`, "INSUFFICIENT_RESOURCES", { short });
+    throw new InsufficientResources(`a ${recruit.unitType} costs ${words}`, short);
   }
 }
 
@@ -75,7 +73,7 @@ export async function recruitHero(
   random: Random = randomInt,
   now = new Date(),
 ): Promise<Hero> {
-  if (!UUID.test(requestId)) refuse("requestId must be a UUID", "BAD_USER_INPUT");
+  if (!UUID.test(requestId)) badInput("requestId must be a UUID");
   const heroId = requestId.toLowerCase();
   const already = await repo.getHero(playerId, heroId);
   if (already) return already;
@@ -83,7 +81,7 @@ export async function recruitHero(
   const at = location(STARTING_LOCATION);
   const recruit = at?.recruits.find((r) => r.unitType === unitType);
   if (!at || !recruit || !UNIT_TYPES.includes(unitType as UnitType)) {
-    refuse(`${at?.name ?? STARTING_LOCATION} does not recruit ${unitType}`, "BAD_USER_INPUT");
+    badInput(`${at?.name ?? STARTING_LOCATION} does not recruit ${unitType}`);
   }
 
   const camp = await repo.camp(playerId, at.id);
@@ -118,6 +116,6 @@ export async function recruitHero(
     const made = await repo.getHero(playerId, heroId);
     if (made) return made;
     refuseIfBarred(await repo.camp(playerId, at.id), recruit);
-    refuse("the camp changed while recruiting; no hero was recruited", "CONFLICT");
+    throw new Conflict("the camp changed while recruiting; no hero was recruited");
   }
 }

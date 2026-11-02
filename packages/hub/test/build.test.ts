@@ -1,13 +1,14 @@
 import { range } from "es-toolkit";
 import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, QueryCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
+import type { Material } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
 import { BuildRefused, InsufficientBalance, RecruitRefused, Repository, campLevels, type Hero } from "../src/db/repository.js";
 import { buildFacility } from "../src/build.js";
 import { recruitHero } from "../src/recruit.js";
+import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;
@@ -24,8 +25,8 @@ const at = "millbrook";
 const player = () => `p-${randomUUID()}`;
 
 /** Puts stock into the camp directly, as settlement would credit it. */
-async function stock(p: string, holdings: Record<string, number>) {
-  for (const [material, balance] of Object.entries(holdings)) await repo.setBalance(p, at, material, balance);
+async function stock(p: string, holdings: Partial<Record<Material, number>>) {
+  for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, at, material, balance);
 }
 
 async function balances(p: string): Promise<Record<string, number>> {
@@ -43,15 +44,18 @@ async function ledger(p: string): Promise<Record<string, unknown>[]> {
   return r.Items ?? [];
 }
 
-async function refusal(promise: Promise<unknown>): Promise<{ code: string; extensions: Record<string, unknown> } | undefined> {
+/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
+async function refusal(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;
   } catch (e) {
-    if (e instanceof GraphQLError) return { code: e.extensions["code"] as string, extensions: e.extensions };
-    throw e;
+    return e;
   }
   return undefined;
 }
+
+/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
+const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 describe("buildFacility: the mine", () => {
   it("builds the mine for one timber run's 60 timber and 3 cloth, with one ledger entry per resource", async () => {
@@ -72,8 +76,8 @@ describe("buildFacility: the mine", () => {
     const p = player();
     await stock(p, { timber: 60 });
     const r = await refusal(buildFacility(repo, p, at, "mine", 1));
-    expect(r?.code).toBe("INSUFFICIENT_RESOURCES");
-    expect(r?.extensions["short"]).toEqual([{ material: "cloth", amount: 3, balance: 0 }]);
+    expect(r).toBeInstanceOf(InsufficientResources);
+    expect(r).toMatchObject({ short: [{ material: "cloth", amount: 3, balance: 0 }] });
     expect((await repo.camp(p, at)).facilities).toEqual({});
     expect(await balances(p)).toEqual({ timber: 60 });
   });
@@ -91,7 +95,7 @@ describe("buildFacility: the mine", () => {
     const p = player();
     await stock(p, { timber: 60, cloth: 3 });
     await buildFacility(repo, p, at, "mine", 1);
-    expect((await refusal(buildFacility(repo, p, at, "mine", 2)))?.code).toBe("MAX_LEVEL");
+    expect(await refusal(buildFacility(repo, p, at, "mine", 2))).toBeInstanceOf(MaxLevel);
   });
 
   it("builds once and charges once for five concurrent requests", async () => {
@@ -111,7 +115,7 @@ describe("buildFacility: the mine", () => {
     const built = results.filter((r) => r.status === "fulfilled");
     expect(built).toHaveLength(1);
     const lost = results.find((r) => r.status === "rejected") as PromiseRejectedResult;
-    expect((lost.reason as GraphQLError).extensions["code"]).toBe("INSUFFICIENT_RESOURCES");
+    expect(lost.reason).toBeInstanceOf(InsufficientResources);
     expect((await balances(p))["timber"]).toBeGreaterThanOrEqual(0);
     expect(Object.keys((await repo.camp(p, at)).facilities)).toHaveLength(1);
   });
@@ -136,10 +140,10 @@ describe("buildFacility: the mine", () => {
 
   it("refuses an unknown facility, a shared one, an unknown camp and a level that is not the next", async () => {
     const p = player();
-    expect((await refusal(buildFacility(repo, p, at, "castle", 1)))?.code).toBe("BAD_USER_INPUT");
-    expect((await refusal(buildFacility(repo, p, at, "job-board", 1)))?.code).toBe("BAD_USER_INPUT");
-    expect((await refusal(buildFacility(repo, p, "atlantis", "mine", 1)))?.code).toBe("BAD_USER_INPUT");
-    expect((await refusal(buildFacility(repo, p, at, "heroes-hall", 3)))?.code).toBe("BAD_USER_INPUT");
+    expect(await refusal(buildFacility(repo, p, at, "castle", 1))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(buildFacility(repo, p, at, "job-board", 1))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(buildFacility(repo, p, "atlantis", "mine", 1))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(buildFacility(repo, p, at, "heroes-hall", 3))).toMatchObject(BAD_USER_INPUT);
   });
 });
 
@@ -160,7 +164,7 @@ describe("buildFacility: the hall and the warehouse", () => {
         Item: { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: 4, livingHeroes: 0 },
       }),
     );
-    expect((await refusal(recruitHero(repo, p, "villager", randomUUID())))?.code).toBe("HALL_FULL");
+    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(HallFull);
     await stock(p, { timber: 80, cloth: 20 });
     await buildFacility(repo, p, at, "heroes-hall", 2);
     await recruitHero(repo, p, "villager", randomUUID());
@@ -204,8 +208,8 @@ describe("buildFacility: what a level needs first", () => {
     const p = player();
     await stock(p, { timber: 100, ore: 100, cloth: 20 });
     const r = await refusal(buildFacility(repo, p, at, "caravan-hub", 1));
-    expect(r?.code).toBe("REQUIRES");
-    expect(r?.extensions["missing"]).toEqual([{ kind: "warehouse", level: 2 }]);
+    expect(r).toBeInstanceOf(Requires);
+    expect(r).toMatchObject({ missing: [{ kind: "warehouse", level: 2 }] });
     expect(await balances(p)).toEqual({ timber: 100, ore: 100, cloth: 20 });
 
     await stock(p, { timber: 180, ore: 100, cloth: 20 });

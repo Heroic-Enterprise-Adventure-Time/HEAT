@@ -1,9 +1,34 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Api, ApiError, type Route } from './api';
+import { constantCase } from 'es-toolkit';
+import { Api, type Route } from './api';
 import { Game, overrideInput, type AdventureResultView, type AdventureView, type HeroView, type PlayerView, type SeenHeroView } from './game';
 import { Session, type SessionUser } from './session';
 import { must } from '@heat/engine';
+
+/**
+ * The views as the hub sends them: the engine's closed sets as the schema's
+ * UPPER_CASE enum values, which `Game` reads back into the engine's own
+ * (graphql.md, rule 4). The fakes answer in this form and the tests expect
+ * the engine's.
+ */
+const wireHero = <T extends { unitType: string }>(hero: T) => ({ ...hero, unitType: constantCase(hero.unitType) });
+const wireAmounts = (amounts: readonly { material: string; amount?: number; balance?: number }[]) => amounts.map((a) => ({ ...a, material: constantCase(a.material) }));
+const wireAdventure = (a: AdventureView) => ({ ...a, snapshot: { ...a.snapshot, heroes: a.snapshot.heroes.map(wireHero) } });
+const wirePlayer = (p: PlayerView) => ({
+  ...p,
+  camps: p.camps.map((c) => ({ ...c, holdings: wireAmounts(c.holdings), facilities: c.facilities.map((f) => ({ ...f, kind: constantCase(f.kind) })) })),
+  heroes: p.heroes.map(wireHero),
+  openAdventure: p.openAdventure && wireAdventure(p.openAdventure),
+});
+const wireResult = (r: AdventureResultView) => ({
+  ...r,
+  outcome: constantCase(r.outcome),
+  stages: r.stages.map((s) => ({ ...s, kind: constantCase(s.kind), ended: constantCase(s.ended) })),
+  rewards: wireAmounts(r.rewards),
+  credited: wireAmounts(r.credited),
+  lost: wireAmounts(r.lost),
+});
 
 const villager: HeroView = {
   id: '6f1c2b52-8f8a-4d55-9a5e-2d3f4a1b0c9d',
@@ -26,7 +51,7 @@ function playerWith(
 ): PlayerView {
   return {
     id: 'p1',
-    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings, resourceCapacity: 100, warehouseLevel: 1, facilities: [] }],
+    camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings, resourceCapacity: 100, warehouseLevel: 1, facilities: [{ kind: 'heroes-hall', level: 1 }] }],
     heroes,
     openAdventure: null,
   };
@@ -34,51 +59,58 @@ function playerWith(
 
 const moss: SeenHeroView = { id: 's1', name: 'Moss', unitType: 'villager', spriteSet: 'villager-07', level: 2 };
 
-/** An API that answers each operation from the player held here, and records what it was asked. */
+/**
+ * An API that answers each operation from the player held here, in the
+ * hub's shape (one input object in, a result union out), and records what
+ * it was asked.
+ */
 function fakeApi(start: PlayerView) {
   let player = start;
   const calls: { query: string; variables: Record<string, unknown> }[] = [];
-  // Answered on a later tick, as the hub's would be; a refusal thrown here becomes the rejection.
+  // Answered on a later tick, as the hub's would be; a refusal is a member of the union, as the hub answers it.
   const answer = (query: string, variables: Record<string, unknown>) => {
     calls.push({ query, variables });
-    if (query.includes('joinGame')) return { joinGame: { id: player.id } };
-    if (query.includes('heroesSeenAt')) return { heroesSeenAt: variables['at'] === 'millbrook' ? [moss] : [] };
+    if (query.includes('joinGame')) return { joinGame: { __typename: 'JoinGameSuccess', player: { id: player.id } } };
+    if (query.includes('heroesSeenAt')) return { heroesSeenAt: variables['at'] === 'millbrook' ? [wireHero(moss)] : [] };
     if (query.includes('recruitHero')) {
+      const { unitType, requestId } = variables['input'] as { unitType: string; requestId: string };
       // The hub's price, on the fake's holdings: a villager is free with no hero alive, 20 timber otherwise.
       const camp = must(player.camps[0], 'the camp');
       const timber = camp.holdings.find((h) => h.material === 'timber')?.balance ?? 0;
       const price = camp.livingHeroes > 0 ? 20 : 0;
-      if (timber < price) throw new ApiError('a villager costs 20 timber, and the camp has 0', 'INSUFFICIENT_RESOURCES');
-      const hero = { ...villager, id: variables['id'] as string, unitType: variables['unitType'] as string };
+      if (timber < price) return { recruitHero: { __typename: 'InsufficientResources', message: 'a villager costs 20 timber, and the camp has 0' } };
+      const hero = { ...villager, id: requestId, unitType: unitType.toLowerCase() };
       const holdings = price > 0 ? [{ material: 'timber', balance: timber - price }] : camp.holdings;
       player = playerWith([...player.heroes, hero], camp.activeHeroes + 1, camp.livingHeroes + 1, holdings);
-      return { recruitHero: hero };
+      return { recruitHero: { __typename: 'RecruitHeroSuccess', hero: wireHero(hero) } };
     }
     if (query.includes('retireHero')) {
-      const hero = { ...must(player.heroes.find((h) => h.id === variables['id']), `hero ${String(variables['id'])}`), status: 'RETIRED' as const, retiredAt: '2026-10-21T12:00:00.000Z' };
+      const { heroId } = variables['input'] as { heroId: string };
+      const hero = { ...must(player.heroes.find((h) => h.id === heroId), `hero ${heroId}`), status: 'RETIRED' as const, retiredAt: '2026-10-21T12:00:00.000Z' };
       player = playerWith(player.heroes.map((h) => (h.id === hero.id ? hero : h)), 0, 0);
-      return { retireHero: hero };
+      return { retireHero: { __typename: 'RetireHeroSuccess', hero: wireHero(hero) } };
     }
     if (query.includes('startAdventure')) {
-      if (player.openAdventure) throw new ApiError('an adventure is already open', 'ADVENTURE_OPEN');
-      const heroes = player.heroes.filter((h) => (variables['heroes'] as string[]).includes(h.id));
+      if (player.openAdventure) return { startAdventure: { __typename: 'AdventureOpen', message: 'an adventure is already open', adventureId: player.openAdventure.id } };
+      const { location, jobId, heroIds } = variables['input'] as { location: string; jobId: string; heroIds: string[] };
+      const heroes = player.heroes.filter((h) => heroIds.includes(h.id));
       const adventure = {
         id: 'a1',
         startedAt: '2026-10-22T07:00:00.000Z',
-        location: variables['at'] as string,
+        location,
         seed: 's1',
         version: 'v1',
-        job: { id: variables['job'] as string, name: 'Wolves on the mill road', description: 'Two wolves.' },
+        job: { id: jobId, name: 'Wolves on the mill road', description: 'Two wolves.' },
         snapshot: {
           version: 'v1',
-          jobId: variables['job'] as string,
+          jobId,
           heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } })),
         },
       };
       player = { ...player, openAdventure: adventure };
-      return { startAdventure: adventure };
+      return { startAdventure: { __typename: 'StartAdventureSuccess', adventure: wireAdventure(adventure) } };
     }
-    return { me: player };
+    return { me: wirePlayer(player) };
   };
   return { calls, request: (query: string, variables: Record<string, unknown> = {}) => Promise.resolve().then(() => answer(query, variables)) };
 }
@@ -103,6 +135,16 @@ describe('Game', () => {
     const own = api.calls.filter((c) => !c.query.includes('heroesSeenAt'));
     expect(own.map((c) => c.query.includes('joinGame'))).toEqual([true, false]);
     expect(game.camp()?.name).toBe('Millbrook');
+  });
+
+  it("reads the schema's enum values back as the engine's own, so nothing past the service sees HEROES_HALL or TIMBER", async () => {
+    const { game } = setup(playerWith([villager], 1, 1, [{ material: 'timber', balance: 40 }]));
+    TestBed.tick();
+    await vi.waitFor(() => { expect(game.player()).not.toBeNull(); });
+    expect(game.camp()?.facilities).toEqual([{ kind: 'heroes-hall', level: 1 }]);
+    expect(game.camp()?.holdings).toEqual([{ material: 'timber', balance: 40 }]);
+    expect(game.heroesHere().map((h) => h.unitType)).toEqual(['villager']);
+    await vi.waitFor(() => { expect(game.seenHere()).toEqual([moss]); });
   });
 
   it("reads the heroes seen at the camp's location after sign-in and again when the camp changes, not after a recruit", async () => {
@@ -137,9 +179,11 @@ describe('Game', () => {
 
     const hero = await game.recruit('villager');
     const recruit = api.calls.find((c) => c.query.includes('recruitHero'));
-    expect(recruit?.variables['unitType']).toBe('villager');
-    expect(recruit?.variables['id']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
-    expect(hero.id).toBe(recruit?.variables['id']);
+    const sent = recruit?.variables['input'] as { unitType: string; requestId: string };
+    expect(sent.unitType).toBe('VILLAGER');
+    expect(sent.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(hero.id).toBe(sent.requestId);
+    expect(hero.unitType).toBe('villager');
     expect(game.heroesHere().map((h) => h.id)).toEqual([hero.id]);
     expect(game.recruits()[0]).toEqual({ unitType: 'villager', cost: [{ material: 'timber', amount: 20, balance: 0 }], reason: 'Not enough timber.' });
   });
@@ -166,19 +210,19 @@ describe('Game', () => {
     TestBed.tick();
     await vi.waitFor(() => { expect(game.player()).not.toBeNull(); });
     const hero = await game.retire(villager.id);
-    expect(api.calls.find((c) => c.query.includes('retireHero'))?.variables).toEqual({ id: villager.id });
+    expect(api.calls.find((c) => c.query.includes('retireHero'))?.variables).toEqual({ input: { heroId: villager.id } });
     expect(hero?.status).toBe('RETIRED');
     expect(game.heroesHere()).toEqual([]);
     expect(game.retiredHere().map((h) => h.id)).toEqual([villager.id]);
     expect(game.recruits()[0]).toEqual({ unitType: 'villager', cost: [], reason: null });
   });
 
-  it("throws the hub's refusal of a recruit with its code, for the hall to show in place, and reads the camp again", async () => {
+  it("throws the hub's refusal of a recruit, named by its type, for the hall to show in place, and reads the camp again", async () => {
     const { api, game } = setup(playerWith([villager]));
     TestBed.tick();
     await vi.waitFor(() => { expect(game.player()).not.toBeNull(); });
     const loads = api.calls.filter((c) => c.query.includes('me {')).length;
-    await expect(game.recruit('villager')).rejects.toMatchObject({ code: 'INSUFFICIENT_RESOURCES' });
+    await expect(game.recruit('villager')).rejects.toMatchObject({ kind: 'InsufficientResources', message: 'a villager costs 20 timber, and the camp has 0' });
     expect(api.calls.filter((c) => c.query.includes('me {')).length).toBe(loads + 1);
     expect(game.busy()).toBe(false);
   });
@@ -191,23 +235,21 @@ describe('Game', () => {
 
     const adventure = await game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id]);
     expect(api.calls.find((c) => c.query.includes('startAdventure'))?.variables).toEqual({
-      at: 'millbrook',
-      job: 'wolves-on-the-mill-road',
-      heroes: [villager.id],
+      input: { location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: [villager.id] },
     });
     expect(adventure.snapshot.heroes.map((h) => h.name)).toEqual(['Wren']);
     expect(game.adventure()?.job.name).toBe('Wolves on the mill road');
     expect(game.busy()).toBe(false);
   });
 
-  it("throws a start's refusal with its code, and reads the player again", async () => {
+  it("throws a start's refusal, named by its type, and reads the player again", async () => {
     const { api, game } = setup(playerWith([villager]));
     TestBed.tick();
     await vi.waitFor(() => { expect(game.player()).not.toBeNull(); });
     await game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id]);
     const reads = api.calls.filter((c) => c.query.includes('me {')).length;
 
-    await expect(game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id])).rejects.toMatchObject({ code: 'ADVENTURE_OPEN' });
+    await expect(game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id])).rejects.toMatchObject({ kind: 'AdventureOpen' });
     expect(api.calls.filter((c) => c.query.includes('me {'))).toHaveLength(reads + 1);
     expect(game.error()).toBeNull();
     expect(game.busy()).toBe(false);
@@ -235,21 +277,23 @@ const settledResult: AdventureResultView = {
 
 /**
  * An API whose submit answers by route, each answer a result or the hub's
- * refusal code, recording each operation and its route.
+ * refusal by its type name, recording each operation and its route.
  */
 function submitApi(answers: Partial<Record<Route, AdventureResultView | string>>) {
   const calls: { op: string; route: Route; variables: Record<string, unknown> }[] = [];
-  // Answered on a later tick, as the hub's would be; a refusal thrown here becomes the rejection.
+  // Answered on a later tick, as the hub's would be; a refusal is a member of the union, as the hub answers it.
   const respond = (query: string, variables: Record<string, unknown>, route: Route) => {
     const op = /submitAdventure|discardAdventure|joinGame|heroesSeenAt/.exec(query)?.[0] ?? 'me';
     calls.push({ op, route, variables });
     if (op === 'submitAdventure') {
       const answer = answers[route];
-      if (typeof answer === 'string') throw new ApiError('refused', answer);
-      return { submitAdventure: { result: answer } };
+      if (typeof answer === 'string') return { submitAdventure: { __typename: answer, message: 'refused' } };
+      return { submitAdventure: { __typename: 'SubmitAdventureSuccess', adventure: { result: answer && wireResult(answer) } } };
     }
-    if (op === 'discardAdventure') return { discardAdventure: { id: variables['id'] } };
-    return { me: playerWith([]) };
+    if (op === 'discardAdventure') {
+      return { discardAdventure: { __typename: 'DiscardAdventureSuccess', adventure: { id: (variables['input'] as { adventureId: string }).adventureId } } };
+    }
+    return { me: wirePlayer(playerWith([])) };
   };
   return { calls, request: (query: string, variables: Record<string, unknown> = {}, route: Route = 'current') => Promise.resolve().then(() => respond(query, variables, route)) };
 }
@@ -279,17 +323,19 @@ describe('Game, submitting an adventure', () => {
       ['me', 'current'],
     ]);
     expect(api.calls[0]?.variables).toEqual({
-      id: 'a1',
-      overrides: [
-        { kind: 'UNIT', acceptedAtSimTime: 6829, unitId: 'h1', abilityId: 'chop' },
-        { kind: 'PARTY', acceptedAtSimTime: 20_000, order: 'RETREAT' },
-      ],
+      input: {
+        adventureId: 'a1',
+        overrides: [
+          { kind: 'UNIT', acceptedAtSimTime: 6829, unitId: 'h1', abilityId: 'chop' },
+          { kind: 'PARTY', acceptedAtSimTime: 20_000, order: 'RETREAT' },
+        ],
+      },
     });
     expect(game.settled()).toEqual({ adventure: open, result: settledResult });
   });
 
   it('goes to the previous deploy when the current one says the engine was updated', async () => {
-    const { api, game } = setupSubmit({ current: 'ENGINE_UPDATED', previous: settledResult });
+    const { api, game } = setupSubmit({ current: 'EngineUpdated', previous: settledResult });
     await game.submitAdventure(open, log);
     expect(api.calls.map((c) => [c.op, c.route])).toEqual([
       ['submitAdventure', 'current'],
@@ -300,7 +346,7 @@ describe('Game, submitting an adventure', () => {
   });
 
   it('discards the adventure when the previous deploy says so too, and keeps no result', async () => {
-    const { api, game } = setupSubmit({ current: 'ENGINE_UPDATED', previous: 'ENGINE_UPDATED' });
+    const { api, game } = setupSubmit({ current: 'EngineUpdated', previous: 'EngineUpdated' });
     await game.submitAdventure(open, log);
     expect(api.calls.map((c) => [c.op, c.route])).toEqual([
       ['submitAdventure', 'current'],
@@ -311,9 +357,9 @@ describe('Game, submitting an adventure', () => {
     expect(game.settled()).toEqual({ adventure: open, result: null });
   });
 
-  it('throws any other failure and keeps nothing, so the run can be sent again', async () => {
-    const { game } = setupSubmit({ current: 'CONFLICT' });
-    await expect(game.submitAdventure(open, log)).rejects.toMatchObject({ code: 'CONFLICT' });
+  it('throws any other refusal and keeps nothing, so the run can be sent again', async () => {
+    const { game } = setupSubmit({ current: 'Conflict' });
+    await expect(game.submitAdventure(open, log)).rejects.toMatchObject({ kind: 'Conflict' });
     expect(game.settled()).toBeNull();
   });
 

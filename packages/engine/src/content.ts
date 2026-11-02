@@ -20,6 +20,8 @@ export const UNIT_TYPES: readonly UnitType[] = ["villager", "fighter", "knight",
 
 export type FacilityKind = "heroes-hall" | "warehouse" | "job-board" | "mine" | "lumber-camp" | "caravan-hub";
 
+export const FACILITY_KINDS: readonly FacilityKind[] = ["heroes-hall", "warehouse", "job-board", "mine", "lumber-camp", "caravan-hub"];
+
 /** A cost in resources: there is no currency (game.md, "Resources"). */
 export type Cost = readonly { material: Material; amount: number }[];
 

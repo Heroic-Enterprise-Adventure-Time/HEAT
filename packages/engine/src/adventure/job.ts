@@ -39,6 +39,8 @@ export type Stage =
 
 export type StageKind = Stage["kind"];
 
+export const STAGE_KINDS: readonly StageKind[] = ["travel", "fight", "gather", "arrive"];
+
 /** What a retreat keeps of a job's yield: its own penalty (game.md, "The battle"). */
 export interface RetreatPenalty {
   readonly keepsPay: boolean;

@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { routes } from '../app.routes';
-import { ApiError } from '../api';
+import { Refusal } from '../api';
 import type { FacilityKind } from '@heat/engine';
 import { Game, upgradeOffer, type CampView, type HeroView, type RecruitOffer, type SeenHeroView } from '../game';
 import { Session } from '../session';
@@ -62,7 +62,7 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
     upgrade: (kind: FacilityKind) => upgradeOffer(fake.camp(), kind),
     built: [] as [string, number][],
     /** A refusal the next build throws, as the hub would. */
-    refuseBuild: null as ApiError | null,
+    refuseBuild: null as Refusal | null,
     build: (kind: FacilityKind, level: number) => {
       fake.built.push([kind, level]);
       if (fake.refuseBuild) return Promise.reject(fake.refuseBuild);
@@ -87,7 +87,7 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
     error: signal<string | null>(null),
     recruited: [] as string[],
     /** A refusal the next recruit throws, as the hub would. */
-    refuse: null as ApiError | null,
+    refuse: null as Refusal | null,
     recruit: (unitType: string) => {
       fake.recruited.push(unitType);
       if (fake.refuse) return Promise.reject(fake.refuse);
@@ -188,7 +188,7 @@ describe('Camp', () => {
     await settle();
     expect(page.querySelector('.roster.living')?.textContent).toContain('Linnet');
 
-    game.refuse = new ApiError('the heroes hall is full', 'HALL_FULL');
+    game.refuse = new Refusal('HallFull', 'the heroes hall is full');
     button().click();
     await vi.waitFor(() => { expect(game.recruited).toHaveLength(2); });
     await settle();
@@ -379,7 +379,7 @@ describe('Camp', () => {
 
   it("shows the hub's refusal of a build in place", async () => {
     const game = fakeGame([]);
-    game.refuseBuild = new ApiError('level 1 costs 60 timber', 'INSUFFICIENT_RESOURCES');
+    game.refuseBuild = new Refusal('InsufficientResources', 'level 1 costs 60 timber');
     const { page, settle } = await render(game, '/camp/millbrook/mine');
     (page.querySelector('.build button') as HTMLButtonElement).click();
     await vi.waitFor(() => { expect(game.built).toHaveLength(1); });

@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 import { PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
 import { UNIT_PROFILES, must } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
@@ -8,6 +7,7 @@ import { playerKeys } from "../src/db/keys.js";
 import { Repository, type Camp, type Hero, type HeroStatus } from "../src/db/repository.js";
 import { buildFacility } from "../src/build.js";
 import { recruitHero } from "../src/recruit.js";
+import { AdventureOpen, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
@@ -57,20 +57,18 @@ async function putHeroes(p: string, statuses: HeroStatus[], location = at): Prom
   return heroes;
 }
 
-/** The extensions of a GraphQLError, which is how the hub refuses; anything else is rethrown. */
-function extensionsOf(e: unknown): { code: string; adventureId?: string } {
-  if (e instanceof GraphQLError) return e.extensions as { code: string; adventureId?: string };
-  throw e;
-}
-
-async function refusal(promise: Promise<unknown>): Promise<{ code: string; adventureId?: string } | undefined> {
+/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
+async function refusal(promise: Promise<unknown>): Promise<unknown> {
   try {
     await promise;
   } catch (e) {
-    return extensionsOf(e);
+    return e;
   }
   return undefined;
 }
+
+/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
+const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 describe("startAdventure", () => {
   it("starts the wolves job with the free villager: the record, the snapshot, the open item and the mark", async () => {
@@ -109,16 +107,18 @@ describe("startAdventure", () => {
     const a = must(heroes[0], "hero a");
     const b = must(heroes[1], "hero b");
     const first = await startAdventure(repo, p, version, at, wolves, [a.id]);
-    expect(await refusal(startAdventure(repo, p, version, at, wolves, [b.id]))).toEqual({ code: "ADVENTURE_OPEN", adventureId: first.adventureId });
+    const refused = await refusal(startAdventure(repo, p, version, at, wolves, [b.id]));
+    expect(refused).toBeInstanceOf(AdventureOpen);
+    expect(refused).toMatchObject({ adventureId: first.adventureId });
     expect((await repo.getHero(p, b.id))?.adventureId).toBeNull();
   });
 
   it("refuses a job that is not on the location's board, and a location that does not exist", async () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    expect((await refusal(startAdventure(repo, p, version, at, "dragons-in-the-well", [hero.id])))?.code).toBe("NO_SUCH_JOB");
-    expect((await refusal(startAdventure(repo, p, version, at, "toString", [hero.id])))?.code).toBe("NO_SUCH_JOB");
-    expect((await refusal(startAdventure(repo, p, version, "atlantis", wolves, [hero.id])))?.code).toBe("BAD_USER_INPUT");
+    expect(await refusal(startAdventure(repo, p, version, at, "dragons-in-the-well", [hero.id]))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, p, version, at, "toString", [hero.id]))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, p, version, "atlantis", wolves, [hero.id]))).toMatchObject(BAD_USER_INPUT);
   });
 
   it("refuses a party of none, of five, or with a hero twice", async () => {
@@ -126,9 +126,9 @@ describe("startAdventure", () => {
     const heroes = await putHeroes(p, ["ALIVE", "ALIVE", "ALIVE", "ALIVE", "ALIVE"]);
     const ids = heroes.map((h) => h.id);
     const first = must(ids[0], "the first id");
-    expect((await refusal(startAdventure(repo, p, version, at, wolves, [])))?.code).toBe("PARTY_SIZE");
-    expect((await refusal(startAdventure(repo, p, version, at, wolves, ids)))?.code).toBe("PARTY_SIZE");
-    expect((await refusal(startAdventure(repo, p, version, at, wolves, [first, first.toUpperCase()])))?.code).toBe("BAD_USER_INPUT");
+    expect(await refusal(startAdventure(repo, p, version, at, wolves, []))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, p, version, at, wolves, ids))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, p, version, at, wolves, [first, first.toUpperCase()]))).toMatchObject(BAD_USER_INPUT);
     expect(await repo.openAdventure(p)).toBeUndefined();
   });
 
@@ -140,12 +140,14 @@ describe("startAdventure", () => {
     const alive = must(heroes[0], "the living hero");
     const dead = must(heroes[1], "the dead hero");
     const retired = must(heroes[2], "the retired hero");
-    const code = async (ids: string[]) => (await refusal(startAdventure(repo, p, version, at, wolves, ids)))?.code;
-    expect(await code([alive.id, theirs.id])).toBe("NOT_YOUR_HERO");
-    expect(await code([randomUUID()])).toBe("NOT_YOUR_HERO");
-    expect(await code([alive.id, away.id])).toBe("HERO_NOT_HERE");
-    expect(await code([alive.id, dead.id])).toBe("HERO_DEAD");
-    expect(await code([alive.id, retired.id])).toBe("HERO_RETIRED");
+    const refused = (ids: string[]) => refusal(startAdventure(repo, p, version, at, wolves, ids));
+    // Another player's hero is not said to exist, so it is the client's defect, not a refusal.
+    expect(await refused([alive.id, theirs.id])).toMatchObject(BAD_USER_INPUT);
+    expect(await refused([randomUUID()])).toMatchObject(BAD_USER_INPUT);
+    expect(await refused([alive.id, away.id])).toBeInstanceOf(HeroNotHere);
+    expect(await refused([alive.id, dead.id])).toBeInstanceOf(HeroDead);
+    expect(await refused([alive.id, retired.id])).toBeInstanceOf(HeroRetired);
+    expect(await refused([alive.id, dead.id])).toMatchObject({ heroId: dead.id });
     expect(await repo.openAdventure(p)).toBeUndefined();
     expect((await repo.getHero(p, alive.id))?.adventureId).toBeNull();
   });
@@ -164,7 +166,10 @@ describe("startAdventure", () => {
       expect(won).toHaveLength(1);
       const winner = must(won[0], "the winning start");
       for (const r of results) {
-        if (r.status === "rejected") expect(extensionsOf(r.reason)).toEqual({ code: "ADVENTURE_OPEN", adventureId: winner.adventureId });
+        if (r.status === "rejected") {
+          expect(r.reason).toBeInstanceOf(AdventureOpen);
+          expect(r.reason).toMatchObject({ adventureId: winner.adventureId });
+        }
       }
       expect((await repo.openAdventure(p))?.adventureId).toBe(winner.adventureId);
       const marked = (await repo.heroes(p)).filter((h) => h.adventureId !== null).map((h) => h.id).sort();
@@ -172,7 +177,7 @@ describe("startAdventure", () => {
     }
   });
 
-  it("answers ADVENTURE_OPEN when another start commits between its read of the open adventure and of its party", async () => {
+  it("answers AdventureOpen when another start commits between its read of the open adventure and of its party", async () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
     const winner = await startAdventure(repo, p, version, at, wolves, [hero.id]);
@@ -185,7 +190,8 @@ describe("startAdventure", () => {
           : Reflect.get(target, key, receiver),
     });
     const lost = await refusal(startAdventure(late, p, version, at, wolves, [hero.id]));
-    expect(lost).toEqual({ code: "ADVENTURE_OPEN", adventureId: winner.adventureId });
+    expect(lost).toBeInstanceOf(AdventureOpen);
+    expect(lost).toMatchObject({ adventureId: winner.adventureId });
   });
 });
 
@@ -203,7 +209,8 @@ describe("a facility's job (Issue-133)", () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
     const refused = await refusal(startAdventure(repo, p, version, at, ore, [hero.id]));
-    expect(refused).toEqual({ code: "REQUIRES", missing: [{ kind: "mine", level: 1 }] });
+    expect(refused).toBeInstanceOf(Requires);
+    expect(refused).toMatchObject({ missing: [{ kind: "mine", level: 1 }] });
     expect(await repo.openAdventure(p)).toBeUndefined();
     expect((await repo.getHero(p, hero.id))?.adventureId).toBeNull();
   });
@@ -233,7 +240,8 @@ describe("a facility's job (Issue-133)", () => {
           : Reflect.get(target, key, receiver),
     });
     const refused = await refusal(startAdventure(stale, p, version, at, ore, [hero.id]));
-    expect(refused).toEqual({ code: "REQUIRES", missing: [{ kind: "mine", level: 1 }] });
+    expect(refused).toBeInstanceOf(Requires);
+    expect(refused).toMatchObject({ missing: [{ kind: "mine", level: 1 }] });
     expect(await repo.openAdventure(p)).toBeUndefined();
     expect((await repo.getHero(p, hero.id))?.adventureId).toBeNull();
   });
@@ -250,7 +258,7 @@ describe("no retiring a hero while it is adventuring", () => {
     const p = player();
     const villager = await recruitHero(repo, p, "villager", randomUUID());
     const started = await startAdventure(repo, p, version, at, wolves, [villager.id]);
-    expect((await refusal(retireHero(repo, p, villager.id)))?.code).toBe("HERO_ADVENTURING");
+    expect(await refusal(retireHero(repo, p, villager.id))).toBeInstanceOf(HeroAdventuring);
     expect((await repo.getHero(p, villager.id))?.status).toBe("ALIVE");
 
     // A lone villager does not survive the wolves (settle.test.ts); a dead
