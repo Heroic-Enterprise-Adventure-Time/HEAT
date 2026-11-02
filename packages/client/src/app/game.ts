@@ -207,7 +207,8 @@ const RESULT_FIELDS =
 const REFUSAL_FIELDS = '__typename ... on Error { message }';
 const SEEN = `query($at: ID!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
 const ME = `{ me { id camps { ${CAMP_FIELDS} } heroes { ${HERO_FIELDS} } openAdventure { ${ADVENTURE_FIELDS} } } }`;
-const JOIN = `mutation { joinGame { ${REFUSAL_FIELDS} ... on JoinGameSuccess { player { id } } } }`;
+// No `... on Error` here: nothing refuses joinGame, so its union has no Error member and the spread would not validate.
+const JOIN = `mutation { joinGame { __typename ... on JoinGameSuccess { player { id } } } }`;
 const SUBMIT = `mutation($input: SubmitAdventureInput!) { submitAdventure(input: $input) { ${REFUSAL_FIELDS} ... on SubmitAdventureSuccess { adventure { result { ${RESULT_FIELDS} } } } } }`;
 const TIMELINE = `query($id: ID!) { adventure(id: $id) { timeline } }`;
 const DISCARD = `mutation($input: DiscardAdventureInput!) { discardAdventure(input: $input) { ${REFUSAL_FIELDS} ... on DiscardAdventureSuccess { adventure { id } } } }`;
