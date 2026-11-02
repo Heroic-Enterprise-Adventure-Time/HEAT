@@ -5,19 +5,10 @@
  * page's flow. Landscape, from 4:3: the menu on the left, the scene filling
  * the middle, the panel on the right, always there.
  */
-:host {
-  --night: #0b0806;
-  --ink: #140d08;
-  --bar: #1a120c;
-  --parchment: #94805c;
-  --gold: #d9a441;
-  --light: #e6d6b8;
-}
-
 .camp {
   display: flex;
   flex-direction: column;
-  min-height: calc(100dvh - 2.25rem);
+  min-height: calc(100dvh - var(--header-height));
   background: var(--night);
 }
 
@@ -33,8 +24,8 @@
   height: 4rem;
   flex: none;
   background: var(--bar);
-  border-top: 2px solid var(--ink);
-  border-bottom: 2px solid var(--ink);
+  border-top: var(--border) solid var(--ink);
+  border-bottom: var(--border) solid var(--ink);
 }
 
 .entry {
@@ -42,7 +33,7 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.125rem;
+  gap: var(--space-xs);
   flex: 1;
   min-width: 0;
   color: var(--light);
@@ -71,17 +62,17 @@
 
 .entry.active {
   background: #33241a;
-  box-shadow: inset 0 -3px 0 var(--gold);
+  box-shadow: inset 0 calc(-1 * var(--border-thick)) 0 var(--gold);
 }
 
 .entry:focus-visible {
-  outline: 2px solid var(--gold);
-  outline-offset: -2px;
+  outline: var(--border) solid var(--gold);
+  outline-offset: calc(-1 * var(--border));
 }
 
 .panel {
   flex: 1;
-  padding: 0.75rem 1rem;
+  padding: var(--space-lg) var(--space-xl);
   background: var(--parchment);
   color: var(--ink);
 }
@@ -112,14 +103,14 @@
 /* Side by side, where that leaves the scene scale 2 (page-layout.ts, isSideBySide): the menu, the scene and the panel in columns. */
 .camp.side {
   display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr) clamp(17rem, 26vw, 28rem);
+  grid-template-columns: 3.5rem minmax(0, 1fr) var(--panel-width);
   grid-template-areas: 'menu stage panel';
-  height: calc(100dvh - 2.25rem);
+  height: calc(100dvh - var(--header-height));
   min-height: 0;
 }
 
 .camp.side.labels {
-  grid-template-columns: 13.5rem minmax(0, 1fr) clamp(17rem, 26vw, 28rem);
+  grid-template-columns: 13.5rem minmax(0, 1fr) var(--panel-width);
 }
 
 .side .stage {
@@ -132,9 +123,9 @@
   flex-direction: column;
   justify-content: flex-start;
   height: auto;
-  padding-top: 0.5rem;
+  padding-top: var(--space-md);
   border: none;
-  border-right: 2px solid var(--ink);
+  border-right: var(--border) solid var(--ink);
 }
 
 .side .entry {
@@ -142,21 +133,21 @@
   flex: none;
   flex-direction: row;
   justify-content: flex-start;
-  gap: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  font-size: 0.9rem;
+  gap: var(--space-lg);
+  padding: var(--space-md) var(--space-lg);
+  font-size: var(--text-sm);
 }
 
 .side .entry.active {
-  box-shadow: inset 3px 0 0 var(--gold);
+  box-shadow: inset var(--border-thick) 0 0 var(--gold);
 }
 
 /* The rail shows each label beside it on hover and on focus. */
 .camp.side:not(.labels) .label {
   position: absolute;
-  left: calc(100% + 0.25rem);
+  left: calc(100% + var(--space-sm));
   z-index: 2;
-  padding: 0.125rem 0.5rem;
+  padding: var(--space-xs) var(--space-md);
   background: var(--bar);
   pointer-events: none;
   visibility: hidden;
@@ -170,12 +161,12 @@
 .side .panel {
   grid-area: panel;
   overflow-y: auto;
-  border-left: 3px solid var(--ink);
+  border-left: var(--border-thick) solid var(--ink);
 }
 
 .error {
   position: fixed;
-  bottom: 0.5rem;
-  left: 1rem;
-  color: #ff8a8a;
+  bottom: var(--space-md);
+  left: var(--space-xl);
+  color: var(--ember);
 }
