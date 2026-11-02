@@ -1,21 +1,21 @@
 main {
   max-width: 40rem;
   margin: 0 auto;
-  padding: 3rem 1rem;
+  padding: 3rem var(--space-xl);
 }
 
 h1 {
   font-size: 3rem;
   letter-spacing: 0.1em;
-  margin: 0 0 1rem;
+  margin: 0 0 var(--space-xl);
 }
 
 button {
   font: inherit;
-  padding: 0.5rem 1rem;
+  padding: var(--space-md) var(--space-xl);
   cursor: pointer;
 }
 
 .error {
-  color: light-dark(#a40000, #ff8a8a);
+  color: light-dark(#a40000, var(--ember));
 }

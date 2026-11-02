@@ -7,6 +7,8 @@ import { routes } from '../../app.routes';
 import { Game, type AdventureView, type HeroView } from '../../game';
 import { Session } from '../../session';
 import { CAMP_SCENE_FACTORY } from '../camp';
+import { LAYOUT_SIZES } from '../layout-sizes';
+import { TEST_LAYOUT_SIZES } from '../../testing/layout-sizes';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
 import { must } from '@heat/engine';
 
@@ -100,6 +102,7 @@ async function render(game: ReturnType<typeof fakeGame>, url: string) {
         provide: CAMP_SCENE_FACTORY,
         useValue: () => Promise.resolve({ setHeroes: () => undefined, setLevels: () => undefined, destroy: () => undefined }),
       },
+      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],
   });
   const harness = await RouterTestingHarness.create(url);
