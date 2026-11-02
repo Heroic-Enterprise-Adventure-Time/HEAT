@@ -12,22 +12,7 @@ import { Game } from '../../game';
 @Component({
   selector: 'heat-seen-hero-card',
   imports: [RouterLink],
-  template: `
-    <a class="back" routerLink="../..">← Heroes hall</a>
-    @if (hero(); as hero) {
-      <h2 id="panel-title">{{ hero.name }}</h2>
-      <p>Another company's hero, seen about the camp.</p>
-      <dl>
-        <dt>Unit type</dt>
-        <dd>{{ hero.unitType }}</dd>
-        <dt>Level</dt>
-        <dd>{{ hero.level }}</dd>
-      </dl>
-    } @else {
-      <h2 id="panel-title">Hero</h2>
-      <p>That hero has moved on.</p>
-    }
-  `,
+  templateUrl: './seen-hero-card.html',
   styleUrl: './panel.css',
 })
 export class SeenHeroCard {

@@ -1,12 +1,14 @@
+import { sortBy } from "es-toolkit";
 import { randomUUID } from "node:crypto";
-import { PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { GraphQLError } from "graphql";
+import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { SPRITE_SETS, SPRITE_SET_PRESENTATION, heroNames } from "@heat/engine";
+import { SPRITE_SETS, SPRITE_SET_PRESENTATION, heroNames, must, type Material } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { RecruitRefused, Repository, type Hero } from "../src/db/repository.js";
+import { InsufficientBalance, RecruitRefused, Repository, type Hero } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
+import { HallFull, InsufficientResources } from "../src/refusals.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;
@@ -32,15 +34,6 @@ async function putCamp(p: string, activeHeroes: number, livingHeroes: number) {
   );
 }
 
-async function refusal(promise: Promise<unknown>): Promise<string | undefined> {
-  try {
-    await promise;
-  } catch (e) {
-    if (e instanceof GraphQLError) return e.extensions["code"] as string;
-    throw e;
-  }
-  return undefined;
-}
 
 describe("recruitHero: the free villager", () => {
   it("gives a new player a villager drawn by the hub, and counts it into the camp", async () => {
@@ -54,10 +47,10 @@ describe("recruitHero: the free villager", () => {
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1, hallLevel: 1, stored: true });
   });
 
-  it("refuses a second free villager while a hero is alive", async () => {
+  it("charges for a second villager while a hero is alive, and refuses it without the timber", async () => {
     const p = player();
     await recruitHero(repo, p, "villager", randomUUID());
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBe("NOT_FREE");
+    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(InsufficientResources);
     expect((await repo.heroes(p)).length).toBe(1);
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
   });
@@ -109,7 +102,7 @@ describe("recruitHero: the free villager", () => {
   it("refuses when the hall is full of dead heroes", async () => {
     const p = player();
     await putCamp(p, 4, 0);
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBe("HALL_FULL");
+    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(HallFull);
     expect(await repo.heroes(p)).toEqual([]);
   });
 
@@ -122,15 +115,139 @@ describe("recruitHero: the free villager", () => {
       id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
       recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
     };
-    await expect(repo.recruitFree(p, stale, 4, hero)).rejects.toBeInstanceOf(RecruitRefused);
+    await expect(repo.recruit(p, stale, 4, hero, [], "none")).rejects.toBeInstanceOf(RecruitRefused);
     expect((await repo.heroes(p)).length).toBe(1);
   });
 
-  it("refuses the fighter, which costs resources, an unknown unit type and a request id that is not a UUID", async () => {
+  it("refuses a fighter with no ore, an unknown unit type and a request id that is not a UUID", async () => {
     const p = player();
-    expect(await refusal(recruitHero(repo, p, "fighter", randomUUID()))).toBe("NOT_AVAILABLE");
-    expect(await refusal(recruitHero(repo, p, "dragon", randomUUID()))).toBe("BAD_USER_INPUT");
-    expect(await refusal(recruitHero(repo, p, "villager", "not-a-uuid"))).toBe("BAD_USER_INPUT");
+    expect(await refusal(recruitHero(repo, p, "fighter", randomUUID()))).toBeInstanceOf(InsufficientResources);
+    expect(await refusal(recruitHero(repo, p, "dragon", randomUUID()))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(recruitHero(repo, p, "villager", "not-a-uuid"))).toMatchObject(BAD_USER_INPUT);
     expect(await repo.heroes(p)).toEqual([]);
+  });
+});
+
+/** A camp with living heroes and holdings, as recruits and settlements leave it. */
+async function putPaidCamp(p: string, livingHeroes: number, holdings: Partial<Record<Material, number>>) {
+  await putCamp(p, livingHeroes, livingHeroes);
+  for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, at, material, balance);
+}
+
+const wren = (): Hero => ({
+  id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
+  recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
+});
+
+async function ledgerDelta(p: string, heroId: string, material: string): Promise<number | undefined> {
+  const r = await db.send(new GetCommand({ TableName: tables.player, Key: playerKeys.ledger(p, heroId, `debit#${material}`) }));
+  return r.Item?.["delta"] as number | undefined;
+}
+
+const byMaterial = (holdings: { material: string; balance: number }[]) => sortBy(holdings, ["material"]);
+
+describe("recruitHero: paid", () => {
+  it("recruits a villager for 20 timber while a hero is alive, with one debit and one ledger entry", async () => {
+    const p = player();
+    await putPaidCamp(p, 1, { timber: 35 });
+    const requestId = randomUUID();
+    const hero = await recruitHero(repo, p, "villager", requestId);
+    expect(hero).toMatchObject({ id: requestId, unitType: "villager", status: "ALIVE" });
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 15 }]);
+    expect(await ledgerDelta(p, requestId, "timber")).toBe(-20);
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+  });
+
+  it("recruits a fighter for 40 ore, put into the holdings directly since no job yields ore yet", async () => {
+    const p = player();
+    await putPaidCamp(p, 1, { ore: 40, timber: 10 });
+    const requestId = randomUUID();
+    const hero = await recruitHero(repo, p, "fighter", requestId);
+    expect(hero.unitType).toBe("fighter");
+    expect(SPRITE_SETS.fighter).toContain(hero.spriteSet);
+    expect(byMaterial(await repo.holdings(p, at))).toEqual([
+      { material: "ore", balance: 0 },
+      { material: "timber", balance: 10 },
+    ]);
+    expect(await ledgerDelta(p, requestId, "ore")).toBe(-40);
+    expect(await ledgerDelta(p, requestId, "timber")).toBeUndefined();
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+  });
+
+  it("charges a fighter even when no hero is alive: only the villager is free", async () => {
+    const p = player();
+    const refused = await refusal(recruitHero(repo, p, "fighter", randomUUID()));
+    expect(refused).toBeInstanceOf(InsufficientResources);
+    expect(refused).toMatchObject({ short: [{ material: "ore", amount: 40, balance: 0 }] });
+    await putPaidCamp(p, 0, { ore: 40 });
+    await recruitHero(repo, p, "fighter", randomUUID());
+    expect(await repo.holdings(p, at)).toEqual([{ material: "ore", balance: 0 }]);
+  });
+
+  it("says what is short when the camp cannot pay, and debits nothing", async () => {
+    const p = player();
+    await putPaidCamp(p, 1, { timber: 19 });
+    const refused = await refusal(recruitHero(repo, p, "villager", randomUUID()));
+    expect(refused).toBeInstanceOf(InsufficientResources);
+    expect(refused).toMatchObject({ short: [{ material: "timber", amount: 20, balance: 19 }] });
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 19 }]);
+    expect(await repo.heroes(p)).toEqual([]);
+  });
+
+  it("debits once for three concurrent repeats of one paid request", async () => {
+    const p = player();
+    await putPaidCamp(p, 1, { timber: 60 });
+    const requestId = randomUUID();
+    const results = await Promise.all([1, 2, 3].map(() => recruitHero(repo, p, "villager", requestId)));
+    expect(new Set(results.map((h) => h.id))).toEqual(new Set([requestId]));
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 40 }]);
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+  });
+
+  it("gives the last slot to one of two concurrent paid recruits, and tells the other the hall is full", async () => {
+    for (let round = 0; round < 5; round++) {
+      const p = player();
+      await putPaidCamp(p, 3, { timber: 100 });
+      const results = await Promise.allSettled([1, 2].map(() => recruitHero(repo, p, "villager", randomUUID())));
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const lost = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+      expect(must(lost, "the refused recruit").reason).toBeInstanceOf(HallFull);
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 80 }]);
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 4, livingHeroes: 4 });
+    }
+  });
+
+  it("pays for one of two concurrent recruits with timber for one, and tells the other what is short", async () => {
+    for (let round = 0; round < 5; round++) {
+      const p = player();
+      await putPaidCamp(p, 1, { timber: 30 });
+      const results = await Promise.allSettled([1, 2].map(() => recruitHero(repo, p, "villager", randomUUID())));
+      expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+      const lost = results.find((r): r is PromiseRejectedResult => r.status === "rejected");
+      expect(must(lost, "the refused recruit").reason).toBeInstanceOf(InsufficientResources);
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 10 }]);
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+    }
+  });
+
+  it("holds the price in the transaction: a villager read as free is refused once a hero lives", async () => {
+    const p = player();
+    await putPaidCamp(p, 0, { timber: 100 });
+    const stale = await repo.camp(p, at);
+    await recruitHero(repo, p, "villager", randomUUID());
+    await expect(repo.recruit(p, stale, 4, wren(), [], "none")).rejects.toBeInstanceOf(RecruitRefused);
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 100 }]);
+  });
+
+  it("holds the balance in the transaction, against holdings read before another debit", async () => {
+    const p = player();
+    await putPaidCamp(p, 1, { timber: 20 });
+    await recruitHero(repo, p, "villager", randomUUID());
+    const hero = wren();
+    const camp = await repo.camp(p, at);
+    await expect(repo.recruit(p, camp, 4, hero, [{ material: "timber", amount: 20 }], "some")).rejects.toBeInstanceOf(InsufficientBalance);
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 0 }]);
+    expect(await ledgerDelta(p, hero.id, "timber")).toBeUndefined();
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
   });
 });

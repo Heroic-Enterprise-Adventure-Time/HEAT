@@ -3,6 +3,54 @@
   color-scheme: light dark;
   font-family: system-ui, sans-serif;
   line-height: 1.5;
+
+  /*
+   * The tokens (docs/standards/angular.md, rule 17): what more than one
+   * component reads, named for what it is. A value one component uses once
+   * is a literal in that component.
+   */
+
+  /* The palette. */
+  --night: #0b0806;
+  --ink: #140d08;
+  --bar: #1a120c;
+  --parchment: #94805c;
+  --gold: #d9a441;
+  --light: #e6d6b8;
+  --rust: #3d140c; /* a refusal, a loss or a note, on parchment */
+  --ember: #ff8a8a; /* an error, on night */
+
+  /* The spacing scale. */
+  --space-xs: 0.125rem;
+  --space-sm: 0.25rem;
+  --space-md: 0.5rem;
+  --space-lg: 0.75rem;
+  --space-xl: 1rem;
+  --space-2xl: 1.25rem;
+
+  /* The type sizes beside the base, 1rem. */
+  --text-sm: 0.9rem;
+  --text-lg: 1.1rem;
+
+  /* The border widths. */
+  --border-thin: 1px;
+  --border: 2px;
+  --border-thick: 3px;
+
+  /*
+   * The page's regions, in rem so they follow the player's font size. The
+   * layout arithmetic reads these at runtime (camp/page-layout.ts,
+   * readLayoutSizes), so nothing holds a second copy of them. A breakpoint
+   * stays a literal, because a media query cannot read a custom property.
+   */
+  --header-height: 2.25rem;
+  --menu-rail-width: 3.5rem;
+  --menu-labelled-width: 13.5rem;
+  --menu-row-height: 4rem;
+  --panel-min-width: 17rem;
+  --panel-share: 26vw;
+  --panel-max-width: 28rem;
+  --panel-width: clamp(var(--panel-min-width), var(--panel-share), var(--panel-max-width));
 }
 
 body {

@@ -2,7 +2,7 @@
 # by git). The account id is real, from the private script in docs/private/;
 # the other three stay placeholders, because dev's values never cross a
 # laptop (decision 0020). The pipeline sets all four from the repository
-# variable HEAT_DEV_ACCOUNT_ID and the dev environment's HEAT_GOOGLE_CLIENT_ID,
+# secret HEAT_DEV_ACCOUNT_ID and the dev environment's HEAT_GOOGLE_CLIENT_ID,
 # HEAT_GOOGLE_CLIENT_SECRET and HEAT_ALARM_EMAIL. None of the four is ever
 # committed.
 workload_account_id  = "000000000000"

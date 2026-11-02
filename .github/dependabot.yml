@@ -29,6 +29,9 @@ updates:
       # Dependabot's to open.
       - dependency-name: "@angular/*"
         update-types: ["version-update:semver-major"]
+      # angular-eslint's major tracks Angular's, so it moves with them.
+      - dependency-name: angular-eslint
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
@@ -48,6 +51,9 @@ updates:
       - /terraform/bootstrap/dev
       - /terraform/bootstrap/prod
       - /terraform/environment/sandbox-base
+      - /terraform/environment/sandbox
+      - /terraform/environment/dev
+      - /terraform/environment/prod
     schedule:
       interval: weekly
     groups:

@@ -1,5 +1,6 @@
-import type { APIGatewayProxyEventV2, APIGatewayProxyEventV2WithJWTAuthorizer } from "aws-lambda";
+import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import { GraphQLError } from "graphql";
 import type { Tables } from "./db/client.js";
 import { Repository } from "./db/repository.js";
 import type { Timelines } from "./timelines.js";
@@ -27,16 +28,28 @@ export interface Context {
   clientVersion: string | undefined;
 }
 
+/**
+ * The signed-in player's id. Every field that reads it declares the
+ * `authenticated` scope, which the scope-auth plugin checks before the
+ * resolver runs, so the throw is a guard against a field that forgot to.
+ */
+export function callerId(ctx: Context): string {
+  if (ctx.playerId === undefined) throw new GraphQLError("not signed in", { extensions: { code: "UNAUTHENTICATED" } });
+  return ctx.playerId;
+}
+
 export interface Identity {
   playerId: string;
   playerName: string;
 }
 
+/** The event as the HTTP API sends it when a route has a JWT authorizer, which every route here has; the integration types it without one, and a synthesized test event may have none. */
+interface MaybeAuthorized {
+  requestContext?: { authorizer?: { jwt?: { claims?: Record<string, unknown> } } };
+}
+
 export function identityFromEvent(event: APIGatewayProxyEventV2): Identity | undefined {
-  // The integration types the event without an authorizer; the HTTP API
-  // attaches one when a route has a JWT authorizer, which every route here has.
-  const withJwt = event as Partial<APIGatewayProxyEventV2WithJWTAuthorizer>;
-  const claims = withJwt.requestContext?.authorizer?.jwt?.claims ?? {};
+  const claims = (event as MaybeAuthorized).requestContext?.authorizer?.jwt?.claims ?? {};
   const sub = claims["sub"];
   if (typeof sub !== "string" || sub.length === 0) return undefined;
   const email = claims["email"];
@@ -51,10 +64,11 @@ export interface Versions {
 export function createContextFactory(db: DynamoDBDocumentClient, tables: Tables, versions: Versions, timelines: Timelines) {
   const repo = new Repository(db, tables);
   const { version, previousVersion } = versions;
-  return async ({ event }: { event: APIGatewayProxyEventV2 }): Promise<Context> => {
+  // Apollo's context function returns a promise; nothing here waits.
+  return ({ event }: { event: APIGatewayProxyEventV2 }): Promise<Context> => {
     const identity = identityFromEvent(event);
     // Payload 2.0 lower-cases header names.
-    const clientVersion = event.headers?.[VERSION_HEADER];
-    return { playerId: identity?.playerId, playerName: identity?.playerName, repo, version, previousVersion, timelines, clientVersion };
+    const clientVersion = event.headers[VERSION_HEADER];
+    return Promise.resolve({ playerId: identity?.playerId, playerName: identity?.playerName, repo, version, previousVersion, timelines, clientVersion });
   };
 }

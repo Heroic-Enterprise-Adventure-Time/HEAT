@@ -1,7 +1,10 @@
 {
   "set": "warehouse",
   "kind": "facility",
-  "facility": { "kind": "warehouse", "owner": "player" },
+  "facility": {
+    "kind": "warehouse",
+    "owner": "player"
+  },
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",
@@ -12,8 +15,18 @@
   "levels": {
     "1": {
       "file": "level-1.png",
-      "canvas": [48, 48],
-      "pixellab": { "mapObjectId": "f104f6aa-0866-48fa-82f6-30655befbcbb", "tags": ["heat", "facility", "warehouse"] },
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "f104f6aa-0866-48fa-82f6-30655befbcbb",
+        "tags": [
+          "heat",
+          "facility",
+          "warehouse"
+        ]
+      },
       "tool": "create_map_object",
       "via": "MCP",
       "createdAt": "2026-10-20T05:37Z",
@@ -28,15 +41,109 @@
         "background_image": null
       },
       "generations": 1
+    },
+    "2": {
+      "file": "level-2.png",
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "50c8e1a5-680e-463a-b37a-7bbfaa9dcca5",
+        "tags": [
+          "heat",
+          "facility",
+          "warehouse"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-23T03:28Z",
+      "parameters": {
+        "description": "bigger wooden log storehouse with a double door, a loading platform, stacked crates, sacks and barrels beside it, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
+    },
+    "3": {
+      "file": "level-3.png",
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "00e8cc4c-acd8-48ed-ad04-9029798fd7ad",
+        "tags": [
+          "heat",
+          "facility",
+          "warehouse"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-10-23T03:28Z",
+      "parameters": {
+        "description": "large stone and timber warehouse with a tiled roof, a wide double door, a hoist beam over the door, stacked crates, sacks and barrels beside it, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
     }
   },
   "rejectedTags": "Every rejected map object below is tagged heat, facility, its kind and rejected in PixelLab.",
   "rejected": [
-    { "mapObjectId": "7180ac62-65b6-4440-92cb-7d124b9ebe05", "why": "First call, without the angle in the description: a log storehouse drawn head-on; the owner liked it but wanted a little depth." },
-    { "mapObjectId": "3df4b251-93b8-4dd2-bc0b-bb6a26ad413a", "why": "First call: a plank barn, head-on." },
-    { "imageJobId": "d7fd8053-5fd9-4a78-8cdc-2503bd3716eb", "why": "An image, not an object, so it carries no tags. create_image_pixflux over 7180ac62 (init_image_strength 150) asking for a side wall: barely changed, still head-on." },
-    { "mapObjectId": "f614b75b-6a85-4c90-8594-b0485bd7709b", "why": "The kept call's twin: angled, but busier and more orange than the hall." }
+    {
+      "mapObjectId": "7180ac62-65b6-4440-92cb-7d124b9ebe05",
+      "why": "First call, without the angle in the description: a log storehouse drawn head-on; the owner liked it but wanted a little depth."
+    },
+    {
+      "mapObjectId": "3df4b251-93b8-4dd2-bc0b-bb6a26ad413a",
+      "why": "First call: a plank barn, head-on."
+    },
+    {
+      "imageJobId": "d7fd8053-5fd9-4a78-8cdc-2503bd3716eb",
+      "why": "An image, not an object, so it carries no tags. create_image_pixflux over 7180ac62 (init_image_strength 150) asking for a side wall: barely changed, still head-on."
+    },
+    {
+      "mapObjectId": "f614b75b-6a85-4c90-8594-b0485bd7709b",
+      "why": "The kept call's twin: angled, but busier and more orange than the hall."
+    },
+    {
+      "mapObjectId": "fea76767-d40f-458a-8250-eb10a2c67c14",
+      "why": "Level 2, the same call as the kept one: on a straw platform."
+    },
+    {
+      "mapObjectId": "21816cad-8df6-41b7-9799-92932c2937fd",
+      "why": "Level 2, worded for nothing under it (bigger wooden log storehouse with a double door and a side shed, stacked crates, sacks and barrels beside it, standing alone with nothing under it, seen at a slight angle so its side wall shows, three-quarter view, no ground, no base, no platform, black outline, warm earthy tones, NES-era retro pixel art, few colors): on a ground patch."
+    },
+    {
+      "mapObjectId": "df551617-9a54-4238-83ad-e3b7e1c02e3e",
+      "why": "Level 2, the same call: clean, but barely bigger than level 1."
+    },
+    {
+      "mapObjectId": "77467300-9b9a-4d87-b316-037ae4a22008",
+      "why": "Level 2, worded after the pick with nothing under it (bigger wooden log storehouse with a grey shingled roof and a double door, sacks of grain, crates and barrels piled against its front wall, standing alone with nothing under it, seen at a slight angle so its side wall shows, three-quarter view, no ground, no base, no floor, no platform, black outline, warm earthy tones, NES-era retro pixel art, few colors): a cool blue roof."
+    },
+    {
+      "mapObjectId": "d558be47-1521-4f8e-b4fd-eeb199e0b4f1",
+      "why": "Level 2, the same call: barely differs from level 1."
+    },
+    {
+      "mapObjectId": "6c5ec3fa-bb16-4f52-b253-0cec54f683a7",
+      "why": "Level 3, the same call as the kept one: a grey-blue roof, the coolest colour in the camp."
+    }
   ],
-  "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png).",
-  "verified": "level-1.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
+  "chosenBy": "The owner, 2026-10-19, in a 320×180 camp mock-up at 4× with kept hero sets (art/mockups/first-camp-4x.png). Levels 2 and 3: the owner, 2026-10-22 (Issue-93), from a mock-up of each candidate beside level 1 and a villager on the meadow-01 ground, rolled two at a time: level 3 once, level 2 three times, the third round worded after the pick, which it did not beat. Level 2 stands on its loading platform, which the owner accepted.",
+  "verified": "level-1.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20. level-2.png and level-3.png are byte-identical to a second download, 2026-10-22."
 }

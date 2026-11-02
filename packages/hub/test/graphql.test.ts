@@ -3,12 +3,18 @@ import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext 
 import { beforeAll, describe, expect, it } from "vitest";
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
+import { must } from "@heat/engine";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
  * the shape API Gateway sends after its JWT authorizer has validated the
  * token and attached the claims. Rule 2 of decision 0009: the handler is a
  * plain function of an event, so the test calls it like Lambda would.
+ *
+ * Every mutation takes one input object and answers a result union
+ * (docs/standards/graphql.md, rules 5 and 6): the test reads `__typename`
+ * as the client does, a refusal being a member of the union and malformed
+ * input a GraphQLError in `errors`.
  */
 type Handler = (event: APIGatewayProxyEventV2WithJWTAuthorizer, context: LambdaContext) => Promise<{
   statusCode?: number;
@@ -58,17 +64,60 @@ function event(
   };
 }
 
-async function gql<T = unknown>(query: string, variables: Record<string, unknown> = {}, playerId?: string, headers: Record<string, string> = {}) {
-  const res = await handler(event(query, variables, playerId, headers), {} as LambdaContext);
-  expect(res.statusCode).toBe(200);
-  return JSON.parse(res.body ?? "{}") as {
-    data?: T;
-    errors?: { message: string; path?: (string | number)[]; extensions?: Record<string, unknown> }[];
-    extensions?: Record<string, unknown>;
-  };
+/** The handler's reply: the data the query selected, the errors, and the extensions. */
+interface Reply<T> {
+  data?: T;
+  errors?: { message: string; path?: (string | number)[]; extensions?: Record<string, unknown> }[];
+  extensions?: Record<string, unknown>;
 }
 
-const START = `mutation($heroIds: [String!]!) { startAdventure(location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds) { id seed } }`;
+/**
+ * A query with the shape of the data it selects, `QUERY as Query<{ me: { id: string } }>`,
+ * so that the reply is typed by the query that asked for it and not by the call.
+ * The brand exists only in the type: the query is a string at run time.
+ */
+type Query<T> = string & { readonly selects: T };
+
+/** A mutation's result union as the test selects it: the type name, and the success's field when it succeeded. */
+type Result<K extends string, T> = { __typename: string } & Partial<Record<K, T>> & Record<string, unknown>;
+
+function gql<T>(query: Query<T>, variables?: Record<string, unknown>, playerId?: string, headers?: Record<string, string>): Promise<Reply<T>>;
+/** A plain string asks for nothing in particular, and its data is `unknown`. */
+function gql(query: string, variables?: Record<string, unknown>, playerId?: string, headers?: Record<string, string>): Promise<Reply<unknown>>;
+async function gql(query: string, variables: Record<string, unknown> = {}, playerId?: string, headers: Record<string, string> = {}): Promise<Reply<unknown>> {
+  const res = await handler(event(query, variables, playerId, headers), {} as LambdaContext);
+  expect(res.statusCode).toBe(200);
+  return JSON.parse(res.body ?? "{}") as Reply<unknown>;
+}
+
+/** A request Apollo refuses before executing it, which it answers with a 400 and the reason in `errors`. */
+async function invalid(query: string, variables: Record<string, unknown>, playerId: string): Promise<Reply<unknown>> {
+  const res = await handler(event(query, variables, playerId), {} as LambdaContext);
+  expect(res.statusCode).toBe(400);
+  return JSON.parse(res.body ?? "{}") as Reply<unknown>;
+}
+
+const JOIN = `mutation { joinGame { ... on JoinGameSuccess { player { id name } } } }` as Query<{ joinGame: Result<"player", { id: string; name: string }> }>;
+const START = `mutation($heroIds: [ID!]!) {
+  startAdventure(input: { location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds }) {
+    __typename
+    ... on StartAdventureSuccess { adventure { id seed } }
+    ... on AdventureOpen { adventureId }
+  }
+}` as Query<{ startAdventure: Result<"adventure", { id: string; seed: string }> }>;
+const RECRUIT = `mutation($id: ID!) {
+  recruitHero(input: { unitType: VILLAGER, requestId: $id }) {
+    __typename
+    ... on RecruitHeroSuccess { hero { id name unitType spriteSet status } }
+    ... on Error { message }
+  }
+}` as Query<{ recruitHero: Result<"hero", { id: string; name: string; unitType: string; spriteSet: string; status: string }> }>;
+const RETIRE = `mutation($id: ID!) {
+  retireHero(input: { heroId: $id }) {
+    __typename
+    ... on RetireHeroSuccess { hero { id status retiredAt } }
+  }
+}` as Query<{ retireHero: Result<"hero", { id: string; status: string; retiredAt: string | null }> }>;
 
 describe("authorization at the field level", () => {
   it("serves public fields to anyone and private fields only to the owner", async () => {
@@ -77,19 +126,20 @@ describe("authorization at the field level", () => {
     await repo.putPlayer({ id: owner, name: "Owner" });
     await repo.setBalance(owner, "millbrook", "timber", 5);
 
-    const q = `query($id: String!) { player(id: $id) { id name camps { location holdings { material balance } } heroes { id } } }`;
+    const q = `query($id: ID!) { player(id: $id) { id name camps { location holdings { material balance } } heroes { id } } }`;
 
-    const asOther = await gql<{ player: { name: string; camps: unknown; heroes: unknown } }>(q, { id: owner }, other);
+    const asOther = await gql(q as Query<{ player: { name: string; camps: unknown; heroes: unknown } }>, { id: owner }, other);
     expect(asOther.data?.player.name).toBe("Owner");
     expect(asOther.data?.player.camps).toBeNull();
     expect(asOther.data?.player.heroes).toBeNull();
     expect(asOther.errors?.map((e) => e.path)).toEqual(expect.arrayContaining([["player", "camps"], ["player", "heroes"]]));
 
-    const asOwner = await gql<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>(q, { id: owner }, owner);
+    const asOwner = await gql(q as Query<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>, { id: owner }, owner);
     expect(asOwner.errors).toBeUndefined();
-    expect(asOwner.data?.player.camps).toEqual([{ location: "millbrook", holdings: [{ material: "timber", balance: 5 }] }]);
+    // The engine's `timber` is the enum value TIMBER on the wire (graphql.md, rule 4).
+    expect(asOwner.data?.player.camps).toEqual([{ location: "millbrook", holdings: [{ material: "TIMBER", balance: 5 }] }]);
 
-    const anonymous = await gql<{ me: unknown }>(`{ me { id } }`);
+    const anonymous = await gql(`{ me { id } }` as Query<{ me: unknown }>);
     expect(anonymous.data?.me).toBeNull();
     expect(anonymous.errors?.[0]?.path).toEqual(["me"]);
   });
@@ -101,78 +151,80 @@ describe("first sign-in", () => {
     await gql(START, { heroIds: [randomUUID()] }, p);
     expect(await repo.getPlayer(p)).toBeUndefined();
 
-    const joined = await gql<{ joinGame: { id: string; name: string } }>(`mutation { joinGame { id name } }`, {}, p);
+    const joined = await gql(JOIN, {}, p);
     expect(joined.errors).toBeUndefined();
     // No email claim in the synthesized token, so the name falls back to the subject.
-    expect(joined.data?.joinGame).toEqual({ id: p, name: p });
+    expect(joined.data?.joinGame.player).toEqual({ id: p, name: p });
 
     await repo.putPlayer({ id: p, name: "Renamed in the table" });
-    const again = await gql<{ joinGame: { name: string } }>(`mutation { joinGame { name } }`, {}, p);
-    expect(again.data?.joinGame.name).toBe("Renamed in the table");
+    const again = await gql(JOIN, {}, p);
+    expect(again.data?.joinGame.player?.name).toBe("Renamed in the table");
   });
 });
 
 describe("the camp through the graph", () => {
   it("shows a new player the starting camp, recruits the free villager, and refuses a second", async () => {
     const p = `p-${randomUUID()}`;
-    await gql(`mutation { joinGame { id } }`, {}, p);
+    await gql(JOIN, {}, p);
     const camp = `{ me { camps { location name hallLevel heroCapacity resourceCapacity activeHeroes livingHeroes } heroes { id name unitType spriteSet status } } }`;
 
-    const before = await gql<{ me: { camps: unknown[]; heroes: unknown[] } }>(camp, {}, p);
+    const before = await gql(camp as Query<{ me: { camps: unknown[]; heroes: unknown[] } }>, {}, p);
     expect(before.data?.me).toEqual({
       camps: [{ location: "millbrook", name: "Millbrook", hallLevel: 1, heroCapacity: 4, resourceCapacity: 100, activeHeroes: 0, livingHeroes: 0 }],
       heroes: [],
     });
 
     const requestId = randomUUID();
-    const recruit = `mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id name unitType spriteSet status } }`;
-    const made = await gql<{ recruitHero: { id: string; unitType: string; status: string } }>(recruit, { id: requestId }, p);
+    const made = await gql(RECRUIT, { id: requestId }, p);
     expect(made.errors).toBeUndefined();
-    expect(made.data?.recruitHero).toMatchObject({ id: requestId, unitType: "villager", status: "ALIVE" });
+    expect(made.data?.recruitHero.__typename).toBe("RecruitHeroSuccess");
+    expect(made.data?.recruitHero.hero).toMatchObject({ id: requestId, unitType: "VILLAGER", status: "ALIVE" });
 
-    const after = await gql<{ me: { camps: { activeHeroes: number }[]; heroes: unknown[] } }>(camp, {}, p);
+    const after = await gql(camp as Query<{ me: { camps: { activeHeroes: number }[]; heroes: unknown[] } }>, {}, p);
     expect(after.data?.me.camps[0]?.activeHeroes).toBe(1);
-    expect(after.data?.me.heroes).toEqual([made.data?.recruitHero]);
+    expect(after.data?.me.heroes).toEqual([made.data?.recruitHero.hero]);
 
-    const second = await gql(recruit, { id: randomUUID() }, p);
-    expect((second.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("NOT_FREE");
+    // The refusal is data: a member of the result union, with its message, and no entry in errors.
+    const second = await gql(RECRUIT, { id: randomUUID() }, p);
+    expect(second.errors).toBeUndefined();
+    expect(second.data?.recruitHero).toEqual({ __typename: "InsufficientResources", message: "a villager costs 20 timber, and the camp has 0" });
   });
 
   it("retires the villager, which frees the next villager", async () => {
     const p = `p-${randomUUID()}`;
-    await gql(`mutation { joinGame { id } }`, {}, p);
-    const recruit = `mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id } }`;
-    const retire = `mutation($id: String!) { retireHero(heroId: $id) { id status retiredAt } }`;
+    await gql(JOIN, {}, p);
     const id = randomUUID();
-    await gql(recruit, { id }, p);
+    await gql(RECRUIT, { id }, p);
 
-    const retired = await gql<{ retireHero: { id: string; status: string; retiredAt: string | null } }>(retire, { id }, p);
+    const retired = await gql(RETIRE, { id }, p);
     expect(retired.errors).toBeUndefined();
-    expect(retired.data?.retireHero).toMatchObject({ id, status: "RETIRED" });
-    expect(retired.data?.retireHero.retiredAt).toEqual(expect.any(String));
+    expect(retired.data?.retireHero.hero).toMatchObject({ id, status: "RETIRED" });
+    expect(retired.data?.retireHero.hero?.retiredAt).toEqual(expect.any(String));
 
-    const counts = await gql<{ me: { camps: unknown[] } }>(`{ me { camps { activeHeroes livingHeroes } } }`, {}, p);
+    const counts = await gql(`{ me { camps { activeHeroes livingHeroes } } }` as Query<{ me: { camps: unknown[] } }>, {}, p);
     expect(counts.data?.me.camps).toEqual([{ activeHeroes: 0, livingHeroes: 0 }]);
-    const next = await gql(recruit, { id: randomUUID() }, p);
-    expect(next.errors).toBeUndefined();
+    const next = await gql(RECRUIT, { id: randomUUID() }, p);
+    expect(next.data?.recruitHero.__typename).toBe("RecruitHeroSuccess");
 
-    const missing = await gql(retire, { id: randomUUID() }, `p-${randomUUID()}`);
-    expect((missing.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("NOT_FOUND");
+    // Another player's hero is not said to exist: the client's defect, in errors, not a refusal type.
+    const missing = await gql(RETIRE, { id: randomUUID() }, `p-${randomUUID()}`);
+    expect(missing.data?.retireHero).toBeNull();
+    expect(missing.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
   });
 
   it("shows other players' heroes seen at the location by their public fields, never the caller's own", async () => {
     const p = `p-${randomUUID()}`;
-    await gql(`mutation { joinGame { id } }`, {}, p);
+    await gql(JOIN, {}, p);
     const mine = randomUUID();
-    await gql(`mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id } }`, { id: mine }, p);
+    await gql(RECRUIT, { id: mine }, p);
 
-    const seen = `query($at: String!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
-    const r = await gql<{ heroesSeenAt: { id: string }[] }>(seen, { at: "millbrook" }, p);
+    const seen = `query($at: ID!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
+    const r = await gql(seen as Query<{ heroesSeenAt: { id: string }[] }>, { at: "millbrook" }, p);
     expect(r.errors).toBeUndefined();
     expect(r.data?.heroesSeenAt.length).toBeLessThanOrEqual(6);
     expect(r.data?.heroesSeenAt.map((h) => h.id)).not.toContain(mine);
 
-    const fields = await gql<{ __type: { fields: { name: string }[] } }>(`{ __type(name: "SeenHero") { fields { name } } }`);
+    const fields = await gql(`{ __type(name: "SeenHero") { fields { name } } }` as Query<{ __type: { fields: { name: string }[] } }>);
     expect(fields.data?.__type.fields.map((f) => f.name).sort()).toEqual(["id", "level", "name", "spriteSet", "unitType"]);
 
     const anonymous = await gql(seen, { at: "millbrook" });
@@ -185,62 +237,81 @@ describe("the camp through the graph", () => {
 describe("the adventure loop through the graph", () => {
   it("starts a job with the villager, shows it on me, refuses a second start, and settles with the engine's rewards once", async () => {
     const p = `p-${randomUUID()}`;
-    await gql(`mutation { joinGame { id } }`, {}, p);
+    await gql(JOIN, {}, p);
     const villager = randomUUID();
-    await gql(`mutation($id: String!) { recruitHero(unitType: "villager", requestId: $id) { id } }`, { id: villager }, p);
+    await gql(RECRUIT, { id: villager }, p);
 
-    const start = await gql<{ startAdventure: { id: string; seed: string } }>(START, { heroIds: [villager] }, p);
+    const start = await gql(START, { heroIds: [villager] }, p);
     expect(start.errors).toBeUndefined();
-    const { id: adventureId, seed } = start.data!.startAdventure;
+    const { id: adventureId, seed } = must(start.data?.startAdventure.adventure, "the start's adventure");
 
-    const me = await gql<{ me: { openAdventure: unknown } }>(
-      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gathering } } } } } }`,
+    const me = await gql(
+      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gathering } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
       {}, p,
     );
     expect(me.errors).toBeUndefined();
-    const version = process.env.HEAT_VERSION;
+    const version = process.env["HEAT_VERSION"];
     expect(me.data?.me.openAdventure).toEqual({
       id: adventureId, seed, location: "millbrook", version,
       job: { id: "wolves-on-the-mill-road", name: "Wolves on the mill road", location: "millbrook" },
       snapshot: {
         version, jobId: "wolves-on-the-mill-road",
-        heroes: [{ heroId: villager, unitType: "villager", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
+        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
       },
     });
 
     const again = await gql(START, { heroIds: [villager] }, p);
-    expect(again.errors?.[0]?.extensions).toMatchObject({ code: "ADVENTURE_OPEN", adventureId });
+    expect(again.errors).toBeUndefined();
+    expect(again.data?.startAdventure).toEqual({ __typename: "AdventureOpen", adventureId });
 
-    const retire = await gql(`mutation($id: String!) { retireHero(heroId: $id) { id } }`, { id: villager }, p);
-    expect(retire.errors?.[0]?.extensions?.["code"]).toBe("HERO_ADVENTURING");
+    const retire = await gql(RETIRE, { id: villager }, p);
+    expect(retire.data?.retireHero.__typename).toBe("HeroAdventuring");
 
     // Submit's refusals that come before the replay bucket: settling itself
     // is proven against the in-memory store (settle.test.ts) and on the
     // stack against the real bucket.
-    const SUBMIT = `mutation($id: String!, $log: [OverrideInput!]!) { submitAdventure(adventureId: $id, overrides: $log) { id status } }`;
+    const SUBMIT = `mutation($id: ID!, $log: [OverrideInput!]!) {
+      submitAdventure(input: { adventureId: $id, overrides: $log }) { __typename ... on SubmitAdventureSuccess { adventure { id status } } }
+    }` as Query<{ submitAdventure: Result<"adventure", { id: string; status: string }> | null }>;
     const stranger = await gql(SUBMIT, { id: adventureId, log: [] }, `p-${randomUUID()}`);
-    expect(stranger.errors?.[0]?.extensions?.["code"]).toBe("NO_SUCH_ADVENTURE");
+    expect(stranger.data?.submitAdventure).toBeNull();
+    expect(stranger.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
     const badLog = await gql(SUBMIT, { id: adventureId, log: [{ kind: "UNIT", acceptedAtSimTime: 0, unitId: "nobody", abilityId: "swing" }] }, p);
     expect(badLog.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
-    const discard = await gql(`mutation($id: String!) { discardAdventure(adventureId: $id) { id } }`, { id: adventureId }, p);
-    expect(discard.errors?.[0]?.extensions).toMatchObject({ code: "ADVENTURE_VERIFIABLE", version });
+    const discard = await gql(
+      `mutation($id: ID!) { discardAdventure(input: { adventureId: $id }) { __typename ... on AdventureVerifiable { version } } }` as Query<{ discardAdventure: Result<never, never> }>,
+      { id: adventureId }, p,
+    );
+    expect(discard.errors).toBeUndefined();
+    expect(discard.data?.discardAdventure).toEqual({ __typename: "AdventureVerifiable", version });
 
     // The record, open: its player reads it with no result and no timeline; nobody else does.
-    const read = `query($id: String!) { adventure(id: $id) { id status result { outcome } timeline } }`;
-    const own = await gql<{ adventure: unknown }>(read, { id: adventureId }, p);
+    const read = `query($id: ID!) { adventure(id: $id) { id status result { outcome } timeline } }`;
+    const own = await gql(read as Query<{ adventure: unknown }>, { id: adventureId }, p);
     expect(own.data?.adventure).toEqual({ id: adventureId, status: "OPEN", result: null, timeline: null });
-    const other = await gql<{ adventure: unknown }>(read, { id: adventureId }, `p-${randomUUID()}`);
+    const other = await gql(read as Query<{ adventure: unknown }>, { id: adventureId }, `p-${randomUUID()}`);
     expect(other.data?.adventure).toBeNull();
+  });
+
+  it("refuses an input the schema cannot read before any resolver runs", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(JOIN, {}, p);
+    // A unit type outside the enum, and a mutation called with its old positional arguments.
+    const dragon = await invalid(`mutation($id: ID!) { recruitHero(input: { unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
+    expect(dragon.data).toBeUndefined();
+    expect(dragon.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+    const positional = await invalid(`mutation { recruitHero(unitType: VILLAGER, requestId: "x") { __typename } }`, {}, p);
+    expect(positional.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
   });
 });
 
 describe("the deploy's version", () => {
   it("flags outdated on a response to a client of another version, errors included, and never otherwise", async () => {
     const p = `p-${randomUUID()}`;
-    await gql(`mutation { joinGame { id } }`, {}, p);
-    const version = process.env.HEAT_VERSION!;
+    await gql(JOIN, {}, p);
+    const version = must(process.env["HEAT_VERSION"], "HEAT_VERSION");
 
-    const asked = await gql<{ version: string }>(`{ version }`, {}, p);
+    const asked = await gql(`{ version }` as Query<{ version: string }>, {}, p);
     expect(asked.data?.version).toBe(version);
 
     const same = await gql(`{ me { id } }`, {}, p, { "heat-version": version });
@@ -248,11 +319,12 @@ describe("the deploy's version", () => {
     const none = await gql(`{ me { id } }`, {}, p);
     expect(none.extensions?.["outdated"]).toBeUndefined();
 
-    const other = await gql<{ me: { id: string } }>(`{ me { id } }`, {}, p, { "heat-version": "0".repeat(40) });
+    const other = await gql(`{ me { id } }` as Query<{ me: { id: string } }>, {}, p, { "heat-version": "0".repeat(40) });
     expect(other.data?.me.id).toBe(p);
     expect(other.extensions?.["outdated"]).toBe(true);
+    // A party of none is malformed input, in errors; the flag rides on that response too.
     const refused = await gql(START, { heroIds: [] }, p, { "heat-version": "0".repeat(40) });
-    expect(refused.errors?.[0]?.extensions?.["code"]).toBe("PARTY_SIZE");
+    expect(refused.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
     expect(refused.extensions?.["outdated"]).toBe(true);
   });
 });

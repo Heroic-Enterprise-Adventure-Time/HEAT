@@ -1,6 +1,6 @@
 # Four values this root never commits (docs/README.md, rule 9; decision 0016
 # for the address). In the pipeline all four come from GitHub: the account id
-# as TF_VAR_workload_account_id from the repository variable
+# as TF_VAR_workload_account_id from the repository secret
 # HEAT_DEV_ACCOUNT_ID, and the other three from the dev environment under the
 # names every environment uses (decision 0020): the variable
 # HEAT_GOOGLE_CLIENT_ID, the secret HEAT_GOOGLE_CLIENT_SECRET and the

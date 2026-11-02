@@ -3,6 +3,7 @@ import type { AdventureEvent, AdventureSnapshot, AdventureTimeline, PartyOrder }
 import { Game, type AdventureView } from '../game';
 import { applyEvent, emptyField, isEntry, type Field } from './field';
 import { AdventureRun, TimelineRun, forgetRun, loadRun, saveRun, type Run } from './run';
+import { must } from '@heat/engine';
 
 /** The speeds the player can pick (decision 0002): simulated milliseconds per wall-clock millisecond. */
 export const SPEEDS = [1, 2, 4] as const;
@@ -85,7 +86,7 @@ export class Play {
     if (!run || run.complete || this.paused() || this.entering()) return [];
     const events = run.advanceTo(run.simTime + Math.round(wallMs * this.speed()));
     if (events.length > 0) {
-      this.field.update((field) => events.reduce(applyEvent, field!));
+      this.field.update((field) => events.reduce(applyEvent, must(field, 'the field while events play')));
       this.settleQueue(events);
       if (this.holdEntries && events.some(isEntry)) this.entering.set(true);
     }

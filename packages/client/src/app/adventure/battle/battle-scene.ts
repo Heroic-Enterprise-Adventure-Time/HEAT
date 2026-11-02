@@ -1,9 +1,24 @@
+import { clamp, range } from 'es-toolkit';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
-import { MONSTER_SPRITE_SETS, PROP_SPRITE_SETS, UNIT_PROFILES, type AdventureEvent, type Line, type MonsterType, type ResourceType, type UnitType } from '@heat/engine';
+import {
+  ABILITY_EFFECTS,
+  MONSTER_SPRITE_SETS,
+  PROP_SPRITE_SETS,
+  UNIT_PROFILES,
+  WEAPON_SPRITES,
+  must,
+  type AbilityId,
+  type AdventureEvent,
+  type Line,
+  type MonsterType,
+  type ResourceType,
+  type UnitType,
+} from '@heat/engine';
 import { layGround, type Terrain, type TilesetJson } from '../../camp/scene/ground';
 import type { Field, FieldUnit } from '../field';
 import { battleView, entryOffset, spots, type BattleView } from './battle-layout';
-import { loadUnitArt, type Frames, type UnitArt } from './battle-art';
+import { loadEffectArt, loadUnitArt, loadWeaponArt, type EffectArt, type Frames, type UnitArt, type WeaponArt } from './battle-art';
+import { effectFrameAt, heldFrame } from './action-sprites';
 
 /**
  * The battle scene, drawn with PixiJS like the camp (decision 0028): the
@@ -12,7 +27,9 @@ import { loadUnitArt, type Frames, type UnitArt } from './battle-art';
  *
  * It draws from the field, where everyone stands and how they are, and
  * animates from the events: an action's act, held on its hold frame until
- * it resolves; a hit; a fall, held; a step up a line or a collapse as a walk.
+ * it resolves, with its weapon beside it, swung in step and held on its own
+ * hold frame; the ability's effect on whatever the action lands on; a hit; a
+ * fall, held; a step up a line or a collapse as a walk.
  * The progression reads left to right: the party runs on from the left at
  * the start and walks in place while the road scrolls by on a travel; at a
  * fight or a gather the other side rushes on from the right as the road
@@ -57,6 +74,14 @@ const STANCE_MS = 150;
 const FADE_AFTER_MS = 600;
 const FADE_MS = 500;
 
+/**
+ * Where a weapon's grip goes, from an actor's feet facing east: its
+ * leading hand at the act's hold frame, the same on every set, all made on
+ * one skeleton (measured on every hero set, Issue-130: the fist 10 to 13 px
+ * ahead of the canvas's centre and 20 px above the feet).
+ */
+const HAND = { x: 10, y: -20 };
+
 /** The road the units stand on, in the ground's lower terrain: the corner rows from 6 to 10, y 96 to 160 on the stage. */
 const ROAD_ROWS = { from: 6, to: 10 };
 
@@ -68,6 +93,9 @@ interface UnitView {
   readonly picture: Sprite;
   /** The rows above a fading down's cut, drawn with their own alpha. */
   readonly top: Sprite;
+  /** The weapon in hand while the unit acts; none for a unit that uses none, such as the wolf. */
+  weapon: WeaponArt | null;
+  readonly weaponSprite: Sprite;
   readonly bar: Graphics;
   barShown: string;
   x: number;
@@ -82,13 +110,24 @@ interface UnitView {
   behind: boolean;
 }
 
+/** An ability's effect playing on whatever its action landed on. */
+interface EffectView {
+  art: EffectArt | null;
+  readonly target: UnitView;
+  /** Made for an actor on the left: mirrored when the other side acts. */
+  readonly mirrored: boolean;
+  /** When it began, on the presentation clock. */
+  readonly at: number;
+  readonly sprite: Sprite;
+}
+
 function artPath(unit: FieldUnit, heroSets: ReadonlyMap<string, string>): string | null {
   if (unit.kind === 'hero') {
     const set = heroSets.get(unit.unitId);
     return set ? `heroes/${set}` : null;
   }
   if (unit.kind === 'monster') {
-    const set = MONSTER_SPRITE_SETS[unit.type as MonsterType]?.[0];
+    const set = MONSTER_SPRITE_SETS[unit.type as MonsterType][0];
     return set ? `monsters/${set}` : null;
   }
   const set = PROP_SPRITE_SETS[unit.type as ResourceType]?.[0];
@@ -100,7 +139,7 @@ function lineOf(unit: FieldUnit): Line {
   return unit.line ?? UNIT_PROFILES[unit.type as UnitType]?.homeLine ?? 'near';
 }
 
-const frameOf = (frames: Frames, index: number) => frames.textures[Math.max(0, Math.min(frames.textures.length - 1, index))]!;
+const frameOf = (frames: Frames, index: number) => must(frames.textures[clamp(index, 0, frames.textures.length - 1)], 'a frame');
 
 export async function createBattleScene(host: HTMLElement, callbacks: BattleSceneCallbacks): Promise<BattleSceneHandle> {
   TextureStyle.defaultOptions.scaleMode = 'nearest';
@@ -129,10 +168,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     const row0 = Math.floor(-view.stageY / 16);
     const rows = Math.ceil((view.height - view.stageY) / 16) - row0;
     const cols = Math.ceil(view.width / 16) + 1;
-    const corners = Array.from({ length: rows + 1 }, (_, r): Terrain[] => {
+    const corners = range(rows + 1).map((r): Terrain[] => {
       const row = row0 + r;
       const terrain: Terrain = row >= ROAD_ROWS.from && row <= ROAD_ROWS.to ? 'lower' : 'upper';
-      return Array.from({ length: cols + 1 }, () => terrain);
+      return range(cols + 1).map(() => terrain);
     });
     for (const tile of layGround(tileset, corners)) {
       const sprite = new Sprite(new Texture({ source: sheet.source, frame: new Rectangle(tile.box.x, tile.box.y, tile.box.width, tile.box.height) }));
@@ -157,7 +196,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     if (!entry) return;
     const ratio = window.devicePixelRatio;
     const css = entry.contentBoxSize[0];
-    const device = entry.devicePixelContentBoxSize?.[0];
+    // Safari has no devicePixelContentBoxSize, though the DOM types say every browser does.
+    const device = 'devicePixelContentBoxSize' in entry ? entry.devicePixelContentBoxSize[0] : undefined;
     const cssWidth = css?.inlineSize ?? entry.contentRect.width;
     const cssHeight = css?.blockSize ?? entry.contentRect.height;
     resize(device?.inlineSize ?? Math.round(cssWidth * ratio), device?.blockSize ?? Math.round(cssHeight * ratio), cssWidth, cssHeight);
@@ -170,6 +210,9 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   resize(Math.round(host.clientWidth * window.devicePixelRatio), Math.round(host.clientHeight * window.devicePixelRatio), host.clientWidth, host.clientHeight);
 
   const units = new Map<string, UnitView>();
+  const effects: EffectView[] = [];
+  /** The presentation clock, the wall clock times the speed: what an effect plays on. */
+  let shown = 0;
   let heroSets: ReadonlyMap<string, string> = new Map();
   /** The party running on from the left, the other side rushing on from the right, or neither. */
   let entering: 'party' | 'opponents' | null = null;
@@ -182,8 +225,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     const picture = new Sprite();
     const top = new Sprite();
     top.visible = false;
+    const weaponSprite = new Sprite();
+    weaponSprite.visible = false;
     const bar = new Graphics();
-    body.addChild(picture, top);
+    body.addChild(picture, top, weaponSprite);
     things.addChild(body, bar);
     const unitView: UnitView = {
       unit,
@@ -192,6 +237,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       body,
       picture,
       top,
+      weapon: null,
+      weaponSprite,
       bar,
       barShown: '',
       x: 0,
@@ -208,8 +255,56 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         if (!destroyed) unitView.art = art;
       });
     }
+    // The weapon by unit type for now; a hero's equipped weapon replaces this lookup (game.md, "Heroes").
+    const weapon = unit.kind === 'resource' ? undefined : WEAPON_SPRITES[unit.type as UnitType | MonsterType];
+    if (weapon) {
+      void loadWeaponArt(weapon).then((art) => {
+        if (!destroyed) unitView.weapon = art;
+      });
+    }
     units.set(unit.unitId, unitView);
     return unitView;
+  };
+
+  const removeEffect = (effect: EffectView) => {
+    effects.splice(effects.indexOf(effect), 1);
+    effect.sprite.destroy();
+  };
+
+  /** Starts an ability's effect on the unit its action landed on. */
+  const addEffect = (set: string, target: UnitView, mirrored: boolean) => {
+    const sprite = new Sprite();
+    sprite.visible = false;
+    things.addChild(sprite);
+    const effect: EffectView = { art: null, target, mirrored, at: shown, sprite };
+    effects.push(effect);
+    void loadEffectArt(set).then((art) => {
+      if (!destroyed) effect.art = art;
+    });
+  };
+
+  /** Shows each effect's frame on its target's feet, and lets go of those over. */
+  const drawEffects = () => {
+    for (const effect of [...effects]) {
+      const { art, target, sprite } = effect;
+      if (!units.has(target.unit.unitId)) {
+        removeEffect(effect);
+        continue;
+      }
+      if (!art) continue;
+      const index = effectFrameAt(art.layout, shown - effect.at);
+      if (index === null) {
+        removeEffect(effect);
+        continue;
+      }
+      sprite.visible = index >= 0;
+      if (index < 0) continue;
+      const { offset } = art.layout;
+      sprite.texture = must(art.frames[index], `frame ${index} of the effect`);
+      sprite.scale.set(effect.mirrored ? -1 : 1, 1);
+      sprite.position.set(Math.round(target.x) + (effect.mirrored ? -offset.x : offset.x), Math.round(target.y) + offset.y);
+      sprite.zIndex = target.y + 0.4;
+    }
   };
 
   const removeUnit = (id: string) => {
@@ -274,8 +369,20 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     picture.pivot.set(texture.width / 2, frames.foot + 1 - cut);
   };
 
+  /** The weapon in hand at the act's frame, its grip on the hand, or none outside an act. */
+  const drawWeapon = (unitView: UnitView, simTime: number) => {
+    const { weapon, weaponSprite, act } = unitView;
+    const index = weapon && act && unitView.downAt === null ? heldFrame(simTime, act, weapon.holdFrame, weapon.swing.length, ACT_MS) : null;
+    weaponSprite.visible = index !== null;
+    if (index === null || !weapon) return;
+    const grip = must(weapon.grips[index], `grip ${index} of the weapon`);
+    weaponSprite.texture = must(weapon.swing[index], `frame ${index} of the weapon`);
+    weaponSprite.position.set(HAND.x - grip.x, HAND.y - grip.y);
+  };
+
   const draw = (unitView: UnitView, simTime: number, moving: boolean, rushing: boolean, mirrored: boolean) => {
     const art = unitView.art;
+    drawWeapon(unitView, simTime);
     if (!art) return;
     if (unitView.downAt !== null) {
       const last = art.down.textures.length - 1;
@@ -284,19 +391,19 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       show(unitView, art.down, index, mirrored, last > 0 ? 1 - index / last : null);
       // A fallen monster or a felled tree lies a moment, then fades away; a fallen hero stays down.
       if (unitView.unit.kind !== 'hero') {
-        unitView.body.alpha = Math.max(0, Math.min(1, 1 - (since - last * DOWN_MS - FADE_AFTER_MS) / FADE_MS));
+        unitView.body.alpha = clamp(1 - (since - last * DOWN_MS - FADE_AFTER_MS) / FADE_MS, 0, 1);
       }
       return;
     }
     const act = unitView.act;
     if (act) {
-      const hold = art.actHold;
-      const index = simTime < act.resolve ? Math.min(hold, Math.floor((simTime - act.from) / ACT_MS)) : hold + 1 + Math.floor((simTime - act.resolve) / ACT_MS);
-      if (index < art.act.textures.length) {
+      const index = heldFrame(simTime, act, art.actHold, art.act.textures.length, ACT_MS);
+      if (index !== null) {
         show(unitView, art.act, index, mirrored);
         return;
       }
       unitView.act = null;
+      unitView.weaponSprite.visible = false;
     }
     if (unitView.hitAt !== null) {
       const index = Math.floor((unitView.clock - unitView.hitAt) / HIT_MS);
@@ -315,16 +422,17 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   return {
     reset(field, sets, enter) {
       heroSets = sets;
+      for (const effect of [...effects]) removeEffect(effect);
       for (const id of [...units.keys()]) removeUnit(id);
       scroll = 0;
       offset = 0;
       sync(field);
       const at = targets(field);
       // Running on, the party keeps its order and starts with its front hero just beyond the window's left edge.
-      const front = Math.max(...field.party.map((u) => at.get(u.unitId)!.x));
+      const front = Math.max(...field.party.map((u) => must(at.get(u.unitId), `the spot of ${u.unitId}`).x));
       const runOn = front + view.stageX + 16;
       for (const unitView of units.values()) {
-        const spot = at.get(unitView.unit.unitId)!;
+        const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
         unitView.y = spot.y;
         unitView.x = enter && !unitView.opponent ? spot.x - runOn : spot.x;
         if (unitView.unit.health <= 0) unitView.downAt = -Infinity;
@@ -349,10 +457,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       sync(field);
       if (beginning) {
         const at = targets(field);
-        const fresh = field.opponents.map((u) => units.get(u.unitId)!).filter((v) => !v.behind);
-        offset = entryOffset(fresh.map((v) => at.get(v.unit.unitId)!.x));
+        const fresh = field.opponents.map((u) => must(units.get(u.unitId), `the view of ${u.unitId}`)).filter((v) => !v.behind);
+        offset = entryOffset(fresh.map((v) => must(at.get(v.unit.unitId), `the spot of ${v.unit.unitId}`).x));
         for (const unitView of fresh) {
-          const spot = at.get(unitView.unit.unitId)!;
+          const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
           unitView.x = spot.x + offset;
           unitView.y = spot.y;
         }
@@ -363,10 +471,17 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           const unitView = units.get(event.unitId);
           if (unitView) unitView.act = { from: event.timestamp, resolve: event.resolveTimestamp };
         } else if (event.kind === 'action-resolved') {
+          const set = ABILITY_EFFECTS[event.abilityId as AbilityId];
+          const actor = units.get(event.unitId);
           for (const effect of event.effects) {
             if (effect.kind === 'damage' || effect.kind === 'harvest') {
               const target = units.get(effect.targetId);
               if (target && effect.newHealth > 0) target.hitAt = target.clock;
+            }
+            // The effect lands on whoever the action reached: a guard that took a hit, not the ally it covered.
+            if (set && effect.kind !== 'move') {
+              const target = units.get(effect.targetId);
+              if (target) addEffect(set, target, actor?.opponent ?? false);
             }
           }
         } else if (event.kind === 'unit-down') {
@@ -377,6 +492,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     },
 
     frame(ms, simTime, field) {
+      shown += ms;
       const at = targets(field);
       const travelling = entering === null && field.outcome === null && field.stageKind === 'travel';
       const retreating = field.outcome === 'retreat';
@@ -407,9 +523,9 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           drawBar(unitView);
           continue;
         }
-        const spot = at.get(unitView.unit.unitId)!;
+        const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
         let moving = false;
-        let rushing = false;
+        let rushing: boolean;
         let mirrored = unitView.opponent;
         if (unitView.opponent && entering === 'opponents') {
           unitView.x = spot.x + offset;
@@ -447,6 +563,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         draw(unitView, simTime, moving, rushing, mirrored);
         drawBar(unitView);
       }
+
+      drawEffects();
 
       if ((entering === 'party' && partyOn) || (entering === 'opponents' && offset <= 0)) {
         entering = null;

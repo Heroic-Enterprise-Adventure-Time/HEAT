@@ -26,7 +26,12 @@ function setup(loaded: PlayerView | null, version = 'v1') {
       { provide: Api, useValue: api },
       { provide: Game, useValue: game },
       { provide: Config, useValue: { value: signal({ version }) } },
-      { provide: RELOAD, useValue: () => void reloads.count++ },
+      {
+        provide: RELOAD,
+        useValue: () => {
+          reloads.count++;
+        },
+      },
     ],
   });
   TestBed.inject(Updates);
@@ -35,7 +40,7 @@ function setup(loaded: PlayerView | null, version = 'v1') {
 }
 
 describe('Updates', () => {
-  beforeEach(() => sessionStorage.clear());
+  beforeEach(() => { sessionStorage.clear(); });
 
   it('reloads at once when the hub says the client is outdated and no adventure is open', () => {
     const { api, reloads } = setup(player(null));

@@ -9,6 +9,7 @@
  * and did not build it.
  */
 
+import { sortBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 import { CombatEngine, type BattleOutcome, type BattleSetup, type OverrideLogEntry, type PlayerOverride } from "../../src/index.js";
 import { hero, opponent, setup } from "./helpers.js";
@@ -22,7 +23,7 @@ interface Click {
 /** The browser: a frame at a time, stepping every event that is due, clicks between frames. */
 function playLive(battle: BattleSetup, clicks: readonly Click[], frameMs = 16): BattleOutcome {
   const engine = new CombatEngine(battle);
-  const pending = [...clicks].sort((a, b) => a.atWallMs - b.atWallMs);
+  const pending = sortBy(clicks, ["atWallMs"]);
   let wall = 0;
   while (!engine.isComplete()) {
     while (pending[0] && pending[0].atWallMs <= wall) {

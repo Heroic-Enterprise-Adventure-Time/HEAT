@@ -1,12 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { GraphQLError } from "graphql";
 import { beforeAll, describe, expect, it } from "vitest";
-import { JOBS, LEVEL_XP, levelForXp, replay, warehouseCapacity, type AdventureTimeline, type UnitType } from "@heat/engine";
+import { JOBS, LEVEL_XP, levelForXp, replay, warehouseCapacity, must, type AdventureTimeline, type UnitType } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { locationKeys, playerKeys } from "../src/db/keys.js";
 import { Repository, type Hero, type Settlement } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
+import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, EngineUpdated } from "../src/refusals.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
@@ -66,15 +67,6 @@ async function start(p: string, heroes: Hero[], issuedBy = version) {
   return startAdventure(repo, p, issuedBy, at, wolves.id, heroes.map((h) => h.id));
 }
 
-async function refusal(promise: Promise<unknown>): Promise<Record<string, unknown> | undefined> {
-  try {
-    await promise;
-  } catch (e) {
-    if (e instanceof GraphQLError) return e.extensions;
-    throw e;
-  }
-  return undefined;
-}
 
 async function item(table: string, key: Record<string, string>) {
   return (await db.send(new GetCommand({ TableName: table, Key: key }))).Item;
@@ -116,7 +108,7 @@ describe("a party that completes the job", () => {
     }
     expect(settled.result?.heroes.map((h) => [h.xpGained, h.level, h.dead])).toEqual(heroes.map(() => [wolves.xp, level, false]));
 
-    const stored = JSON.parse(timelines.objects.get(started.adventureId)!) as AdventureTimeline;
+    const stored = JSON.parse(must(timelines.objects.get(started.adventureId), "the stored timeline")) as AdventureTimeline;
     expect(stored).toEqual(JSON.parse(JSON.stringify(replay(started.snapshot, started.seed, []).timeline)));
     expect(stored.version).toBe(version);
   });
@@ -194,28 +186,30 @@ describe("the warehouse's cap", () => {
 describe("a death", () => {
   it("sets the hero dead, counts it out of the living, deletes its sighting and credits nothing", async () => {
     const p = player();
-    const [villager] = await putParty(p, ["villager"]);
-    const started = await start(p, [villager!]);
-    expect(replay(started.snapshot, started.seed, []).result.dead).toEqual([villager!.id]);
+    const villager = must((await putParty(p, ["villager"]))[0], "the villager");
+    const started = await start(p, [villager]);
+    expect(replay(started.snapshot, started.seed, []).result.dead).toEqual([villager.id]);
 
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(settled.result?.outcome).toBe("defeat");
     expect(settled.result?.credited).toEqual([]);
-    expect(settled.result?.heroes).toEqual([expect.objectContaining({ heroId: villager!.id, dead: true, xpGained: 0, health: 0 })]);
-    expect(await repo.getHero(p, villager!.id)).toMatchObject({ status: "DEAD", xp: 0, level: 1, adventureId: null });
+    expect(settled.result?.heroes).toEqual([expect.objectContaining({ heroId: villager.id, dead: true, xpGained: 0, health: 0 })]);
+    expect(await repo.getHero(p, villager.id)).toMatchObject({ status: "DEAD", xp: 0, level: 1, adventureId: null });
     expect(await repo.camp(p, at)).toMatchObject({ livingHeroes: 0, activeHeroes: 1 });
-    expect(await item(tables.location, locationKeys.seen(at, villager!.id))).toBeUndefined();
+    expect(await item(tables.location, locationKeys.seen(at, villager.id))).toBeUndefined();
     expect(await repo.holdings(p, at)).toEqual([]);
   });
 });
 
 describe("what verifies an adventure", () => {
-  it("refuses another version with ENGINE_UPDATED and this deploy's version, writing nothing", async () => {
+  it("refuses another version with EngineUpdated and this deploy's version, writing nothing", async () => {
     const p = player();
     const heroes = await putParty(p, ["fighter", "villager"]);
     const started = await start(p, heroes, previous);
     const timelines = new MemoryTimelines();
-    expect(await refusal(submitAdventure(repo, timelines, p, version, started.adventureId, []))).toEqual({ code: "ENGINE_UPDATED", version });
+    const refused = await refusal(submitAdventure(repo, timelines, p, version, started.adventureId, []));
+    expect(refused).toBeInstanceOf(EngineUpdated);
+    expect(refused).toMatchObject({ version });
     expect(timelines.objects.size).toBe(0);
     expect((await repo.getAdventure(started.adventureId))?.status).toBe("OPEN");
   });
@@ -223,14 +217,14 @@ describe("what verifies an adventure", () => {
   it("refuses another player's adventure as if it did not exist", async () => {
     const p = player();
     const started = await start(p, await putParty(p, ["villager"]));
-    expect((await refusal(submitAdventure(repo, new MemoryTimelines(), player(), version, started.adventureId, [])))?.["code"]).toBe("NO_SUCH_ADVENTURE");
+    expect(await refusal(submitAdventure(repo, new MemoryTimelines(), player(), version, started.adventureId, []))).toMatchObject(BAD_USER_INPUT);
   });
 
   it("refuses a log entry for a unit outside the party", async () => {
     const p = player();
     const started = await start(p, await putParty(p, ["villager"]));
     const log = [{ kind: "UNIT" as const, acceptedAtSimTime: 5000, unitId: "s1-wolf-1", abilityId: "bite" }];
-    expect((await refusal(submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, log)))?.["code"]).toBe("BAD_USER_INPUT");
+    expect(await refusal(submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, log))).toMatchObject(BAD_USER_INPUT);
   });
 
   it("settles with the timeline already stored, so the record and the replay agree", async () => {
@@ -259,10 +253,9 @@ describe("discard", () => {
     for (const issuedBy of [version, previous]) {
       const p = player();
       const started = await start(p, await putParty(p, ["villager"]), issuedBy);
-      expect(await refusal(discardAdventure(repo, p, { current: version, previous }, started.adventureId))).toEqual({
-        code: "ADVENTURE_VERIFIABLE",
-        version: issuedBy,
-      });
+      const refused = await refusal(discardAdventure(repo, p, { current: version, previous }, started.adventureId));
+      expect(refused).toBeInstanceOf(AdventureVerifiable);
+      expect(refused).toMatchObject({ version: issuedBy });
       expect((await repo.getAdventure(started.adventureId))?.status).toBe("OPEN");
     }
   });
@@ -280,7 +273,7 @@ describe("discard", () => {
     expect(await repo.holdings(p, at)).toEqual([]);
 
     expect((await discardAdventure(repo, p, versions, started.adventureId)).discardedAt).toBe(discarded.discardedAt);
-    expect((await refusal(submitAdventure(repo, new MemoryTimelines(), p, "0".repeat(40), started.adventureId, [])))?.["code"]).toBe("ADVENTURE_DISCARDED");
+    expect(await refusal(submitAdventure(repo, new MemoryTimelines(), p, "0".repeat(40), started.adventureId, []))).toBeInstanceOf(AdventureDiscarded);
     // The party can set out again.
     expect((await start(p, heroes)).status).toBe("OPEN");
   });
@@ -289,14 +282,14 @@ describe("discard", () => {
     const p = player();
     const started = await start(p, await putParty(p, ["fighter", "villager"]));
     await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
-    expect((await refusal(discardAdventure(repo, p, { current: "1".repeat(40), previous: undefined }, started.adventureId)))?.["code"]).toBe("ADVENTURE_SETTLED");
+    expect(await refusal(discardAdventure(repo, p, { current: "1".repeat(40), previous: undefined }, started.adventureId))).toBeInstanceOf(AdventureSettled);
   });
 });
 
 describe("the level table", () => {
   it("raises a level at each threshold and never past the last", () => {
     expect(levelForXp(0)).toBe(1);
-    expect(levelForXp(LEVEL_XP[1]!)).toBe(2);
+    expect(levelForXp(must(LEVEL_XP[1], "the second level's threshold"))).toBe(2);
     expect(levelForXp(1_000_000)).toBe(LEVEL_XP.length);
   });
 });

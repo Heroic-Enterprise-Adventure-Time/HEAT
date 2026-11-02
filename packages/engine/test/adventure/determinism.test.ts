@@ -5,6 +5,7 @@
  * verifies it, give the same timeline and result.
  */
 
+import { sortBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 import { AdventureEngine, replay, type AdventureSnapshot, type PartyOrder, type PlayerOverride } from "../../src/index.js";
 import { hero, snapshot, TIMBER, WOLVES } from "./helpers.js";
@@ -16,7 +17,7 @@ type Click =
 /** The browser: a frame at a time, stepping every event that is due, clicks between frames. */
 function playLive(snap: AdventureSnapshot, seed: string, clicks: readonly Click[], frameMs = 16) {
   const engine = new AdventureEngine(snap, seed);
-  const pending = [...clicks].sort((a, b) => a.atWallMs - b.atWallMs);
+  const pending = sortBy(clicks, ["atWallMs"]);
   let wall = 0;
   while (!engine.isComplete()) {
     while (pending[0] && pending[0].atWallMs <= wall) {

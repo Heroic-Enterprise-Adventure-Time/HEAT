@@ -7,6 +7,7 @@ import {
   type PartyOrder,
 } from '@heat/engine';
 import { isEntry } from './field';
+import { sortBy } from 'es-toolkit';
 
 /**
  * What the page plays: a run of the engine, or a stored timeline replayed
@@ -98,7 +99,7 @@ export class AdventureRun implements Run {
   }
 
   private resume(saved: readonly AdventureLogEntry[], simTime: number): void {
-    const log = [...saved].sort((a, b) => a.acceptedAtSimTime - b.acceptedAtSimTime);
+    const log = sortBy(saved, ['acceptedAtSimTime']);
     let i = 0;
     while (!this.engine.isComplete() && this.engine.getNextEventTime() <= simTime) {
       for (let entry = log[i]; entry && entry.acceptedAtSimTime <= this.engine.getNextEventTime(); entry = log[++i]) {
@@ -156,10 +157,10 @@ export class TimelineRun implements Run {
   advanceTo(simTime: number): readonly AdventureEvent[] {
     const { events } = this.timeline;
     const from = this.next;
-    while (this.next < events.length && events[this.next]!.timestamp <= simTime) {
-      const event = events[this.next++]!;
+    for (let event = events[this.next]; event && event.timestamp <= simTime; event = events[this.next]) {
+      this.next++;
       if (isEntry(event)) {
-        while (this.next < events.length && events[this.next]!.timestamp === event.timestamp) this.next++;
+        while (events[this.next]?.timestamp === event.timestamp) this.next++;
         this.time = event.timestamp;
         return events.slice(from, this.next);
       }

@@ -1,0 +1,96 @@
+{
+  "set": "ore-vein-01",
+  "kind": "prop sprite set",
+  "props": ["ore-vein"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "objectId": "e98df0be-3e55-476f-bae2-8cfb0534c18f",
+    "name": "Ore vein 01",
+    "tags": ["heat", "prop", "ore-vein"]
+  },
+  "object": {
+    "tool": "create_map_object",
+    "via": "MCP",
+    "createdAt": "2026-10-23T07:10Z",
+    "parameters": {
+      "description": "low mound of grey stone with thick seams of rusty orange iron ore running through it, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "view": "low top-down",
+      "outline": "single color outline",
+      "shading": "flat shading",
+      "detail": "low detail"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "standing": {
+      "file": "standing.png",
+      "canvas": [48, 48],
+      "from": "the object's one rotation"
+    }
+  },
+  "animations": {
+    "hit": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "0f27e752-d0fd-4607-abf3-230144c105a9",
+      "animationDescription": "the stone mound shudders slightly from a pick blow and settles still, the rocks staying in place, no particles, no effects",
+      "frameCount": 6,
+      "frames": 7,
+      "canvas": [48, 48],
+      "files": "hit-<0..6>.png",
+      "generations": 4
+    },
+    "down": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "39c32e66-09d5-4d13-8408-abf3efc08b8a",
+      "animationDescription": "the stone mound slowly settles and sinks down into a low flat scatter of broken grey rubble on the ground, the stones keeping their grey colour, no flash, no particles, no effects",
+      "frameCount": 8,
+      "frames": 9,
+      "canvas": [48, 48],
+      "endFrame": {
+        "objectId": "85d538d4-ccf8-4f54-8a60-7ec5efb20de3",
+        "stateName": "rubble",
+        "editDescription": "the mound has been mined away: only a low flat scatter of broken grey stone rubble remains on the ground, with no orange ore left; empty transparent space above it",
+        "generations": 4
+      },
+      "heldLast": true,
+      "files": "down-<0..8>.png",
+      "generations": 4
+    }
+  },
+  "animationGenerations": 12,
+  "rejected": [
+    {
+      "name": "boulder",
+      "objectId": "4cf55ac8-4a5d-4040-a042-ea3a1180c498",
+      "description": "boulder of dark stone with chunks of copper-brown ore embedded in it, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "why": "The first set drawn, kept in the first commit of Issue-133 with its rubble state f01825ec-056a-4b5e-9128-eeb52420884c, hit and down; re-rolled on the owner's word for candidate A of three."
+    },
+    {
+      "name": "spire",
+      "objectId": "d6d39a81-65eb-4581-bb64-cefdd74eb362",
+      "description": "grey rock outcrop with veins of rusty orange iron ore showing through cracks, black outline, warm earthy tones, NES-era retro pixel art, few colors"
+    },
+    {
+      "name": "candidate B, rock cluster",
+      "objectId": "5095f9e3-a599-4be4-a221-3a8564b9dd42",
+      "description": "cluster of brown and grey rocks with glinting copper ore nuggets on top, black outline, warm earthy tones, NES-era retro pixel art, few colors"
+    },
+    {
+      "name": "candidate C, sandy outcrop",
+      "objectId": "f31c8641-9671-4cd4-95b9-da7d7ad4b2bb",
+      "description": "jagged rock outcrop of sandy brown stone with veins of dark red iron ore streaked across its face, black outline, warm earthy tones, NES-era retro pixel art, few colors"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-10-23."
+}

@@ -27,7 +27,8 @@ export const signedIn: CanActivateFn = (_route, state) => {
  * path, `/camp/<location>/<facility>` or `/camp/<location>/heroes-hall/heroes/<id>`,
  * so a hero's card sits under the hall; another player's hero seen about the
  * camp is `/camp/<location>/seen/<id>`, under no facility. A job's detail
- * sits under the job board, `/camp/<location>/job-board/jobs/<id>`, and the
+ * sits under the job board, `/camp/<location>/job-board/jobs/<id>`, or under
+ * the facility that posts it, `/camp/<location>/mine/jobs/<id>` (Issue-133), and the
  * open adventure is `/adventure`, outside any camp (Issue-115). Anything else
  * goes home, which sends a signed-in player on to their camp.
  */
@@ -45,6 +46,7 @@ export const routes: Routes = [
       { path: 'job-board/jobs/:job', component: JobPanel },
       { path: 'seen/:hero', component: SeenHeroCard },
       { path: ':facility', component: FacilityPanel },
+      { path: ':facility/jobs/:job', component: JobPanel },
     ],
   },
   // Loaded on first use, so the engine that plays it is a chunk of its own (Issue-15).

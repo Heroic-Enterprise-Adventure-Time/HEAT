@@ -12,13 +12,20 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run build --workspace @heat/engine && npm run test --workspaces --if-present",
     "typecheck": "npm run build --workspace @heat/engine && npm run typecheck --workspaces --if-present",
+    "lint": "npm run build --workspace @heat/engine && eslint .",
     "bundle": "npm run build --workspace @heat/engine && node scripts/bundle.mjs",
     "schema:print": "npm run schema:print --workspace @heat/hub"
   },
   "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@graphql-eslint/eslint-plugin": "4.4.2",
     "@types/node": "24.19.2",
+    "angular-eslint": "22.6.0",
     "esbuild": "0.28.2",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
     "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
     "vitest": "5.0.5"
   },
   "allowScripts": {

@@ -1,5 +1,6 @@
+import { range } from 'es-toolkit';
 import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
-import type { FacilityKind } from '@heat/engine';
+import { facilityArtLevel, must, type FacilityKind } from '@heat/engine';
 import { layGround, type TilesetJson } from './ground';
 import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
 import { lowestOpaqueRow } from '../../pixel-art';
@@ -33,6 +34,8 @@ export interface SceneCallbacks {
 export interface CampSceneHandle {
   /** Shows these heroes: `arriving` walks out of the hall, `leaving`, no longer listed, walks back in. */
   setHeroes(heroes: readonly SceneHero[], arriving?: string, leaving?: string): void;
+  /** Shows each facility at its level, swapping its picture in place when a build changes it (Issue-93). */
+  setLevels(levels: Readonly<Partial<Record<FacilityKind, number>>>): void;
   destroy(): void;
 }
 
@@ -71,11 +74,11 @@ function loadHeroFrames(set: string): Promise<HeroFrames> {
         await Promise.all(
           WALK_DIRECTIONS.map(async (d) => [
             d,
-            await Promise.all(Array.from({ length: WALK_FRAMES }, (_, i) => Assets.load<Texture>(`${base}/walk-${d}-${i}.png`))),
+            await Promise.all(range(WALK_FRAMES).map((i) => Assets.load<Texture>(`${base}/walk-${d}-${i}.png`))),
           ] as const),
         ),
       ) as Record<WalkDirection, Texture[]>;
-      const walkFoot = Object.fromEntries(WALK_DIRECTIONS.map((d) => [d, lowestOpaqueRow(walk[d][0]!)])) as Record<WalkDirection, number>;
+      const walkFoot = Object.fromEntries(WALK_DIRECTIONS.map((d) => [d, lowestOpaqueRow(must(walk[d][0], `the first ${d} walk frame`))])) as Record<WalkDirection, number>;
       return { still, walk, stillFoot: lowestOpaqueRow(still.south), walkFoot };
     })();
     heroFrames.set(set, frames);
@@ -173,7 +176,8 @@ export async function createCampScene(
     if (!entry) return;
     const ratio = window.devicePixelRatio;
     const css = entry.contentBoxSize[0];
-    const device = entry.devicePixelContentBoxSize?.[0];
+    // Safari has no devicePixelContentBoxSize, though the DOM types say every browser does.
+    const device = 'devicePixelContentBoxSize' in entry ? entry.devicePixelContentBoxSize[0] : undefined;
     const cssWidth = css?.inlineSize ?? entry.contentRect.width;
     const cssHeight = css?.blockSize ?? entry.contentRect.height;
     box = {
@@ -205,21 +209,36 @@ export async function createCampScene(
   watchRatio();
   resize();
 
+  let destroyed = false;
+
+  // Each facility shows the picture of its level, or of the highest level
+  // below it that has one (assets.md, rule 17), standing by its base.
+  const facilities = new Map<FacilityKind, { sprite: Sprite; art: number }>();
+  const picture = async (kind: FacilityKind, level: number) => {
+    const art = facilityArtLevel(kind, level);
+    const shown = facilities.get(kind);
+    if (shown?.art === art) return;
+    const texture = await Assets.load<Texture>(`/art/facilities/${kind}/level-${art}.png`);
+    const now = facilities.get(kind);
+    if (!now || destroyed) return;
+    now.art = art;
+    now.sprite.texture = texture;
+    now.sprite.pivot.set(texture.width / 2, lowestOpaqueRow(texture) + 1);
+  };
   for (const spot of layout.facilities) {
-    const texture = await Assets.load<Texture>(`/art/facilities/${spot.kind}/level-${levels[spot.kind] ?? 1}.png`);
-    const sprite = new Sprite(texture);
-    sprite.pivot.set(texture.width / 2, lowestOpaqueRow(texture) + 1);
+    const sprite = new Sprite(Texture.EMPTY);
+    facilities.set(spot.kind, { sprite, art: -1 });
+    await picture(spot.kind, levels[spot.kind] ?? 1);
     sprite.position.set(spot.at.x, spot.at.y);
     sprite.zIndex = spot.at.y;
     // Every facility opens its panel, as its entry in the menu does (Issue-89).
     sprite.eventMode = 'static';
     sprite.cursor = 'pointer';
-    sprite.on('pointertap', () => callbacks.onFacility(spot.kind));
+    sprite.on('pointertap', () => { callbacks.onFacility(spot.kind); });
     things.addChild(sprite);
   }
 
   const heroes = new Map<string, HeroOnScreen>();
-  let destroyed = false;
 
   app.ticker.add((ticker) => {
     // A hero's size against the map, and its stroll in map pixels, which keeps
@@ -237,7 +256,7 @@ export async function createCampScene(
         hero.clockMs += ticker.deltaMS;
         const direction: WalkDirection = facing === 'west' ? 'east' : facing;
         const frame = Math.floor(hero.clockMs / WALK_FRAME_MS) % WALK_FRAMES;
-        show(hero.sprite, hero.frames.walk[direction][frame]!, hero.frames.walkFoot[direction], facing === 'west', size);
+        show(hero.sprite, must(hero.frames.walk[direction][frame], `walk frame ${frame}`), hero.frames.walkFoot[direction], facing === 'west', size);
       } else {
         hero.clockMs = 0;
         show(hero.sprite, hero.frames.still[facing], hero.frames.stillFoot, false, size);
@@ -249,6 +268,9 @@ export async function createCampScene(
   });
 
   return {
+    setLevels(levels) {
+      for (const kind of facilities.keys()) void picture(kind, levels[kind] ?? 1);
+    },
     setHeroes(list, arriving, leaving) {
       const wanted = new Set(list.map((h) => h.id));
       for (const [id, hero] of heroes) {
@@ -275,7 +297,7 @@ export async function createCampScene(
           const sprite = new Sprite(frames.still.south);
           sprite.eventMode = 'static';
           sprite.cursor = 'pointer';
-          sprite.on('pointertap', () => callbacks.onHero(h.id));
+          sprite.on('pointertap', () => { callbacks.onHero(h.id); });
           things.addChild(sprite);
           heroes.set(h.id, { sprite, walker, frames, clockMs: 0 });
         });

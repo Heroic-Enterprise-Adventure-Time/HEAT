@@ -1,27 +1,32 @@
 import { randomUUID } from "node:crypto";
-import { GraphQLError } from "graphql";
 import {
+  FACILITIES,
   JOBS,
   MAX_PARTY,
   UNIT_PROFILES,
   location,
   type AdventureSnapshot,
   type Job,
+  type Requirement,
   type SnapshotHero,
 } from "@heat/engine";
 import {
   AdventureAlreadyOpen,
+  FacilityMissing,
   HeroChanged,
   TransactionConflict,
+  campLevels,
   type AdventureRecord,
   type Hero,
   type Repository,
 } from "./db/repository.js";
+import { AdventureOpen, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires, badInput, type Refusal } from "./refusals.js";
 
 /**
- * Starting an adventure from a location's job board (overview, "The
- * adventure loop"; decision 0030). The client names the location, the job
- * and the party; the hub checks them, issues the seed and the frozen
+ * Starting an adventure from a location's job board, or from a facility the
+ * camp has built (overview, "The adventure loop"; decision 0030; Issue-133).
+ * The client names the location, the job and the party; the hub checks
+ * them, issues the seed and the frozen
  * snapshot of the party, stamped with the deploy's version, and opens the
  * player's one adventure.
  *
@@ -29,30 +34,31 @@ import {
  * read, to give the player a reason; and in the transaction's conditions,
  * which are what hold under concurrent requests. A start that loses a race
  * reads again and answers with the reason it finds.
+ *
+ * The refusals, answered as data (`refusals.ts`): AdventureOpen, Requires
+ * (the facility that posts the job, not built), HeroDead, HeroRetired,
+ * HeroNotHere and HeroAdventuring for a hero of the party, and Conflict. A
+ * location or job the hub does not know, a party of the wrong size or with
+ * a hero twice, or a hero that is not the player's is BAD_USER_INPUT.
  */
-
-function refuse(message: string, code: string, extensions: Record<string, unknown> = {}): never {
-  throw new GraphQLError(message, { extensions: { code, ...extensions } });
-}
 
 /** A second start answers with the adventure already open, which the client reads from `me`. */
 function refuseOpen(adventureId: string): never {
-  refuse("an adventure is already open", "ADVENTURE_OPEN", { adventureId });
+  throw new AdventureOpen("an adventure is already open", adventureId);
 }
 
-/** The job, if it is on the location's board: every job names the location that posts it. */
-export function jobOnBoard(locationId: string, jobId: string): Job | undefined {
+/** The job, if the location posts it, on its board or at one of its facilities: every job names the location. */
+export function jobAt(locationId: string, jobId: string): Job | undefined {
   const job = Object.hasOwn(JOBS, jobId) ? JOBS[jobId as keyof typeof JOBS] : undefined;
   return job?.location === locationId ? job : undefined;
 }
 
 /** Why a hero cannot set out from the location, or nothing if it can. */
-function heroRefusal(hero: Hero | undefined, locationId: string): [message: string, code: string] | undefined {
-  if (!hero) return ["not one of your heroes", "NOT_YOUR_HERO"];
-  if (hero.status === "DEAD") return [`${hero.name} is dead`, "HERO_DEAD"];
-  if (hero.status === "RETIRED") return [`${hero.name} has retired`, "HERO_RETIRED"];
-  if (hero.location !== locationId) return [`${hero.name} is not at this camp`, "HERO_NOT_HERE"];
-  if (hero.adventureId !== null) return [`${hero.name} is on an adventure`, "HERO_ADVENTURING"];
+function heroRefusal(hero: Hero, locationId: string): Refusal | undefined {
+  if (hero.status === "DEAD") return new HeroDead(`${hero.name} is dead`, hero.id);
+  if (hero.status === "RETIRED") return new HeroRetired(`${hero.name} has retired`, hero.id);
+  if (hero.location !== locationId) return new HeroNotHere(`${hero.name} is not at this camp`, hero.id);
+  if (hero.adventureId !== null) return new HeroAdventuring(`${hero.name} is on an adventure`, hero.id);
   return undefined;
 }
 
@@ -63,8 +69,8 @@ function heroRefusal(hero: Hero | undefined, locationId: string): [message: stri
  */
 function snapshotHero(hero: Hero): SnapshotHero {
   const profile = UNIT_PROFILES[hero.unitType];
-  // Only villagers can be recruited, and they have a profile; a unit type
-  // without one is content not built yet, not a player's mistake.
+  // Every unit type a location recruits has a profile; a unit type without
+  // one is content not built yet, not a player's mistake.
   if (!profile) throw new Error(`unit type ${hero.unitType} has no combat profile`);
   return {
     heroId: hero.id,
@@ -89,20 +95,46 @@ export async function startAdventure(
   if (open) refuseOpen(open.adventureId);
 
   const at = location(locationId);
-  if (!at) refuse(`no location ${locationId}`, "BAD_USER_INPUT");
-  const job = jobOnBoard(at.id, jobId);
-  if (!job) refuse(`${at.name}'s job board has no job ${jobId}`, "NO_SUCH_JOB");
-  if (heroIds.length < 1 || heroIds.length > MAX_PARTY) refuse(`a party is 1 to ${MAX_PARTY} heroes`, "PARTY_SIZE");
+  if (!at) badInput(`no location ${locationId}`);
+  const job = jobAt(at.id, jobId);
+  if (!job) badInput(`${at.name} has no job ${jobId}`);
+
+  // A facility's job needs the facility built (game.md, "Locations and camps").
+  const needs: Requirement[] = job.facility ? [{ kind: job.facility, level: 1 }] : [];
+  const checkFacilities = async (): Promise<void> => {
+    if (needs.length === 0) return;
+    const levels = campLevels(await repo.camp(playerId, at.id));
+    const missing = needs.filter((r) => (levels[r.kind] ?? 0) < r.level);
+    if (missing.length === 0) return;
+    const words = missing.map((r) => `a level ${r.level} ${FACILITIES[r.kind].name.toLowerCase()}`).join(" and ");
+    throw new Requires(`${job.name} needs ${words} first`, missing);
+  };
+  await checkFacilities();
+
+  if (heroIds.length < 1 || heroIds.length > MAX_PARTY) badInput(`a party is 1 to ${MAX_PARTY} heroes`);
   const ids = heroIds.map((id) => id.toLowerCase());
-  if (new Set(ids).size !== ids.length) refuse("a hero is in the party twice", "BAD_USER_INPUT");
+  if (new Set(ids).size !== ids.length) badInput("a hero is in the party twice");
 
   const checkParty = async (): Promise<Hero[]> => {
     const heroes = await Promise.all(ids.map((id) => repo.getHero(playerId, id)));
+    const party: Hero[] = [];
     for (const hero of heroes) {
+      // Another player's hero is not said to exist.
+      if (!hero) badInput("not one of your heroes");
       const refusal = heroRefusal(hero, at.id);
-      if (refusal) refuse(...refusal);
+      if (!refusal) {
+        party.push(hero);
+        continue;
+      }
+      // A hero on an adventure means the player's one adventure is open: a
+      // start that read none before another committed says which it is.
+      if (refusal instanceof HeroAdventuring) {
+        const winner = await repo.openAdventure(playerId);
+        if (winner) refuseOpen(winner.adventureId);
+      }
+      throw refusal;
     }
-    return heroes as Hero[];
+    return party;
   };
   const heroes = await checkParty();
 
@@ -116,13 +148,14 @@ export async function startAdventure(
       snapshot,
       version,
       startedAt: now.toISOString(),
-    });
+    }, needs);
   } catch (e) {
-    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof TransactionConflict)) throw e;
+    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof FacilityMissing || e instanceof TransactionConflict)) throw e;
     // Another request got there first: answer with what it changed.
     const winner = await repo.openAdventure(playerId);
     if (winner) refuseOpen(winner.adventureId);
     await checkParty();
-    refuse("the party changed while starting; no adventure was started", "CONFLICT");
+    await checkFacilities();
+    throw new Conflict("the party changed while starting; no adventure was started");
   }
 }

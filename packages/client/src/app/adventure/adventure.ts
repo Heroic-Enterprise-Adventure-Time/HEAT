@@ -1,8 +1,9 @@
 import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Router } from '@angular/router';
-import { ABILITIES, JOBS, UNIT_PROFILES, location, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
+import { ABILITIES, JOBS, UNIT_PROFILES, location, must, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
 import { Game, type AdventureResultView } from '../game';
+import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
@@ -25,7 +26,7 @@ export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.adventure.frames',
       last = now;
       id = requestAnimationFrame(frame);
     });
-    return () => cancelAnimationFrame(id);
+    return () => { cancelAnimationFrame(id); };
   },
 });
 
@@ -79,18 +80,20 @@ export class Adventure {
   protected readonly game = inject(Game);
   protected readonly play = inject(Play);
   private readonly router = inject(Router);
+  private readonly createScene = inject(BATTLE_SCENE_FACTORY);
+  private readonly readSizes = inject(LAYOUT_SIZES);
   protected readonly speeds = SPEEDS;
   protected readonly endings = ENDINGS;
   protected readonly outcomes = OUTCOMES;
 
-  private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
-  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height));
+  /** The window and the regions' sizes, measured together, since a font-size change moves both. */
+  private readonly viewport = signal(this.measured());
+  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height, this.viewport().sizes));
   /** Stacked, the stage's box is the page's width by the stage's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() =>
     this.side() ? null : stackedBattleHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
   );
   private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
-  private readonly createScene = inject(BATTLE_SCENE_FACTORY);
   private scene: BattleSceneHandle | null = null;
   /** Set once the scene has loaded, or failed to, and the run may start. */
   private readonly sceneReady = signal(false);
@@ -127,7 +130,7 @@ export class Adventure {
       untracked(() => {
         this.startedId = adventure.id;
         this.play.start(adventure);
-        this.scene?.reset(this.play.field()!, new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
+        this.scene?.reset(must(this.play.field(), 'the field'), new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
       });
     });
     effect(() => {
@@ -141,7 +144,7 @@ export class Adventure {
     let destroyed = false;
     afterNextRender(() => {
       void this.mount().then(() => {
-        if (!destroyed) destroyRef.onDestroy(frames((ms) => this.frame(ms)));
+        if (!destroyed) destroyRef.onDestroy(frames((ms) => { this.frame(ms); }));
       });
     });
     destroyRef.onDestroy(() => {
@@ -151,13 +154,17 @@ export class Adventure {
   }
 
   protected measure(): void {
-    this.viewport.set({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
+    this.viewport.set(this.measured());
+  }
+
+  private measured() {
+    return { width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio, sizes: this.readSizes() };
   }
 
   /** Loads the scene; without one, as where WebGL is missing, the run plays with the controls alone. */
   private async mount(): Promise<void> {
     try {
-      this.scene = await this.createScene(this.box().nativeElement, { onEntered: () => this.play.entered() });
+      this.scene = await this.createScene(this.box().nativeElement, { onEntered: () => { this.play.entered(); } });
       this.play.holdEntries = true;
     } catch {
       this.scene = null;
@@ -186,7 +193,7 @@ export class Adventure {
     }
     this.replayState.set('idle');
     this.play.replay(timeline);
-    this.scene?.reset(this.play.field()!, new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
+    this.scene?.reset(must(this.play.field(), 'the field'), new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */

@@ -1,12 +1,13 @@
-import { JOBS, MONSTERS, RESOURCE_NODES, type Job, type Stage } from '@heat/engine';
+import { MONSTERS, RESOURCE_NODES, jobsPostedBy, type FacilityKind, type Job, type Stage } from '@heat/engine';
+import { uniq } from 'es-toolkit';
 
-/** The jobs a location's job board posts, in the content's order. */
-export function jobsAt(location: string): Job[] {
-  return Object.values(JOBS).filter((job) => job.location === location);
+/** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133). */
+export function jobsAt(location: string, poster: FacilityKind): Job[] {
+  return jobsPostedBy(location, poster);
 }
 
-export function jobAt(location: string, id: string | null | undefined): Job | undefined {
-  return jobsAt(location).find((job) => job.id === id);
+export function jobAt(location: string, poster: FacilityKind, id: string | null | undefined): Job | undefined {
+  return jobsAt(location, poster).find((job) => job.id === id);
 }
 
 /** "a wolf", "2 wolves", "3 trees", "2 ore veins". */
@@ -18,7 +19,7 @@ function count(n: number, name: string): string {
 
 /** The materials a gather stage yields, from its nodes, in order and once each. */
 function gathered(stage: Extract<Stage, { kind: 'gather' }>): string[] {
-  return [...new Set(stage.nodes.map((n) => RESOURCE_NODES[n.type].material))];
+  return uniq(stage.nodes.map((n) => RESOURCE_NODES[n.type].material));
 }
 
 /**
@@ -48,7 +49,13 @@ export interface Credit {
 
 export function credits(job: Job): Credit[] {
   const byMaterial = new Map<string, { pay: number; cargo: number }>();
-  const entry = (material: string) => byMaterial.get(material) ?? byMaterial.set(material, { pay: 0, cargo: 0 }).get(material)!;
+  const entry = (material: string) => {
+    const found = byMaterial.get(material);
+    if (found) return found;
+    const fresh = { pay: 0, cargo: 0 };
+    byMaterial.set(material, fresh);
+    return fresh;
+  };
   for (const reward of job.pay) entry(reward.material).pay += reward.amount;
   for (const stage of job.stages) {
     if (stage.kind !== 'gather') continue;
@@ -66,18 +73,22 @@ export function creditWords(credit: Credit): string {
   return `${parts.join(' and ')} ${credit.material}`;
 }
 
-/** The pay alone, for the board's list: "pays 10 cloth". */
-export function payWords(job: Job): string {
-  return job.pay.length === 0 ? 'no pay' : `pays ${job.pay.map((r) => `${r.amount} ${r.material}`).join(' and ')}`;
+/**
+ * What a job brings home, its pay and its cargo, for the board's list:
+ * "10 cloth", "up to 40 timber", "3 cloth and up to 60 timber". A job with
+ * no pay still brings home what it gathers (decision 0031).
+ */
+export function yieldWords(job: Job): string {
+  const words = credits(job).map(creditWords);
+  return words.length === 0 ? 'nothing to bring home' : words.join(' and ');
 }
 
 /** A job's retreat penalty in words: "A retreat forfeits the pay, keeps the timber gathered, and earns half the XP." */
 export function retreatWords(job: Job): string {
-  const parts = [job.retreat.keepsPay ? 'keeps the pay' : 'forfeits the pay'];
-  const cargo = [...new Set(job.stages.flatMap((s) => (s.kind === 'gather' ? gathered(s) : [])))];
-  if (cargo.length > 0) parts.push(`${job.retreat.keepsCargo ? 'keeps' : 'abandons'} the ${cargo.join(' and ')} gathered`);
+  const pay = job.retreat.keepsPay ? 'keeps the pay' : 'forfeits the pay';
+  const cargo = uniq(job.stages.flatMap((s) => (s.kind === 'gather' ? gathered(s) : [])));
+  const carried = cargo.length > 0 ? `${job.retreat.keepsCargo ? 'keeps' : 'abandons'} the ${cargo.join(' and ')} gathered` : null;
   const xp = job.retreat.xpPercent;
-  parts.push(xp === 100 ? 'earns the full XP' : xp === 50 ? 'earns half the XP' : xp === 0 ? 'earns no XP' : `earns ${xp}% of the XP`);
-  const last = parts.pop()!;
-  return `A retreat ${parts.length > 1 ? `${parts.join(', ')}, and ${last}` : `${parts[0]} and ${last}`}.`;
+  const earns = xp === 100 ? 'earns the full XP' : xp === 50 ? 'earns half the XP' : xp === 0 ? 'earns no XP' : `earns ${xp}% of the XP`;
+  return `A retreat ${carried ? `${pay}, ${carried}, and ${earns}` : `${pay} and ${earns}`}.`;
 }

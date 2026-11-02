@@ -1,0 +1,41 @@
+{
+  "set": "guard-01",
+  "kind": "action effect",
+  "abilities": ["guard"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "effectId": "d4e76872-f17c-4d2e-91e8-3901c40b1589",
+    "name": "HEAT guard 01",
+    "imageId": "26c46ec3-ca3d-44a8-a267-a16060593002"
+  },
+  "effect": {
+    "tool": "vfx_workbench",
+    "via": "MCP",
+    "createdAt": "2026-10-22",
+    "madeAround": "character:49d7d277-c201-4c58-be11-2727b4a86c0e:east (Villager 01, the villager's east rotation)",
+    "parts": [
+      {
+        "name": "collect_pop",
+        "around": "subject (centre)",
+        "colour": ["#4a3010", "#9a6a20", "#e0b040", "#fff0a0", "#ffffff"],
+        "core": true
+      }
+    ],
+    "edits": ["bubble_shield tried first: a loop that covered the whole figure; not exported"],
+    "export": ["export", "--name", "HEAT guard 01", "--game-pack"],
+    "generations": 0
+  },
+  "files": {
+    "whole.png": "the game pack's whole clip: the effect without the sprite, a sheet of frames",
+    "manifest.json": "the game pack's manifest: the frame size, the sheet's layout, the fps and the offset from the target's feet"
+  },
+  "frames": 9,
+  "fps": 15,
+  "verified": "whole.png and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded 2026-10-23."
+}

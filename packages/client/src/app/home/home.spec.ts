@@ -1,15 +1,14 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Component } from '@angular/core';
 import { Router, provideRouter } from '@angular/router';
 import { Config } from '../config';
 import { Session, type SessionUser } from '../session';
 import { CAMP_SCENE_FACTORY } from '../camp/camp';
+import { LAYOUT_SIZES } from '../camp/layout-sizes';
+import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
 import { Game } from '../game';
 import { Home } from './home';
-
-@Component({ template: '' })
-class Stub {}
+import { Blank } from '../testing/blank';
 
 /** A session with a settable user and recorded actions, in place of the real one. */
 function fakeSession(user: SessionUser | null) {
@@ -19,8 +18,14 @@ function fakeSession(user: SessionUser | null) {
     error: signal<string | null>(null),
     signedIn: 0,
     signedOut: 0,
-    signIn: async () => void fake.signedIn++,
-    signOut: async () => void fake.signedOut++,
+    signIn: () => {
+      fake.signedIn++;
+      return Promise.resolve();
+    },
+    signOut: () => {
+      fake.signedOut++;
+      return Promise.resolve();
+    },
   };
   return fake;
 }
@@ -31,12 +36,13 @@ async function render(session: ReturnType<typeof fakeSession>, configError: stri
   await TestBed.configureTestingModule({
     imports: [Home],
     providers: [
-      provideRouter([{ path: 'camp/:location', component: Stub }]),
+      provideRouter([{ path: 'camp/:location', component: Blank }]),
       { provide: Session, useValue: session },
       { provide: Config, useValue: config },
       // The camp's own collaborators, standing in: no hub and no WebGL in a test.
-      { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), freeVillager: signal({ offered: false, reason: null }), busy: signal(false), error: signal(null) } },
-      { provide: CAMP_SCENE_FACTORY, useValue: async () => ({ setHeroes: () => undefined, destroy: () => undefined }) },
+      { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), recruits: signal([]), busy: signal(false), error: signal(null) } },
+      { provide: CAMP_SCENE_FACTORY, useValue: () => Promise.resolve({ setHeroes: () => undefined, setLevels: () => undefined, destroy: () => undefined }) },
+      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],
   }).compileComponents();
   const fixture = TestBed.createComponent(Home);
@@ -62,7 +68,7 @@ describe('Home', () => {
   it('sends a signed-in player on to their camp', async () => {
     const session = fakeSession({ email: 'player@example.com', name: 'Player', accessToken: 'token' });
     const { page } = await render(session);
-    await vi.waitFor(() => expect(TestBed.inject(Router).url).toBe('/camp/millbrook'));
+    await vi.waitFor(() => { expect(TestBed.inject(Router).url).toBe('/camp/millbrook'); });
     expect(page.querySelector('h1')).toBeNull();
   });
 

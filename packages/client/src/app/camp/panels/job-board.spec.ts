@@ -2,12 +2,15 @@ import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { ApiError } from '../../api';
+import { Refusal } from '../../api';
 import { routes } from '../../app.routes';
 import { Game, type AdventureView, type HeroView } from '../../game';
 import { Session } from '../../session';
 import { CAMP_SCENE_FACTORY } from '../camp';
+import { LAYOUT_SIZES } from '../layout-sizes';
+import { TEST_LAYOUT_SIZES } from '../../testing/layout-sizes';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
+import { must } from '@heat/engine';
 
 function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): HeroView {
   return {
@@ -27,7 +30,7 @@ function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): H
 const party = [hero('h1', 'Wren'), hero('h2', 'Moss'), hero('h3', 'Lark'), hero('h4', 'Fen'), hero('h5', 'Ash')];
 
 /** A game with settable heroes and adventure, and a start that answers as the test says, in place of the real one. */
-function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => AdventureView | ApiError = adventureOf) {
+function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => AdventureView | Refusal = adventureOf) {
   const all = signal(heroes);
   const open = signal<AdventureView | null>(null);
   const here = computed(() => all().filter((h) => h.status !== 'RETIRED'));
@@ -45,8 +48,10 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
       livingHeroes: heroes.length,
       holdings: [{ material: 'timber', balance: 90 }],
       resourceCapacity: 100,
+      facilities: [{ kind: 'mine', level: 1 }],
     }),
-    freeVillager: signal({ offered: false, reason: null }),
+    recruits: signal([]),
+    upgrade: () => null,
     location: signal('millbrook'),
     player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
     adventure: open,
@@ -54,12 +59,12 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     busy: signal(false),
     error: signal<string | null>(null),
     started: [] as { location: string; jobId: string; heroIds: readonly string[] }[],
-    startAdventure: async (location: string, jobId: string, heroIds: readonly string[]) => {
+    startAdventure: (location: string, jobId: string, heroIds: readonly string[]) => {
       fake.started.push({ location, jobId, heroIds });
       const result = answer(heroIds);
-      if (result instanceof ApiError) throw result;
+      if (result instanceof Refusal) return Promise.reject(result);
       open.set(result);
-      return result;
+      return Promise.resolve(result);
     },
     all,
   };
@@ -95,8 +100,9 @@ async function render(game: ReturnType<typeof fakeGame>, url: string) {
       { provide: BATTLE_SCENE_FACTORY, useValue: async () => Promise.reject(new Error('no WebGL in jsdom')) },
       {
         provide: CAMP_SCENE_FACTORY,
-        useValue: async () => ({ setHeroes: () => undefined, destroy: () => undefined }),
+        useValue: () => Promise.resolve({ setHeroes: () => undefined, setLevels: () => undefined, destroy: () => undefined }),
       },
+      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],
   });
   const harness = await RouterTestingHarness.create(url);
@@ -109,33 +115,35 @@ async function render(game: ReturnType<typeof fakeGame>, url: string) {
   return { harness, router, settle, page: harness.routeNativeElement as HTMLElement };
 }
 
-const current = (page: HTMLElement) => page.querySelector('nav.menu a[aria-current="page"]')?.textContent?.trim();
+const current = (page: HTMLElement) => page.querySelector('nav.menu a[aria-current="page"]')?.textContent.trim();
 const boxes = (page: HTMLElement) => [...page.querySelectorAll<HTMLInputElement>('.party input[type="checkbox"]')];
-const depart = (page: HTMLElement) => [...page.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Depart');
+const box = (page: HTMLElement, index: number) => must(boxes(page)[index], `party box ${index}`);
+const depart = (page: HTMLElement) => [...page.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Depart');
 
 describe('Job board', () => {
-  it("lists the board's jobs with their pay, each linked to its detail", async () => {
+  it("lists the board's jobs, easiest first, with what each brings home, each linked to its detail", async () => {
     const { page } = await render(fakeGame([]), '/camp/millbrook/job-board');
     expect(page.querySelector('aside h2')?.textContent).toBe('Job board');
-    const jobs = [...page.querySelectorAll('.jobs li')].map((li) => [...li.children].map((c) => c.textContent?.trim()));
+    const jobs = [...page.querySelectorAll('.jobs li')].map((li) => [...li.children].map((c) => c.textContent.trim()));
     expect(jobs).toEqual([
-      ['Wolves on the mill road', 'pays 10 cloth'],
-      ['Timber from the near woods', 'pays 3 cloth'],
+      ['Pick up sticks', 'up to 40 timber'],
+      ['Timber from the near woods', '3 cloth and up to 60 timber'],
+      ['Wolves on the mill road', '10 cloth'],
     ]);
-    expect(page.querySelector('.jobs a')?.getAttribute('href')).toBe('/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
+    expect(page.querySelector('.jobs a')?.getAttribute('href')).toBe('/camp/millbrook/job-board/jobs/pick-up-sticks');
     expect(current(page)).toBe('Job board');
   });
 
   it("shows a job's stages in order, its credits beside the camp's balance and room, and its retreat penalty", async () => {
-    const { page } = await render(fakeGame([party[0]!]), '/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
+    const { page } = await render(fakeGame([must(party[0], 'the first of the party')]), '/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
     expect(page.querySelector('aside h2')?.textContent).toBe('Timber from the near woods');
-    expect([...page.querySelectorAll('.stages li')].map((li) => li.textContent?.trim())).toEqual([
+    expect([...page.querySelectorAll('.stages li')].map((li) => li.textContent.trim())).toEqual([
       'Travel',
       'Gather timber from 3 trees, up to 60',
       'Fight a wolf',
       'Arrive',
     ]);
-    expect([...page.querySelectorAll('.credits li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+    expect([...page.querySelectorAll('.credits li')].map((li) => li.textContent.replace(/\s+/g, ' ').trim())).toEqual([
       '3 cloth. Millbrook holds 0, with room for 100 more.',
       'Up to 60 timber. Millbrook holds 90, with room for 10 more.',
       '15 XP to each hero who comes back.',
@@ -156,7 +164,7 @@ describe('Job board', () => {
     expect(depart(page)?.disabled).toBe(false);
     expect(boxes(page).map((b) => b.disabled)).toEqual([false, false, false, false, true]);
 
-    boxes(page)[0]!.click();
+    box(page, 0).click();
     await settle();
     expect(boxes(page).map((b) => b.disabled)).toEqual([false, false, false, false, false]);
   });
@@ -164,11 +172,11 @@ describe('Job board', () => {
   it('Departs through startAdventure and goes to the adventure, which shows the job and the party', async () => {
     const game = fakeGame(party);
     const { harness, page, router, settle } = await render(game, '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
-    boxes(page)[0]!.click();
-    boxes(page)[2]!.click();
+    box(page, 0).click();
+    box(page, 2).click();
     await settle();
-    depart(page)!.click();
-    await vi.waitFor(() => expect(router.url).toBe('/adventure'));
+    must(depart(page), 'the Depart button').click();
+    await vi.waitFor(() => { expect(router.url).toBe('/adventure'); });
     expect(game.started).toEqual([{ location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: ['h1', 'h3'] }]);
 
     await settle();
@@ -182,25 +190,37 @@ describe('Job board', () => {
   });
 
   it("shows a start's refusal in place, in the player's words", async () => {
-    const game = fakeGame(party, () => new ApiError('hero h1 is dead', 'HERO_DEAD'));
+    const game = fakeGame(party, () => new Refusal('HeroDead', 'hero h1 is dead'));
     const { page, router, settle } = await render(game, '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
-    boxes(page)[0]!.click();
+    box(page, 0).click();
     await settle();
-    depart(page)!.click();
-    await vi.waitFor(() => expect(game.started).toHaveLength(1));
+    must(depart(page), 'the Depart button').click();
+    await vi.waitFor(() => { expect(game.started).toHaveLength(1); });
     await settle();
     expect(page.querySelector('.refusal')?.textContent).toBe('A hero in the party is dead.');
     expect(page.querySelector('.refusal')?.getAttribute('role')).toBe('alert');
     expect(router.url).toBe('/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
   });
 
-  it("shows a refusal it has no words for as the hub put it", async () => {
-    const game = fakeGame(party, () => new ApiError('something new', 'SOMETHING_NEW'));
-    const { page, settle } = await render(game, '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
-    boxes(page)[0]!.click();
+  it("says to build the facility when the hub refuses a facility's job with Requires (Issue-133)", async () => {
+    const game = fakeGame(party, () => new Refusal('Requires', 'Ore from the hill needs a level 1 mine first'));
+    const { page, settle } = await render(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    box(page, 0).click();
     await settle();
-    depart(page)!.click();
-    await vi.waitFor(() => expect(game.started).toHaveLength(1));
+    must(depart(page), 'the Depart button').click();
+    await vi.waitFor(() => { expect(game.started).toHaveLength(1); });
+    await settle();
+    expect(game.started[0]?.jobId).toBe('ore-from-the-hill');
+    expect(page.querySelector('.refusal')?.textContent).toBe('Build the mine first.');
+  });
+
+  it("shows a refusal it has no words for as the hub put it", async () => {
+    const game = fakeGame(party, () => new Refusal('SomethingNew', 'something new'));
+    const { page, settle } = await render(game, '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road');
+    box(page, 0).click();
+    await settle();
+    must(depart(page), 'the Depart button').click();
+    await vi.waitFor(() => { expect(game.started).toHaveLength(1); });
     await settle();
     expect(page.querySelector('.refusal')?.textContent).toBe('something new');
   });
@@ -219,14 +239,14 @@ describe('Job board', () => {
     const { page } = await render(game, '/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
     expect(depart(page)).toBeUndefined();
     expect(page.querySelector('aside .note a')?.getAttribute('href')).toBe('/adventure');
-    const entry = [...page.querySelectorAll('nav.menu a')].find((a) => a.textContent?.trim() === 'Adventure');
+    const entry = [...page.querySelectorAll('nav.menu a')].find((a) => a.textContent.trim() === 'Adventure');
     expect(entry?.getAttribute('href')).toBe('/adventure');
     expect(entry?.querySelector('img')?.getAttribute('src')).toBe('art/icons/adventure.png');
   });
 
   it('has no adventure entry in the menu while none is open', async () => {
     const { page } = await render(fakeGame(party), '/camp/millbrook/job-board');
-    expect([...page.querySelectorAll('nav.menu a')].map((a) => a.textContent?.trim())).not.toContain('Adventure');
+    expect([...page.querySelectorAll('nav.menu a')].map((a) => a.textContent.trim())).not.toContain('Adventure');
   });
 
   it('says so for a job the board does not post', async () => {
@@ -236,6 +256,6 @@ describe('Job board', () => {
 
   it('sends /adventure to the camp when no adventure is open', async () => {
     const { router } = await render(fakeGame(party), '/adventure');
-    await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook/heroes-hall'));
+    await vi.waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
   });
 });

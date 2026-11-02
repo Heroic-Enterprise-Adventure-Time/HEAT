@@ -6,7 +6,7 @@ describe("The battle's content", () => {
 
   it("names only abilities that exist, each under its own id", () => {
     for (const profile of profiles) {
-      for (const id of profile?.actions ?? []) expect(Object.keys(ABILITIES)).toContain(id);
+      for (const id of profile.actions) expect(Object.keys(ABILITIES)).toContain(id);
     }
     for (const [id, ability] of Object.entries(ABILITIES)) expect(ability.abilityId).toBe(id);
   });
@@ -20,9 +20,9 @@ describe("The battle's content", () => {
 
   it("uses positive whole numbers for stats, warmups and amounts", () => {
     for (const profile of profiles) {
-      const stats = profile?.stats;
-      expect(Number.isInteger(stats?.maxHealth) && (stats?.maxHealth ?? 0) > 0).toBe(true);
-      expect(Number.isInteger(stats?.speed) && (stats?.speed ?? 0) > 0).toBe(true);
+      const stats = profile.stats;
+      expect(Number.isInteger(stats.maxHealth) && stats.maxHealth > 0).toBe(true);
+      expect(Number.isInteger(stats.speed) && stats.speed > 0).toBe(true);
     }
     for (const ability of Object.values(ABILITIES)) expect(Number.isInteger(ability.warmupMs)).toBe(true);
     for (const node of Object.values(RESOURCE_NODES)) expect(Number.isInteger(node.amount) && node.amount > 0).toBe(true);

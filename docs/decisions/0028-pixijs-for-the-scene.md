@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels) and 2026-10-22 by Issue-15 (the battle scene)
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene) and 2026-10-22 by Issue-130 (an action's weapon and effect)
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -56,6 +56,12 @@
 **The progression reads left to right** (the owner's call on Issue-15). The party runs on from the left at the start, at four times the pace, since it is no scroll; on a travel it walks in place while the road scrolls left; at a fight or a gather the other side rushes on from the right as the road scrolls with it, which reads as the party rushing to meet it; what is left of a stage scrolls away on the next travel; a retreat runs off to the left. Every run and every scroll goes at one speed, so the progression never changes pace. The rush on is flavor only: the adventure's clock stops at the entry, the party setting out or a fight or gather beginning, and runs again only when the scene says everyone is on, so the first blow is never struck while the other side is still coming on. The timeline, the log and verification are untouched by it. A resumed run places everyone where they stand, with no rush.
 
 **Without WebGL** the scene does not load, the clock does not wait, and the run plays with the controls alone.
+
+## Amendment: an action's weapon and effect (Issue-130, 2026-10-22)
+
+**An action draws two more sprites, in Pixi's core.** While a unit acts, its weapon is a sprite inside the unit's own container, so it is mirrored and sorted with it; its frames play on the adventure's clock with the act, each holding its own hold frame until the action resolves, and each frame's grip, from the weapon's provenance, sits on the leading hand. When the action resolves, the ability's effect is a sprite of its own, sorted just in front of the unit it landed on, playing once on the presentation clock from the frames of the effect's game pack. Both come from the events alone, so a run and a replay show the same. The weapon by unit type and the effect by ability are one engine module, `packages/engine/src/action-art.ts`, which a crafted weapon later replaces for heroes (game.md, "Heroes"). The frame arithmetic is `packages/client/src/app/adventure/battle/action-sprites.ts`, tested without a renderer. The rules for the art are `docs/process/assets.md`, rules 32 to 35.
+
+**Still no particle emitter.** PixelLab's effects tool bakes its particles into frames, so the battle plays frames and needs no emitter library.
 
 ## Considered and not chosen
 

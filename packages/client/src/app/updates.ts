@@ -1,4 +1,4 @@
-import { Injectable, InjectionToken, effect, inject, untracked } from '@angular/core';
+import { Service, InjectionToken, effect, inject, untracked } from '@angular/core';
 import { Api } from './api';
 import { Config } from './config';
 import { Game } from './game';
@@ -6,7 +6,7 @@ import { Game } from './game';
 /** Reloads the page; a test provides one that counts. */
 export const RELOAD = new InjectionToken<() => void>('heat.reload', {
   providedIn: 'root',
-  factory: () => () => window.location.reload(),
+  factory: () => () => { window.location.reload(); },
 });
 
 /** The version this tab last reloaded away from, in session storage. */
@@ -24,7 +24,7 @@ export const RELOADED_FROM = 'heat.reloadedFrom';
  * a deploy, it stays as it is rather than reloading in a loop; the next load
  * by any other means picks the deploy up.
  */
-@Injectable({ providedIn: 'root' })
+@Service()
 export class Updates {
   private readonly api = inject(Api);
   private readonly config = inject(Config);
@@ -39,7 +39,7 @@ export class Updates {
       if (!player || player.openAdventure || this.game.settled()) return;
       const version = this.config.value()?.version;
       if (!version) return;
-      untracked(() => this.reloadOnce(version));
+      untracked(() => { this.reloadOnce(version); });
     });
   }
 

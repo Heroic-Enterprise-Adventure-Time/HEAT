@@ -8,7 +8,7 @@
  * content.ts.
  */
 
-import type { MonsterType, ResourceType } from "../content.js";
+import type { FacilityKind, MonsterType, ResourceType } from "../content.js";
 import type { Reward } from "../index.js";
 import type { BattleContent } from "../battle/index.js";
 
@@ -39,6 +39,10 @@ export type Stage =
 
 export type StageKind = Stage["kind"];
 
+export const STAGE_KINDS = ["travel", "fight", "gather", "arrive"] as const satisfies readonly StageKind[];
+// Every kind of Stage is in the list: a stage added to the union without its kind here fails here (typescript.md, rule 18).
+const _everyStageKindListed: [Exclude<StageKind, (typeof STAGE_KINDS)[number]>] extends [never] ? true : never = true;
+
 /** What a retreat keeps of a job's yield: its own penalty (game.md, "The battle"). */
 export interface RetreatPenalty {
   readonly keepsPay: boolean;
@@ -51,8 +55,13 @@ export interface Job {
   readonly id: string;
   readonly name: string;
   readonly description: string;
-  /** The location whose job board posts it. */
+  /** The location that posts it. */
   readonly location: string;
+  /**
+   * The own facility that posts it, which the camp must have built to start
+   * it; a job with none is on the location's job board (Issue-133).
+   */
+  readonly facility?: FacilityKind;
   readonly stages: readonly Stage[];
   /** The reward from whoever posted the job, paid on arrival. */
   readonly pay: readonly Reward[];

@@ -7,6 +7,7 @@ import { Repository, type Hero } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, heroesSeenAt, sightingOf, type Random } from "../src/seen.js";
+import { must } from "@heat/engine";
 
 /**
  * The heroes seen at a location (decision 0029): recruit writes a sighting
@@ -59,7 +60,7 @@ async function reads<T>(run: () => Promise<T>): Promise<{ result: T; queries: nu
   for (const [i, [command]] of send.mock.calls.entries()) {
     if (!(command instanceof QueryCommand) || command.input.TableName !== tables.location) continue;
     queries++;
-    read += ((await send.mock.results[i]!.value) as { ScannedCount?: number }).ScannedCount ?? 0;
+    read += ((await must(send.mock.results[i], `the result of call ${i}`).value) as { ScannedCount?: number }).ScannedCount ?? 0;
   }
   return { result, queries, read };
 }

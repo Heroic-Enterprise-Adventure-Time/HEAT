@@ -15,12 +15,15 @@
 #             hostname; the URL in the job summary, on the deployment and,
 #             when the branch has an open pull request, in one comment on
 #             it. The checks run here so that a stack always holds a commit
-#             that typechecks and passes the tests (0017); until Issue-53
-#             they also run in Build and test while a pull request is open.
+#             that typechecks and passes the tests (0017); they also run in
+#             Build and test while a pull request is open (Issue-53, closed
+#             as not planned: the duplicate costs a minute or two and no
+#             wall-clock time).
 #   pull_request (opened, reopened)   the URL comment alone, so the pull
 #             request carries it from its first minute; the hostname is
-#             known from the issue number, with no apply. Not on a release
-#             pull request, whose head is main and has no stack.
+#             known from the issue number, with no apply. Only for a head of
+#             the working shape: a release pull request, whose head is main,
+#             or a Dependabot pull request has no stack and gets no comment.
 #   delete    destroy the branch's stack from its state key, with main's
 #             copy of the root. The root evaluates the bundle's hash even to
 #             destroy, so the job bundles first. The distribution's destroy
@@ -77,6 +80,13 @@ env:
 permissions:
   contents: read
 
+# Every run step runs as `bash --noprofile --norc -eo pipefail {0}`. With no
+# shell named, GitHub runs `bash -e {0}`, where a pipe's status is its last
+# command's: a stack test that failed into tee left the run green (Issue-137).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # ---------------------------------------------------------------- push --
   checks:
@@ -121,7 +131,7 @@ jobs:
         run: npm run bundle
 
       - name: Upload the bundles for the apply job
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: bundles
           path: dist/
@@ -134,7 +144,7 @@ jobs:
         run: npm run build --workspace @heat/client
 
       - name: Upload the client for the apply job
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: client
           path: packages/client/dist/client/browser/
@@ -159,20 +169,21 @@ jobs:
       # The stack URL comment on the branch's pull request.
       pull-requests: write
     env:
-      TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      TF_VAR_workload_account_id: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       # The deploy's version, the commit this run deploys (decision 0030):
       # the hub's HEAT_VERSION and config.json's version from Issue-113. A
       # root without the variable ignores it.
       TF_VAR_app_version: ${{ github.sha }}
-      ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      # A repository secret, so that GitHub masks the id in every log line
+      # (docs/README.md, rule 9).
+      ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       ISSUE: ${{ needs.checks.outputs.issue }}
       STACK: ${{ needs.checks.outputs.name }}
     steps:
       - name: Refuse to run without the account id
         run: |
           set -eu
-          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
-          echo "::add-mask::$ACCOUNT_ID"
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out the branch
         uses: actions/checkout@v7
@@ -189,13 +200,13 @@ jobs:
           terraform_wrapper: false
 
       - name: Download the bundles
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: bundles
           path: dist/
 
       - name: Download the client
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: client
           path: client/
@@ -283,6 +294,12 @@ jobs:
           set -eu
           echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
           node scripts/e2e.mjs --issue "$ISSUE" --username "e2e-$ISSUE@heat-sb.dcg-games.com" | tee -a "$RUNNER_TEMP/e2e.log"
+
+      # Its own step, so the log reaches the run's page when the test fails,
+      # which ends the step above at the failing line.
+      - name: Put the stack test's log on the run's page
+        if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
+        run: |
           {
             echo
             echo '```text'
@@ -296,10 +313,18 @@ jobs:
   # -------------------------------------------------------- pull request --
   comment-url:
     name: Comment the stack's URL on the pull request
-    # A release pull request has main as its head: no issue number, so no
-    # stack and no URL (decision 0021). A hotfix/<issue>-* head has a stack
-    # and keeps its comment.
-    if: github.event_name == 'pull_request' && github.head_ref != 'main'
+    # Only a head of the working shape has a stack, the same six prefixes
+    # the push trigger names; GitHub's expressions have no regex, so the
+    # list is spelled out. A release pull request, whose head is main
+    # (decision 0021), a Dependabot pull request, or any other head outside
+    # the shape has no issue number, so no stack and no comment: the job is
+    # skipped rather than failing in scripts/sandbox.mjs (Issue-187). A
+    # hotfix/<issue>-* head has a stack and keeps its comment.
+    if: >-
+      github.event_name == 'pull_request'
+      && (startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/')
+          || startsWith(github.head_ref, 'docs/') || startsWith(github.head_ref, 'infra/')
+          || startsWith(github.head_ref, 'chore/') || startsWith(github.head_ref, 'hotfix/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -371,20 +396,21 @@ jobs:
       contents: read
       id-token: write
     env:
-      TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      TF_VAR_workload_account_id: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       # The deploy's version, the commit this run deploys (decision 0030):
       # the hub's HEAT_VERSION and config.json's version from Issue-113. A
       # root without the variable ignores it.
       TF_VAR_app_version: ${{ github.sha }}
-      ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      # A repository secret, so that GitHub masks the id in every log line
+      # (docs/README.md, rule 9).
+      ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       ISSUE: ${{ needs.name-deleted.outputs.issue }}
       STACK: ${{ needs.name-deleted.outputs.name }}
     steps:
       - name: Refuse to run without the account id
         run: |
           set -eu
-          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
-          echo "::add-mask::$ACCOUNT_ID"
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
 
       # The branch itself is gone; main's copy of the root destroys from the
       # state key.
@@ -441,19 +467,20 @@ jobs:
       contents: read
       id-token: write
     env:
-      TF_VAR_workload_account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      TF_VAR_workload_account_id: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       # The deploy's version, the commit this run deploys (decision 0030):
       # the hub's HEAT_VERSION and config.json's version from Issue-113. A
       # root without the variable ignores it.
       TF_VAR_app_version: ${{ github.sha }}
-      ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
+      # A repository secret, so that GitHub masks the id in every log line
+      # (docs/README.md, rule 9).
+      ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       DRY_RUN: ${{ github.event_name == 'schedule' && 'false' || inputs.dry_run }}
     steps:
       - name: Refuse to run without the account id
         run: |
           set -eu
-          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
-          echo "::add-mask::$ACCOUNT_ID"
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out main
         uses: actions/checkout@v7

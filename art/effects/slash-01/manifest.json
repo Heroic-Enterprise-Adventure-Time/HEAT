@@ -1,0 +1,120 @@
+{
+ "app": "PixelLab VFX Creator",
+ "name": "HEAT slash 01",
+ "fps": 16,
+ "frame_ms": 63,
+ "frames": 7,
+ "loop": false,
+ "canvas": {
+  "w": 43,
+  "h": 41
+ },
+ "anchor": {
+  "kind": "feet",
+  "x": 20,
+  "y": 32
+ },
+ "clips": [
+  {
+   "name": "whole",
+   "title": "the whole effect, no sprite",
+   "depth": "both",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 5,
+   "frame": {
+    "w": 21,
+    "h": 34
+   },
+   "sheets": [
+    {
+     "file": "whole.png",
+     "first_frame": 0,
+     "frames": 5,
+     "columns": 3,
+     "rows": 2
+    }
+   ],
+   "offset": {
+    "x": -1,
+    "y": -29
+   }
+  },
+  {
+   "name": "whole-with-sprite",
+   "title": "the whole effect with the sprite in it",
+   "depth": "both",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 7,
+   "frame": {
+    "w": 37,
+    "h": 34
+   },
+   "sheets": [
+    {
+     "file": "whole-with-sprite.png",
+     "first_frame": 0,
+     "frames": 7,
+     "columns": 3,
+     "rows": 3
+    }
+   ],
+   "offset": {
+    "x": -17,
+    "y": -29
+   }
+  },
+  {
+   "name": "front",
+   "title": "everything in front of the sprite",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 5,
+   "frame": {
+    "w": 21,
+    "h": 34
+   },
+   "sheets": [
+    {
+     "file": "front.png",
+     "first_frame": 0,
+     "frames": 5,
+     "columns": 3,
+     "rows": 2
+    }
+   ],
+   "offset": {
+    "x": -1,
+    "y": -29
+   }
+  },
+  {
+   "name": "part-slash_trail",
+   "title": "the slash trail part",
+   "part": "slash_trail",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 5,
+   "frame": {
+    "w": 21,
+    "h": 34
+   },
+   "sheets": [
+    {
+     "file": "part-slash_trail.png",
+     "first_frame": 0,
+     "frames": 5,
+     "columns": 3,
+     "rows": 2
+    }
+   ],
+   "offset": {
+    "x": -1,
+    "y": -29
+   }
+  }
+ ]
+}

@@ -1,0 +1,42 @@
+{
+  "set": "slash-01",
+  "kind": "action effect",
+  "abilities": ["strike", "strike-weakest"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "effectId": "5062390d-cf7a-4022-9425-15c146b8fccb",
+    "name": "HEAT slash 01",
+    "imageId": "f1dff2a6-e1ca-41ee-93cd-8443ac08fe1a"
+  },
+  "effect": {
+    "tool": "vfx_workbench",
+    "via": "MCP",
+    "createdAt": "2026-10-22",
+    "madeAround": "character:51acb472-6ebb-42e6-9380-e572635a3067:east (Wolf 02, the wolf's east rotation)",
+    "parts": [
+      {
+        "name": "slash_trail",
+        "around": "subject (centre)",
+        "size": 0.7,
+        "colour": ["#5a3a1c", "#b07a3a", "#e8c070", "#fff4d0", "#ffffff"],
+        "core": true
+      }
+    ],
+    "edits": ["render patch retime: 8 frames to 7, keeping the speed (16 fps)"],
+    "export": ["export", "--name", "HEAT slash 01", "--game-pack"],
+    "generations": 0
+  },
+  "files": {
+    "whole.png": "the game pack's whole clip: the effect without the sprite, a sheet of frames",
+    "manifest.json": "the game pack's manifest: the frame size, the sheet's layout, the fps and the offset from the target's feet"
+  },
+  "frames": 5,
+  "fps": 16,
+  "verified": "whole.png and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded 2026-10-23."
+}

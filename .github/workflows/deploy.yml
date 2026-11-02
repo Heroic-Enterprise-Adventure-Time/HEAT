@@ -54,6 +54,13 @@ env:
   TF_INPUT: "false"
   AWS_REGION: us-east-1
 
+# Every run step runs as `bash --noprofile --norc -eo pipefail {0}`. With no
+# shell named, GitHub runs `bash -e {0}`, where a pipe's status is its last
+# command's: a stack test that failed into tee left the run green (Issue-137).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   plan:
     name: Plan ${{ matrix.root }}
@@ -73,20 +80,17 @@ jobs:
       matrix:
         include:
           # One row per permanent root. The role ARN is the account id
-          # variable plus the committed role name (terraform/bootstrap/README.md).
+          # secret plus the committed role name (terraform/bootstrap/README.md).
           # code is true where the root hashes the function bundles.
           - root: sandbox-base
             environment: sandbox-base
-            account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
             role: heat-sandbox-plan
             code: false
           - root: dev
             environment: dev
-            account_id: ${{ vars.HEAT_DEV_ACCOUNT_ID }}
             role: heat-dev-plan
             code: true
     env:
-      TF_VAR_workload_account_id: ${{ matrix.account_id }}
       # The deploy's version (decision 0030): the pull request's head, which
       # this job checks out and plans. Not github.sha, which in a
       # pull_request_target run is the base branch's tip. A root without the
@@ -102,16 +106,26 @@ jobs:
       TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
       TF_VAR_alarm_email: ${{ vars.HEAT_ALARM_EMAIL }}
     steps:
-      - name: Refuse to run without the account id
+      # The row's account id, a repository secret so that GitHub masks it in
+      # every log line, the env echo included (docs/README.md, rule 9; decision
+      # 0035). The secrets context is not available in a matrix, so the row
+      # cannot carry the id: both secrets are in this step's env and the root
+      # chooses, so that the guard reads exactly the value the job will use (an
+      # `&& ... ||` expression would fall back to the other secret when the
+      # row's is empty). Written to GITHUB_ENV once, for every later step.
+      - name: Pick the row's account id, or refuse to run
         env:
-          ACCOUNT_ID: ${{ matrix.account_id }}
+          ROOT: ${{ matrix.root }}
+          SANDBOX_ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
+          DEV_ACCOUNT_ID: ${{ secrets.HEAT_DEV_ACCOUNT_ID }}
         run: |
           set -eu
-          if [ -z "$ACCOUNT_ID" ]; then
-            echo "The account id variable for ${{ matrix.root }} is not set." >&2
-            exit 1
-          fi
-          echo "::add-mask::$ACCOUNT_ID"
+          case "$ROOT" in
+            dev) account="$DEV_ACCOUNT_ID"; secret=HEAT_DEV_ACCOUNT_ID ;;
+            *)   account="$SANDBOX_ACCOUNT_ID"; secret=HEAT_SANDBOX_ACCOUNT_ID ;;
+          esac
+          [ -n "$account" ] || { echo "The repository secret $secret is not set." >&2; exit 1; }
+          { echo "ACCOUNT_ID=$account"; echo "TF_VAR_workload_account_id=$account"; } >> "$GITHUB_ENV"
 
       - name: Check out the pull request's head
         uses: actions/checkout@v7
@@ -141,7 +155,7 @@ jobs:
       - name: Assume the plan role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::${{ matrix.account_id }}:role/${{ matrix.role }}
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/${{ matrix.role }}
           role-session-name: deploy-plan-${{ matrix.root }}
           aws-region: ${{ env.AWS_REGION }}
 
@@ -159,7 +173,6 @@ jobs:
 
       - name: Write the plan to the job summary and the pull request
         env:
-          ACCOUNT_ID: ${{ matrix.account_id }}
           ENVIRONMENT: ${{ matrix.environment }}
           GH_TOKEN: ${{ github.token }}
         run: sh scripts/post-terraform-plan.sh "${{ matrix.root }}" "$RUNNER_TEMP/plan.tfplan" "${{ github.event.pull_request.head.sha }}" "plan role" "${{ github.event.pull_request.number }}"
@@ -191,19 +204,16 @@ jobs:
           # heat-<environment>, for the smoke test and the cold start.
           - root: sandbox-base
             environment: sandbox-base
-            account_id: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
             role: heat-sandbox-apply
             test_users: true
             code: false
           - root: dev
             environment: dev
-            account_id: ${{ vars.HEAT_DEV_ACCOUNT_ID }}
             role: heat-dev-apply
             test_users: true
             code: true
             stack: heat-dev
     env:
-      TF_VAR_workload_account_id: ${{ matrix.account_id }}
       # The deploy's version, the commit this run deploys (decision 0030):
       # the hub's HEAT_VERSION and config.json's version from Issue-113. A
       # root without the variable ignores it.
@@ -219,16 +229,26 @@ jobs:
       ROOT: ${{ matrix.root }}
       STACK: ${{ matrix.stack }}
     steps:
-      - name: Refuse to run without the account id
+      # The row's account id, a repository secret so that GitHub masks it in
+      # every log line, the env echo included (docs/README.md, rule 9; decision
+      # 0035). The secrets context is not available in a matrix, so the row
+      # cannot carry the id: both secrets are in this step's env and the root
+      # chooses, so that the guard reads exactly the value the job will use (an
+      # `&& ... ||` expression would fall back to the other secret when the
+      # row's is empty). Written to GITHUB_ENV once, for every later step.
+      - name: Pick the row's account id, or refuse to run
         env:
-          ACCOUNT_ID: ${{ matrix.account_id }}
+          ROOT: ${{ matrix.root }}
+          SANDBOX_ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
+          DEV_ACCOUNT_ID: ${{ secrets.HEAT_DEV_ACCOUNT_ID }}
         run: |
           set -eu
-          if [ -z "$ACCOUNT_ID" ]; then
-            echo "The account id variable for ${{ matrix.root }} is not set." >&2
-            exit 1
-          fi
-          echo "::add-mask::$ACCOUNT_ID"
+          case "$ROOT" in
+            dev) account="$DEV_ACCOUNT_ID"; secret=HEAT_DEV_ACCOUNT_ID ;;
+            *)   account="$SANDBOX_ACCOUNT_ID"; secret=HEAT_SANDBOX_ACCOUNT_ID ;;
+          esac
+          [ -n "$account" ] || { echo "The repository secret $secret is not set." >&2; exit 1; }
+          { echo "ACCOUNT_ID=$account"; echo "TF_VAR_workload_account_id=$account"; } >> "$GITHUB_ENV"
 
       - name: Check out main
         uses: actions/checkout@v7
@@ -259,7 +279,7 @@ jobs:
       - name: Assume the apply role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
         with:
-          role-to-assume: arn:aws:iam::${{ matrix.account_id }}:role/${{ matrix.role }}
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/${{ matrix.role }}
           role-session-name: deploy-apply-${{ matrix.root }}
           aws-region: ${{ env.AWS_REGION }}
 
@@ -277,7 +297,6 @@ jobs:
 
       - name: Write the plan to the job summary
         env:
-          ACCOUNT_ID: ${{ matrix.account_id }}
           ENVIRONMENT: ${{ matrix.environment }}
         run: sh scripts/post-terraform-plan.sh "${{ matrix.root }}" "$RUNNER_TEMP/plan.tfplan" "$GITHUB_SHA" "apply role"
 
@@ -346,6 +365,12 @@ jobs:
           zone_name="$(terraform -chdir="terraform/environment/$ROOT" output -raw zone_name)"
           echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
           node scripts/e2e.mjs --stack "$STACK" --username "e2e@$zone_name" | tee -a "$RUNNER_TEMP/e2e.log"
+
+      # Its own step, so the log reaches the run's page when the test fails,
+      # which ends the step above at the failing line.
+      - name: Put the stack test's log on the run's page
+        if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
+        run: |
           {
             echo
             echo '```text'

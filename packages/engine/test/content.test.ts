@@ -12,10 +12,19 @@ import {
   hallCapacity,
   heroNames,
   location,
+  recruitCost,
   warehouseCapacity,
+  FACILITIES,
+  WAREHOUSE_CAPACITY,
+  buildRefusal,
+  facilityArtLevel,
+  nextLevel,
+  must,
+  type FacilityKind,
 } from "../src/index.js";
 
 const heroes = new URL("../../../art/heroes/", import.meta.url);
+const facilities = new URL("../../../art/facilities/", import.meta.url);
 
 describe("static content", () => {
   const provenances = readdirSync(heroes)
@@ -59,9 +68,49 @@ describe("static content", () => {
     }
   });
 
-  it("caps a level-1 camp at 4 heroes and 100 of each resource", () => {
-    expect(hallCapacity(1)).toBe(4);
-    expect(warehouseCapacity(1)).toBe(100);
+  it("prices Millbrook's recruits by the first progression, with the villager free when no hero is alive", () => {
+    const recruits = must(location(STARTING_LOCATION), "the starting location").recruits;
+    const villager = must(recruits[0], "the villager recruit");
+    const fighter = must(recruits[1], "the fighter recruit");
+    expect(recruitCost(villager, 0)).toEqual([]);
+    expect(recruitCost(villager, 1)).toEqual([{ material: "timber", amount: 20 }]);
+    expect(recruitCost(fighter, 0)).toEqual([{ material: "ore", amount: 40 }]);
+    expect(recruitCost(fighter, 2)).toEqual([{ material: "ore", amount: 40 }]);
+  });
+
+  it("caps a camp's heroes and stock by its hall's and warehouse's levels", () => {
+    expect([1, 2, 3].map(hallCapacity)).toEqual([4, 6, 8]);
+    expect([1, 2, 3].map(warehouseCapacity)).toEqual([100, 200, 400]);
+    // Every level the content offers has a cap.
+    expect(HALL_CAPACITY).toHaveLength(FACILITIES["heroes-hall"].levels.length);
+    expect(WAREHOUSE_CAPACITY).toHaveLength(FACILITIES.warehouse.levels.length);
+  });
+
+  it("gives each facility's levels the pictures under art/facilities, falling back to the highest below", () => {
+    for (const kind of Object.keys(FACILITIES) as FacilityKind[]) {
+      const files = readdirSync(new URL(`${kind}/`, facilities)).filter((f) => /^level-\d+\.png$/.test(f));
+      expect(files.map((f) => Number(f.slice(6, -4))).sort()).toEqual([...FACILITIES[kind].art]);
+    }
+    expect(facilityArtLevel("mine", 0)).toBe(0);
+    expect(facilityArtLevel("mine", 1)).toBe(1);
+    expect(facilityArtLevel("job-board", 1)).toBe(1);
+    expect(facilityArtLevel("job-board", 4)).toBe(1);
+  });
+
+  it("prices the mine's first level by the first progression, and keeps every level-1 cost within a level-1 warehouse", () => {
+    expect(nextLevel("mine", 0)).toEqual({ level: 1, cost: [{ material: "timber", amount: 60 }, { material: "cloth", amount: 3 }], requires: [] });
+    expect(nextLevel("mine", 1)).toBeUndefined();
+    for (const kind of Object.keys(FACILITIES) as FacilityKind[]) {
+      for (const { amount } of FACILITIES[kind].levels[0]?.cost ?? []) expect(amount).toBeLessThanOrEqual(warehouseCapacity(1));
+    }
+  });
+
+  it("refuses a build at the highest level, then for a missing facility, then for the cost", () => {
+    const poor = { levels: { "heroes-hall": 1, warehouse: 1 }, holdings: [{ material: "timber", balance: 60 }] };
+    expect(buildRefusal({ ...poor, levels: { mine: 1 } }, "mine")?.code).toBe("MAX_LEVEL");
+    expect(buildRefusal(poor, "caravan-hub")).toMatchObject({ code: "REQUIRES", missing: [{ kind: "warehouse", level: 2 }] });
+    expect(buildRefusal(poor, "mine")).toMatchObject({ code: "INSUFFICIENT_RESOURCES", short: [{ material: "cloth", amount: 3, balance: 0 }] });
+    expect(buildRefusal({ ...poor, holdings: [{ material: "timber", balance: 60 }, { material: "cloth", balance: 3 }] }, "mine")).toBeNull();
   });
 
   it("has enough distinct names for every presentation that a full hall never runs out", () => {

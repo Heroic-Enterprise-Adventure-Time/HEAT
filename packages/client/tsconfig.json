@@ -15,7 +15,6 @@
     // Angular's own settings, as `ng new` writes them.
     "experimentalDecorators": true,
     "importHelpers": true,
-    "noPropertyAccessFromIndexSignature": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },

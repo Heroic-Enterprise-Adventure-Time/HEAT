@@ -40,7 +40,6 @@ module "environment" {
   source = "../../modules/environment"
 
   name_prefix = local.name_prefix
-  environment = local.environment
 
   functions = jsondecode(file("${path.module}/../../../manifest.json")).functions
   dist_dir  = "${path.module}/../../../dist"

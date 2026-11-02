@@ -21,23 +21,26 @@ export const tracer = new Tracer();
  * logs variables or responses: those can hold private data.
  */
 export function requestLogging(): ApolloServerPlugin<Context> {
+  // Apollo's hooks return promises; nothing here waits.
   return {
-    async requestDidStart() {
+    requestDidStart() {
       const started = performance.now();
-      return {
-        async didEncounterErrors({ errors }) {
+      return Promise.resolve({
+        didEncounterErrors({ errors }) {
           for (const error of errors) {
             logger.warn("graphql error", { message: error.message, path: error.path ?? null });
           }
+          return Promise.resolve();
         },
-        async willSendResponse({ request, errors }) {
+        willSendResponse({ request, errors }) {
           logger.info("graphql request", {
             operationName: request.operationName ?? null,
             durationMs: Math.round(performance.now() - started),
             errors: errors?.length ?? 0,
           });
+          return Promise.resolve();
         },
-      };
+      });
     },
   };
 }

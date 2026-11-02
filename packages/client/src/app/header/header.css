@@ -2,13 +2,13 @@
 header {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  height: 2.25rem;
+  gap: var(--space-lg);
+  height: var(--header-height);
   box-sizing: border-box;
-  padding: 0 0.75rem;
+  padding: 0 var(--space-lg);
   background: #2b1d14;
   color: #f3e6cf;
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .title {
@@ -21,8 +21,8 @@ header {
 }
 
 .adventure {
-  padding: 0 0.5rem;
-  border: 1px solid #d9a441;
+  padding: 0 var(--space-md);
+  border: var(--border-thin) solid var(--gold);
   color: #f5cf7a;
   text-decoration: none;
   white-space: nowrap;
@@ -50,7 +50,7 @@ header {
 select,
 button {
   font: inherit;
-  padding: 0.125rem 0.5rem;
+  padding: var(--space-xs) var(--space-md);
 }
 
 button {

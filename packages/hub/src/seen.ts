@@ -1,3 +1,4 @@
+import { range } from "es-toolkit";
 import { randomInt } from "node:crypto";
 import type { UnitType } from "@heat/engine";
 import type { Hero, Repository } from "./db/repository.js";
@@ -46,7 +47,7 @@ export function sightingOf(hero: Hero, at: Date): Sighting {
 
 /** A random point among the sightings' keys: hero ids are random UUIDs, so this starts a random window. */
 function randomStart(random: Random): string {
-  return Array.from({ length: 8 }, () => random(16).toString(16)).join("");
+  return range(8).map(() => random(16).toString(16)).join("");
 }
 
 /**
@@ -71,7 +72,11 @@ export async function heroesSeenAt(
   const others = [...first.sightings, ...wrapped.sightings].filter((s) => !own.has(s.heroId));
   for (let i = others.length - 1; i > 0; i--) {
     const j = random(i + 1);
-    [others[i], others[j]] = [others[j]!, others[i]!];
+    const a = others[i];
+    const b = others[j];
+    if (a === undefined || b === undefined) throw new Error(`a shuffle index is out of range: ${i}, ${j} of ${others.length}`);
+    others[i] = b;
+    others[j] = a;
   }
   return others.slice(0, SAMPLE_SIZE);
 }

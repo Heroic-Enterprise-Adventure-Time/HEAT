@@ -1,17 +1,17 @@
-import { Component, computed, signal } from '@angular/core';
+import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { UNIT_PROFILES, replay, type AdventureEvent, type AdventureLogEntry, type AdventureSnapshot } from '@heat/engine';
+import { UNIT_PROFILES, replay, must, type AdventureEvent, type AdventureLogEntry, type AdventureSnapshot } from '@heat/engine';
 import { ApiError } from '../api';
 import { Game, type AdventureResultView, type AdventureView, type SettledView } from '../game';
 import { Adventure, BATTLE_SCENE_FACTORY, FRAME_LOOP } from './adventure';
+import { LAYOUT_SIZES } from '../camp/layout-sizes';
+import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
 import type { BattleSceneCallbacks } from './battle/battle-scene';
 import { isEntry, type Field } from './field';
 import { AdventureRun, loadRun, saveRun } from './run';
-
-@Component({ template: 'camp' })
-class CampStub {}
+import { Blank } from '../testing/blank';
 
 const adventure: AdventureView = {
   id: 'a1',
@@ -24,8 +24,8 @@ const adventure: AdventureView = {
     version: 'v1',
     jobId: 'timber-from-the-near-woods',
     heroes: [
-      { heroId: 'h1', name: 'Wat', unitType: 'fighter', spriteSet: 'fighter-02', level: 1, stats: UNIT_PROFILES.fighter!.stats },
-      { heroId: 'h2', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: UNIT_PROFILES.villager!.stats },
+      { heroId: 'h1', name: 'Wat', unitType: 'fighter', spriteSet: 'fighter-02', level: 1, stats: must(UNIT_PROFILES.fighter, 'the fighter profile').stats },
+      { heroId: 'h2', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: must(UNIT_PROFILES.villager, 'the villager profile').stats },
     ],
   },
 };
@@ -68,9 +68,9 @@ function fakeScene(holding = false) {
     fed: [] as AdventureEvent[],
     frames: 0,
     release: () => callbacks?.onEntered(),
-    factory: async (_host: HTMLElement, given: BattleSceneCallbacks) => {
+    factory: (_host: HTMLElement, given: BattleSceneCallbacks) => {
       callbacks = given;
-      return {
+      return Promise.resolve({
         reset: (field: Field, _sets: ReadonlyMap<string, string>, enter: boolean) => {
           scene.resets.push({ field, enter });
           if (enter && !holding) given.onEntered();
@@ -79,9 +79,11 @@ function fakeScene(holding = false) {
           scene.fed.push(...events);
           if (events.some(isEntry) && !holding) given.onEntered();
         },
-        frame: () => void scene.frames++,
+        frame: () => {
+          scene.frames++;
+        },
         destroy: () => undefined,
-      };
+      });
     },
   };
   return scene;
@@ -98,16 +100,17 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
     settled,
     submitted: [] as (readonly AdventureLogEntry[])[],
     timelines: [] as string[],
-    timeline: async (id: string) => {
+    timeline: (id: string) => {
       fake.timelines.push(id);
-      return replay(adventure.snapshot as AdventureSnapshot, adventure.seed, []).timeline;
+      return Promise.resolve(replay(adventure.snapshot as AdventureSnapshot, adventure.seed, []).timeline);
     },
-    submitAdventure: async (submittedAdventure: AdventureView, log: readonly AdventureLogEntry[]) => {
+    submitAdventure: (submittedAdventure: AdventureView, log: readonly AdventureLogEntry[]) => {
       fake.submitted.push([...log]);
       const answered = answer();
-      if (answered instanceof Error) throw answered;
+      if (answered instanceof Error) return Promise.reject(answered);
       settled.set({ adventure: submittedAdventure, result: answered });
       open.set(null);
+      return Promise.resolve();
     },
   };
   return fake;
@@ -119,11 +122,12 @@ async function render(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
     providers: [
       provideRouter([
         { path: 'adventure', component: Adventure },
-        { path: 'camp/:location', component: CampStub },
+        { path: 'camp/:location', component: Blank },
       ]),
       { provide: Game, useValue: game },
       { provide: FRAME_LOOP, useValue: (f: (ms: number) => void) => ((onFrame = f), () => undefined) },
       { provide: BATTLE_SCENE_FACTORY, useValue: scene.factory },
+      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],
   });
   const harness = await RouterTestingHarness.create('/adventure');
@@ -133,7 +137,7 @@ async function render(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
   };
   await settle();
   // The scene loads after the first render; the run starts once it has.
-  await vi.waitFor(() => expect(scene.resets.length).toBeGreaterThan(0));
+  await vi.waitFor(() => { expect(scene.resets.length).toBeGreaterThan(0); });
   await settle();
   const page = harness.routeNativeElement as HTMLElement;
   /** Runs `ms` of wall-clock time in frames of at most 250 ms, as the browser would. */
@@ -145,29 +149,29 @@ async function render(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
 }
 
 const button = (page: HTMLElement, text: string, within = page) =>
-  [...within.querySelectorAll('button')].find((b) => b.textContent?.trim() === text);
+  must([...within.querySelectorAll('button')].find((b) => b.textContent.trim() === text), `the ${text} button`);
 const heroItem = (page: HTMLElement, name: string) =>
-  [...page.querySelectorAll<HTMLElement>('.party li')].find((li) => li.querySelector('strong')?.textContent === name)!;
+  must([...page.querySelectorAll<HTMLElement>('.party li')].find((li) => li.querySelector('strong')?.textContent === name), `the party item of ${name}`);
 
 describe('Adventure', () => {
-  beforeEach(() => localStorage.clear());
+  beforeEach(() => { localStorage.clear(); });
 
   it("shows the job, the stage under way and each hero's abilities, usable only in a fight or a gather", async () => {
     const { page, run } = await render(fakeGame());
     expect(page.querySelector('aside h2')?.textContent).toBe('Timber from the near woods');
     expect(page.querySelector('.stage-name')?.textContent).toBe('Stage 1 of 4: Travel');
-    expect([...heroItem(page, 'Wren').querySelectorAll('.abilities button')].map((b) => b.textContent?.trim())).toEqual([
+    expect([...heroItem(page, 'Wren').querySelectorAll('.abilities button')].map((b) => b.textContent.trim())).toEqual([
       'Strike',
       'Chop',
       'Mine',
       'Move up',
     ]);
-    expect([...heroItem(page, 'Wat').querySelectorAll('.abilities button')].map((b) => b.textContent?.trim())).toEqual(['Guard', 'Strike']);
-    expect(button(page, 'Chop', heroItem(page, 'Wren'))!.disabled).toBe(true);
+    expect([...heroItem(page, 'Wat').querySelectorAll('.abilities button')].map((b) => b.textContent.trim())).toEqual(['Guard', 'Strike']);
+    expect(button(page, 'Chop', heroItem(page, 'Wren')).disabled).toBe(true);
 
     await run(4100);
     expect(page.querySelector('.stage-name')?.textContent).toBe('Stage 2 of 4: Gather timber from 3 trees, up to 60');
-    expect(button(page, 'Chop', heroItem(page, 'Wren'))!.disabled).toBe(false);
+    expect(button(page, 'Chop', heroItem(page, 'Wren')).disabled).toBe(false);
   });
 
   it("queues a forced action until the hero's turn uses it, and logs it then", async () => {
@@ -175,14 +179,14 @@ describe('Adventure', () => {
     const { page, run, settle } = await render(game);
     // By 7 s the villager has stepped up to the front line, where the trees are in reach.
     await run(7000);
-    button(page, 'Chop', heroItem(page, 'Wren'))!.click();
+    button(page, 'Chop', heroItem(page, 'Wren')).click();
     await settle();
-    expect(button(page, 'Chop', heroItem(page, 'Wren'))!.getAttribute('aria-pressed')).toBe('true');
+    expect(button(page, 'Chop', heroItem(page, 'Wren')).getAttribute('aria-pressed')).toBe('true');
     expect(heroItem(page, 'Wren').querySelector('.queued')?.textContent).toBe('Next: Chop');
     await run(3000);
     expect(heroItem(page, 'Wren').querySelector('.queued')).toBeNull();
     expect(loadRun('a1')?.log).toEqual([
-      { kind: 'unit', acceptedAtSimTime: expect.any(Number), unitId: 'h2', override: { kind: 'force-action', abilityId: 'chop' } },
+      { kind: 'unit', acceptedAtSimTime: expect.any(Number) as number, unitId: 'h2', override: { kind: 'force-action', abilityId: 'chop' } },
     ]);
   });
 
@@ -190,7 +194,7 @@ describe('Adventure', () => {
     const { page, run, settle } = await render(fakeGame());
     await run(4100);
     // No ore vein in the near woods.
-    button(page, 'Mine', heroItem(page, 'Wren'))!.click();
+    button(page, 'Mine', heroItem(page, 'Wren')).click();
     await settle();
     await run(3000);
     expect(heroItem(page, 'Wren').querySelector('.queued')).toBeNull();
@@ -199,13 +203,13 @@ describe('Adventure', () => {
 
   it('pauses, and runs at the speed picked', async () => {
     const { page, run, settle } = await render(fakeGame());
-    button(page, 'Pause')!.click();
+    button(page, 'Pause').click();
     await run(1000);
     expect(page.querySelector('.stage-name')?.textContent).toBe('Stage 1 of 4: Travel');
-    button(page, 'Resume')!.click();
-    button(page, '4×')!.click();
+    button(page, 'Resume').click();
+    button(page, '4×').click();
     await settle();
-    expect(button(page, '4×')!.getAttribute('aria-pressed')).toBe('true');
+    expect(button(page, '4×').getAttribute('aria-pressed')).toBe('true');
     await run(1100);
     expect(page.querySelector('.stage-name')?.textContent).toContain('Stage 2 of 4');
   });
@@ -214,19 +218,19 @@ describe('Adventure', () => {
     const game = fakeGame();
     const { page, run, settle } = await render(game);
     await run(4100);
-    button(page, 'Retreat')!.click();
+    button(page, 'Retreat').click();
     await settle();
-    expect(button(page, 'Retreat')!.getAttribute('aria-pressed')).toBe('true');
-    expect(button(page, 'Press on')!.getAttribute('aria-pressed')).toBe('false');
+    expect(button(page, 'Retreat').getAttribute('aria-pressed')).toBe('true');
+    expect(button(page, 'Press on').getAttribute('aria-pressed')).toBe('false');
     await run(60_000);
     expect(game.submitted).toHaveLength(1);
-    expect(game.submitted[0]!.some((e) => e.kind === 'party' && e.order === 'retreat')).toBe(true);
+    expect(game.submitted[0]?.some((e) => e.kind === 'party' && e.order === 'retreat')).toBe(true);
   });
 
   it('holds the clock at an entry until the scene has brought everyone on', async () => {
     const scene = fakeScene(true);
     const { page, run } = await render(fakeGame(), scene);
-    expect(scene.resets).toEqual([{ field: expect.objectContaining({ stage: 0 }), enter: true }]);
+    expect(scene.resets).toMatchObject([{ field: { stage: 0 }, enter: true }]);
     await run(2000);
     expect(scene.fed).toEqual([]);
     scene.release();
@@ -244,7 +248,7 @@ describe('Adventure', () => {
   });
 
   it('resumes from the log saved in the browser, at the time it reached', async () => {
-    const earlier = new AdventureRun(adventure.snapshot as never, adventure.seed);
+    const earlier = new AdventureRun(adventure.snapshot as AdventureSnapshot, adventure.seed);
     earlier.advanceTo(8000);
     saveRun('a1', { log: earlier.log, simTime: earlier.simTime });
     const scene = fakeScene();
@@ -262,21 +266,21 @@ describe('Adventure', () => {
     expect(game.submitted).toHaveLength(1);
     expect(loadRun('a1')).toBeNull();
     expect(page.querySelector('.outcome')?.textContent).toBe('Job done.');
-    expect([...page.querySelectorAll('.stages li')].map((li) => li.textContent?.trim())).toEqual([
+    expect([...page.querySelectorAll('.stages li')].map((li) => li.textContent.trim())).toEqual([
       'travel: done',
       'gather: won',
       'fight: won',
       'arrive: done',
     ]);
-    expect([...page.querySelectorAll('.rewards li')].map((li) => li.textContent?.trim())).toEqual(['60 timber', '3 cloth']);
-    expect([...page.querySelectorAll('p.lost')].map((p) => p.textContent?.trim())).toEqual(['10 timber lost: the warehouse was full.']);
-    expect([...page.querySelectorAll('.heroes li')].map((li) => li.textContent?.replace(/\s+/g, ' ').trim())).toEqual([
+    expect([...page.querySelectorAll('.rewards li')].map((li) => li.textContent.trim())).toEqual(['60 timber', '3 cloth']);
+    expect([...page.querySelectorAll('p.lost')].map((p) => p.textContent.trim())).toEqual(['10 timber lost: the warehouse was full.']);
+    expect([...page.querySelectorAll('.heroes li')].map((li) => li.textContent.replace(/\s+/g, ' ').trim())).toEqual([
       'Wat +15 XP, level 2 level up',
       'Wren died',
     ]);
 
-    button(page, 'Back to Millbrook')!.click();
-    await vi.waitFor(() => expect(router.url).toBe('/camp/millbrook'));
+    button(page, 'Back to Millbrook').click();
+    await vi.waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
     await settle();
     expect(game.settled()).toBeNull();
   });
@@ -286,11 +290,11 @@ describe('Adventure', () => {
     const game = fakeGame();
     const { page, run, settle } = await render(game, scene);
     await run(120_000);
-    button(page, 'Watch the replay')!.click();
-    await vi.waitFor(() => expect(scene.resets).toHaveLength(2));
+    button(page, 'Watch the replay').click();
+    await vi.waitFor(() => { expect(scene.resets).toHaveLength(2); });
     await settle();
     expect(game.timelines).toEqual(['a1']);
-    expect(scene.resets[1]).toEqual({ field: expect.objectContaining({ stage: 0, outcome: null }), enter: true });
+    expect(scene.resets[1]).toMatchObject({ field: { stage: 0, outcome: null }, enter: true });
     expect(page.querySelector('.note')?.textContent).toBe('Replay');
     expect(page.querySelector('.abilities')).toBeNull();
     const before = scene.fed.length;
@@ -298,7 +302,7 @@ describe('Adventure', () => {
     expect(scene.fed.length).toBeGreaterThan(before);
     expect(game.submitted).toHaveLength(1);
 
-    button(page, 'Back to the result')!.click();
+    button(page, 'Back to the result').click();
     await settle();
     expect(page.querySelector('.outcome')?.textContent).toBe('Job done.');
   });
@@ -322,8 +326,8 @@ describe('Adventure', () => {
     expect(loadRun('a1')).not.toBeNull();
 
     failing = false;
-    button(page, 'Try again')!.click();
-    await vi.waitFor(() => expect(game.submitted).toHaveLength(2));
+    button(page, 'Try again').click();
+    await vi.waitFor(() => { expect(game.submitted).toHaveLength(2); });
     await settle();
     expect(game.submitted[1]).toEqual(game.submitted[0]);
     expect(page.querySelector('.outcome')?.textContent).toBe('Job done.');

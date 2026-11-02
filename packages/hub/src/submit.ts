@@ -1,4 +1,4 @@
-import { GraphQLError } from "graphql";
+import { clamp } from "es-toolkit";
 import {
   levelForXp,
   replay,
@@ -20,6 +20,7 @@ import {
   type Settlement,
 } from "./db/repository.js";
 import { logger } from "./observability.js";
+import { AdventureDiscarded, Conflict, EngineUpdated, badInput } from "./refusals.js";
 import type { Timelines } from "./timelines.js";
 
 /**
@@ -32,11 +33,12 @@ import type { Timelines } from "./timelines.js";
  *
  * In order:
  *
- * 1. The adventure must be the caller's. A settled one answers as it is, so
- *    a repeat after a lost response pays nothing and still gets the result;
- *    a discarded one is refused.
+ * 1. The adventure must be the caller's; another player's is not said to
+ *    exist (BAD_USER_INPUT). A settled one answers as it is, so a repeat
+ *    after a lost response pays nothing and still gets the result; a
+ *    discarded one is refused with AdventureDiscarded.
  * 2. Only the version that issued it verifies it. Another is refused with
- *    ENGINE_UPDATED and this deploy's version; the client tries the
+ *    EngineUpdated and this deploy's version; the client tries the
  *    previous route, and the same refusal there means the adventure is too
  *    old and the client asks for the discard.
  * 3. The log is checked for shape and replayed. A log that differs from the
@@ -51,12 +53,12 @@ import type { Timelines } from "./timelines.js";
  * 5. Settlement reads the camp, its holdings and the party, computes the
  *    capped credits, the XP and the deaths, and writes them in one
  *    conditional transaction; a balance that moved in between is read again,
- *    up to SETTLE_ATTEMPTS times.
+ *    up to SETTLE_ATTEMPTS times, then the refusal is Conflict.
  */
 
 /** The most entries a log may have: far beyond what a person can click in a stage's time limits. */
 export const MAX_OVERRIDES = 2000;
-/** Reads and writes of a settlement before it answers CONFLICT. */
+/** Reads and writes of a settlement before it answers Conflict. */
 export const SETTLE_ATTEMPTS = 3;
 
 /** One entry of the submitted log, as the graph takes it: flat, checked here into the engine's union. */
@@ -68,30 +70,26 @@ export interface OverrideInput {
   order?: "PRESS_ON" | "RETREAT" | null | undefined;
 }
 
-function refuse(message: string, code: string, extensions: Record<string, unknown> = {}): never {
-  throw new GraphQLError(message, { extensions: { code, ...extensions } });
-}
-
-/** The caller's adventure, or NO_SUCH_ADVENTURE: another player's is not said to exist. */
+/** The caller's adventure, or BAD_USER_INPUT: another player's is not said to exist. */
 export async function ownAdventure(repo: Repository, playerId: string, adventureId: string): Promise<AdventureRecord> {
   const record = await repo.getAdventure(adventureId);
-  if (!record || record.playerId !== playerId) refuse(`no adventure ${adventureId}`, "NO_SUCH_ADVENTURE");
+  if (record?.playerId !== playerId) badInput(`no adventure ${adventureId}`);
   return record;
 }
 
 /** The submitted log as the engine's entries, or BAD_USER_INPUT. */
 export function toLog(record: AdventureRecord, inputs: readonly OverrideInput[]): AdventureLogEntry[] {
-  if (inputs.length > MAX_OVERRIDES) refuse(`a log holds at most ${MAX_OVERRIDES} entries`, "BAD_USER_INPUT");
+  if (inputs.length > MAX_OVERRIDES) badInput(`a log holds at most ${MAX_OVERRIDES} entries`);
   const party = new Set(record.snapshot.heroes.map((h) => h.heroId));
   return inputs.map((input, i): AdventureLogEntry => {
     const at = input.acceptedAtSimTime;
-    if (!Number.isSafeInteger(at) || at < 0) refuse(`entry ${i}: the time is a whole number of milliseconds`, "BAD_USER_INPUT");
+    if (!Number.isSafeInteger(at) || at < 0) badInput(`entry ${i}: the time is a whole number of milliseconds`);
     if (input.kind === "PARTY") {
-      if (!input.order) refuse(`entry ${i}: a party entry names an order`, "BAD_USER_INPUT");
+      if (!input.order) badInput(`entry ${i}: a party entry names an order`);
       return { kind: "party", acceptedAtSimTime: at, order: input.order === "RETREAT" ? "retreat" : "press-on" };
     }
-    if (!input.unitId || !party.has(input.unitId)) refuse(`entry ${i}: a unit entry names a hero of the party`, "BAD_USER_INPUT");
-    if (!input.abilityId || input.abilityId.length > 64) refuse(`entry ${i}: a unit entry names an ability`, "BAD_USER_INPUT");
+    if (!input.unitId || !party.has(input.unitId)) badInput(`entry ${i}: a unit entry names a hero of the party`);
+    if (!input.abilityId || input.abilityId.length > 64) badInput(`entry ${i}: a unit entry names an ability`);
     return {
       kind: "unit",
       acceptedAtSimTime: at,
@@ -124,7 +122,7 @@ export function settlement(
   const cap = warehouseCapacity(warehouseLevel);
   const holdings = [...byMaterial(result.rewards)].map(([material, amount]) => {
     const read = balances.get(material) ?? null;
-    const credit = Math.min(amount, Math.max(0, cap - (read ?? 0)));
+    const credit = clamp(cap - (read ?? 0), 0, amount);
     return { material, read, credit, lost: amount - credit };
   });
   const dead = new Set(result.dead);
@@ -171,8 +169,8 @@ export function settlement(
 async function closed(repo: Repository, adventureId: string): Promise<AdventureRecord> {
   const now = await repo.getAdventure(adventureId);
   if (now?.status === "SETTLED") return now;
-  if (now?.status === "DISCARDED") refuse("the adventure was discarded", "ADVENTURE_DISCARDED");
-  refuse("the adventure changed while settling; nothing was settled", "CONFLICT");
+  if (now?.status === "DISCARDED") throw new AdventureDiscarded("the adventure was discarded");
+  throw new Conflict("the adventure changed while settling; nothing was settled");
 }
 
 export async function submitAdventure(
@@ -186,10 +184,8 @@ export async function submitAdventure(
 ): Promise<AdventureRecord> {
   const record = await ownAdventure(repo, playerId, adventureId);
   if (record.status === "SETTLED") return record;
-  if (record.status === "DISCARDED") refuse("the adventure was discarded", "ADVENTURE_DISCARDED");
-  if (record.version !== version) {
-    refuse("the adventure was issued by another version of the game", "ENGINE_UPDATED", { version });
-  }
+  if (record.status === "DISCARDED") throw new AdventureDiscarded("the adventure was discarded");
+  if (record.version !== version) throw new EngineUpdated("the adventure was issued by another version of the game", version);
 
   const log = toLog(record, overrides);
   const verified = replay(record.snapshot, record.seed, log);
@@ -204,7 +200,7 @@ export async function submitAdventure(
   let result = verified.result;
   if (!(await timelines.putIfAbsent(adventureId, JSON.stringify(verified.timeline)))) {
     const body = await timelines.get(adventureId);
-    if (body === undefined) refuse("the stored timeline could not be read; nothing was settled", "CONFLICT");
+    if (body === undefined) throw new Conflict("the stored timeline could not be read; nothing was settled");
     const stored = JSON.parse(body) as AdventureTimeline;
     result = replay(record.snapshot, record.seed, stored.overrideLog).result;
   }
@@ -223,5 +219,5 @@ export async function submitAdventure(
       if (!(e instanceof CampChanged || e instanceof TransactionConflict)) throw e;
     }
   }
-  refuse("the camp kept changing while settling; nothing was settled", "CONFLICT");
+  throw new Conflict("the camp kept changing while settling; nothing was settled");
 }

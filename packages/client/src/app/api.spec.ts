@@ -24,10 +24,10 @@ function setup(body: unknown) {
   const api = TestBed.inject(Api);
   const headers: Record<string, string>[] = [];
   const paths: string[] = [];
-  api.fetchFn = async (input, init) => {
+  api.fetchFn = (input, init) => {
     paths.push(input);
     headers.push(init.headers as Record<string, string>);
-    return new Response(JSON.stringify(body), { status: 200 });
+    return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
   };
   return { api, headers, paths };
 }
@@ -47,9 +47,9 @@ describe('Api', () => {
     expect(api.outdated()).toBe(true);
   });
 
-  it('records the flag on an error response too, and still throws the refusal with its code', async () => {
-    const { api } = setup({ errors: [{ message: 'a party is 1 to 4 heroes', extensions: { code: 'PARTY_SIZE' } }], extensions: { outdated: true } });
-    await expect(api.request('mutation { x }')).rejects.toEqual(new ApiError('a party is 1 to 4 heroes', 'PARTY_SIZE'));
+  it('records the flag on an error response too, and still throws the error with its code', async () => {
+    const { api } = setup({ errors: [{ message: 'a party is 1 to 4 heroes', extensions: { code: 'BAD_USER_INPUT' } }], extensions: { outdated: true } });
+    await expect(api.request('mutation { x }')).rejects.toEqual(new ApiError('a party is 1 to 4 heroes', 'BAD_USER_INPUT'));
     expect(api.outdated()).toBe(true);
   });
 

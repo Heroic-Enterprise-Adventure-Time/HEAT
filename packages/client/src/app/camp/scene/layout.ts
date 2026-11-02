@@ -1,4 +1,5 @@
 import type { FacilityKind } from '@heat/engine';
+import { range } from 'es-toolkit';
 import type { Terrain } from './ground';
 
 /**
@@ -57,9 +58,7 @@ const COLS = Math.ceil(MAP_WIDTH / TILE);
 const ROWS = Math.ceil(MAP_HEIGHT / TILE);
 
 function corners(dirt: (col: number, row: number) => boolean): Terrain[][] {
-  return Array.from({ length: ROWS + 1 }, (_, row) =>
-    Array.from({ length: COLS + 1 }, (_, col): Terrain => (dirt(col, row) ? 'lower' : 'upper')),
-  );
+  return range(ROWS + 1).map((row) => range(COLS + 1).map((col): Terrain => (dirt(col, row) ? 'lower' : 'upper')));
 }
 
 export const MILLBROOK: CampLayout = {
@@ -89,7 +88,5 @@ export const LAYOUTS: Readonly<Record<string, CampLayout>> = { millbrook: MILLBR
  * fill whatever the scene's box shows around it.
  */
 export function cornersAround(layout: CampLayout, col0: number, row0: number, cols: number, rows: number): Terrain[][] {
-  return Array.from({ length: rows + 1 }, (_, r) =>
-    Array.from({ length: cols + 1 }, (_, c): Terrain => layout.corners[row0 + r]?.[col0 + c] ?? 'upper'),
-  );
+  return range(rows + 1).map((r) => range(cols + 1).map((c): Terrain => layout.corners[row0 + r]?.[col0 + c] ?? 'upper'));
 }

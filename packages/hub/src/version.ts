@@ -12,7 +12,7 @@ import type { Context } from "./context.js";
 export const VERSION_HEADER = "heat-version";
 
 export function versionFromEnv(env: NodeJS.ProcessEnv = process.env): string {
-  const version = env.HEAT_VERSION;
+  const version = env["HEAT_VERSION"];
   if (!version) throw new Error("HEAT_VERSION is not set");
   return version;
 }
@@ -24,7 +24,8 @@ export function versionFromEnv(env: NodeJS.ProcessEnv = process.env): string {
  * Only a discard reads it.
  */
 export function previousVersionFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return env.HEAT_PREVIOUS_VERSION || undefined;
+  const previous = env["HEAT_PREVIOUS_VERSION"];
+  return previous === undefined || previous === "" ? undefined : previous;
 }
 
 /**
@@ -34,17 +35,19 @@ export function previousVersionFromEnv(env: NodeJS.ProcessEnv = process.env): st
  * flag is Issue-115's and Issue-15's.
  */
 export function outdatedFlag(): ApolloServerPlugin<Context> {
+  // Apollo's hooks return promises; nothing here waits.
   return {
-    async requestDidStart() {
-      return {
-        async willSendResponse({ contextValue, response }) {
+    requestDidStart() {
+      return Promise.resolve({
+        willSendResponse({ contextValue, response }) {
           const { clientVersion, version } = contextValue;
-          if (clientVersion === undefined || clientVersion === version) return;
-          if (response.body.kind !== "single") return;
-          const result = response.body.singleResult;
-          result.extensions = { ...result.extensions, outdated: true };
+          if (clientVersion !== undefined && clientVersion !== version && response.body.kind === "single") {
+            const result = response.body.singleResult;
+            result.extensions = { ...result.extensions, outdated: true };
+          }
+          return Promise.resolve();
         },
-      };
+      });
     },
   };
 }
