@@ -1,0 +1,34 @@
+# The checks trivy raises against a scale-down a rule already states, one id
+# per line, excused for every root and module under this directory, with the
+# reason on the lines above it; the standing list is "Held back" in
+# docs/standards/terraform.md, and an excuse for one resource is an inline
+# trivy:ignore on that resource instead (rule 17). Read by `trivy config .`
+# from this directory, on a laptop and in CI alike.
+
+# S3 encryption with a customer-managed key: a key costs at rest (rule 12),
+# and decision 0008 declined one for the state bucket. Every bucket is
+# encrypted with S3's own keys.
+AVD-AWS-0132
+
+# DynamoDB encryption with a customer-managed key: rule 12. The tables are
+# encrypted with AWS-owned keys.
+AVD-AWS-0025
+
+# CloudWatch log groups encrypted with a customer-managed key: rule 12. The
+# hub's one logging path writes no secret (docs/standards/graphql.md,
+# rule 16).
+AVD-AWS-0017
+
+# A WAF in front of the distribution: a web ACL costs at rest, in every
+# environment and every sandbox stack (rule 12). The API sits behind the JWT
+# authorizer and the site is static.
+AVD-AWS-0011
+
+# CloudFront access logs: a log destination per environment, with its policy
+# and lifecycle, and no reader. The gateway's access log and the function's
+# log are the request record (docs/process/development.md, rule 7).
+AVD-AWS-0010
+
+# S3 server access logs: a log bucket per bucket per account, and no reader.
+# CloudTrail records the bucket-level calls.
+AVD-AWS-0089

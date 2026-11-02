@@ -8,13 +8,24 @@
 # role is the only reader and writer (functions.tf); there is no
 # distribution in front of it.
 #
-# No versioning: an object is written once, with If-None-Match, and never
-# changed. force_destroy follows deletion protection: a sandbox stack's
-# destroy empties the bucket, and a destroy of dev or prod refuses to
-# delete players' timelines.
+# force_destroy follows deletion protection: a sandbox stack's destroy
+# empties the bucket, every version of every object, and a destroy of dev
+# or prod refuses to delete players' timelines.
 resource "aws_s3_bucket" "replays" {
   bucket        = "${var.name_prefix}-replays"
   force_destroy = !var.deletion_protection
+}
+
+# Versioned: an object is written once, with If-None-Match, and never
+# changed, so no version is ever noncurrent and versioning stores nothing
+# twice; what it buys is that a timeline deleted by mistake can be put back
+# (Issue-157, trivy's AVD-AWS-0090).
+resource "aws_s3_bucket_versioning" "replays" {
+  bucket = aws_s3_bucket.replays.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
 }
 
 resource "aws_s3_bucket_public_access_block" "replays" {

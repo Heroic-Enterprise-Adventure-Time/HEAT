@@ -3,8 +3,9 @@
 # The gate on every pull request and on main: does the repository build, does
 # it lint clean, do its tests pass, does the client build for production, is
 # the committed GraphQL schema current and the client's generated code with
-# it, does every function bundle, is every Terraform root formatted and valid,
-# and does every workflow lint clean under actionlint. It runs with no AWS
+# it, does every function bundle, is every Terraform root formatted, valid
+# and clean under tflint and trivy, and does every workflow lint clean under
+# actionlint. It runs with no AWS
 # credentials; the integration tests start their own containers (decision
 # 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
@@ -76,7 +77,7 @@ jobs:
         run: npm run bundle
 
   terraform:
-    name: Terraform format, validate and lint
+    name: Terraform format, validate, lint and scan
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -121,6 +122,31 @@ jobs:
         working-directory: terraform
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      # trivy's misconfiguration checks, pinned, from its release archive with
+      # the archive's build attestation verified before it runs, as actionlint
+      # is below; the install script its document offers pipes a fetch into
+      # sh, which this project does not do. The options and the pinned checks
+      # bundle are terraform/trivy.yaml, the standing excuses
+      # terraform/.trivyignore (docs/standards/terraform.md, rule 17).
+      - name: Set up trivy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TRIVY_VERSION: 0.76.1
+        run: |
+          set -eu
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          gh release download "v$TRIVY_VERSION" --repo aquasecurity/trivy --pattern "$archive" --dir "$RUNNER_TEMP"
+          gh attestation verify "$RUNNER_TEMP/$archive" --repo aquasecurity/trivy
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
+          "$RUNNER_TEMP/trivy" --version
+
+      # The command a laptop runs (docs/process/development.md, rule 2): the
+      # roots and modules, with trivy.yaml and .trivyignore read from here.
+      - name: Scan every root and module for misconfigurations
+        run: |
+          "$RUNNER_TEMP/trivy" config .
+        working-directory: terraform
 
   workflows:
     name: Lint the workflows
