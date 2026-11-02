@@ -2,9 +2,9 @@
 
 HEAT (Heroic Enterprise Adventure Time) is a browser game about running an adventuring business. It exists as a technical showcase: the game is deliberately simple, and the interest is in the data services behind it and the pipeline that delivers them.
 
-![The camp at Millbrook on a sandbox stack: the heroes hall, the job board, the warehouse, the sites of the lumber camp, the mine and the caravan hub, and the camp's first heroes](docs/images/camp.png)
+![The camp at Millbrook on the sandbox stack heat-sb177 at commit c464d1a, 2026-11-02: the heroes hall, the job board, the warehouse, the sites of the lumber camp, the mine and the caravan hub, and the camp's first heroes](docs/images/camp.png)
 
-![Six hero still frames: villager, fighter, knight, ranger, priest and wizard](docs/images/heroes.png)
+![Six hero still frames at three times their size, composed from the still-south frames of villager-01, fighter-02, knight-06, ranger-01, priest-02 and wizard-01 under art/heroes](docs/images/heroes.png)
 
 ## Play it
 

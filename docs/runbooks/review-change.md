@@ -16,6 +16,7 @@ How a pull request is reviewed against the standards before the owner reads it: 
    | `packages/client/**` | `docs/standards/angular.md` as well |
    | `packages/hub/**` | `docs/standards/graphql.md` as well |
    | `terraform/**` | `docs/standards/terraform.md` |
+   | `README.md` at the repository root | `docs/README.md`, which indexes it as a document (Issue-177) |
    | `docs/**`, `AGENTS.md`, `CLAUDE.md`, `.claude/**` | `docs/README.md` |
    | `docs/decisions/**` | `docs/decisions/README.md` as well |
 

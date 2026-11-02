@@ -91,12 +91,6 @@ jobs:
             role: heat-dev-plan
             code: true
     env:
-      # The root's account id, a repository secret so that GitHub masks it in
-      # every log line, the env echo included (docs/README.md, rule 9). The
-      # secrets context is not available in a matrix, so the row's root picks
-      # the secret here.
-      ACCOUNT_ID: ${{ matrix.root == 'dev' && secrets.HEAT_DEV_ACCOUNT_ID || secrets.HEAT_SANDBOX_ACCOUNT_ID }}
-      TF_VAR_workload_account_id: ${{ matrix.root == 'dev' && secrets.HEAT_DEV_ACCOUNT_ID || secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       # The deploy's version (decision 0030): the pull request's head, which
       # this job checks out and plans. Not github.sha, which in a
       # pull_request_target run is the base branch's tip. A root without the
@@ -112,13 +106,26 @@ jobs:
       TF_VAR_google_client_secret: ${{ secrets.HEAT_GOOGLE_CLIENT_SECRET }}
       TF_VAR_alarm_email: ${{ vars.HEAT_ALARM_EMAIL }}
     steps:
-      - name: Refuse to run without the account id
+      # The row's account id, a repository secret so that GitHub masks it in
+      # every log line, the env echo included (docs/README.md, rule 9; decision
+      # 0035). The secrets context is not available in a matrix, so the row
+      # cannot carry the id: both secrets are in this step's env and the root
+      # chooses, so that the guard reads exactly the value the job will use (an
+      # `&& ... ||` expression would fall back to the other secret when the
+      # row's is empty). Written to GITHUB_ENV once, for every later step.
+      - name: Pick the row's account id, or refuse to run
+        env:
+          ROOT: ${{ matrix.root }}
+          SANDBOX_ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
+          DEV_ACCOUNT_ID: ${{ secrets.HEAT_DEV_ACCOUNT_ID }}
         run: |
           set -eu
-          if [ -z "$ACCOUNT_ID" ]; then
-            echo "The account id secret for ${{ matrix.root }} is not set." >&2
-            exit 1
-          fi
+          case "$ROOT" in
+            dev) account="$DEV_ACCOUNT_ID"; secret=HEAT_DEV_ACCOUNT_ID ;;
+            *)   account="$SANDBOX_ACCOUNT_ID"; secret=HEAT_SANDBOX_ACCOUNT_ID ;;
+          esac
+          [ -n "$account" ] || { echo "The repository secret $secret is not set." >&2; exit 1; }
+          { echo "ACCOUNT_ID=$account"; echo "TF_VAR_workload_account_id=$account"; } >> "$GITHUB_ENV"
 
       - name: Check out the pull request's head
         uses: actions/checkout@v7
@@ -207,12 +214,6 @@ jobs:
             code: true
             stack: heat-dev
     env:
-      # The root's account id, a repository secret so that GitHub masks it in
-      # every log line, the env echo included (docs/README.md, rule 9). The
-      # secrets context is not available in a matrix, so the row's root picks
-      # the secret here.
-      ACCOUNT_ID: ${{ matrix.root == 'dev' && secrets.HEAT_DEV_ACCOUNT_ID || secrets.HEAT_SANDBOX_ACCOUNT_ID }}
-      TF_VAR_workload_account_id: ${{ matrix.root == 'dev' && secrets.HEAT_DEV_ACCOUNT_ID || secrets.HEAT_SANDBOX_ACCOUNT_ID }}
       # The deploy's version, the commit this run deploys (decision 0030):
       # the hub's HEAT_VERSION and config.json's version from Issue-113. A
       # root without the variable ignores it.
@@ -228,13 +229,26 @@ jobs:
       ROOT: ${{ matrix.root }}
       STACK: ${{ matrix.stack }}
     steps:
-      - name: Refuse to run without the account id
+      # The row's account id, a repository secret so that GitHub masks it in
+      # every log line, the env echo included (docs/README.md, rule 9; decision
+      # 0035). The secrets context is not available in a matrix, so the row
+      # cannot carry the id: both secrets are in this step's env and the root
+      # chooses, so that the guard reads exactly the value the job will use (an
+      # `&& ... ||` expression would fall back to the other secret when the
+      # row's is empty). Written to GITHUB_ENV once, for every later step.
+      - name: Pick the row's account id, or refuse to run
+        env:
+          ROOT: ${{ matrix.root }}
+          SANDBOX_ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
+          DEV_ACCOUNT_ID: ${{ secrets.HEAT_DEV_ACCOUNT_ID }}
         run: |
           set -eu
-          if [ -z "$ACCOUNT_ID" ]; then
-            echo "The account id secret for ${{ matrix.root }} is not set." >&2
-            exit 1
-          fi
+          case "$ROOT" in
+            dev) account="$DEV_ACCOUNT_ID"; secret=HEAT_DEV_ACCOUNT_ID ;;
+            *)   account="$SANDBOX_ACCOUNT_ID"; secret=HEAT_SANDBOX_ACCOUNT_ID ;;
+          esac
+          [ -n "$account" ] || { echo "The repository secret $secret is not set." >&2; exit 1; }
+          { echo "ACCOUNT_ID=$account"; echo "TF_VAR_workload_account_id=$account"; } >> "$GITHUB_ENV"
 
       - name: Check out main
         uses: actions/checkout@v7

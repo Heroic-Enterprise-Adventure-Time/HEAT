@@ -78,9 +78,10 @@ Remove-Item dev.tfplan
 
 Two things learned on the first applies, 2026-10-15. PowerShell splits a `-flag=value` argument at a dot in the value, so a flag that takes a value is written with a space, as `-out dev.tfplan` is. And a value piped into `gh variable set` or `gh secret set` arrived with a UTF-8 byte-order mark in front of it; pass values as arguments, `--body "<value>"`, never through a pipe.
 
-**On the GitHub side.** The workflows store no role ARNs: a role's ARN is the account id secret plus its committed name, `heat-<environment>-apply` or `-plan`. One repository secret per account, set once that account's root is applied; a secret and not a variable, because GitHub masks a secret in every log line and the logs are public with the repository (Issue-177). From the worktree or the checkout, so that `gh` finds the repository:
+**On the GitHub side.** The workflows store no role ARNs: a role's ARN is the account id secret plus its committed name, `heat-<environment>-apply` or `-plan`. One repository secret per account, set once that account's root is applied; a secret and not a variable, because GitHub masks a secret in every log line and the logs are public with the repository (decision 0035). The variables the secrets replaced are deleted after the first apply from `main` that read the secrets (Issue-178), because a pull request's plan runs `main`'s copy of `deploy.yml`. From the worktree or the checkout, so that `gh` finds the repository:
 
 ```powershell
+gh secret set HEAT_DEV_ACCOUNT_ID --body "<the heat-dev account id>"
 gh secret set HEAT_PROD_ACCOUNT_ID --body "<the heat-prod account id>"
 gh secret set HEAT_SANDBOX_ACCOUNT_ID --body "<the heat-sandbox account id>"
 gh variable delete HEAT_DEV_DEPLOY_ROLE_ARN
