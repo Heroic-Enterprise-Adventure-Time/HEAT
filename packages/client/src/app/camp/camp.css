@@ -21,7 +21,7 @@
 .menu {
   display: flex;
   justify-content: space-around;
-  height: 4rem;
+  height: var(--menu-row-height);
   flex: none;
   background: var(--bar);
   border-top: var(--border) solid var(--ink);
@@ -103,14 +103,14 @@
 /* Side by side, where that leaves the scene scale 2 (page-layout.ts, isSideBySide): the menu, the scene and the panel in columns. */
 .camp.side {
   display: grid;
-  grid-template-columns: 3.5rem minmax(0, 1fr) var(--panel-width);
+  grid-template-columns: var(--menu-rail-width) minmax(0, 1fr) var(--panel-width);
   grid-template-areas: 'menu stage panel';
   height: calc(100dvh - var(--header-height));
   min-height: 0;
 }
 
 .camp.side.labels {
-  grid-template-columns: 13.5rem minmax(0, 1fr) var(--panel-width);
+  grid-template-columns: var(--menu-labelled-width) minmax(0, 1fr) var(--panel-width);
 }
 
 .side .stage {

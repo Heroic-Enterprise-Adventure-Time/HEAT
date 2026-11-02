@@ -6,6 +6,8 @@ import { UNIT_PROFILES, replay, must, type AdventureEvent, type AdventureLogEntr
 import { ApiError } from '../api';
 import { Game, type AdventureResultView, type AdventureView, type SettledView } from '../game';
 import { Adventure, BATTLE_SCENE_FACTORY, FRAME_LOOP } from './adventure';
+import { LAYOUT_SIZES } from '../camp/layout-sizes';
+import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
 import type { BattleSceneCallbacks } from './battle/battle-scene';
 import { isEntry, type Field } from './field';
 import { AdventureRun, loadRun, saveRun } from './run';
@@ -125,6 +127,7 @@ async function render(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
       { provide: Game, useValue: game },
       { provide: FRAME_LOOP, useValue: (f: (ms: number) => void) => ((onFrame = f), () => undefined) },
       { provide: BATTLE_SCENE_FACTORY, useValue: scene.factory },
+      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],
   });
   const harness = await RouterTestingHarness.create('/adventure');

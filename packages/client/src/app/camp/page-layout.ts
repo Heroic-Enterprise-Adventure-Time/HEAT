@@ -7,19 +7,70 @@ import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH } from './scene/layout';
  * menu shows its labels and at what size its icons, and the scene's whole
  * number scale and the window of the world it shows. Plain functions of the
  * sizes, so they are tested without a browser; the CSS lays the regions out
- * by the classes these decide. The regions are decided in CSS pixels; the
+ * by the classes these decide, and the regions' own sizes are the CSS's,
+ * read from its tokens. The regions are decided in CSS pixels; the
  * scene's scale counts device pixels, so that at a fractional device pixel
  * ratio every art pixel is still the same whole number of them (Issue-95).
  */
 
-/** The header bar's height in CSS pixels: 2.25rem. */
-export const HEADER_PX = 36;
-/** The facility menu as an icon rail: 3.5rem. */
-export const RAIL_PX = 56;
-/** The facility menu with its labels, room for a 64 px icon beside them: 13.5rem. */
-export const LABELLED_PX = 216;
-/** The menu as a row under the scene when the regions stack: 4rem. */
-export const MENU_ROW_PX = 64;
+/**
+ * The page's regions in CSS pixels, read from the tokens in styles.css by
+ * `readLayoutSizes`, so the arithmetic and the stylesheet hold one copy, at
+ * the player's font size (best-practices.md, rule 10).
+ */
+export interface LayoutSizes {
+  /** The header bar's height. */
+  readonly header: number;
+  /** The facility menu as an icon rail. */
+  readonly rail: number;
+  /** The facility menu with its labels, room for a 64 px icon beside them. */
+  readonly labelledMenu: number;
+  /** The menu as a row under the scene when the regions stack. */
+  readonly menuRow: number;
+  /** The panel beside the scene: its share of the window's width, held between the two bounds. */
+  readonly panelShare: number;
+  readonly panelMin: number;
+  readonly panelMax: number;
+}
+
+/** The token each length is read from. */
+const LENGTH_TOKENS = {
+  header: '--header-height',
+  rail: '--menu-rail-width',
+  labelledMenu: '--menu-labelled-width',
+  menuRow: '--menu-row-height',
+  panelMin: '--panel-min-width',
+  panelMax: '--panel-max-width',
+} as const;
+const PANEL_SHARE_TOKEN = '--panel-share';
+
+/**
+ * The regions' sizes from the root element's computed style: a `rem` token
+ * at the root font size, a `px` token as it is, the panel's share as a
+ * fraction of the window's width from its `vw`. Pure in its argument, so a
+ * test hands it a style of its own; a token missing or in another unit is a
+ * mistake in styles.css and fails here with its name.
+ */
+export function readLayoutSizes(root: Pick<CSSStyleDeclaration, 'fontSize' | 'getPropertyValue'>): LayoutSizes {
+  const rem = parseFloat(root.fontSize);
+  const read = (token: string, unit: RegExp): number => {
+    const value = root.getPropertyValue(token).trim();
+    const match = unit.exec(value);
+    if (!match?.[1]) throw new Error(`styles.css: ${token} is "${value}", not a length the layout can read`);
+    return value.endsWith('rem') ? Number(match[1]) * rem : Number(match[1]);
+  };
+  const length = (token: string) => read(token, /^(\d*\.?\d+)(?:rem|px)$/);
+  return {
+    header: length(LENGTH_TOKENS.header),
+    rail: length(LENGTH_TOKENS.rail),
+    labelledMenu: length(LENGTH_TOKENS.labelledMenu),
+    menuRow: length(LENGTH_TOKENS.menuRow),
+    panelShare: read(PANEL_SHARE_TOKEN, /^(\d*\.?\d+)vw$/) / 100,
+    panelMin: length(LENGTH_TOKENS.panelMin),
+    panelMax: length(LENGTH_TOKENS.panelMax),
+  };
+}
+
 /** The scale side by side must give the scene; below it the regions stack. */
 export const SIDE_BY_SIDE_MIN_SCALE = 2;
 /** The scene scale from which the labelled menu draws its icons at 2×. */
@@ -30,14 +81,14 @@ export function sceneScale(width: number, height: number): number {
   return Math.max(1, Math.floor(Math.min(width / MAP_CORE_WIDTH, height / MAP_HEIGHT)));
 }
 
-/** The panel beside the scene: 26% of the window, held between 17rem and 28rem. Matches the CSS's `clamp(17rem, 26vw, 28rem)`. */
-export function panelPx(width: number): number {
-  return clamp(width * 0.26, 272, 448);
+/** The panel beside the scene: its share of the window, held between its bounds, as the CSS's `--panel-width` clamps it. */
+export function panelPx(width: number, sizes: LayoutSizes): number {
+  return clamp(width * sizes.panelShare, sizes.panelMin, sizes.panelMax);
 }
 
 /** The scene's scale with the regions side by side and the given menu width. */
-function sideScale(width: number, height: number, menu: number): number {
-  return sceneScale(width - menu - panelPx(width), height - HEADER_PX);
+function sideScale(width: number, height: number, menu: number, sizes: LayoutSizes): number {
+  return sceneScale(width - menu - panelPx(width, sizes), height - sizes.header);
 }
 
 /**
@@ -46,18 +97,18 @@ function sideScale(width: number, height: number, menu: number): number {
  * them, with the scene across the full width, rather than squeeze the scene
  * to scale 1 between two columns.
  */
-export function isSideBySide(width: number, height: number): boolean {
-  return width > height && sideScale(width, height, RAIL_PX) >= SIDE_BY_SIDE_MIN_SCALE;
+export function isSideBySide(width: number, height: number, sizes: LayoutSizes): boolean {
+  return width > height && sideScale(width, height, sizes.rail, sizes) >= SIDE_BY_SIDE_MIN_SCALE;
 }
 
 /** Whether the menu shows its labels: only side by side, and only where the wider menu costs the scene no scale step. */
-export function menuLabels(width: number, height: number): boolean {
-  return isSideBySide(width, height) && sideScale(width, height, LABELLED_PX) >= sideScale(width, height, RAIL_PX);
+export function menuLabels(width: number, height: number, sizes: LayoutSizes): boolean {
+  return isSideBySide(width, height, sizes) && sideScale(width, height, sizes.labelledMenu, sizes) >= sideScale(width, height, sizes.rail, sizes);
 }
 
 /** The menu's icon scale: 2× in a labelled menu beside a scene at scale 3 or more, so the icons keep up with it; else 1×. */
-export function iconScale(width: number, height: number): number {
-  return menuLabels(width, height) && sideScale(width, height, LABELLED_PX) >= BIG_ICONS_MIN_SCALE ? 2 : 1;
+export function iconScale(width: number, height: number, sizes: LayoutSizes): number {
+  return menuLabels(width, height, sizes) && sideScale(width, height, sizes.labelledMenu, sizes) >= BIG_ICONS_MIN_SCALE ? 2 : 1;
 }
 
 /**
@@ -66,8 +117,8 @@ export function iconScale(width: number, height: number): number {
  * width and the height left under the header and the menu row, so the scene
  * and the menu stay on screen.
  */
-export function stackedStageHeight(width: number, height: number, ratio = 1): number {
-  const byHeight = Math.floor(((height - HEADER_PX - MENU_ROW_PX) * ratio) / MAP_HEIGHT);
+export function stackedStageHeight(width: number, height: number, sizes: LayoutSizes, ratio = 1): number {
+  const byHeight = Math.floor(((height - sizes.header - sizes.menuRow) * ratio) / MAP_HEIGHT);
   return (MAP_HEIGHT * Math.max(1, Math.min(Math.floor((width * ratio) / MAP_CORE_WIDTH), byHeight))) / ratio;
 }
 

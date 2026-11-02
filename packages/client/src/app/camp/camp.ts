@@ -5,6 +5,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { STARTING_LOCATION, type FacilityKind } from '@heat/engine';
 import { Game, type HeroView, type SeenHeroView } from '../game';
 import { CampState } from './camp-state';
+import { LAYOUT_SIZES } from './layout-sizes';
 import { iconScale, isSideBySide, menuLabels, stackedStageHeight } from './page-layout';
 import { LAYOUTS } from './scene/layout';
 import type { CampSceneHandle, SceneCallbacks } from './scene/camp-scene';
@@ -52,18 +53,20 @@ export class Camp {
   protected readonly state = inject(CampState);
   private readonly router = inject(Router);
   private readonly createScene = inject(CAMP_SCENE_FACTORY);
+  private readonly readSizes = inject(LAYOUT_SIZES);
   private readonly params = toSignal(inject(ActivatedRoute).paramMap);
   private readonly stage = viewChild.required<ElementRef<HTMLElement>>('stage');
 
   protected readonly location = computed(() => this.params()?.get('location') ?? STARTING_LOCATION);
 
-  private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
-  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height));
-  protected readonly labels = computed(() => menuLabels(this.viewport().width, this.viewport().height));
-  protected readonly iconPx = computed(() => 32 * iconScale(this.viewport().width, this.viewport().height));
+  /** The window and the regions' sizes, measured together, since a font-size change moves both. */
+  private readonly viewport = signal(this.measured());
+  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height, this.viewport().sizes));
+  protected readonly labels = computed(() => menuLabels(this.viewport().width, this.viewport().height, this.viewport().sizes));
+  protected readonly iconPx = computed(() => 32 * iconScale(this.viewport().width, this.viewport().height, this.viewport().sizes));
   /** Stacked, the scene's box is the page's width by the map's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() =>
-    this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
+    this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height, this.viewport().sizes, this.viewport().ratio),
   );
 
   /** The heroes about the camp: not those away on the open adventure (Issue-15). */
@@ -116,7 +119,11 @@ export class Camp {
   }
 
   protected measure(): void {
-    this.viewport.set({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
+    this.viewport.set(this.measured());
+  }
+
+  private measured() {
+    return { width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio, sizes: this.readSizes() };
   }
 
   /** Measures again when the device pixel ratio changes, browser zoom or another screen, which a resize alone may not report. */

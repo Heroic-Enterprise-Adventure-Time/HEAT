@@ -9,6 +9,8 @@ import { Game, upgradeOffer, type CampView, type HeroView, type RecruitOffer, ty
 import { Session } from '../session';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
 import { CAMP_SCENE_FACTORY } from './camp';
+import { LAYOUT_SIZES } from './layout-sizes';
+import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
 import { must } from '@heat/engine';
 
 const wren: HeroView = {
@@ -134,6 +136,7 @@ async function render(game: ReturnType<typeof fakeGame>, url = '/camp/millbrook'
       { provide: Game, useValue: game },
       { provide: Session, useValue: { user: signal({ email: 'player@example.com', name: null, accessToken: 't' }) } },
       { provide: CAMP_SCENE_FACTORY, useValue: scene.factory },
+      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],
   });
   const harness = await RouterTestingHarness.create(url);

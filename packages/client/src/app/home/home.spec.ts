@@ -4,6 +4,8 @@ import { Router, provideRouter } from '@angular/router';
 import { Config } from '../config';
 import { Session, type SessionUser } from '../session';
 import { CAMP_SCENE_FACTORY } from '../camp/camp';
+import { LAYOUT_SIZES } from '../camp/layout-sizes';
+import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
 import { Game } from '../game';
 import { Home } from './home';
 import { Blank } from '../testing/blank';
@@ -40,6 +42,7 @@ async function render(session: ReturnType<typeof fakeSession>, configError: stri
       // The camp's own collaborators, standing in: no hub and no WebGL in a test.
       { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), recruits: signal([]), busy: signal(false), error: signal(null) } },
       { provide: CAMP_SCENE_FACTORY, useValue: () => Promise.resolve({ setHeroes: () => undefined, setLevels: () => undefined, destroy: () => undefined }) },
+      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],
   }).compileComponents();
   const fixture = TestBed.createComponent(Home);

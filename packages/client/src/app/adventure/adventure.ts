@@ -3,6 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Router } from '@angular/router';
 import { ABILITIES, JOBS, UNIT_PROFILES, location, must, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
 import { Game, type AdventureResultView } from '../game';
+import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
@@ -80,12 +81,14 @@ export class Adventure {
   protected readonly play = inject(Play);
   private readonly router = inject(Router);
   private readonly createScene = inject(BATTLE_SCENE_FACTORY);
+  private readonly readSizes = inject(LAYOUT_SIZES);
   protected readonly speeds = SPEEDS;
   protected readonly endings = ENDINGS;
   protected readonly outcomes = OUTCOMES;
 
-  private readonly viewport = signal({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
-  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height));
+  /** The window and the regions' sizes, measured together, since a font-size change moves both. */
+  private readonly viewport = signal(this.measured());
+  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height, this.viewport().sizes));
   /** Stacked, the stage's box is the page's width by the stage's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() =>
     this.side() ? null : stackedBattleHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
@@ -151,7 +154,11 @@ export class Adventure {
   }
 
   protected measure(): void {
-    this.viewport.set({ width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio });
+    this.viewport.set(this.measured());
+  }
+
+  private measured() {
+    return { width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio, sizes: this.readSizes() };
   }
 
   /** Loads the scene; without one, as where WebGL is missing, the run plays with the controls alone. */
