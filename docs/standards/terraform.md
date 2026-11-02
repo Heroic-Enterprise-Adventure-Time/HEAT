@@ -12,7 +12,7 @@ Standards for every stack under `terraform/`: `backend`, `bootstrap` and `enviro
 
 ### What never enters git
 
-4. **No account id and no secret in a committed file** (docs/README.md, rule 9; decision 0020). An account id is a variable validated as twelve digits, from a GitHub variable in the pipeline and from the private script or an ignored `terraform.tfvars` on a laptop, and the provider's `allowed_account_ids` refuses any other account before anything is planned. A secret is `sensitive = true`, lives in the GitHub environment of the deployment it belongs to, enters AWS through a base root, and is never given to an environment root. State holds a secret only where the resource needs the raw value, which decision 0020 names.
+4. **No account id and no secret in a committed file** (docs/README.md, rule 9; decision 0020). An account id is a variable validated as twelve digits, from a repository secret in the pipeline (decision 0035) and from the private script or an ignored `terraform.tfvars` on a laptop, and the provider's `allowed_account_ids` refuses any other account before anything is planned. A secret is `sensitive = true`, lives in the GitHub environment of the deployment it belongs to, enters AWS through a base root, and is never given to an environment root. State holds a secret only where the resource needs the raw value, which decision 0020 names.
 5. **Every variable has a description, a type and, where its shape is known, a validation;** every output a description where its name does not say enough (tflint, `terraform_documented_variables`, `terraform_typed_variables`). The description says what the value is and where it comes from, in the pipeline and on a laptop.
 
 ### Naming and tags

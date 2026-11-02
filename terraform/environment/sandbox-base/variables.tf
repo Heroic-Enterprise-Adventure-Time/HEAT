@@ -1,6 +1,6 @@
 # Three values this root never commits (docs/README.md, rule 9). The sandbox
 # account's id arrives in the pipeline as TF_VAR_workload_account_id from the
-# repository variable HEAT_SANDBOX_ACCOUNT_ID, and the provider uses it only
+# repository secret HEAT_SANDBOX_ACCOUNT_ID, and the provider uses it only
 # to refuse credentials for any other account. The Google OAuth client's id
 # and secret arrive from the sandbox-base GitHub environment, as
 # TF_VAR_google_client_id from the variable HEAT_GOOGLE_CLIENT_ID and

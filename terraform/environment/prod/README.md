@@ -39,7 +39,7 @@ No flag selects an environment; the directory does (decision 0016).
 
 | Variable | From, in the pipeline | From, on a laptop |
 | --- | --- | --- |
-| `workload_account_id` | The repository variable `HEAT_PROD_ACCOUNT_ID` | The private script in `docs/private/`, or `terraform.tfvars` |
+| `workload_account_id` | The repository secret `HEAT_PROD_ACCOUNT_ID` | The private script in `docs/private/`, or `terraform.tfvars` |
 | `google_client_id` | The `prod` environment's variable `HEAT_GOOGLE_CLIENT_ID`, the client registered against `auth.heat.dcg-games.com` | A placeholder |
 | `google_client_secret` | The `prod` environment's secret `HEAT_GOOGLE_CLIENT_SECRET` (sensitive) | A placeholder |
 | `alarm_email` | The `prod` environment's variable `HEAT_ALARM_EMAIL` | A placeholder |

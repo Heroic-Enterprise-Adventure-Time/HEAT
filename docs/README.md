@@ -6,6 +6,7 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 
 | Document | Covers | Reaches an agent |
 | --- | --- | --- |
+| [../README.md](../README.md) | The front page for a person arriving at the repository: what HEAT is, where it runs, what it shows, how it is built, where to read next | Never by itself; a person's entry point, where `AGENTS.md` is an agent's |
 | [process/collaboration.md](process/collaboration.md) | How the project owner and an agent work together | Every session |
 | [process/code-changes.md](process/code-changes.md) | Checkpoints, branches, pull requests, review, merging, who applies | Every session |
 | [process/best-practices.md](process/best-practices.md) | Best practice first, especially for security and platform management | Every session |
@@ -49,9 +50,10 @@ These are part of the structure and are not written yet. Each is written when th
 6. **Say what is real.** Nothing is described as built, tested or enforced unless it is.
 7. **Mark the status of design items.** Each item in a design or architecture document is labeled Decided, Working assumption or Open. The labels are defined at the top of each of those documents.
 8. **Design and process documents say what is true now.** When a decision changes, edit the document and add a decision record. The record keeps what was rejected and the history; in the document, how a rule got there is one sentence pointing at the record. At the pauses that rule 9 of `process/best-practices.md` names, a checkpoint merged or a step of the build order begun, the documents are swept for history that has crept in, and it is moved to a record or cut.
-9. **AWS account ids do not appear in committed files.** Documents and code name accounts by name (`heat-dev`, `heat-platform`) and never by id. Credentials never appear anywhere. This repository is written to be safe to publish; the organization-level `dcg-platform` repository takes the opposite rule, for reasons recorded there as its decision 0001.
+9. **AWS account ids do not appear in committed files.** Documents and code name accounts by name (`heat-dev`, `heat-platform`) and never by id. Credentials never appear anywhere. This repository is written to be safe to publish; the organization-level `dcg-platform` repository takes the opposite rule, for reasons recorded there as its decision 0001. The ids reach the pipeline as repository secrets, `HEAT_<ENVIRONMENT>_ACCOUNT_ID`, never as variables, because GitHub masks a secret in every log line and the logs are public with the repository (decision 0035).
 10. **A procedure lives in one document.** Another document that needs it names it and points at it; it does not restate the steps. A process rule says that the procedure is followed and where it is; a decision record says why it has the shape it has; a skill says how Claude Code's arguments map onto it. From the review skill's first run (decision 0033).
 11. **Rule numbers are stable.** A new rule is appended to its document, never inserted; a retired rule keeps its number and says it is retired, with the record that retired it. A finding, a review thread, an issue and another document cite a rule by its number, and the checkup's deduplication keys on it (`runbooks/checkup.md`, rule 7), so a renumbering would break every citation. From the review of PR-163 (Issue-147).
+ 12. **An image under `docs/` says what it shows and when.** Its alt text, or a note beside the file, names the stack or commit it was captured from, or the committed art it was composed from, as every set under `art/` carries its provenance. From the review of PR-179 (Issue-177).
 
 ## Not documents
 
