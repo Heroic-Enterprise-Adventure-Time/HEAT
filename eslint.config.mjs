@@ -145,7 +145,7 @@ export default tseslint.config(
   // The client's operations, one definition per file with the fragments it
   // imports (codegen.mjs), under every operations rule and validated against
   // the committed schema, so a document the hub would refuse fails lint
-  // (docs/standards/graphql.md, rule 21).
+  // (docs/standards/graphql.md, rule 1).
   {
     files: ['packages/client/src/app/graphql/*.graphql'],
     rules: {

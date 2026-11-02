@@ -1,6 +1,6 @@
 # 0012: The hub is TypeScript on Lambda, with Apollo Server and Pothos
 
-- **Status:** Decided
+- **Status:** Decided; built: the hub by Issues 36 to 155, the API's shape by Issue-155 (decision 0038), the generated client and Apollo Angular by Issue-156 (2026-11-02)
 - **Date:** 2026-10-14, recorded 2026-10-15
 - **Supersedes:** 0004
 
@@ -29,4 +29,4 @@ What this changes in earlier records:
 
 ## Where it is described
 
-`docs/architecture/overview.md`, "Services and data". `docs/standards/typescript.md`, rules 10 to 12. `packages/hub`.
+`docs/architecture/overview.md`, "Services and data". `docs/standards/typescript.md`, rules 10 to 12; `docs/standards/angular.md`, rules 4 and 5. `packages/hub`; `codegen.mjs` and `packages/client/src/app/hub.ts`.

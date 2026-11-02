@@ -25,7 +25,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 ### The hub
 
 10. **Apollo Server, Pothos code-first, scope-auth for authorization.** Field-level access is declared as scopes on fields and types; a field the caller may not read resolves to null with an error on that field, so such fields are declared nullable.
-11. **The printed schema is committed.** `npm run schema:print` writes `packages/hub/schema.graphql` from the Pothos builder; CI fails if the committed file is stale. Every pull request that changes the API therefore shows the change as a schema diff, and the client's code generation reads a committed file.
+11. **The printed schema is committed, and the client's code is generated from it.** `npm run schema:print` writes `packages/hub/schema.graphql` from the Pothos builder; CI fails if the committed file is stale. Every pull request that changes the API therefore shows the change as a schema diff. `npm run codegen` then generates the client's operations and types from that file with GraphQL Code Generator's client preset (`codegen.mjs` at the root), into `packages/client/src/app/graphql/generated/`, committed too and checked current by CI the same way, so the client never reads a running hub to build and the same pull request shows the client's types changing beside the schema (`docs/standards/angular.md`, rule 5).
 
 ### Bundling
 
