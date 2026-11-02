@@ -141,4 +141,5 @@ jobs:
 
       # With no argument actionlint finds every workflow under .github/workflows.
       - name: Lint every workflow
-        run: "$RUNNER_TEMP/actionlint" -color
+        run: |
+          "$RUNNER_TEMP/actionlint" -color
