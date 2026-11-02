@@ -9,6 +9,7 @@ One short record per significant decision: what was chosen, what was considered 
 3. A record is numbered with the next four-digit number and named `<number>-<short-title>.md`.
 4. A record uses the sections Decision, Considered and not chosen, and Where it is described. Its status is **Decided** or **Working assumption**, with the same meaning as in the design documents.
 5. A record is history and is not rewritten. When a decision changes, write a new record and change the old record's status to "Superseded by" the new number.
+6. A record's Status and Date lines and its "Where it is described" section may be amended to point at a later record, at the issue that amended a detail, or at where the decision is now described; its Decision and "Considered and not chosen" sections are never changed. From the review of PR-163 (Issue-147), which found the practice of 0008 to 0033 in no rule.
 
 ## Why
 
