@@ -15,12 +15,15 @@
 #             hostname; the URL in the job summary, on the deployment and,
 #             when the branch has an open pull request, in one comment on
 #             it. The checks run here so that a stack always holds a commit
-#             that typechecks and passes the tests (0017); until Issue-53
-#             they also run in Build and test while a pull request is open.
+#             that typechecks and passes the tests (0017); they also run in
+#             Build and test while a pull request is open (Issue-53, closed
+#             as not planned: the duplicate costs a minute or two and no
+#             wall-clock time).
 #   pull_request (opened, reopened)   the URL comment alone, so the pull
 #             request carries it from its first minute; the hostname is
-#             known from the issue number, with no apply. Not on a release
-#             pull request, whose head is main and has no stack.
+#             known from the issue number, with no apply. Only for a head of
+#             the working shape: a release pull request, whose head is main,
+#             or a Dependabot pull request has no stack and gets no comment.
 #   delete    destroy the branch's stack from its state key, with main's
 #             copy of the root. The root evaluates the bundle's hash even to
 #             destroy, so the job bundles first. The distribution's destroy
@@ -310,10 +313,18 @@ jobs:
   # -------------------------------------------------------- pull request --
   comment-url:
     name: Comment the stack's URL on the pull request
-    # A release pull request has main as its head: no issue number, so no
-    # stack and no URL (decision 0021). A hotfix/<issue>-* head has a stack
-    # and keeps its comment.
-    if: github.event_name == 'pull_request' && github.head_ref != 'main'
+    # Only a head of the working shape has a stack, the same six prefixes
+    # the push trigger names; GitHub's expressions have no regex, so the
+    # list is spelled out. A release pull request, whose head is main
+    # (decision 0021), a Dependabot pull request, or any other head outside
+    # the shape has no issue number, so no stack and no comment: the job is
+    # skipped rather than failing in scripts/sandbox.mjs (Issue-187). A
+    # hotfix/<issue>-* head has a stack and keeps its comment.
+    if: >-
+      github.event_name == 'pull_request'
+      && (startsWith(github.head_ref, 'feat/') || startsWith(github.head_ref, 'fix/')
+          || startsWith(github.head_ref, 'docs/') || startsWith(github.head_ref, 'infra/')
+          || startsWith(github.head_ref, 'chore/') || startsWith(github.head_ref, 'hotfix/'))
     runs-on: ubuntu-latest
     permissions:
       contents: read
