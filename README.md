@@ -6,6 +6,8 @@ HEAT (Heroic Enterprise Adventure Time) is a browser game about running an adven
 
 ![The camp at Millbrook on the sandbox stack heat-sb177 at commit c464d1a, 2026-11-02: the heroes hall, the job board, the warehouse, the sites of the lumber camp, the mine and the caravan hub, and the camp's first heroes](docs/images/camp.png)
 
+![A battle on "Timber from the near woods", the replay of player1's adventure on the sandbox stack heat-sb180 at commit aaf8059, 2026-11-02, drawn by the dev server from the same commit: the villager Cora with her axe mid-swing, the wolf taking the hit, and a tree on the road](docs/images/battle.png)
+
 ![Six hero still frames at three times their size, composed from the still-south frames of villager-01, fighter-02, knight-06, ranger-01, priest-02 and wizard-01 under art/heroes](docs/images/heroes.png)
 
 ## Play it
