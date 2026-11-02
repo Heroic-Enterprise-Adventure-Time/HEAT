@@ -49,7 +49,7 @@
         </li>
       }
     </ul>
-    <button type="button" [disabled]="picked().size === 0 || game.busy()" (click)="depart(job.id)">Depart</button>
+    <button type="button" [disabled]="picked().size === 0 || pending()" (click)="depart(job.id)">Depart</button>
   }
   @if (refusal(); as refusal) {
     <p class="refusal" role="alert">{{ refusal }}</p>

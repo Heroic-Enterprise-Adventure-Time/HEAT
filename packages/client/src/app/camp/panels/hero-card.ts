@@ -3,13 +3,21 @@ import { DatePipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Game } from '../../game';
+import { Refusal } from '../../hub';
 import { CampState } from '../camp-state';
+
+/** The hub's refusals of a retirement, by type, in the player's words; any other is shown as the hub put it. */
+const REFUSALS: Readonly<Record<string, string>> = {
+  HeroAdventuring: 'This hero is away on an adventure, and retires once it is settled.',
+  Conflict: 'The camp changed while retiring, and nobody retired. Try again.',
+};
 
 /**
  * A hero's card, `/camp/<location>/heroes-hall/heroes/<id>`: under the hall,
  * so the menu keeps the hall marked. An active hero can be retired, behind a
  * confirmation in place, because retiring is permanent (game.md, "The heroes
- * hall"); a retired hero's card says so and offers nothing.
+ * hall"); a refusal from the hub is shown in place, under the confirmation.
+ * A retired hero's card says so and offers nothing.
  */
 @Component({
   selector: 'heat-hero-card',
@@ -27,10 +35,23 @@ export class HeroCard {
   });
   /** The hero whose retirement is being confirmed: by id, so another hero's card never opens confirmed. */
   protected readonly confirming = signal<string | null>(null);
+  /** Whether the retirement is under way, while the hub answers. */
+  protected readonly pending = signal(false);
+  /** The hub's last refusal; cleared by the next try. */
+  protected readonly refused = signal<string | null>(null);
 
   protected async retire(id: string): Promise<void> {
-    const hero = await this.game.retire(id);
-    this.confirming.set(null);
-    if (hero) this.camp.leaving.set(hero.id);
+    this.refused.set(null);
+    this.pending.set(true);
+    try {
+      const hero = await this.game.retire(id);
+      this.confirming.set(null);
+      this.camp.leaving.set(hero.id);
+    } catch (e) {
+      const kind = e instanceof Refusal ? e.kind : null;
+      this.refused.set((kind && REFUSALS[kind]) ?? (e instanceof Error ? e.message : String(e)));
+    } finally {
+      this.pending.set(false);
+    }
   }
 }

@@ -23,8 +23,11 @@
           Retire <strong>{{ hero.name }}</strong>? Retiring is permanent. {{ hero.name }} leaves the hall for good and
           frees a slot; the record stays.
         </p>
-        <button type="button" [disabled]="game.busy()" (click)="retire(hero.id)">Retire {{ hero.name }}</button>
-        <button type="button" [disabled]="game.busy()" (click)="confirming.set(null)">Keep</button>
+        <button type="button" [disabled]="pending()" (click)="retire(hero.id)">Retire {{ hero.name }}</button>
+        <button type="button" [disabled]="pending()" (click)="confirming.set(null)">Keep</button>
+        @if (refused(); as refused) {
+          <p class="refusal" role="alert">{{ refused }}</p>
+        }
       </div>
     } @else {
       <button type="button" class="retire" (click)="confirming.set(hero.id)">Retire</button>

@@ -10,9 +10,11 @@ import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  // Build output, Angular's cache and the client's copy of the art.
+  // Build output, Angular's cache, the client's copy of the art, and the
+  // client's generated GraphQL code (codegen.mjs), which is read as the
+  // schema's and its operations' and never edited.
   // node_modules and .git are ignored by default.
-  { ignores: ['**/dist/', '**/.angular/', 'packages/client/generated/'] },
+  { ignores: ['**/dist/', '**/.angular/', 'packages/client/generated/', 'packages/client/src/app/graphql/generated/'] },
 
   // Plain JavaScript: the scripts, the client's build helpers and this file.
   {
@@ -103,12 +105,23 @@ export default tseslint.config(
     },
   },
 
+  // GraphQL: the committed schema and the client's operations, parsed with
+  // one configuration, because the plugin keeps the first it is given for
+  // every file after; the operations rules read the schema and the sibling
+  // documents from it.
+  {
+    files: ['**/*.graphql'],
+    languageOptions: {
+      parser: graphql.parser,
+      parserOptions: { graphQLConfig: { schema: 'packages/hub/schema.graphql', documents: 'packages/client/src/app/graphql/*.graphql' } },
+    },
+    plugins: { '@graphql-eslint': graphql },
+  },
+
   // The committed schema, printed from the Pothos builder (rule 11), under
   // every schema rule (docs/standards/graphql.md).
   {
-    files: ['**/*.graphql'],
-    languageOptions: { parser: graphql.parser, parserOptions: { graphQLConfig: { schema: 'packages/hub/schema.graphql' } } },
-    plugins: { '@graphql-eslint': graphql },
+    files: ['packages/hub/schema.graphql'],
     rules: {
       ...graphql.configs['flat/schema-all'].rules,
       // One input object per mutation, named for it (graphql.md, rule 5). The
@@ -126,6 +139,21 @@ export default tseslint.config(
       '@graphql-eslint/no-root-type': 'off',
       // The file is printed by Pothos, so its order is the printer's.
       '@graphql-eslint/alphabetize': 'off',
+    },
+  },
+
+  // The client's operations, one definition per file with the fragments it
+  // imports (codegen.mjs), under every operations rule and validated against
+  // the committed schema, so a document the hub would refuse fails lint
+  // (docs/standards/graphql.md, rule 21).
+  {
+    files: ['packages/client/src/app/graphql/*.graphql'],
+    rules: {
+      ...graphql.configs['flat/operations-all'].rules,
+      // A fragment names the shape a view type derives from
+      // (docs/standards/angular.md, rule 5), whether one operation spreads
+      // it or three.
+      '@graphql-eslint/no-one-place-fragments': 'off',
     },
   },
 );

@@ -1,0 +1,13 @@
+mutation BuildFacility($input: BuildFacilityInput!) {
+  buildFacility(input: $input) {
+    __typename
+    ... on Error {
+      message
+    }
+    ... on BuildFacilitySuccess {
+      camp {
+        location
+      }
+    }
+  }
+}

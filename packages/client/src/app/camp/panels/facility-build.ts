@@ -1,6 +1,6 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import type { FacilityKind } from '@heat/engine';
-import { Refusal } from '../../api';
+import { Refusal } from '../../hub';
 import { Game, type UpgradeOffer } from '../../game';
 
 /** The hub's refusals of a build, by type, in the player's words; any other is shown as the hub put it. */
@@ -36,16 +36,21 @@ export class FacilityBuild {
     const offer = this.offer();
     return offer ? costWords(offer) : '';
   });
+  /** Whether a build is under way, while the hub answers. */
+  protected readonly pending = signal(false);
   /** The hub's last refusal; cleared by the next try. */
   protected readonly refused = signal<string | null>(null);
 
   protected async build(offer: UpgradeOffer): Promise<void> {
     this.refused.set(null);
+    this.pending.set(true);
     try {
       await this.game.build(offer.kind, offer.level);
     } catch (e) {
       const kind = e instanceof Refusal ? e.kind : null;
       this.refused.set((kind && REFUSALS[kind]) ?? (e instanceof Error ? e.message : String(e)));
+    } finally {
+      this.pending.set(false);
     }
   }
 }

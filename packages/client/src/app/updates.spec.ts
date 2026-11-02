@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Api } from './api';
+import { Hub } from './hub';
 import { Config } from './config';
 import { Game, type AdventureView, type PlayerView, type SettledView } from './game';
 import { RELOAD, RELOADED_FROM, Updates } from './updates';
@@ -19,11 +19,11 @@ const player = (open: AdventureView | null): PlayerView => ({ id: 'p1', camps: [
 
 function setup(loaded: PlayerView | null, version = 'v1') {
   const reloads = { count: 0 };
-  const api = { outdated: signal(false) };
+  const hub = { outdated: signal(false) };
   const game = { player: signal(loaded), settled: signal<SettledView | null>(null) };
   TestBed.configureTestingModule({
     providers: [
-      { provide: Api, useValue: api },
+      { provide: Hub, useValue: hub },
       { provide: Game, useValue: game },
       { provide: Config, useValue: { value: signal({ version }) } },
       {
@@ -36,24 +36,24 @@ function setup(loaded: PlayerView | null, version = 'v1') {
   });
   TestBed.inject(Updates);
   TestBed.tick();
-  return { api, game, reloads };
+  return { hub, game, reloads };
 }
 
 describe('Updates', () => {
   beforeEach(() => { sessionStorage.clear(); });
 
   it('reloads at once when the hub says the client is outdated and no adventure is open', () => {
-    const { api, reloads } = setup(player(null));
+    const { hub, reloads } = setup(player(null));
     expect(reloads.count).toBe(0);
-    api.outdated.set(true);
+    hub.outdated.set(true);
     TestBed.tick();
     expect(reloads.count).toBe(1);
     expect(sessionStorage.getItem(RELOADED_FROM)).toBe('v1');
   });
 
   it('queues the reload while an adventure is open, and reloads once it has closed', () => {
-    const { api, game, reloads } = setup(player(adventure));
-    api.outdated.set(true);
+    const { hub, game, reloads } = setup(player(adventure));
+    hub.outdated.set(true);
     TestBed.tick();
     expect(reloads.count).toBe(0);
     game.player.set(player(null));
@@ -62,8 +62,8 @@ describe('Updates', () => {
   });
 
   it('waits while the result of the adventure just ended is on screen, and reloads once the player leaves it', () => {
-    const { api, game, reloads } = setup(player(adventure));
-    api.outdated.set(true);
+    const { hub, game, reloads } = setup(player(adventure));
+    hub.outdated.set(true);
     game.settled.set({ adventure, result: null });
     game.player.set(player(null));
     TestBed.tick();
@@ -74,8 +74,8 @@ describe('Updates', () => {
   });
 
   it('waits for the player to be read, since an open adventure cannot be ruled out before', () => {
-    const { api, game, reloads } = setup(null);
-    api.outdated.set(true);
+    const { hub, game, reloads } = setup(null);
+    hub.outdated.set(true);
     TestBed.tick();
     expect(reloads.count).toBe(0);
     game.player.set(player(null));
@@ -85,16 +85,16 @@ describe('Updates', () => {
 
   it('reloads away from a version once, so a page still outdated after the reload does not loop', () => {
     sessionStorage.setItem(RELOADED_FROM, 'v1');
-    const { api, reloads } = setup(player(null));
-    api.outdated.set(true);
+    const { hub, reloads } = setup(player(null));
+    hub.outdated.set(true);
     TestBed.tick();
     expect(reloads.count).toBe(0);
   });
 
   it('reloads again from a newer version, at the next deploy', () => {
     sessionStorage.setItem(RELOADED_FROM, 'v1');
-    const { api, reloads } = setup(player(null), 'v2');
-    api.outdated.set(true);
+    const { hub, reloads } = setup(player(null), 'v2');
+    hub.outdated.set(true);
     TestBed.tick();
     expect(reloads.count).toBe(1);
   });

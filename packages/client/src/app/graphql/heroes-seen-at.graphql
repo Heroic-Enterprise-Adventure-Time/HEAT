@@ -1,0 +1,7 @@
+#import "./seen-hero-fields.graphql"
+
+query HeroesSeenAt($location: ID!) {
+  heroesSeenAt(location: $location) {
+    ...SeenHeroFields
+  }
+}

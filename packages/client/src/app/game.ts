@@ -1,4 +1,5 @@
-import { Service, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Service, computed, inject, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import {
   ADVENTURE_OUTCOMES,
   FACILITY_KINDS,
@@ -15,86 +16,81 @@ import {
   recruitCost,
   warehouseCapacity,
   type AdventureLogEntry,
+  type AdventureOutcome,
   type AdventureTimeline,
   type FacilityKind,
   type UnitType,
 } from '@heat/engine';
+import type { OperationVariables, TypedDocumentNode } from '@apollo/client';
+import { Apollo } from 'apollo-angular';
 import { constantCase, kebabCase } from 'es-toolkit';
-import { Api, ApiError, PREVIOUS, Refusal, type Route } from './api';
+import { catchError, combineLatest, firstValueFrom, from, map, of, startWith, switchMap, type Observable } from 'rxjs';
+import {
+  BuildFacilityDocument,
+  DiscardAdventureDocument,
+  HeroesSeenAtDocument,
+  JoinGameDocument,
+  MeDocument,
+  RecruitHeroDocument,
+  RetireHeroDocument,
+  StartAdventureDocument,
+  SubmitAdventureDocument,
+  TimelineDocument,
+  type AdventureFieldsFragment,
+  type AdventureOutcome as WireAdventureOutcome,
+  type CampFieldsFragment,
+  type FacilityKind as WireFacilityKind,
+  type HeroFieldsFragment,
+  type Material as WireMaterial,
+  type MeQuery,
+  type OverrideInput,
+  type ResultFieldsFragment,
+  type SeenHeroFieldsFragment,
+  type StageEnding as WireStageEnding,
+  type StageKind as WireStageKind,
+  type UnitType as WireUnitType,
+} from './graphql/generated/graphql';
+import { PREVIOUS, Refusal, apiError, type Route } from './hub';
 import { Session } from './session';
 
-export interface HeroView {
-  readonly id: string;
-  readonly name: string;
-  readonly unitType: string;
-  readonly spriteSet: string;
-  readonly location: string;
-  readonly recruitedAt: string;
-  readonly level: number;
-  readonly xp: number;
-  readonly status: 'ALIVE' | 'DEAD' | 'RETIRED';
-  readonly retiredAt: string | null;
-}
+/**
+ * A view as the pages read it, derived from the fragment the operation
+ * selects (`packages/client/src/app/graphql/*.graphql`, generated into
+ * `graphql/generated/`): the same shape, with the engine's closed sets read
+ * back from the schema's UPPER_CASE enum values into the engine's own
+ * (`VILLAGER` is `villager`; docs/standards/graphql.md, rule 4). A unit
+ * type, a material, a stage's kind and its ending are `string`, because a
+ * value this client's engine lacks passes through (`engineValues`); a
+ * facility kind and an outcome keep the engine's type, which the pages
+ * switch on. Nothing past this file sees a wire value.
+ */
+type Engine<T> = T extends WireUnitType | WireMaterial | WireStageKind | WireStageEnding
+  ? string
+  : T extends WireFacilityKind
+    ? FacilityKind
+    : T extends WireAdventureOutcome
+      ? AdventureOutcome
+      : T extends readonly (infer U)[]
+        ? readonly Engine<U>[]
+        : T extends object
+          ? { readonly [K in keyof T]: Engine<T[K]> }
+          : T;
 
+export type HeroView = Engine<HeroFieldsFragment>;
 /** Another player's hero seen at the location: its public fields only, never whose it is (decision 0029). */
-export interface SeenHeroView {
-  readonly id: string;
-  readonly name: string;
-  readonly unitType: string;
-  readonly spriteSet: string;
-  readonly level: number;
-}
-
-export interface CampView {
-  readonly location: string;
-  readonly name: string;
-  readonly hallLevel: number;
-  readonly warehouseLevel: number;
-  readonly heroCapacity: number;
-  readonly activeHeroes: number;
-  readonly livingHeroes: number;
-  /** The camp's stock; a resource it has none of may be missing. */
-  readonly holdings: readonly { readonly material: string; readonly balance: number }[];
-  /** The stock of each resource the warehouse holds at its level. */
-  readonly resourceCapacity: number;
-  /** Each of the camp's own facilities and its level, 0 for one not built (Issue-93). */
-  readonly facilities: readonly { readonly kind: FacilityKind; readonly level: number }[];
-}
-
-/** A hero as the adventure took it at the start, from the snapshot, with the numbers the engine runs it by. */
-export interface PartyHeroView {
-  readonly heroId: string;
-  readonly name: string;
-  readonly unitType: string;
-  readonly spriteSet: string;
-  readonly level: number;
-  readonly stats: { readonly maxHealth: number; readonly speed: number; readonly damage: number; readonly gathering: number };
-}
-
+export type SeenHeroView = Engine<SeenHeroFieldsFragment>;
+export type CampView = Engine<CampFieldsFragment>;
 /**
  * The player's one open adventure: its job and its party (Issue-115), and
  * the seed and the snapshot the client plays it from (Issue-15).
  */
-export interface AdventureView {
-  readonly id: string;
-  readonly startedAt: string;
-  readonly location: string;
-  readonly seed: string;
-  /** The deploy that issued it, the only one that verifies it (decision 0030). */
-  readonly version: string;
-  readonly job: { readonly id: string; readonly name: string; readonly description: string };
-  readonly snapshot: { readonly version: string; readonly jobId: string; readonly heroes: readonly PartyHeroView[] };
-}
-
+export type AdventureView = Engine<AdventureFieldsFragment>;
 /** What the hub's replay found and settlement wrote (Issue-114). */
-export interface AdventureResultView {
-  readonly outcome: 'complete' | 'retreat' | 'defeat';
-  readonly stages: readonly { readonly stage: number; readonly kind: string; readonly ended: string }[];
-  readonly rewards: readonly { readonly material: string; readonly amount: number }[];
-  readonly credited: readonly { readonly material: string; readonly amount: number }[];
-  readonly lost: readonly { readonly material: string; readonly amount: number }[];
-  readonly heroes: readonly { readonly heroId: string; readonly xpGained: number; readonly xp: number; readonly level: number; readonly dead: boolean }[];
-}
+export type AdventureResultView = Engine<ResultFieldsFragment>;
+
+type MePlayer = NonNullable<MeQuery['me']>;
+/** The signed-in player: `camps` and `heroes` are nulled only for another caller (graphql.md, rule 11), never for the player's own read. */
+export type PlayerView = Engine<Omit<MePlayer, 'camps' | 'heroes'> & { readonly camps: readonly CampFieldsFragment[]; readonly heroes: readonly HeroFieldsFragment[] }>;
 
 /**
  * An adventure just ended, kept until the player leaves its result: the
@@ -105,28 +101,6 @@ export interface SettledView {
   readonly adventure: AdventureView;
   readonly result: AdventureResultView | null;
 }
-
-export interface PlayerView {
-  readonly id: string;
-  readonly camps: readonly CampView[];
-  readonly heroes: readonly HeroView[];
-  readonly openAdventure: AdventureView | null;
-}
-
-/**
- * A view as the hub answers it: the same shape, every string widened, because
- * the engine's closed sets travel as the schema's UPPER_CASE enum values
- * (`VILLAGER`, `TIMBER`, `HEROES_HALL`) and are read back into the engine's
- * own values at this boundary (docs/standards/graphql.md, rule 4). Nothing
- * past this file sees a wire value.
- */
-type Wire<T> = T extends string
-  ? string
-  : T extends readonly (infer U)[]
-    ? readonly Wire<U>[]
-    : T extends object
-      ? { readonly [K in keyof T]: Wire<T[K]> }
-      : T;
 
 /**
  * The engine's value behind a schema enum name, `VILLAGER` for `villager`,
@@ -141,9 +115,19 @@ function engineValues<T extends string>(values: readonly T[]): (name: string) =>
   return (name) => byName.get(name) ?? (kebabCase(name) as T);
 }
 
-/** The schema's enum name of an engine value: `heroes-hall` is sent as `HEROES_HALL`. */
-export function wireValue(value: string): string {
-  return constantCase(value);
+/** An engine value's spelling on the wire: `heroes-hall` is `HEROES_HALL` (graphql.md, rule 4). */
+type ConstantCase<S extends string> = Uppercase<S extends `${infer Head}-${infer Tail}` ? `${Head}_${ConstantCase<Tail>}` : S>;
+
+/**
+ * The schema's enum name of each engine value, `villager` as `VILLAGER`,
+ * looked up in a map built once per list. The enum is built from the same
+ * list (graphql.md, rule 4), so the names are its members: the compiler
+ * checks that where a name is sent, against the generated input type. The
+ * cast says what `constantCase` does, in the type's own terms.
+ */
+function wireNames<E extends string>(values: readonly E[]): (value: E) => ConstantCase<E> {
+  const byValue = new Map(values.map((value) => [value, constantCase(value) as ConstantCase<E>]));
+  return (value) => must(byValue.get(value), `${value} on the wire`);
 }
 
 const unitType = engineValues(UNIT_TYPES);
@@ -152,13 +136,19 @@ const facilityKind = engineValues(FACILITY_KINDS);
 const outcome = engineValues(ADVENTURE_OUTCOMES);
 const stageKind = engineValues(STAGE_KINDS);
 const stageEnding = engineValues(STAGE_ENDINGS);
+const wireUnitType = wireNames(UNIT_TYPES);
+const wireFacilityKind = wireNames(FACILITY_KINDS);
 const materials = <T extends { readonly material: string }>(items: readonly T[]) => items.map((item) => ({ ...item, material: material(item.material) }));
 
-function heroFromWire(hero: Wire<HeroView>): HeroView {
-  return { ...hero, unitType: unitType(hero.unitType), status: hero.status as HeroView['status'] };
+function heroFromWire(hero: HeroFieldsFragment): HeroView {
+  return { ...hero, unitType: unitType(hero.unitType) };
 }
 
-function campFromWire(camp: Wire<CampView>): CampView {
+function seenHeroFromWire(hero: SeenHeroFieldsFragment): SeenHeroView {
+  return { ...hero, unitType: unitType(hero.unitType) };
+}
+
+function campFromWire(camp: CampFieldsFragment): CampView {
   return {
     ...camp,
     holdings: materials(camp.holdings),
@@ -166,14 +156,14 @@ function campFromWire(camp: Wire<CampView>): CampView {
   };
 }
 
-function adventureFromWire(adventure: Wire<AdventureView>): AdventureView {
+function adventureFromWire(adventure: AdventureFieldsFragment): AdventureView {
   return {
     ...adventure,
     snapshot: { ...adventure.snapshot, heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType) })) },
   };
 }
 
-function resultFromWire(result: Wire<AdventureResultView>): AdventureResultView {
+function resultFromWire(result: ResultFieldsFragment): AdventureResultView {
   return {
     ...result,
     outcome: outcome(result.outcome),
@@ -184,50 +174,37 @@ function resultFromWire(result: Wire<AdventureResultView>): AdventureResultView 
   };
 }
 
-function playerFromWire(player: Wire<PlayerView>): PlayerView {
+function playerFromWire(player: MePlayer): PlayerView {
   return {
     ...player,
-    camps: player.camps.map(campFromWire),
-    heroes: player.heroes.map(heroFromWire),
+    camps: (player.camps ?? []).map(campFromWire),
+    heroes: (player.heroes ?? []).map(heroFromWire),
     openAdventure: player.openAdventure ? adventureFromWire(player.openAdventure) : null,
   };
 }
 
 /**
  * A mutation's result union as the client selects it: the type's name, the
- * success's one field when the mutation did its work, and the refusal's
+ * success's fields when the mutation did its work, and the refusal's
  * message otherwise (graphql.md, rule 6).
  */
-type Answer<K extends string, T> = { readonly __typename: string; readonly message?: string } & Partial<Record<K, T>>;
+interface Answer {
+  readonly __typename: string;
+  readonly message?: string;
+}
 
-/** The success's field, or the refusal thrown as a `Refusal` named by its type, for the panel that asked to show. */
-function answered<K extends string, T>(answer: Answer<K, T>, success: string, field: K): T {
-  const fields: Partial<Record<K, T>> = answer;
-  if (answer.__typename === success) return must<T>(fields[field], `${success}.${field}`);
+/** The success member, or the refusal thrown as a `Refusal` named by its type, for the panel that asked to show. */
+function answered<A extends Answer, S extends A['__typename']>(answer: A, success: S): Extract<A, { readonly __typename: S }> {
+  if (answer.__typename === success) return answer as Extract<A, { readonly __typename: S }>;
   throw new Refusal(answer.__typename, answer.message ?? answer.__typename);
 }
 
-const HERO_FIELDS = 'id name unitType spriteSet location recruitedAt level xp status retiredAt';
-const CAMP_FIELDS =
-  'location name hallLevel warehouseLevel heroCapacity activeHeroes livingHeroes holdings { material balance } resourceCapacity facilities { kind level }';
-const ADVENTURE_FIELDS =
-  'id startedAt location seed version job { id name description } ' +
-  'snapshot { version jobId heroes { heroId name unitType spriteSet level stats { maxHealth speed damage gathering } } }';
-const RESULT_FIELDS =
-  'outcome stages { stage kind ended } rewards { material amount } credited { material amount } lost { material amount } ' +
-  'heroes { heroId xpGained xp level dead }';
-const REFUSAL_FIELDS = '__typename ... on Error { message }';
-const SEEN = `query($at: ID!) { heroesSeenAt(location: $at) { id name unitType spriteSet level } }`;
-const ME = `{ me { id camps { ${CAMP_FIELDS} } heroes { ${HERO_FIELDS} } openAdventure { ${ADVENTURE_FIELDS} } } }`;
-// No `... on Error` here: nothing refuses joinGame, so its union has no Error member and the spread would not validate.
-const JOIN = `mutation { joinGame { __typename ... on JoinGameSuccess { player { id } } } }`;
-const SUBMIT = `mutation($input: SubmitAdventureInput!) { submitAdventure(input: $input) { ${REFUSAL_FIELDS} ... on SubmitAdventureSuccess { adventure { result { ${RESULT_FIELDS} } } } } }`;
-const TIMELINE = `query($id: ID!) { adventure(id: $id) { timeline } }`;
-const DISCARD = `mutation($input: DiscardAdventureInput!) { discardAdventure(input: $input) { ${REFUSAL_FIELDS} ... on DiscardAdventureSuccess { adventure { id } } } }`;
-const START = `mutation($input: StartAdventureInput!) { startAdventure(input: $input) { ${REFUSAL_FIELDS} ... on StartAdventureSuccess { adventure { ${ADVENTURE_FIELDS} } } } }`;
-const BUILD = `mutation($input: BuildFacilityInput!) { buildFacility(input: $input) { ${REFUSAL_FIELDS} ... on BuildFacilitySuccess { camp { location } } } }`;
-const RECRUIT = `mutation($input: RecruitHeroInput!) { recruitHero(input: $input) { ${REFUSAL_FIELDS} ... on RecruitHeroSuccess { hero { ${HERO_FIELDS} } } } }`;
-const RETIRE = `mutation($input: RetireHeroInput!) { retireHero(input: $input) { ${REFUSAL_FIELDS} ... on RetireHeroSuccess { hero { ${HERO_FIELDS} } } } }`;
+/** The player's query as it last answered: what Apollo's result carries, or the join's failure in its place. */
+interface Loaded {
+  readonly data: MeQuery | undefined;
+  readonly loading: boolean;
+  readonly error: unknown;
+}
 
 /** A unit type the hall recruits, its price to the camp, and why it cannot be had now, or null when it can. */
 export interface RecruitOffer {
@@ -278,28 +255,57 @@ export function upgradeOffer(camp: CampView, kind: FacilityKind): UpgradeOffer |
 
 /**
  * The signed-in player's game: their camps, their heroes and the open
- * adventure, loaded from the hub after every sign-in, and what
- * they can do yet: recruit a hero, retire one, build a facility and start a job
- * from the job board. Joining comes
- * first, because the profile is made on first sign-in (joinGame, Issue-81).
+ * adventure, watched through Apollo from the moment they sign in, and what
+ * they can do yet: recruit a hero, retire one, build a facility and start a
+ * job from the job board. Joining comes first, because the profile is made
+ * on first sign-in (joinGame, Issue-81), and the player's query follows it.
  * Beside them, a few of other players' heroes seen at the camp's location,
  * read again when the player signs in or changes camps, not after each
  * change of their own, so the passers-by do not shuffle on every recruit.
  *
  * Every mutation sends one input object and answers a result union; a
  * refusal is a member of the union, thrown here as a `Refusal` named by its
- * type for the panel to show in place (graphql.md, rules 5 and 6).
+ * type for the panel to show in place (graphql.md, rules 5 and 6), and the
+ * player's query is read again either way, since a refusal means the view
+ * was stale. The in-flight state of an action belongs to the control that
+ * started it, beside the refusal it shows (angular.md, rule 6).
  */
 @Service()
 export class Game {
-  private readonly api = inject(Api);
+  private readonly apollo = inject(Apollo);
   private readonly session = inject(Session);
 
-  readonly player = signal<PlayerView | null>(null);
-  readonly error = signal<string | null>(null);
-  readonly busy = signal(false);
+  /** The player's query, run once signed in and joined, and read again after every mutation. */
+  private readonly me = this.apollo.watchQuery({ query: MeDocument, fetchPolicy: 'network-only' });
+  private readonly loaded = toSignal(
+    toObservable(this.session.user).pipe(
+      switchMap((user): Observable<Loaded | null> =>
+        user
+          ? from(this.join()).pipe(
+              switchMap(() => this.me.valueChanges),
+              map((result): Loaded => ({ data: result.dataState === 'complete' ? result.data : undefined, loading: result.loading, error: result.error })),
+              catchError((e: unknown) => of<Loaded>({ data: undefined, loading: false, error: e })),
+            )
+          : of(null),
+      ),
+    ),
+    { initialValue: null },
+  );
+
   /** The camp on screen; the header bar's select changes it. */
   readonly location = signal(STARTING_LOCATION);
+  /** The player as the hub last answered, or null before the first read and while nobody is signed in. */
+  readonly player = computed(() => {
+    const me = this.loaded()?.data?.me;
+    return me ? playerFromWire(me) : null;
+  });
+  /** Whether the player's query is in flight, at sign-in or after a mutation. */
+  readonly loading = computed(() => this.loaded()?.loading ?? false);
+  /** Why the player could not be read, in the hub's words, or null. */
+  readonly error = computed(() => {
+    const e = this.loaded()?.error;
+    return e === undefined ? null : apiError(e).message;
+  });
 
   readonly camp = computed(() => this.player()?.camps.find((c) => c.location === this.location()) ?? null);
   /** The heroes the camp shows: the living and the dead, not the retired. */
@@ -316,8 +322,27 @@ export class Game {
   readonly retiredHere = computed(() =>
     (this.player()?.heroes ?? []).filter((h) => h.location === this.location() && h.status === 'RETIRED'),
   );
-  /** A few of other players' heroes seen at the camp's location, who walk about it for flavor. */
-  readonly seenHere = signal<readonly SeenHeroView[]>([]);
+  /**
+   * A few of other players' heroes seen at the camp's location, who walk
+   * about it for flavor: read when the player signs in or changes camps,
+   * and empty while the read is under way. The sample is flavor: if it
+   * cannot be read, the camp shows no passers-by and says nothing.
+   */
+  private readonly seen = toSignal(
+    combineLatest([toObservable(this.session.user), toObservable(this.location)]).pipe(
+      switchMap(([user, at]) =>
+        user
+          ? this.apollo.query({ query: HeroesSeenAtDocument, variables: { location: at }, fetchPolicy: 'network-only' }).pipe(
+              map((result) => result.data?.heroesSeenAt ?? []),
+              catchError(() => of([])),
+              startWith([]),
+            )
+          : of([]),
+      ),
+    ),
+    { initialValue: [] },
+  );
+  readonly seenHere = computed(() => this.seen().map(seenHeroFromWire));
   /**
    * What the hall offers: each unit type on the location's list, its price
    * to this camp beside the camp's balance, and why it cannot be had now,
@@ -352,44 +377,6 @@ export class Game {
     return camp && upgradeOffer(camp, kind);
   }
 
-  constructor() {
-    effect(() => {
-      if (this.session.user()) void this.join();
-      else this.player.set(null);
-    });
-    effect(() => {
-      const signedIn = this.session.user() !== null;
-      const location = this.location();
-      untracked(() => {
-        this.seenHere.set([]);
-        if (signedIn) void this.loadSeen(location);
-      });
-    });
-  }
-
-  /** The sample is flavor: if it cannot be read, the camp shows no passers-by and says nothing. */
-  async loadSeen(location: string): Promise<void> {
-    try {
-      const data = await this.api.request<{ heroesSeenAt: readonly Wire<SeenHeroView>[] | null }>(SEEN, { at: location });
-      if (this.location() === location) this.seenHere.set((data.heroesSeenAt ?? []).map((h) => ({ ...h, unitType: unitType(h.unitType) })));
-    } catch {
-      // Left empty.
-    }
-  }
-
-  async join(): Promise<void> {
-    await this.run(async () => {
-      const data = await this.api.request<{ joinGame: Answer<'player', { id: string }> }>(JOIN);
-      answered(data.joinGame, 'JoinGameSuccess', 'player');
-      await this.load();
-    });
-  }
-
-  async load(): Promise<void> {
-    const data = await this.api.request<{ me: Wire<PlayerView> | null }>(ME);
-    this.player.set(data.me ? playerFromWire(data.me) : null);
-  }
-
   /**
    * Recruits a hero of the unit type, with a fresh request id; the hub
    * draws its name and look, and debits its cost. Answers the new hero, or
@@ -398,15 +385,12 @@ export class Game {
    * such as `HallFull` means the view was stale.
    */
   async recruit(unitType: UnitType): Promise<HeroView> {
-    this.busy.set(true);
     try {
-      const input = { unitType: wireValue(unitType), requestId: crypto.randomUUID() };
-      const data = await this.api.request<{ recruitHero: Answer<'hero', Wire<HeroView>> }>(RECRUIT, { input });
-      return heroFromWire(answered(data.recruitHero, 'RecruitHeroSuccess', 'hero'));
+      const input = { unitType: wireUnitType(unitType), requestId: crypto.randomUUID() };
+      const data = await this.mutate(RecruitHeroDocument, { input });
+      return heroFromWire(answered(must(data.recruitHero, 'recruitHero'), 'RecruitHeroSuccess').hero);
     } finally {
-      // A failed read leaves the view as it was; the recruit's own answer is what matters here.
-      await this.load().catch(() => undefined);
-      this.busy.set(false);
+      await this.reload();
     }
   }
 
@@ -417,27 +401,27 @@ export class Game {
    * a refusal means the view was stale.
    */
   async build(kind: FacilityKind, level: number): Promise<void> {
-    this.busy.set(true);
     try {
-      const input = { location: this.location(), kind: wireValue(kind), level };
-      const data = await this.api.request<{ buildFacility: Answer<'camp', { location: string }> }>(BUILD, { input });
-      answered(data.buildFacility, 'BuildFacilitySuccess', 'camp');
+      const input = { location: this.location(), kind: wireFacilityKind(kind), level };
+      const data = await this.mutate(BuildFacilityDocument, { input });
+      answered(must(data.buildFacility, 'buildFacility'), 'BuildFacilitySuccess');
     } finally {
-      // A failed read leaves the view as it was; the build's own answer is what matters here.
-      await this.load().catch(() => undefined);
-      this.busy.set(false);
+      await this.reload();
     }
   }
 
-  /** Retires a hero, alive or dead: permanent. Answers the hero as retired, or null if it failed. */
-  async retire(heroId: string): Promise<HeroView | null> {
-    let hero: HeroView | null = null;
-    await this.run(async () => {
-      const data = await this.api.request<{ retireHero: Answer<'hero', Wire<HeroView>> }>(RETIRE, { input: { heroId } });
-      hero = heroFromWire(answered(data.retireHero, 'RetireHeroSuccess', 'hero'));
-      await this.load();
-    });
-    return hero;
+  /**
+   * Retires a hero, alive or dead: permanent. Answers the hero as retired,
+   * or throws the hub's refusal, a `Refusal` named by its type, for the
+   * card to show in place. The player is read again either way.
+   */
+  async retire(heroId: string): Promise<HeroView> {
+    try {
+      const data = await this.mutate(RetireHeroDocument, { input: { heroId } });
+      return heroFromWire(answered(must(data.retireHero, 'retireHero'), 'RetireHeroSuccess').hero);
+    } finally {
+      await this.reload();
+    }
   }
 
   /**
@@ -448,15 +432,12 @@ export class Game {
    * `AdventureOpen` means the view was stale.
    */
   async startAdventure(location: string, jobId: string, heroIds: readonly string[]): Promise<AdventureView> {
-    this.busy.set(true);
     try {
       const input = { location, jobId, heroIds };
-      const data = await this.api.request<{ startAdventure: Answer<'adventure', Wire<AdventureView>> }>(START, { input });
-      return adventureFromWire(answered(data.startAdventure, 'StartAdventureSuccess', 'adventure'));
+      const data = await this.mutate(StartAdventureDocument, { input });
+      return adventureFromWire(answered(must(data.startAdventure, 'startAdventure'), 'StartAdventureSuccess').adventure);
     } finally {
-      // A failed read leaves the view as it was; the start's own answer is what matters here.
-      await this.load().catch(() => undefined);
-      this.busy.set(false);
+      await this.reload();
     }
   }
 
@@ -470,44 +451,61 @@ export class Game {
    */
   async submitAdventure(adventure: AdventureView, log: readonly AdventureLogEntry[]): Promise<void> {
     const input = { adventureId: adventure.id, overrides: log.map(overrideInput) };
-    const submit = async (route: Route) =>
-      (await this.api.request<{ submitAdventure: Answer<'adventure', { result: Wire<AdventureResultView> | null }> }>(SUBMIT, { input }, route))
-        .submitAdventure;
+    const submit = async (route: Route) => must((await this.mutate(SubmitAdventureDocument, { input }, route)).submitAdventure, 'submitAdventure');
     let result: AdventureResultView | null = null;
     let answer = await submit('current');
     if (answer.__typename === 'EngineUpdated') answer = await submit(PREVIOUS);
     if (answer.__typename === 'EngineUpdated') {
-      const data = await this.api.request<{ discardAdventure: Answer<'adventure', { id: string }> }>(DISCARD, { input: { adventureId: adventure.id } });
-      answered(data.discardAdventure, 'DiscardAdventureSuccess', 'adventure');
+      const data = await this.mutate(DiscardAdventureDocument, { input: { adventureId: adventure.id } });
+      answered(must(data.discardAdventure, 'discardAdventure'), 'DiscardAdventureSuccess');
     } else {
-      result = resultFromWire(must(answered(answer, 'SubmitAdventureSuccess', 'adventure').result, 'the settled result'));
+      result = resultFromWire(must(answered(answer, 'SubmitAdventureSuccess').adventure.result, 'the settled result'));
     }
     this.settled.set({ adventure, result });
-    // A failed read leaves the view as it was; the result is what the player sees now.
-    await this.load().catch(() => undefined);
+    await this.reload();
   }
 
   /** The timeline the hub stored at settlement, for the replay: display only, played with no engine (decision 0030). */
   async timeline(adventureId: string): Promise<AdventureTimeline | null> {
-    const data = await this.api.request<{ adventure: { timeline: AdventureTimeline | null } | null }>(TIMELINE, { id: adventureId });
-    return data.adventure?.timeline ?? null;
+    let data;
+    try {
+      ({ data } = await firstValueFrom(this.apollo.query({ query: TimelineDocument, variables: { id: adventureId }, fetchPolicy: 'network-only' })));
+    } catch (e) {
+      throw apiError(e);
+    }
+    // The JSON scalar carries the engine's own AdventureTimeline, which the hub's replay wrote (decision 0030).
+    return (data?.adventure?.timeline as AdventureTimeline | null | undefined) ?? null;
   }
 
-  private async run(work: () => Promise<void>): Promise<void> {
-    this.busy.set(true);
-    this.error.set(null);
+  /** Makes the player's profile if they have none; called before the player is read, after every sign-in. */
+  private async join(): Promise<void> {
+    const data = await this.mutate(JoinGameDocument, {});
+    answered(must(data.joinGame, 'joinGame'), 'JoinGameSuccess');
+  }
+
+  /** One mutation, on the current deploy or the previous one, answering its data or throwing what Apollo threw as an `ApiError`. */
+  private async mutate<TData, TVariables extends OperationVariables>(
+    mutation: TypedDocumentNode<TData, TVariables>,
+    variables: TVariables,
+    route: Route = 'current',
+  ): Promise<TData> {
+    let data;
     try {
-      await work();
+      ({ data } = await firstValueFrom(this.apollo.mutate({ mutation, variables, context: { route } })));
     } catch (e) {
-      this.error.set(e instanceof ApiError || e instanceof Error ? e.message : String(e));
-    } finally {
-      this.busy.set(false);
+      throw apiError(e);
     }
+    return must(data, 'the mutation’s data');
+  }
+
+  /** Reads the player again after a mutation; a failed read leaves the view as it was, since the mutation's own answer is what matters. */
+  private async reload(): Promise<void> {
+    await this.me.refetch().catch(() => undefined);
   }
 }
 
 /** The engine's log entry as the hub's flat `OverrideInput`. */
-export function overrideInput(entry: AdventureLogEntry): Record<string, unknown> {
+export function overrideInput(entry: AdventureLogEntry): OverrideInput {
   return entry.kind === 'unit'
     ? { kind: 'UNIT', acceptedAtSimTime: entry.acceptedAtSimTime, unitId: entry.unitId, abilityId: entry.override.abilityId }
     : { kind: 'PARTY', acceptedAtSimTime: entry.acceptedAtSimTime, order: entry.order === 'retreat' ? 'RETREAT' : 'PRESS_ON' };

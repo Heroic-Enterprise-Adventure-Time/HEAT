@@ -1,0 +1,18 @@
+#import "./camp-fields.graphql"
+#import "./hero-fields.graphql"
+#import "./adventure-fields.graphql"
+
+query Me {
+  me {
+    id
+    camps {
+      ...CampFields
+    }
+    heroes {
+      ...HeroFields
+    }
+    openAdventure {
+      ...AdventureFields
+    }
+  }
+}

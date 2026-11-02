@@ -1,5 +1,5 @@
 import { Service, InjectionToken, effect, inject, untracked } from '@angular/core';
-import { Api } from './api';
+import { Hub } from './hub';
 import { Config } from './config';
 import { Game } from './game';
 
@@ -26,14 +26,14 @@ export const RELOADED_FROM = 'heat.reloadedFrom';
  */
 @Service()
 export class Updates {
-  private readonly api = inject(Api);
+  private readonly hub = inject(Hub);
   private readonly config = inject(Config);
   private readonly game = inject(Game);
   private readonly reload = inject(RELOAD);
 
   constructor() {
     effect(() => {
-      if (!this.api.outdated()) return;
+      if (!this.hub.outdated()) return;
       const player = this.game.player();
       // Before the player is read, an open adventure cannot be ruled out.
       if (!player || player.openAdventure || this.game.settled()) return;

@@ -2,6 +2,7 @@ import { ApplicationInitStatus, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { type ActivatedRouteSnapshot, type RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
+import { ApolloTestingModule } from 'apollo-angular/testing';
 import { App } from './app';
 import { appConfig } from './app.config';
 import { routes, signedIn } from './app.routes';
@@ -10,8 +11,9 @@ import { Session, type SessionUser } from './session';
 
 describe('App', () => {
   it('routes the empty path to the home page', async () => {
+    // The header reads the game, which needs a client of the hub; signed out, it sends nothing.
     await TestBed.configureTestingModule({
-      imports: [App],
+      imports: [App, ApolloTestingModule],
       providers: [provideRouter(routes)],
     }).compileComponents();
     const harness = await RouterTestingHarness.create('/');
