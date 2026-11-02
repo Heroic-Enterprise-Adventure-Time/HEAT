@@ -2,9 +2,9 @@
 #
 # The gate on every pull request and on main: does the repository build, does
 # it lint clean, do its tests pass, does the client build for production, is
-# the committed GraphQL schema current, does every function bundle, and is
-# every Terraform root formatted and valid. It runs
-# with no AWS credentials; the integration tests start their own containers
+# the committed GraphQL schema current, does every function bundle, is
+# every Terraform root formatted and valid, and does every workflow lint
+# clean under actionlint. It runs with no AWS credentials; the integration tests start their own containers
 # (decision 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
 # roots, under their GitHub environments, and sandbox.yml the per-issue
@@ -113,3 +113,33 @@ jobs:
         working-directory: terraform
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  workflows:
+    name: Lint the workflows
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7
+
+      # actionlint, pinned, from its release archive, with the archive's build
+      # attestation verified before it runs: the check its install document
+      # recommends (read 2026-11-02). The download script the document also
+      # offers pipes a fetch into bash, which this project does not do. The
+      # runner has shellcheck, so every run step's script is checked too
+      # (docs/process/development.md, rule 2).
+      - name: Set up actionlint
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ACTIONLINT_VERSION: 1.7.12
+        run: |
+          set -eu
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          gh release download "v$ACTIONLINT_VERSION" --repo rhysd/actionlint --pattern "$archive" --dir "$RUNNER_TEMP"
+          gh attestation verify "$RUNNER_TEMP/$archive" --repo rhysd/actionlint
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -version
+
+      # With no argument actionlint finds every workflow under .github/workflows.
+      - name: Lint every workflow
+        run: |
+          "$RUNNER_TEMP/actionlint" -color
