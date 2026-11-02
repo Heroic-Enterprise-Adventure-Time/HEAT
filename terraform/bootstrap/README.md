@@ -103,7 +103,7 @@ gh api --method POST repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/pr
 ```ini
 [profile plan-heat-dev]
 role_arn = arn:aws:iam::<heat-dev account id>:role/heat-dev-plan
-source_profile = 209804271597_SecurityAudit
+source_profile = <management account id>_SecurityAudit
 region = us-east-1
 ```
 

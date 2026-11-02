@@ -1,7 +1,7 @@
 # 0033: Three layers of review: lint in CI, the review skill on a pull request, the checkup skill at a pause; the model-driven layers run from sessions on the subscription
 
 - **Status:** Decided
-- **Date:** 2026-10-23; the review skill's surface decided 2026-10-25 (Issue-146)
+- **Date:** 2026-10-23; the review skill's surface decided 2026-10-25 (Issue-146); the checkup's surface decided 2026-10-26 in decision 0034 (Issue-147)
 - **Settles:** Issues 144 to 147: how a change and the tree are reviewed beyond the owner's reading, and where the reviewing model runs and is paid for.
 
 ## Decision
@@ -35,4 +35,4 @@
 
 ## Where it is described
 
-`docs/process/code-changes.md`, rules 9, 23 and 24; `docs/runbooks/review-change.md`; `.claude/skills/review-change/`; `docs/standards/typescript.md`, rule 16, and `docs/standards/terraform.md`, rule 17, for the floor.
+`docs/process/code-changes.md`, rules 9, 23, 24 and 28; `docs/runbooks/review-change.md`; `.claude/skills/review-change/`; `docs/runbooks/checkup.md`; `.claude/skills/checkup/`; `docs/standards/typescript.md`, rule 16, and `docs/standards/terraform.md`, rule 17, for the floor.
