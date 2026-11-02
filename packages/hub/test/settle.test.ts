@@ -7,6 +7,7 @@ import { locationKeys, playerKeys } from "../src/db/keys.js";
 import { Repository, type Hero, type Settlement } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
 import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, EngineUpdated } from "../src/refusals.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
@@ -66,18 +67,6 @@ async function start(p: string, heroes: Hero[], issuedBy = version) {
   return startAdventure(repo, p, issuedBy, at, wolves.id, heroes.map((h) => h.id));
 }
 
-/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
-async function refusal(promise: Promise<unknown>): Promise<unknown> {
-  try {
-    await promise;
-  } catch (e) {
-    return e;
-  }
-  return undefined;
-}
-
-/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
-const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 async function item(table: string, key: Record<string, string>) {
   return (await db.send(new GetCommand({ TableName: table, Key: key }))).Item;

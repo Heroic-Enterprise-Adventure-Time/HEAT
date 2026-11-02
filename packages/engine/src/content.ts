@@ -13,14 +13,13 @@ import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, Monste
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
 import type { Material } from "./index.js";
 
-/** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. */
-export type UnitType = "villager" | "fighter" | "knight" | "ranger" | "wizard" | "priest";
+/** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. The list declares the union (typescript.md, rule 18). */
+export const UNIT_TYPES = ["villager", "fighter", "knight", "ranger", "wizard", "priest"] as const;
+export type UnitType = (typeof UNIT_TYPES)[number];
 
-export const UNIT_TYPES: readonly UnitType[] = ["villager", "fighter", "knight", "ranger", "wizard", "priest"];
-
-export type FacilityKind = "heroes-hall" | "warehouse" | "job-board" | "mine" | "lumber-camp" | "caravan-hub";
-
-export const FACILITY_KINDS: readonly FacilityKind[] = ["heroes-hall", "warehouse", "job-board", "mine", "lumber-camp", "caravan-hub"];
+/** A camp's own facilities: those every camp has and those it may build. */
+export const FACILITY_KINDS = ["heroes-hall", "warehouse", "job-board", "mine", "lumber-camp", "caravan-hub"] as const;
+export type FacilityKind = (typeof FACILITY_KINDS)[number];
 
 /** A cost in resources: there is no currency (game.md, "Resources"). */
 export type Cost = readonly { material: Material; amount: number }[];
@@ -308,14 +307,12 @@ export function heroNames(presentation: Presentation, taken: ReadonlySet<string>
 // ── The battle ─────────────────────────────────────────────────────
 
 /** The monsters, by the type a fight stage names. Their sprite sets are mapped beside them (Issue-111). */
-export type MonsterType = "wolf" | "bandit";
-
-export const MONSTER_TYPES: readonly MonsterType[] = ["wolf", "bandit"];
+export const MONSTER_TYPES = ["wolf", "bandit"] as const;
+export type MonsterType = (typeof MONSTER_TYPES)[number];
 
 /** The resource nodes a gather stage names. */
-export type ResourceType = "tree" | "ore-vein";
-
-export const RESOURCE_TYPES: readonly ResourceType[] = ["tree", "ore-vein"];
+export const RESOURCE_TYPES = ["tree", "ore-vein"] as const;
+export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
 export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "move-up";
 

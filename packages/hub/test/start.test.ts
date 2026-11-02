@@ -8,6 +8,7 @@ import { Repository, type Camp, type Hero, type HeroStatus } from "../src/db/rep
 import { buildFacility } from "../src/build.js";
 import { recruitHero } from "../src/recruit.js";
 import { AdventureOpen, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires } from "../src/refusals.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
@@ -57,18 +58,6 @@ async function putHeroes(p: string, statuses: HeroStatus[], location = at): Prom
   return heroes;
 }
 
-/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
-async function refusal(promise: Promise<unknown>): Promise<unknown> {
-  try {
-    await promise;
-  } catch (e) {
-    return e;
-  }
-  return undefined;
-}
-
-/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
-const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 describe("startAdventure", () => {
   it("starts the wolves job with the free villager: the record, the snapshot, the open item and the mark", async () => {

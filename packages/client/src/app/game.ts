@@ -19,7 +19,7 @@ import {
   type FacilityKind,
   type UnitType,
 } from '@heat/engine';
-import { constantCase } from 'es-toolkit';
+import { constantCase, kebabCase } from 'es-toolkit';
 import { Api, ApiError, PREVIOUS, Refusal, type Route } from './api';
 import { Session } from './session';
 
@@ -128,9 +128,17 @@ type Wire<T> = T extends string
       ? { readonly [K in keyof T]: Wire<T[K]> }
       : T;
 
-/** The engine's value behind a schema enum name: `VILLAGER` is the engine's `villager`. */
-function engineValue<T extends string>(values: readonly T[], name: string): T {
-  return must(values.find((value) => constantCase(value) === name), `an engine value for ${name}`);
+/**
+ * The engine's value behind a schema enum name, `VILLAGER` for `villager`,
+ * looked up in a map built once per list. A name this client's engine lacks,
+ * sent by a newer deploy before the `outdated` reload (decision 0030), passes
+ * through in the engine's spelling rather than failing the whole read, as a
+ * string did before the enums: the page shows it as content it does not know
+ * (angular.md, rule 6).
+ */
+function engineValues<T extends string>(values: readonly T[]): (name: string) => T {
+  const byName = new Map(values.map((value) => [constantCase(value), value]));
+  return (name) => byName.get(name) ?? (kebabCase(name) as T);
 }
 
 /** The schema's enum name of an engine value: `heroes-hall` is sent as `HEROES_HALL`. */
@@ -138,8 +146,12 @@ export function wireValue(value: string): string {
   return constantCase(value);
 }
 
-const unitType = (name: string): UnitType => engineValue(UNIT_TYPES, name);
-const material = (name: string) => engineValue(MATERIALS, name);
+const unitType = engineValues(UNIT_TYPES);
+const material = engineValues(MATERIALS);
+const facilityKind = engineValues(FACILITY_KINDS);
+const outcome = engineValues(ADVENTURE_OUTCOMES);
+const stageKind = engineValues(STAGE_KINDS);
+const stageEnding = engineValues(STAGE_ENDINGS);
 const materials = <T extends { readonly material: string }>(items: readonly T[]) => items.map((item) => ({ ...item, material: material(item.material) }));
 
 function heroFromWire(hero: Wire<HeroView>): HeroView {
@@ -150,7 +162,7 @@ function campFromWire(camp: Wire<CampView>): CampView {
   return {
     ...camp,
     holdings: materials(camp.holdings),
-    facilities: camp.facilities.map((f) => ({ ...f, kind: engineValue(FACILITY_KINDS, f.kind) })),
+    facilities: camp.facilities.map((f) => ({ ...f, kind: facilityKind(f.kind) })),
   };
 }
 
@@ -164,8 +176,8 @@ function adventureFromWire(adventure: Wire<AdventureView>): AdventureView {
 function resultFromWire(result: Wire<AdventureResultView>): AdventureResultView {
   return {
     ...result,
-    outcome: engineValue(ADVENTURE_OUTCOMES, result.outcome),
-    stages: result.stages.map((s) => ({ ...s, kind: engineValue(STAGE_KINDS, s.kind), ended: engineValue(STAGE_ENDINGS, s.ended) })),
+    outcome: outcome(result.outcome),
+    stages: result.stages.map((s) => ({ ...s, kind: stageKind(s.kind), ended: stageEnding(s.ended) })),
     rewards: materials(result.rewards),
     credited: materials(result.credited),
     lost: materials(result.lost),

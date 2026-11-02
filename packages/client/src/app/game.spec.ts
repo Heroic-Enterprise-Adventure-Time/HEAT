@@ -147,6 +147,14 @@ describe('Game', () => {
     await vi.waitFor(() => { expect(game.seenHere()).toEqual([moss]); });
   });
 
+  it("passes a value its engine does not know through in the engine's spelling, so a newer hub does not stop the load", async () => {
+    const { game } = setup(playerWith([{ ...villager, unitType: 'DRAGON_RIDER' }], 1, 1, [{ material: 'GOLD', balance: 1 }]));
+    TestBed.tick();
+    await vi.waitFor(() => { expect(game.player()).not.toBeNull(); });
+    expect(game.heroesHere().map((h) => h.unitType)).toEqual(['dragon-rider']);
+    expect(game.camp()?.holdings).toEqual([{ material: 'gold', balance: 1 }]);
+  });
+
   it("reads the heroes seen at the camp's location after sign-in and again when the camp changes, not after a recruit", async () => {
     const { api, game } = setup(playerWith([]));
     TestBed.tick();

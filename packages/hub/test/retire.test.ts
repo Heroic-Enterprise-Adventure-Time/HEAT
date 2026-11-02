@@ -7,6 +7,7 @@ import { HeroChanged, Repository, type Hero, type HeroStatus } from "../src/db/r
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { must } from "@heat/engine";
 
 let db: DynamoDBDocumentClient;
@@ -52,18 +53,6 @@ async function expectCountsAgree(p: string) {
   });
 }
 
-/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
-async function refusal(promise: Promise<unknown>): Promise<unknown> {
-  try {
-    await promise;
-  } catch (e) {
-    return e;
-  }
-  return undefined;
-}
-
-/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
-const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 describe("retireHero", () => {
   it("retires a living hero and counts it out of the active and the living heroes", async () => {

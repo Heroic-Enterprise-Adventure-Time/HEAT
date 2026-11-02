@@ -9,6 +9,7 @@ import { BuildRefused, InsufficientBalance, RecruitRefused, Repository, campLeve
 import { buildFacility } from "../src/build.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;
@@ -44,18 +45,6 @@ async function ledger(p: string): Promise<Record<string, unknown>[]> {
   return r.Items ?? [];
 }
 
-/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
-async function refusal(promise: Promise<unknown>): Promise<unknown> {
-  try {
-    await promise;
-  } catch (e) {
-    return e;
-  }
-  return undefined;
-}
-
-/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
-const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 describe("buildFacility: the mine", () => {
   it("builds the mine for one timber run's 60 timber and 3 cloth, with one ledger entry per resource", async () => {

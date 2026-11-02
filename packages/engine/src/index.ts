@@ -6,9 +6,9 @@
  * same rules. The spike's rewards-for-a-seed function went with Issue-114.
  */
 
-export type Material = "timber" | "ore" | "cloth";
-
-export const MATERIALS: readonly Material[] = ["timber", "ore", "cloth"];
+/** The resources; there is no currency (game.md, "Resources"). The list declares the union (typescript.md, rule 18). */
+export const MATERIALS = ["timber", "ore", "cloth"] as const;
+export type Material = (typeof MATERIALS)[number];
 
 export interface Reward {
   material: Material;

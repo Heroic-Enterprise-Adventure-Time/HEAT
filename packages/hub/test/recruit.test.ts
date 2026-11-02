@@ -8,6 +8,7 @@ import { playerKeys } from "../src/db/keys.js";
 import { InsufficientBalance, RecruitRefused, Repository, type Hero } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;
@@ -33,18 +34,6 @@ async function putCamp(p: string, activeHeroes: number, livingHeroes: number) {
   );
 }
 
-/** What the call threw: a refusal class, answered as data by the graph, or the GraphQLError of malformed input. */
-async function refusal(promise: Promise<unknown>): Promise<unknown> {
-  try {
-    await promise;
-  } catch (e) {
-    return e;
-  }
-  return undefined;
-}
-
-/** How malformed input is refused: a GraphQLError with the code, never a refusal type (graphql.md, rule 14). */
-const BAD_USER_INPUT = { extensions: { code: "BAD_USER_INPUT" } };
 
 describe("recruitHero: the free villager", () => {
   it("gives a new player a villager drawn by the hub, and counts it into the camp", async () => {
