@@ -3,7 +3,7 @@
 # issue number from the branch name, which names the stack.
 
 variable "workload_account_id" {
-  description = "The heat-sandbox AWS account, which the provider refuses to run against any other. TF_VAR_workload_account_id, from the repository variable HEAT_SANDBOX_ACCOUNT_ID or the private script in docs/private/."
+  description = "The heat-sandbox AWS account, which the provider refuses to run against any other. TF_VAR_workload_account_id, from the repository secret HEAT_SANDBOX_ACCOUNT_ID or the private script in docs/private/."
   type        = string
 
   validation {

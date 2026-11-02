@@ -40,16 +40,16 @@ jobs:
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }}
     steps:
-      # The role ARNs are not stored: each is the account id variable plus
+      # The role ARNs are not stored: each is the account id secret plus
       # the name the bootstrap module gives the role (terraform/bootstrap/README.md).
       - name: Work out the role to ask for
         id: role
         env:
           ENVIRONMENT: ${{ inputs.environment }}
           ROLE_ENVIRONMENT: ${{ inputs.role_environment }}
-          SANDBOX_ACCOUNT_ID: ${{ vars.HEAT_SANDBOX_ACCOUNT_ID }}
-          DEV_ACCOUNT_ID: ${{ vars.HEAT_DEV_ACCOUNT_ID }}
-          PROD_ACCOUNT_ID: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+          SANDBOX_ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
+          DEV_ACCOUNT_ID: ${{ secrets.HEAT_DEV_ACCOUNT_ID }}
+          PROD_ACCOUNT_ID: ${{ secrets.HEAT_PROD_ACCOUNT_ID }}
         run: |
           set -eu
           target="${ROLE_ENVIRONMENT:-$ENVIRONMENT}"
@@ -60,7 +60,7 @@ jobs:
             *) echo "No apply role for '$target'." >&2; exit 1 ;;
           esac
           if [ -z "$account" ]; then
-            echo "The account id variable for '$name' is not set." >&2
+            echo "The account id secret for '$name' is not set." >&2
             exit 1
           fi
           echo "arn=arn:aws:iam::${account}:role/heat-${name}-apply" >> "$GITHUB_OUTPUT"

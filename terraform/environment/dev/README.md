@@ -28,7 +28,7 @@ In `heat-dev`, us-east-1, every resource tagged `Project=heat`, `Environment=dev
 
 | Variable | From, in the pipeline | From, on a laptop |
 | --- | --- | --- |
-| `workload_account_id` | The repository variable `HEAT_DEV_ACCOUNT_ID` | The private script in `docs/private/`, or `terraform.tfvars` |
+| `workload_account_id` | The repository secret `HEAT_DEV_ACCOUNT_ID` | The private script in `docs/private/`, or `terraform.tfvars` |
 | `google_client_id` | The `dev` environment's variable `HEAT_GOOGLE_CLIENT_ID`, the client registered against `auth.heat-dev.dcg-games.com` | A placeholder |
 | `google_client_secret` | The `dev` environment's secret `HEAT_GOOGLE_CLIENT_SECRET` (sensitive) | A placeholder |
 | `alarm_email` | The `dev` environment's variable `HEAT_ALARM_EMAIL` | A placeholder |

@@ -55,7 +55,7 @@ The project owner, from PowerShell, with the `heat-platform` account's `Admin` c
 
 ## Applying
 
-For an account, in this order: its bootstrap root; then the `backend` stack with the account listed in `workload_account_ids`, because the bucket policy names roles that must exist; then its account id as a repository variable; then the checks under "Verification". All three accounts went through this on 2026-10-16. A fourth account would follow the same order, plus an `audit-heat-<name>` profile for the agent before it can verify there.
+For an account, in this order: its bootstrap root; then the `backend` stack with the account listed in `workload_account_ids`, because the bucket policy names roles that must exist; then its account id as a repository secret; then the checks under "Verification". All three accounts went through this on 2026-10-16. A fourth account would follow the same order, plus an `audit-heat-<name>` profile for the agent before it can verify there.
 
 Either create `terraform.tfvars` in the root from its example, or set the values for the terminal with the private script. Then:
 
@@ -76,17 +76,17 @@ terraform apply dev.tfplan
 Remove-Item dev.tfplan
 ```
 
-Two things learned on the first applies, 2026-10-15. PowerShell splits a `-flag=value` argument at a dot in the value, so a flag that takes a value is written with a space, as `-out dev.tfplan` is. And a value piped into `gh variable set` arrived with a UTF-8 byte-order mark in front of it; pass values as arguments, `--body "<value>"`, never through a pipe.
+Two things learned on the first applies, 2026-10-15. PowerShell splits a `-flag=value` argument at a dot in the value, so a flag that takes a value is written with a space, as `-out dev.tfplan` is. And a value piped into `gh variable set` or `gh secret set` arrived with a UTF-8 byte-order mark in front of it; pass values as arguments, `--body "<value>"`, never through a pipe.
 
-**On the GitHub side.** The workflows store no role ARNs: a role's ARN is the account id variable plus its committed name, `heat-<environment>-apply` or `-plan`. One repository variable per account, set once that account's root is applied, and the deploy role's variable deleted with the role. From the worktree or the checkout, so that `gh` finds the repository:
+**On the GitHub side.** The workflows store no role ARNs: a role's ARN is the account id secret plus its committed name, `heat-<environment>-apply` or `-plan`. One repository secret per account, set once that account's root is applied; a secret and not a variable, because GitHub masks a secret in every log line and the logs are public with the repository (Issue-177). From the worktree or the checkout, so that `gh` finds the repository:
 
 ```powershell
-gh variable set HEAT_PROD_ACCOUNT_ID --body "<the heat-prod account id>"
-gh variable set HEAT_SANDBOX_ACCOUNT_ID --body "<the heat-sandbox account id>"
+gh secret set HEAT_PROD_ACCOUNT_ID --body "<the heat-prod account id>"
+gh secret set HEAT_SANDBOX_ACCOUNT_ID --body "<the heat-sandbox account id>"
 gh variable delete HEAT_DEV_DEPLOY_ROLE_ARN
 ```
 
-`HEAT_DEV_ACCOUNT_ID` exists since Issue-12. The GitHub environment `dev` exists. `sandbox-base` is created by the owner before Issue-37's pull request merges, because its secret must exist before the first apply (`terraform/environment/sandbox-base/README.md` has the three commands); `prod` is created by the owner before Issue-41's pull request merges (`terraform/environment/prod/README.md` has the commands). The per-stack environments `sandbox-<issue>` are created by the sandbox workflow. The deployment branch policies are the owner's, set once each environment exists: `dev` and `sandbox-base` to the branch `main`; `prod` to the branches `main` and `release`, because a pull request's `prod` plan runs on `main`'s ref and the apply on `release`'s (decisions 0020 and 0021). Each environment also holds its secrets under one name per secret, so that the workflow names the secret and the environment supplies the value (decision 0020): the test users' password, `HEAT_TEST_USER_PASSWORD`, on `sandbox-base` and later on `dev`, never on `prod`; and from Issue-46 the pool's Google OAuth client, its id as the variable `HEAT_GOOGLE_CLIENT_ID` and its secret as the secret `HEAT_GOOGLE_CLIENT_SECRET`, one Google client per pool, registered against `auth.heat-sb.dcg-games.com`, `auth.heat-dev.dcg-games.com` and `auth.heat.dcg-games.com`, on `sandbox-base`, `dev` and `prod` in turn.
+`HEAT_DEV_ACCOUNT_ID` exists since Issue-12, as a secret since Issue-177. The GitHub environment `dev` exists. `sandbox-base` is created by the owner before Issue-37's pull request merges, because its secret must exist before the first apply (`terraform/environment/sandbox-base/README.md` has the three commands); `prod` is created by the owner before Issue-41's pull request merges (`terraform/environment/prod/README.md` has the commands). The per-stack environments `sandbox-<issue>` are created by the sandbox workflow. The deployment branch policies are the owner's, set once each environment exists: `dev` and `sandbox-base` to the branch `main`; `prod` to the branches `main` and `release`, because a pull request's `prod` plan runs on `main`'s ref and the apply on `release`'s (decisions 0020 and 0021). Each environment also holds its secrets under one name per secret, so that the workflow names the secret and the environment supplies the value (decision 0020): the test users' password, `HEAT_TEST_USER_PASSWORD`, on `sandbox-base` and later on `dev`, never on `prod`; and from Issue-46 the pool's Google OAuth client, its id as the variable `HEAT_GOOGLE_CLIENT_ID` and its secret as the secret `HEAT_GOOGLE_CLIENT_SECRET`, one Google client per pool, registered against `auth.heat-sb.dcg-games.com`, `auth.heat-dev.dcg-games.com` and `auth.heat.dcg-games.com`, on `sandbox-base`, `dev` and `prod` in turn.
 
 ```powershell
 gh api --method PUT repos/Heroic-Enterprise-Adventure-Time/HEAT/environments/dev -F "deployment_branch_policy[protected_branches]=false" -F "deployment_branch_policy[custom_branch_policies]=true"

@@ -102,8 +102,10 @@ jobs:
       id-token: write
       pull-requests: write
     env:
-      ACCOUNT_ID: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
-      TF_VAR_workload_account_id: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+      # A repository secret, so that GitHub masks the id in every log line
+      # (docs/README.md, rule 9).
+      ACCOUNT_ID: ${{ secrets.HEAT_PROD_ACCOUNT_ID }}
+      TF_VAR_workload_account_id: ${{ secrets.HEAT_PROD_ACCOUNT_ID }}
       # The deploy's version (decision 0030): the pull request's head, which
       # this job checks out and plans. Not github.sha, which in a
       # pull_request_target run is the base branch's tip. A root without the
@@ -120,8 +122,7 @@ jobs:
       - name: Refuse to run without the account id
         run: |
           set -eu
-          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
-          echo "::add-mask::$ACCOUNT_ID"
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out the pull request's head
         uses: actions/checkout@v7
@@ -205,8 +206,10 @@ jobs:
       contents: read
       id-token: write
     env:
-      ACCOUNT_ID: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
-      TF_VAR_workload_account_id: ${{ vars.HEAT_PROD_ACCOUNT_ID }}
+      # A repository secret, so that GitHub masks the id in every log line
+      # (docs/README.md, rule 9).
+      ACCOUNT_ID: ${{ secrets.HEAT_PROD_ACCOUNT_ID }}
+      TF_VAR_workload_account_id: ${{ secrets.HEAT_PROD_ACCOUNT_ID }}
       # The deploy's version, the commit this run deploys (decision 0030):
       # the hub's HEAT_VERSION and config.json's version from Issue-113. A
       # root without the variable ignores it.
@@ -218,8 +221,7 @@ jobs:
       - name: Refuse to run without the account id
         run: |
           set -eu
-          [ -n "$ACCOUNT_ID" ] || { echo "The repository variable HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
-          echo "::add-mask::$ACCOUNT_ID"
+          [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out release
         uses: actions/checkout@v7

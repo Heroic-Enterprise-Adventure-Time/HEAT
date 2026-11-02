@@ -34,7 +34,7 @@ The pipeline, and nothing else, in `.github/workflows/sandbox.yml`:
 
 The deletion and the schedule run `main`'s copy of the workflow, as GitHub does for those events, so they took effect when Issue-38 merged; before that, the throwaway branch's stack `heat-sb53` was left behind by its deletion and destroyed by the sweep dispatched from the branch (2026-10-17).
 
-The account id reaches Terraform as `TF_VAR_workload_account_id` from the repository variable `HEAT_SANDBOX_ACCOUNT_ID`, and is replaced by `<account id>` in every plan the workflow writes. The deploy's version reaches it as `TF_VAR_app_version`, the run's `github.sha`, in every job that runs Terraform, the destroys included, because the variable has no default (decision 0030); on a laptop it is the worktree's `HEAD`.
+The account id reaches Terraform as `TF_VAR_workload_account_id` from the repository secret `HEAT_SANDBOX_ACCOUNT_ID`, and is replaced by `<account id>` in every plan the workflow writes. The deploy's version reaches it as `TF_VAR_app_version`, the run's `github.sha`, in every job that runs Terraform, the destroys included, because the variable has no default (decision 0030); on a laptop it is the worktree's `HEAD`.
 
 **The cap.** `SANDBOX_STACK_CAP` in the workflow is 5. Before planning, the job counts the states under `environment/sandbox/` that hold resources, other than `base/` and this issue's own, and fails naming the stacks when the count is at the cap. A re-apply of an existing stack is never refused by it. A destroy leaves an empty state object behind, which the destroy paths remove with `forget`; the sweep lists every per-issue key without a branch, so an empty object left by an earlier run is forgotten too.
 
