@@ -1,5 +1,6 @@
 import { InjectionToken } from '@angular/core';
-import { readLayoutSizes, type LayoutSizes } from './page-layout';
+
+import { type LayoutSizes, readLayoutSizes } from './page-layout';
 
 /**
  * How a page reads the regions' sizes: from the tokens on `:root` in

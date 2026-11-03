@@ -9,8 +9,8 @@
  * table at the end; the numbers are its working assumptions.
  */
 
-import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
+import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
 import type { Material } from "./index.js";
 
 /** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. The list declares the union (typescript.md, rule 18). */

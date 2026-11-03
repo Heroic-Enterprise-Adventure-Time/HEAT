@@ -1,8 +1,9 @@
 import { ApplicationInitStatus, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { type ActivatedRouteSnapshot, type RouterStateSnapshot, UrlTree, provideRouter } from '@angular/router';
+import { type ActivatedRouteSnapshot, provideRouter, type RouterStateSnapshot, UrlTree } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 import { ApolloTestingModule } from 'apollo-angular/testing';
+
 import { App } from './app';
 import { appConfig } from './app.config';
 import { routes, signedIn } from './app.routes';

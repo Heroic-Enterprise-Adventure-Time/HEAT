@@ -1,5 +1,6 @@
 import { Component, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
+
 import { Config } from '../config';
 import { Game } from '../game';
 import { Session } from '../session';

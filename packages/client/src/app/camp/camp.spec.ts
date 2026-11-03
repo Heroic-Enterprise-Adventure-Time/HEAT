@@ -1,17 +1,19 @@
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { routes } from '../app.routes';
-import { Refusal } from '../hub';
+
 import type { FacilityKind } from '@heat/engine';
-import { Game, upgradeOffer, type CampView, type HeroView, type RecruitOffer, type SeenHeroView } from '../game';
+import { must } from '@heat/engine';
+
+import { routes } from '../app.routes';
+import { type CampView, Game, type HeroView, type RecruitOffer, type SeenHeroView, upgradeOffer } from '../game';
+import { Refusal } from '../hub';
 import { Session } from '../session';
-import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
+import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
 import { CAMP_SCENE_FACTORY } from './camp';
 import { LAYOUT_SIZES } from './layout-sizes';
-import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
-import { must } from '@heat/engine';
+import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
 
 const wren: HeroView = {
   id: 'h1',

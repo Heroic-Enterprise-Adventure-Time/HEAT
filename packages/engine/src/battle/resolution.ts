@@ -18,7 +18,7 @@
 import type { AbilityDefinition } from "./ability.js";
 import type { SeededRng } from "./rng.js";
 import type { ActionContext, ActionSelection, UnitState } from "./state.js";
-import { lineAhead, lineIndex, type Line } from "./unit.js";
+import { type Line, lineAhead, lineIndex } from "./unit.js";
 
 /** The first walk of the list, or the second, which aims regular attacks at resource nodes. */
 export type SelectionPass = "units" | "resources";

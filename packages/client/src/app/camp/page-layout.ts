@@ -1,4 +1,5 @@
 import { clamp } from 'es-toolkit';
+
 import { MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH } from './scene/layout';
 
 /**

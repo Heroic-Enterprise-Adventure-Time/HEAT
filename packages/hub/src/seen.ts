@@ -1,6 +1,9 @@
-import { range } from "es-toolkit";
 import { randomInt } from "node:crypto";
+
+import { range } from "es-toolkit";
+
 import type { UnitType } from "@heat/engine";
+
 import type { Hero, Repository } from "./db/repository.js";
 
 /**

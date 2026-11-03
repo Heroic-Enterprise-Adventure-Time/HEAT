@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import {
   AdventureAlreadyOpen,

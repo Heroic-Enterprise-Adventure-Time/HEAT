@@ -1,11 +1,13 @@
 import { range } from 'es-toolkit';
 import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
-import { facilityArtLevel, must, type FacilityKind } from '@heat/engine';
-import { layGround, type TilesetJson } from './ground';
-import { MAP_HEIGHT, MAP_WIDTH, TILE, cornersAround, type CampLayout } from './layout';
+
+import { facilityArtLevel, type FacilityKind, must } from '@heat/engine';
+
 import { lowestOpaqueRow } from '../../pixel-art';
 import { sceneView, type SceneView } from '../page-layout';
-import { WALK_SPEED, gone, leave, newWalker, randomSpot, step, type Facing, type Walker } from './wander';
+import { layGround, type TilesetJson } from './ground';
+import { type CampLayout, cornersAround, MAP_HEIGHT, MAP_WIDTH, TILE } from './layout';
+import { type Facing, gone, leave, newWalker, randomSpot, step, WALK_SPEED, type Walker } from './wander';
 
 /**
  * The camp scene, drawn with PixiJS (decision 0028): the camp's whole map,

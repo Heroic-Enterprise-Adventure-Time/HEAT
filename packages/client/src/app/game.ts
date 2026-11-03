@@ -1,56 +1,58 @@
-import { Service, computed, inject, signal } from '@angular/core';
+import { computed, inject, Service, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import type { OperationVariables, TypedDocumentNode } from '@apollo/client';
+import { Apollo } from 'apollo-angular';
+import { constantCase, kebabCase } from 'es-toolkit';
+import { catchError, combineLatest, firstValueFrom, from, map, type Observable, of, startWith, switchMap } from 'rxjs';
+
 import {
   ADVENTURE_OUTCOMES,
+  type AdventureLogEntry,
+  type AdventureOutcome,
+  type AdventureTimeline,
+  buildRefusal,
   FACILITY_KINDS,
+  type FacilityKind,
+  hallCapacity,
+  location,
   MATERIALS,
+  must,
+  nextLevel,
+  recruitCost,
   STAGE_ENDINGS,
   STAGE_KINDS,
   STARTING_LOCATION,
   UNIT_TYPES,
-  buildRefusal,
-  hallCapacity,
-  location,
-  must,
-  nextLevel,
-  recruitCost,
-  warehouseCapacity,
-  type AdventureLogEntry,
-  type AdventureOutcome,
-  type AdventureTimeline,
-  type FacilityKind,
   type UnitType,
+  warehouseCapacity,
 } from '@heat/engine';
-import type { OperationVariables, TypedDocumentNode } from '@apollo/client';
-import { Apollo } from 'apollo-angular';
-import { constantCase, kebabCase } from 'es-toolkit';
-import { catchError, combineLatest, firstValueFrom, from, map, of, startWith, switchMap, type Observable } from 'rxjs';
+
 import {
+  type AdventureFieldsFragment,
   BuildFacilityDocument,
+  type CampFieldsFragment,
   DiscardAdventureDocument,
   HeroesSeenAtDocument,
+  type HeroFieldsFragment,
   JoinGameDocument,
   MeDocument,
+  type MeQuery,
+  type OverrideInput,
   RecruitHeroDocument,
+  type ResultFieldsFragment,
   RetireHeroDocument,
+  type SeenHeroFieldsFragment,
   StartAdventureDocument,
   SubmitAdventureDocument,
   TimelineDocument,
-  type AdventureFieldsFragment,
   type AdventureOutcome as WireAdventureOutcome,
-  type CampFieldsFragment,
   type FacilityKind as WireFacilityKind,
-  type HeroFieldsFragment,
   type Material as WireMaterial,
-  type MeQuery,
-  type OverrideInput,
-  type ResultFieldsFragment,
-  type SeenHeroFieldsFragment,
   type StageEnding as WireStageEnding,
   type StageKind as WireStageKind,
   type UnitType as WireUnitType,
 } from './graphql/generated/graphql';
-import { PREVIOUS, Refusal, apiError, type Route } from './hub';
+import { apiError, PREVIOUS, Refusal, type Route } from './hub';
 import { Session } from './session';
 
 /**

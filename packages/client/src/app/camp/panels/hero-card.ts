@@ -1,7 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+
 import { Game } from '../../game';
 import { Refusal } from '../../hub';
 import { CampState } from '../camp-state';

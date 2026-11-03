@@ -2,6 +2,7 @@ import SchemaBuilder from "@pothos/core";
 import ErrorsPlugin from "@pothos/plugin-errors";
 import ScopeAuthPlugin from "@pothos/plugin-scope-auth";
 import { DateTimeResolver } from "graphql-scalars";
+
 import type { Context } from "../context.js";
 
 /**

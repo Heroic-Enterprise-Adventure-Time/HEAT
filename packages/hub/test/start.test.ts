@@ -1,18 +1,21 @@
 import { randomUUID } from "node:crypto";
-import { PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { UNIT_PROFILES, must } from "@heat/engine";
+
+import { must, UNIT_PROFILES } from "@heat/engine";
+
+import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { Repository, type Camp, type Hero, type HeroStatus } from "../src/db/repository.js";
-import { buildFacility } from "../src/build.js";
+import { type Camp, type Hero, type HeroStatus, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { AdventureOpen, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires } from "../src/refusals.js";
-import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 /**
  * startAdventure against DynamoDB Local: the job on the location's board,

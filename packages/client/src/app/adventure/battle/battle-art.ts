@@ -1,8 +1,10 @@
 import { range } from 'es-toolkit';
 import { Assets, Rectangle, Texture } from 'pixi.js';
+
+import { must } from '@heat/engine';
+
 import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
 import { effectLayout, type EffectLayout, type EffectManifest } from './action-sprites';
-import { must } from '@heat/engine';
 
 /**
  * A battle unit's pictures, read from its sprite set's files and its

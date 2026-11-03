@@ -1,4 +1,4 @@
-import { GetObjectCommand, PutObjectCommand, S3ServiceException, type S3Client } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, type S3Client, S3ServiceException } from "@aws-sdk/client-s3";
 
 /**
  * The replay bucket (overview, "Services and data"; decision 0030): one

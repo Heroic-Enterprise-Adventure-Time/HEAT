@@ -1,26 +1,28 @@
 import { randomInt } from "node:crypto";
+
 import {
-  SPRITE_SETS,
-  SPRITE_SET_PRESENTATION,
-  STARTING_LOCATION,
-  UNIT_TYPES,
   hallCapacity,
   heroNames,
   location,
-  recruitCost,
   type Recruit,
+  recruitCost,
+  SPRITE_SET_PRESENTATION,
+  SPRITE_SETS,
+  STARTING_LOCATION,
+  UNIT_TYPES,
   type UnitType,
 } from "@heat/engine";
+
 import {
+  type Camp,
+  type Hero,
   HeroExists,
   InsufficientBalance,
   RecruitRefused,
-  TransactionConflict,
-  type Camp,
-  type Hero,
   type Repository,
+  TransactionConflict,
 } from "./db/repository.js";
-import { Conflict, HallFull, HallLevel, InsufficientResources, badInput } from "./refusals.js";
+import { badInput, Conflict, HallFull, HallLevel, InsufficientResources } from "./refusals.js";
 
 /**
  * Recruitment (decision 0026): the client names the unit type and a request

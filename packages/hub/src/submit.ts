@@ -1,26 +1,28 @@
 import { clamp } from "es-toolkit";
+
 import {
-  levelForXp,
-  replay,
-  warehouseCapacity,
   type AdventureLogEntry,
   type AdventureResult,
   type AdventureTimeline,
+  levelForXp,
   type Material,
+  replay,
   type Reward,
+  warehouseCapacity,
 } from "@heat/engine";
+
 import {
   AdventureClosed,
-  CampChanged,
-  TransactionConflict,
   type AdventureRecord,
+  CampChanged,
   type Hero,
   type HeroOutcome,
   type Repository,
   type Settlement,
+  TransactionConflict,
 } from "./db/repository.js";
 import { logger } from "./observability.js";
-import { AdventureDiscarded, Conflict, EngineUpdated, badInput } from "./refusals.js";
+import { AdventureDiscarded, badInput, Conflict, EngineUpdated } from "./refusals.js";
 import type { Timelines } from "./timelines.js";
 
 /**

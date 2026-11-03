@@ -1,5 +1,6 @@
-import { STAGE_HEIGHT, STAGE_WIDTH, battleView, entryOffset, spot, spots, stackedBattleHeight } from './battle-layout';
 import { must } from '@heat/engine';
+
+import { battleView, entryOffset, spot, spots, stackedBattleHeight, STAGE_HEIGHT, STAGE_WIDTH } from './battle-layout';
 
 describe('Battle layout', () => {
   it('puts the party left of the middle and the other side right of it, each line further out', () => {

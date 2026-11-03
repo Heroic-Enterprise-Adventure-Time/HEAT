@@ -1,6 +1,7 @@
-import { build } from "esbuild";
 import { mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
+import { build } from "esbuild";
 
 /**
  * Bundles each function for Lambda: one ESM file per function under

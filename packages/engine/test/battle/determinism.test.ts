@@ -11,7 +11,8 @@
 
 import { sortBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
-import { CombatEngine, type BattleOutcome, type BattleSetup, type OverrideLogEntry, type PlayerOverride } from "../../src/index.js";
+
+import { type BattleOutcome, type BattleSetup, CombatEngine, type OverrideLogEntry, type PlayerOverride } from "../../src/index.js";
 import { hero, opponent, setup } from "./helpers.js";
 
 interface Click {

@@ -1,8 +1,9 @@
 import { DOCUMENT } from '@angular/common';
 import { TestBed } from '@angular/core/testing';
 import type { User, UserManagerSettings } from 'oidc-client-ts';
+
 import { Config, type StackConfig } from './config';
-import { SESSION_MANAGER_FACTORY, Session, type SessionManager, inAppPath, logoutUrl, sessionSettings } from './session';
+import { inAppPath, logoutUrl, Session, SESSION_MANAGER_FACTORY, type SessionManager, sessionSettings } from './session';
 
 const config: StackConfig = {
   graphqlPath: '/graphql',

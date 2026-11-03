@@ -23,6 +23,7 @@
  */
 
 import { sum } from "es-toolkit";
+
 import { BATTLE_CONTENT } from "../content.js";
 import type { Material } from "../index.js";
 import type { AbilityDefinition } from "./ability.js";
@@ -37,7 +38,7 @@ import type { OverrideLogEntry, PlayerOverride } from "./override.js";
 import { selectAction, selectForced } from "./resolution.js";
 import { SeededRng } from "./rng.js";
 import type { ActionContext, ActionSelection, DeclaredAction, UnitState } from "./state.js";
-import { lineAhead, type BattleContent, type BattleSetup, type ParticipantSnapshot, type Side } from "./unit.js";
+import { type BattleContent, type BattleSetup, lineAhead, type ParticipantSnapshot, type Side } from "./unit.js";
 
 /** The charge time of a unit, in whole milliseconds: speed is turns per ten seconds. */
 export function chargeMs(speed: number): number {

@@ -1,5 +1,7 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { FACILITIES, location, type FacilityKind } from '@heat/engine';
+import { computed, inject, Injectable, signal } from '@angular/core';
+
+import { FACILITIES, type FacilityKind, location } from '@heat/engine';
+
 import { Game } from '../game';
 import { LAYOUTS } from './scene/layout';
 

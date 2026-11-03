@@ -7,7 +7,8 @@
 
 import { sortBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
-import { AdventureEngine, replay, type AdventureSnapshot, type PartyOrder, type PlayerOverride } from "../../src/index.js";
+
+import { AdventureEngine, type AdventureSnapshot, type PartyOrder, type PlayerOverride, replay } from "../../src/index.js";
 import { hero, snapshot, TIMBER, WOLVES } from "./helpers.js";
 
 type Click =

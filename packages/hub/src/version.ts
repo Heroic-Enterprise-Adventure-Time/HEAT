@@ -1,4 +1,5 @@
 import type { ApolloServerPlugin } from "@apollo/server";
+
 import type { Context } from "./context.js";
 
 /**

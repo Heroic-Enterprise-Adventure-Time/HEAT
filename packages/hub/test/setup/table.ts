@@ -1,9 +1,10 @@
 import {
   CreateTableCommand,
   DescribeTableCommand,
-  ResourceNotFoundException,
   type DynamoDBClient,
+  ResourceNotFoundException,
 } from "@aws-sdk/client-dynamodb";
+
 import { KEY } from "../../src/db/keys.js";
 
 /**

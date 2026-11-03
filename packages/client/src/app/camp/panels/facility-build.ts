@@ -1,7 +1,9 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
+
 import type { FacilityKind } from '@heat/engine';
-import { Refusal } from '../../hub';
+
 import { Game, type UpgradeOffer } from '../../game';
+import { Refusal } from '../../hub';
 
 /** The hub's refusals of a build, by type, in the player's words; any other is shown as the hub put it. */
 const REFUSALS: Readonly<Record<string, string>> = {
