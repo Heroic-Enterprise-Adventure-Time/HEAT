@@ -147,6 +147,12 @@ describe("authorization at the field level", () => {
     expect(anonymous.data?.me).toBeNull();
     expect(anonymous.errors?.[0]?.path).toEqual(["me"]);
     expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
+
+    // The same code for an anonymous caller failing `self`: it is the caller that decides, not the scope.
+    const anonymousOwner = await gql(q as Query<{ player: { name: string; camps: unknown; heroes: unknown } }>, { id: owner });
+    expect(anonymousOwner.data?.player.name).toBe("Owner");
+    expect(anonymousOwner.data?.player.camps).toBeNull();
+    expect(anonymousOwner.errors?.map((e) => e.extensions?.["code"])).toEqual(["UNAUTHENTICATED", "UNAUTHENTICATED"]);
   });
 });
 

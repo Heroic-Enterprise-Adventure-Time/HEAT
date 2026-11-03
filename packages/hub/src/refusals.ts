@@ -10,10 +10,9 @@ import type { Material, Requirement } from "@heat/engine";
  * the type carries. The message is in the player's words and may be shown
  * as it is.
  *
- * What is not a refusal stays in the response's `errors` array: malformed
- * input (`badInput`, BAD_USER_INPUT), a caller who is not signed in
- * (UNAUTHENTICATED, `callerId`), and anything nobody expected, which is
- * thrown as it is.
+ * What is not a refusal stays in the response's `errors` array, whose codes
+ * docs/standards/graphql.md, rule 6, lists: malformed input is `badInput`, and
+ * anything nobody expected is thrown as it is.
  */
 export abstract class Refusal extends Error {}
 
