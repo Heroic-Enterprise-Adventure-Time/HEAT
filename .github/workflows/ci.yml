@@ -136,8 +136,9 @@ jobs:
       # into sh, which this project does not do. The options and the pinned
       # checks bundle are terraform/trivy.yaml, the standing excuses
       # terraform/.trivyignore (docs/standards/terraform.md, rule 17).
+      # The exact release: the installer publishes no floating major tag.
       - name: Set up cosign
-        uses: sigstore/cosign-installer@v4
+        uses: sigstore/cosign-installer@v4.1.2
         with:
           cosign-release: v3.1.4
 
