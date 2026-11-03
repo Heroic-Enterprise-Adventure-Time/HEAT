@@ -13,6 +13,7 @@ import {
   type UnitType,
 } from "@heat/engine";
 
+import { retryingConflicts } from "./conflict.js";
 import {
   type Camp,
   type Hero,
@@ -20,7 +21,6 @@ import {
   InsufficientBalance,
   RecruitRefused,
   type Repository,
-  TransactionConflict,
 } from "./db/repository.js";
 import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Refusal } from "./refusals.js";
 
@@ -70,7 +70,7 @@ function barred(camp: Camp, recruit: Recruit): Refusal | undefined {
   return undefined;
 }
 
-export async function recruitHero(
+export function recruitHero(
   repo: Repository,
   playerId: string,
   unitType: string,
@@ -78,6 +78,10 @@ export async function recruitHero(
   random: Random = randomInt,
   now = new Date(),
 ): Promise<Hero> {
+  return retryingConflicts("the camp changed while recruiting; no hero was recruited", () => recruitOnce(repo, playerId, unitType, requestId, random, now));
+}
+
+async function recruitOnce(repo: Repository, playerId: string, unitType: string, requestId: string, random: Random, now: Date): Promise<Hero> {
   if (!UUID.test(requestId)) badInput("requestId must be a UUID");
   const heroId = requestId.toLowerCase();
   const already = await repo.getHero(playerId, heroId);
@@ -125,7 +129,7 @@ export async function recruitHero(
   try {
     return await repo.recruit(playerId, camp, hallCapacity(camp.hallLevel), hero, cost, living);
   } catch (e) {
-    if (!(e instanceof HeroExists || e instanceof RecruitRefused || e instanceof InsufficientBalance || e instanceof TransactionConflict)) throw e;
+    if (!(e instanceof HeroExists || e instanceof RecruitRefused || e instanceof InsufficientBalance)) throw e;
     // The camp first and the hero after it, as above: a repeat that won the race is the answer.
     const after = await repo.camp(playerId, at.id);
     const made = await repo.getHero(playerId, heroId);

@@ -8,10 +8,10 @@ import { heroNames, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } 
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { type Hero, InsufficientBalance, RecruitRefused, Repository } from "../src/db/repository.js";
+import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
-import { everyInterleaving, winnerBefore } from "./race.js";
+import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
@@ -262,12 +262,16 @@ describe("recruitHero: a repeat that loses the race to the request it repeats (I
    * each of the repeat's calls in turn, and answers how many it ran: the
    * repeat answers the hero, made once, wherever the other commits.
    */
-  async function race(setup: (p: string) => Promise<void>, made: (p: string) => Promise<void>): Promise<number> {
+  async function race(
+    setup: (p: string) => Promise<void>,
+    made: (p: string) => Promise<void>,
+    place: (k: number, winner: () => Promise<unknown>) => Race = (k, winner) => winnerBefore(repo, k, winner),
+  ): Promise<number> {
     return everyInterleaving(async (k) => {
       const p = player();
       await setup(p);
       const requestId = randomUUID();
-      const late = winnerBefore(repo, k, () => recruitHero(repo, p, "villager", requestId));
+      const late = place(k, () => recruitHero(repo, p, "villager", requestId));
       const hero = await recruitHero(late.repo, p, "villager", requestId);
       expect(hero).toEqual(await repo.getHero(p, requestId));
       await made(p);
@@ -288,6 +292,15 @@ describe("recruitHero: a repeat that loses the race to the request it repeats (I
       expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 0 }]);
       expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
     });
+    expect(runs).toBe(4);
+  });
+
+  it("retries a recruit cancelled by the request it repeats, still committing, and answers its hero", async () => {
+    const conflict = (k: number, winner: () => Promise<unknown>): Race => cancelled(repo, "recruit", new TransactionConflict("conflict"), k, winner);
+    const runs = await race((p) => putPaidCamp(p, 1, { timber: 20 }), async (p) => {
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 0 }]);
+    }, conflict);
+    // Before each of the next run's getHero, camp, heroes and recruit.
     expect(runs).toBe(4);
   });
 });
