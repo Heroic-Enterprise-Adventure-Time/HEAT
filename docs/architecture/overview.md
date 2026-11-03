@@ -70,7 +70,7 @@ sequenceDiagram
 flowchart TB
   subgraph branch["A working branch"]
     push["Push"] --> sandbox["Sandbox stacks: checks, bundle, the cap, plan, the allow-list, apply the branch's stack, publish the client, the stack test at its hostname"]
-    pr["Pull request to main"] --> ci["Build and test: typecheck, lint, tests, schema currency, bundle, Terraform format, validate and tflint"]
+    pr["Pull request to main"] --> ci["Build and test: typecheck, lint, tests, schema currency, bundle, Terraform format, validate, tflint and trivy"]
     pr --> devplan["Deploy: the dev plan under the plan role, posted on the pull request"]
   end
   subgraph mainb["main"]

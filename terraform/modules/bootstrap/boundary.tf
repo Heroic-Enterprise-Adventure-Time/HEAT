@@ -5,7 +5,12 @@
 # uses, with explicit denies on top for what must hold whatever else is
 # attached. Anything not listed is implicitly denied. A branch that rewrites
 # the workflow runs as the apply role and no wider (decision 0017).
-
+#
+# trivy reads the ceiling as a policy that allows s3:* (AVD-AWS-0345), which
+# a boundary does not do: it grants nothing, and the allow-list of service
+# namespaces is its shape (decision 0019). The excuse is on this document
+# alone, so a wildcard in a policy that grants stays a finding.
+#trivy:ignore:AVD-AWS-0345
 data "aws_iam_policy_document" "boundary" {
   # The ceiling: the services of decisions 0012, 0013 and 0018. Adding a
   # service is a change to this list, applied by the owner, which is the
