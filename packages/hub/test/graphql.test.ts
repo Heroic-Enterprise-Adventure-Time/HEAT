@@ -136,6 +136,7 @@ describe("authorization at the field level", () => {
     expect(asOther.data?.player.camps).toBeNull();
     expect(asOther.data?.player.heroes).toBeNull();
     expect(asOther.errors?.map((e) => e.path)).toEqual(expect.arrayContaining([["player", "camps"], ["player", "heroes"]]));
+    expect(asOther.errors?.map((e) => e.extensions?.["code"])).toEqual(["FORBIDDEN", "FORBIDDEN"]);
 
     const asOwner = await gql(q as Query<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>, { id: owner }, owner);
     expect(asOwner.errors).toBeUndefined();
@@ -145,6 +146,7 @@ describe("authorization at the field level", () => {
     const anonymous = await gql(`{ me { id } }` as Query<{ me: unknown }>);
     expect(anonymous.data?.me).toBeNull();
     expect(anonymous.errors?.[0]?.path).toEqual(["me"]);
+    expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
   });
 });
 

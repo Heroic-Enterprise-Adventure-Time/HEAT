@@ -1,9 +1,10 @@
 import SchemaBuilder from "@pothos/core";
 import ErrorsPlugin from "@pothos/plugin-errors";
 import ScopeAuthPlugin from "@pothos/plugin-scope-auth";
+import { GraphQLError } from "graphql";
 import { DateTimeResolver } from "graphql-scalars";
 
-import type { Context } from "../context.js";
+import { type Context, notSignedIn } from "../context.js";
 
 /**
  * Pothos, code-first, with scope-auth for field-level authorization and the
@@ -11,7 +12,10 @@ import type { Context } from "../context.js";
  * and 11). Two scopes: `authenticated` (any signed-in player) and `self`
  * (the field's owner is the caller). Scopes are declared on types and fields
  * and resolved once per request; a field the caller may not read is an error
- * for that field, not for the whole query.
+ * for that field, not for the whole query. The plugin's own error keeps its
+ * code off `extensions`, where Apollo would answer INTERNAL_SERVER_ERROR, so
+ * the refusal is built here: UNAUTHENTICATED for a caller not signed in,
+ * FORBIDDEN for one signed in who failed the scope (rule 11).
  *
  * Fields are non-null unless declared `nullable: true`, so the printed
  * contract says what is guaranteed rather than defaulting to "maybe".
@@ -48,6 +52,8 @@ export const builder = new SchemaBuilder<{
       authenticated: ctx.playerId !== undefined,
       self: (ownerId: string) => ctx.playerId === ownerId,
     }),
+    unauthorizedError: (_parent, ctx, _info, { message }) =>
+      ctx.playerId === undefined ? notSignedIn() : new GraphQLError(message, { extensions: { code: "FORBIDDEN" } }),
   },
   errors: {
     defaultTypes: [],

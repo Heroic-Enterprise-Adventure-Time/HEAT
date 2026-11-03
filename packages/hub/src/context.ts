@@ -29,13 +29,18 @@ export interface Context {
   clientVersion: string | undefined;
 }
 
+/** What a caller who is not signed in is told, by a scope or by `callerId`. */
+export function notSignedIn(): GraphQLError {
+  return new GraphQLError("not signed in", { extensions: { code: "UNAUTHENTICATED" } });
+}
+
 /**
  * The signed-in player's id. Every field that reads it declares the
  * `authenticated` scope, which the scope-auth plugin checks before the
  * resolver runs, so the throw is a guard against a field that forgot to.
  */
 export function callerId(ctx: Context): string {
-  if (ctx.playerId === undefined) throw new GraphQLError("not signed in", { extensions: { code: "UNAUTHENTICATED" } });
+  if (ctx.playerId === undefined) throw notSignedIn();
   return ctx.playerId;
 }
 
