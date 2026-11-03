@@ -8,9 +8,10 @@ import { heroNames, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } 
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { type Hero, InsufficientBalance, RecruitRefused, Repository } from "../src/db/repository.js";
+import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
+import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
@@ -63,6 +64,15 @@ describe("recruitHero: the free villager", () => {
     const requestId = randomUUID();
     const first = await recruitHero(repo, p, "villager", requestId);
     expect(await recruitHero(repo, p, "villager", requestId)).toEqual(first);
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+  });
+
+  it("refuses a request id reused for another unit type, before any rule is read", async () => {
+    const p = player();
+    const requestId = randomUUID();
+    await recruitHero(repo, p, "villager", requestId);
+    // A fighter has no ore here, and the refusal is still the reuse, not the price.
+    expect(await refusal(recruitHero(repo, p, "fighter", requestId))).toMatchObject(BAD_USER_INPUT);
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
   });
 
@@ -252,5 +262,54 @@ describe("recruitHero: paid", () => {
     expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 0 }]);
     expect(await ledgerDelta(p, hero.id, "timber")).toBeUndefined();
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+  });
+});
+
+describe("recruitHero: a repeat that loses the race to the request it repeats (Issue-175)", () => {
+  /**
+   * Runs a repeat of one request with the request itself committing before
+   * each of the repeat's calls in turn, and answers how many it ran: the
+   * repeat answers the hero, made once, wherever the other commits.
+   */
+  async function race(
+    setup: (p: string) => Promise<void>,
+    made: (p: string) => Promise<void>,
+    place: (k: number, winner: () => Promise<unknown>) => Race = (k, winner) => winnerBefore(repo, k, winner),
+  ): Promise<number> {
+    return everyInterleaving(async (k) => {
+      const p = player();
+      await setup(p);
+      const requestId = randomUUID();
+      const late = place(k, () => recruitHero(repo, p, "villager", requestId));
+      const hero = await recruitHero(late.repo, p, "villager", requestId);
+      expect(hero).toEqual(await repo.getHero(p, requestId));
+      await made(p);
+      return late.ran();
+    });
+  }
+
+  it("answers the free villager with the hero, never a price the hero it repeats has set", async () => {
+    const runs = await race(() => Promise.resolve(), async (p) => {
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+    });
+    // Before each of getHero, camp, heroes and recruit.
+    expect(runs).toBe(4);
+  });
+
+  it("answers a paid villager with the hero, never the balance the hero it repeats has spent", async () => {
+    const runs = await race((p) => putPaidCamp(p, 1, { timber: 20 }), async (p) => {
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 0 }]);
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+    });
+    expect(runs).toBe(4);
+  });
+
+  it("retries a recruit cancelled by the request it repeats, still committing, and answers its hero", async () => {
+    const conflict = (k: number, winner: () => Promise<unknown>): Race => cancelled(repo, "recruit", new TransactionConflict("conflict"), k, winner);
+    const runs = await race((p) => putPaidCamp(p, 1, { timber: 20 }), async (p) => {
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 0 }]);
+    }, conflict);
+    // Before each of the next run's getHero, camp, heroes and recruit.
+    expect(runs).toBe(4);
   });
 });

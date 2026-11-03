@@ -7,12 +7,13 @@ import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type 
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { locationKeys, playerKeys } from "../src/db/keys.js";
-import { type Hero, Repository, type Settlement } from "../src/db/repository.js";
+import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
-import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, EngineUpdated } from "../src/refusals.js";
+import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, EngineUpdated } from "../src/refusals.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 /**
@@ -134,6 +135,36 @@ describe("a party that completes the job", () => {
     expect(both.map((r) => r.status)).toEqual(["SETTLED", "SETTLED"]);
     expect(await cloth(p)).toBe(20);
     for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(2 * wolves.xp);
+  });
+
+  /**
+   * A submit raced by its own repeat, which commits as `race` places it:
+   * the loser answers the record as settled, and the camp is paid once. A
+   * party of one, so that no read of the party runs beside another (race.ts).
+   */
+  async function lostSubmit(race: (p: string, adventureId: string, winner: () => Promise<unknown>) => Race): Promise<boolean> {
+    const p = player();
+    const started = await start(p, await putParty(p, ["fighter"]));
+    const timelines = new MemoryTimelines();
+    const late = race(p, started.adventureId, () => submitAdventure(repo, timelines, p, version, started.adventureId, []));
+    const lost = await submitAdventure(late.repo, timelines, p, version, started.adventureId, []);
+    const stored = must(await repo.getAdventure(started.adventureId), "the record");
+    expect(stored.status).toBe("SETTLED");
+    expect(lost.result).toEqual(stored.result);
+    expect(await cloth(p)).toBe(stored.result?.credited.find((c) => c.material === "cloth")?.amount);
+    return late.ran();
+  }
+
+  it("answers a repeat that loses the race with the record settled, wherever the other commits", async () => {
+    const runs = await everyInterleaving((k) => lostSubmit((_p, _id, winner) => winnerBefore(repo, k, winner)));
+    // Before each of getAdventure, camp, getHero and settle.
+    expect(runs).toBe(4);
+  });
+
+  it("retries a settlement cancelled by its repeat in flight, and answers the record settled", async () => {
+    const runs = await everyInterleaving((k) => lostSubmit((_p, _id, winner) => cancelled(repo, "settle", new TransactionConflict("conflict"), k, winner)));
+    // Before each of the next attempt's camp, getHero and settle.
+    expect(runs).toBe(3);
   });
 });
 
@@ -286,6 +317,58 @@ describe("discard", () => {
     const started = await start(p, await putParty(p, ["fighter", "villager"]));
     await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(await refusal(discardAdventure(repo, p, { current: "1".repeat(40), previous: undefined }, started.adventureId))).toBeInstanceOf(AdventureSettled);
+  });
+
+  it("answers a repeat that loses the race with the adventure discarded, wherever the other commits (Issue-172)", async () => {
+    const versions = { current: version, previous };
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const heroes = await putParty(p, ["fighter", "villager"]);
+      const started = await start(p, heroes, "0".repeat(40));
+      const late = winnerBefore(repo, k, () => discardAdventure(repo, p, versions, started.adventureId));
+      expect(await discardAdventure(late.repo, p, versions, started.adventureId)).toMatchObject({ status: "DISCARDED" });
+      expect(await repo.openAdventure(p)).toBeUndefined();
+      for (const hero of heroes) expect(await repo.getHero(p, hero.id)).toMatchObject({ adventureId: null });
+      return late.ran();
+    });
+    // Before each of getAdventure and discard.
+    expect(runs).toBe(2);
+  });
+
+  it("retries a discard cancelled by another in flight, and answers the discard that won (Issue-172)", async () => {
+    const versions = { current: version, previous };
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const started = await start(p, await putParty(p, ["villager"]), "0".repeat(40));
+      const late = cancelled(repo, "discard", new TransactionConflict("conflict"), k, () => discardAdventure(repo, p, versions, started.adventureId));
+      expect(await discardAdventure(late.repo, p, versions, started.adventureId)).toMatchObject({ status: "DISCARDED" });
+      return late.ran();
+    });
+    // Before each of the retry's getAdventure and discard.
+    expect(runs).toBe(2);
+  });
+
+  it("retries a discard cancelled by a submit in flight, and refuses with AdventureSettled (Issue-172)", async () => {
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const started = await start(p, await putParty(p, ["fighter", "villager"]), "0".repeat(40));
+      const settle = () => submitAdventure(repo, new MemoryTimelines(), p, "0".repeat(40), started.adventureId, []);
+      const late = cancelled(repo, "discard", new TransactionConflict("conflict"), k, settle);
+      const lost = await refusal(discardAdventure(late.repo, p, { current: version, previous }, started.adventureId));
+      // Past the last call the submit never commits, and the discard is the one that wins.
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(AdventureSettled);
+      return true;
+    });
+    expect(runs).toBe(2);
+  });
+
+  it("answers Conflict when the adventure is still open and no rule explains the failure (Issue-172)", async () => {
+    const p = player();
+    const started = await start(p, await putParty(p, ["villager"]), "0".repeat(40));
+    const changed = cancelled(repo, "discard", new HeroChanged("condition failed on item 2"), 1, () => Promise.resolve());
+    expect(await refusal(discardAdventure(changed.repo, p, { current: version, previous }, started.adventureId))).toBeInstanceOf(Conflict);
+    expect((await repo.getAdventure(started.adventureId))?.status).toBe("OPEN");
   });
 });
 

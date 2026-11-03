@@ -12,6 +12,7 @@ import {
   UNIT_PROFILES,
 } from "@heat/engine";
 
+import { retryingConflicts } from "./conflict.js";
 import {
   AdventureAlreadyOpen,
   type AdventureRecord,
@@ -20,7 +21,6 @@ import {
   type Hero,
   HeroChanged,
   type Repository,
-  TransactionConflict,
 } from "./db/repository.js";
 import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, type Refusal, Requires } from "./refusals.js";
 
@@ -84,7 +84,7 @@ function snapshotHero(hero: Hero): SnapshotHero {
   };
 }
 
-export async function startAdventure(
+export function startAdventure(
   repo: Repository,
   playerId: string,
   version: string,
@@ -92,6 +92,18 @@ export async function startAdventure(
   jobId: string,
   heroIds: readonly string[],
   now = new Date(),
+): Promise<AdventureRecord> {
+  return retryingConflicts("the party changed while starting; no adventure was started", () => startOnce(repo, playerId, version, locationId, jobId, heroIds, now));
+}
+
+async function startOnce(
+  repo: Repository,
+  playerId: string,
+  version: string,
+  locationId: string,
+  jobId: string,
+  heroIds: readonly string[],
+  now: Date,
 ): Promise<AdventureRecord> {
   const open = await repo.openAdventure(playerId);
   if (open) refuseOpen(open.adventureId);
@@ -152,7 +164,7 @@ export async function startAdventure(
       startedAt: now.toISOString(),
     }, needs);
   } catch (e) {
-    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof FacilityMissing || e instanceof TransactionConflict)) throw e;
+    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof FacilityMissing)) throw e;
     // Another request got there first: answer with what it changed.
     const winner = await repo.openAdventure(playerId);
     if (winner) refuseOpen(winner.adventureId);

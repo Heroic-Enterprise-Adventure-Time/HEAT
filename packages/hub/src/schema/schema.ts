@@ -590,7 +590,7 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit is BAD_USER_INPUT.",
+      "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit, or a request id reused for another unit type, is BAD_USER_INPUT.",
     errors: answers("RecruitHero", { field: "hero", what: "the hero recruited, or already made by this request" }, [HallLevel, HallFull, InsufficientResources, Conflict]),
     args: { input: t.arg({ type: RecruitHeroInput, required: true }) },
     resolve: (_root, { input }, ctx) => recruitHero(ctx.repo, callerId(ctx), input.unitType, input.requestId),
@@ -640,8 +640,8 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. A discarded adventure answers as it is. Refused with AdventureVerifiable while this deploy or the previous one could still verify it, or AdventureSettled; an adventure that is not the player's is BAD_USER_INPUT.",
-    errors: answers("DiscardAdventure", { field: "adventure", what: "the adventure, discarded" }, [AdventureVerifiable, AdventureSettled]),
+      "Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. A discarded adventure answers as it is. Refused with AdventureVerifiable while this deploy or the previous one could still verify it, AdventureSettled, or Conflict; an adventure that is not the player's is BAD_USER_INPUT.",
+    errors: answers("DiscardAdventure", { field: "adventure", what: "the adventure, discarded" }, [AdventureVerifiable, AdventureSettled, Conflict]),
     args: { input: t.arg({ type: DiscardAdventureInput, required: true }) },
     resolve: (_root, { input }, ctx) =>
       discardAdventure(ctx.repo, callerId(ctx), { current: ctx.version, previous: ctx.previousVersion }, input.adventureId),

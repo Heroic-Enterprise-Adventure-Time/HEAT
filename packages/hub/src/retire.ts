@@ -1,4 +1,5 @@
-import { type Hero, HeroChanged, type Repository, TransactionConflict } from "./db/repository.js";
+import { retryingConflicts } from "./conflict.js";
+import { type Hero, HeroChanged, type Repository } from "./db/repository.js";
 import { badInput, Conflict, HeroAdventuring } from "./refusals.js";
 
 /**
@@ -22,7 +23,11 @@ function refuseAdventuring(heroId: string): never {
   throw new HeroAdventuring("the hero is on an adventure; it can retire when the adventure is settled", heroId);
 }
 
-export async function retireHero(repo: Repository, playerId: string, heroId: string, now = new Date()): Promise<Hero> {
+export function retireHero(repo: Repository, playerId: string, heroId: string, now = new Date()): Promise<Hero> {
+  return retryingConflicts("the hero changed while retiring; nothing was retired", () => retireOnce(repo, playerId, heroId, now));
+}
+
+async function retireOnce(repo: Repository, playerId: string, heroId: string, now: Date): Promise<Hero> {
   const hero = await repo.getHero(playerId, heroId.toLowerCase());
   if (!hero) badInput("no such hero");
   if (hero.status === "RETIRED") return hero;
@@ -30,7 +35,7 @@ export async function retireHero(repo: Repository, playerId: string, heroId: str
   try {
     return await repo.retire(playerId, hero, now);
   } catch (e) {
-    if (!(e instanceof HeroChanged || e instanceof TransactionConflict)) throw e;
+    if (!(e instanceof HeroChanged)) throw e;
     const after = await repo.getHero(playerId, hero.id);
     if (after?.status === "RETIRED") return after;
     if (after?.adventureId) refuseAdventuring(hero.id);
