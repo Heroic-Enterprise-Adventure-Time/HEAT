@@ -29,7 +29,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Bundling
 
-12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild into `dist/<name>/`, targeting the Node major in `.node-version`, dependencies included, Powertools among them. Terraform zips that directory and passes it to the function with its hash, so a code change is a change in the plan (decision 0017). Logging goes through the Powertools logger as JSON lines and tracing through its tracer; both are configured by the environment variables Terraform sets on the function.
+12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild into `dist/<name>/`, targeting the Node major in `.node-version`, dependencies included, Powertools among them. Terraform zips that directory and passes it to the function with its hash, so a code change is a change in the plan (decision 0017). Logging goes through the Powertools logger as JSON lines, tracing through its tracer and metrics through its metrics as embedded metric format lines in the log, all at one version, configured by the environment variables Terraform sets on the function. `@middy/core` wraps a handler with the three Powertools middlewares, `injectLambdaContext`, `captureLambdaHandler` and `logMetrics`, with the function's own handler innermost, and only those: what middy's other middlewares do, Apollo's plugins and the integration's own option already do for the hub (decision 0040).
 
 ### The client
 

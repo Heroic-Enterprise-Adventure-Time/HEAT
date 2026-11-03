@@ -88,7 +88,7 @@ export function recruitHero(
   random: Random = randomInt,
   now = new Date(),
 ): Promise<Hero> {
-  return retryingConflicts("the camp changed while recruiting; no hero was recruited", () => recruitOnce(repo, playerId, unitType, requestId, random, now));
+  return retryingConflicts("recruit", "the camp changed while recruiting; no hero was recruited", () => recruitOnce(repo, playerId, unitType, requestId, random, now));
 }
 
 async function recruitOnce(repo: Repository, playerId: string, unitType: string, requestId: string, random: Random, now: Date): Promise<Hero> {

@@ -28,7 +28,7 @@ export function discardAdventure(
   adventureId: string,
   now = new Date(),
 ): Promise<AdventureRecord> {
-  return retryingConflicts("the adventure changed while discarding; nothing was discarded", () => discardOnce(repo, playerId, versions, adventureId, now));
+  return retryingConflicts("discard", "the adventure changed while discarding; nothing was discarded", () => discardOnce(repo, playerId, versions, adventureId, now));
 }
 
 async function discardOnce(

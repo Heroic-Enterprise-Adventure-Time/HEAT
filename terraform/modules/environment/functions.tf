@@ -159,6 +159,9 @@ resource "aws_lambda_function" "function" {
       HEAT_LOCATION_TABLE     = aws_dynamodb_table.location.name
       POWERTOOLS_SERVICE_NAME = "heat-${each.key}"
       POWERTOOLS_LOG_LEVEL    = var.log_level
+      # Each stack's own namespace: sandbox stacks share an account, and the
+      # service dimension is the same in every environment (decision 0040).
+      POWERTOOLS_METRICS_NAMESPACE = var.name_prefix
       # The deploy's version (decision 0030). It changes with every commit,
       # so every deploy publishes a new version and moves the alias, even
       # one whose bundle is unchanged.

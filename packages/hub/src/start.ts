@@ -93,7 +93,7 @@ export function startAdventure(
   heroIds: readonly string[],
   now = new Date(),
 ): Promise<AdventureRecord> {
-  return retryingConflicts("the party changed while starting; no adventure was started", () => startOnce(repo, playerId, version, locationId, jobId, heroIds, now));
+  return retryingConflicts("start", "the party changed while starting; no adventure was started", () => startOnce(repo, playerId, version, locationId, jobId, heroIds, now));
 }
 
 async function startOnce(
