@@ -221,7 +221,7 @@ export async function submitAdventure(
       if (e instanceof AdventureClosed) return closed(repo, adventureId);
       if (!(e instanceof CampChanged || e instanceof TransactionConflict)) throw e;
       // Another transaction is still committing: wait for it before reading again (conflict.ts).
-      if (e instanceof TransactionConflict) await pause(attempt + 1);
+      if (e instanceof TransactionConflict) await pause(attempt + 1, "settling");
     }
   }
   throw new Conflict("the camp kept changing while settling; nothing was settled");

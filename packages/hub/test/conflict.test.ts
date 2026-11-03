@@ -1,7 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { range } from "es-toolkit";
+import { describe, expect, it, vi } from "vitest";
 
-import { CONFLICT_ATTEMPTS, retryingConflicts } from "../src/conflict.js";
+import { backoff, BACKOFF_CAP_MS, CONFLICT_ATTEMPTS, retryingConflicts } from "../src/conflict.js";
 import { TransactionConflict } from "../src/db/repository.js";
+import { logger } from "../src/observability.js";
 import { Conflict } from "../src/refusals.js";
 import { refusal } from "./refusal.js";
 
@@ -38,5 +40,29 @@ describe("retryingConflicts", () => {
     };
     expect(await refusal(retryingConflicts("changed", verb))).toBe(failure);
     expect(runs).toBe(1);
+  });
+
+  it("warns once per run again, naming the verb and the attempt", async () => {
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    try {
+      const { verb } = conflicting(CONFLICT_ATTEMPTS - 1);
+      await retryingConflicts("the camp changed", verb);
+      expect(warn.mock.calls).toEqual(range(1, CONFLICT_ATTEMPTS).map((attempt) => ["transaction conflict; running again", { what: "the camp changed", attempt }]));
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe("backoff", () => {
+  it("draws a wait from zero up to a cap that doubles each attempt", () => {
+    for (const attempt of [1, 2, 3]) {
+      const cap = BACKOFF_CAP_MS * 2 ** (attempt - 1);
+      const waits = range(200).map(() => backoff(attempt));
+      expect(Math.min(...waits)).toBeGreaterThanOrEqual(0);
+      expect(Math.max(...waits)).toBeLessThan(cap);
+      // Full jitter: the draws spread over the range rather than sitting on one value.
+      expect(new Set(waits).size).toBeGreaterThan(cap / 4);
+    }
   });
 });

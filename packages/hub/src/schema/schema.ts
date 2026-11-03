@@ -590,7 +590,7 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit is BAD_USER_INPUT.",
+      "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit, or a request id reused for another unit type, is BAD_USER_INPUT.",
     errors: answers("RecruitHero", { field: "hero", what: "the hero recruited, or already made by this request" }, [HallLevel, HallFull, InsufficientResources, Conflict]),
     args: { input: t.arg({ type: RecruitHeroInput, required: true }) },
     resolve: (_root, { input }, ctx) => recruitHero(ctx.repo, callerId(ctx), input.unitType, input.requestId),

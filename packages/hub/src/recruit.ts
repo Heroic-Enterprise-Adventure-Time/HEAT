@@ -70,6 +70,16 @@ function barred(camp: Camp, recruit: Recruit): Refusal | undefined {
   return undefined;
 }
 
+/**
+ * The hero this request made, if any. A request id reused for another unit
+ * type is the client's defect, not a repeat: BAD_USER_INPUT, never the
+ * first request's hero (graphql.md, rule 7).
+ */
+function madeBy(hero: Hero | undefined, requestId: string, unitType: string): Hero | undefined {
+  if (hero && hero.unitType !== unitType) badInput(`request ${requestId} recruited a ${hero.unitType}, not a ${unitType}`);
+  return hero;
+}
+
 export function recruitHero(
   repo: Repository,
   playerId: string,
@@ -84,7 +94,7 @@ export function recruitHero(
 async function recruitOnce(repo: Repository, playerId: string, unitType: string, requestId: string, random: Random, now: Date): Promise<Hero> {
   if (!UUID.test(requestId)) badInput("requestId must be a UUID");
   const heroId = requestId.toLowerCase();
-  const already = await repo.getHero(playerId, heroId);
+  const already = madeBy(await repo.getHero(playerId, heroId), requestId, unitType);
   if (already) return already;
 
   const at = location(STARTING_LOCATION);
@@ -100,7 +110,7 @@ async function recruitOnce(repo: Repository, playerId: string, unitType: string,
   const camp = await repo.camp(playerId, at.id);
   const refusal = barred(camp, recruit);
   if (refusal) {
-    const made = await repo.getHero(playerId, heroId);
+    const made = madeBy(await repo.getHero(playerId, heroId), requestId, unitType);
     if (made) return made;
     throw refusal;
   }
@@ -132,7 +142,7 @@ async function recruitOnce(repo: Repository, playerId: string, unitType: string,
     if (!(e instanceof HeroExists || e instanceof RecruitRefused || e instanceof InsufficientBalance)) throw e;
     // The camp first and the hero after it, as above: a repeat that won the race is the answer.
     const after = await repo.camp(playerId, at.id);
-    const made = await repo.getHero(playerId, heroId);
+    const made = madeBy(await repo.getHero(playerId, heroId), requestId, unitType);
     if (made) return made;
     throw barred(after, recruit) ?? new Conflict("the camp changed while recruiting; no hero was recruited");
   }

@@ -67,6 +67,15 @@ describe("recruitHero: the free villager", () => {
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
   });
 
+  it("refuses a request id reused for another unit type, before any rule is read", async () => {
+    const p = player();
+    const requestId = randomUUID();
+    await recruitHero(repo, p, "villager", requestId);
+    // A fighter has no ore here, and the refusal is still the reuse, not the price.
+    expect(await refusal(recruitHero(repo, p, "fighter", requestId))).toMatchObject(BAD_USER_INPUT);
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+  });
+
   it("lets exactly one of five concurrent recruits win", async () => {
     const p = player();
     const results = await Promise.allSettled([1, 2, 3, 4, 5].map(() => recruitHero(repo, p, "villager", randomUUID())));
