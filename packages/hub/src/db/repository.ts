@@ -1,15 +1,15 @@
-import { range } from "es-toolkit";
 import { TransactionCanceledException } from "@aws-sdk/client-dynamodb";
 import {
+  type DynamoDBDocumentClient,
   GetCommand,
   PutCommand,
   QueryCommand,
   TransactWriteCommand,
   UpdateCommand,
-  type DynamoDBDocumentClient,
 } from "@aws-sdk/lib-dynamodb";
+import { range } from "es-toolkit";
+
 import {
-  STARTING_LOCATION,
   type AdventureOutcome,
   type AdventureSnapshot,
   type Cost,
@@ -18,9 +18,11 @@ import {
   type Requirement,
   type Reward,
   type StageResult,
+  STARTING_LOCATION,
   type UnitType,
 } from "@heat/engine";
-import { sightingOf, type Sighting } from "../seen.js";
+
+import { type Sighting, sightingOf } from "../seen.js";
 import type { Tables } from "./client.js";
 import { locationKeys, playerKeys } from "./keys.js";
 

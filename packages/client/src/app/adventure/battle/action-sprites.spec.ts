@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { effectFrameAt, effectLayout, heldFrame, type EffectManifest } from './action-sprites';
+
+import { effectFrameAt, effectLayout, type EffectManifest, heldFrame } from './action-sprites';
 
 const manifest: EffectManifest = {
   frame_ms: 71,

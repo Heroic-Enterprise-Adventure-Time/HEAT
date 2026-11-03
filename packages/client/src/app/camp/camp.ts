@@ -1,15 +1,16 @@
-import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgOptimizedImage } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, InjectionToken, signal, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { STARTING_LOCATION, type FacilityKind } from '@heat/engine';
+import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+
+import { type FacilityKind, STARTING_LOCATION } from '@heat/engine';
+
 import { Game, type HeroView, type SeenHeroView } from '../game';
 import { CampState } from './camp-state';
 import { LAYOUT_SIZES } from './layout-sizes';
 import { iconScale, isSideBySide, menuLabels, stackedStageHeight } from './page-layout';
-import { LAYOUTS } from './scene/layout';
 import type { CampSceneHandle, SceneCallbacks } from './scene/camp-scene';
-import type { CampLayout } from './scene/layout';
+import { type CampLayout, LAYOUTS } from './scene/layout';
 
 export type CampSceneFactory = (
   host: HTMLElement,

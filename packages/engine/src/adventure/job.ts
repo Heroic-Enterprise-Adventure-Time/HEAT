@@ -8,9 +8,9 @@
  * content.ts.
  */
 
+import type { BattleContent } from "../battle/index.js";
 import type { FacilityKind, MonsterType, ResourceType } from "../content.js";
 import type { Reward } from "../index.js";
-import type { BattleContent } from "../battle/index.js";
 
 /**
  * One stage of a job.

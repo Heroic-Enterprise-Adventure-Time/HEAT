@@ -6,16 +6,17 @@
 
 import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
+
 import {
   ABILITIES,
-  SeededRng,
+  type ActionContext,
   getReachableLines,
   isAbilityUsable,
-  selectAction,
-  targetCandidates,
-  type ActionContext,
   type Line,
+  SeededRng,
+  selectAction,
   type Side,
+  targetCandidates,
   type UnitKind,
   type UnitState,
 } from "../../src/index.js";

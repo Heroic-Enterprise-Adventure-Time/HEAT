@@ -3,10 +3,12 @@ import { TestBed } from '@angular/core/testing';
 import { InMemoryCache } from '@apollo/client';
 import { APOLLO_TESTING_CACHE, ApolloTestingController, ApolloTestingModule, type TestOperation } from 'apollo-angular/testing';
 import { constantCase } from 'es-toolkit';
-import { Game, overrideInput, type AdventureResultView, type AdventureView, type HeroView, type PlayerView, type SeenHeroView } from './game';
+
+import { must } from '@heat/engine';
+
+import { type AdventureResultView, type AdventureView, Game, type HeroView, overrideInput, type PlayerView, type SeenHeroView } from './game';
 import possibleTypes from './graphql/generated/possible-types';
 import { Session, type SessionUser } from './session';
-import { must } from '@heat/engine';
 
 /** The cache as the application builds it: with the schema's unions and interfaces, so `... on Error` is matched (app.config.ts). */
 const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCache(possibleTypes) });

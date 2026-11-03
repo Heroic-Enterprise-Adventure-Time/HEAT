@@ -1,6 +1,8 @@
 import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+
 import { FACILITIES } from '@heat/engine';
+
 import { Game } from '../../game';
 import { JobList } from './job-list';
 import { jobsAt } from './job-words';

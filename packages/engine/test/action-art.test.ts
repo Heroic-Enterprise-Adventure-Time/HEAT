@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
-import { ABILITIES, ABILITY_EFFECTS, MONSTER_TYPES, UNIT_TYPES, WEAPON_SPRITES, must } from "../src/index.js";
+
+import { ABILITIES, ABILITY_EFFECTS, MONSTER_TYPES, must, UNIT_TYPES, WEAPON_SPRITES } from "../src/index.js";
 
 const art = new URL("../../../art/", import.meta.url);
 

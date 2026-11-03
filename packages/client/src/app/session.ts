@@ -1,6 +1,7 @@
 import { DOCUMENT } from '@angular/common';
-import { Service, InjectionToken, inject, signal } from '@angular/core';
-import { UserManager, type User, type UserManagerSettings } from 'oidc-client-ts';
+import { inject, InjectionToken, Service, signal } from '@angular/core';
+import { type User, UserManager, type UserManagerSettings } from 'oidc-client-ts';
+
 import { Config, type StackConfig } from './config';
 
 /**

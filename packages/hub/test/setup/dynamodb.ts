@@ -1,5 +1,6 @@
-import { GenericContainer, type StartedTestContainer } from "testcontainers";
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { GenericContainer, type StartedTestContainer } from "testcontainers";
+
 import { ensureTable } from "./table.js";
 
 /**

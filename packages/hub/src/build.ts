@@ -1,13 +1,14 @@
-import { FACILITIES, buildRefusal, location, nextLevel, type FacilityKind } from "@heat/engine";
+import { buildRefusal, FACILITIES, type FacilityKind, location, nextLevel } from "@heat/engine";
+
 import {
   BuildRefused,
-  InsufficientBalance,
-  TransactionConflict,
-  campLevels,
   type Camp,
+  campLevels,
+  InsufficientBalance,
   type Repository,
+  TransactionConflict,
 } from "./db/repository.js";
-import { Conflict, InsufficientResources, MaxLevel, Requires, badInput } from "./refusals.js";
+import { badInput, Conflict, InsufficientResources, MaxLevel, Requires } from "./refusals.js";
 
 /**
  * Building and upgrading a facility (Issue-93, decision 0032): the client

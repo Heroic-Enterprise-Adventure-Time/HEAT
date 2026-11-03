@@ -1,5 +1,5 @@
-import { heroScale, iconScale, isSideBySide, menuLabels, panelPx, readLayoutSizes, sceneScale, sceneView, stackedStageHeight } from './page-layout';
 import { TEST_LAYOUT_SIZES as SIZES } from '../testing/layout-sizes';
+import { heroScale, iconScale, isSideBySide, menuLabels, panelPx, readLayoutSizes, sceneScale, sceneView, stackedStageHeight } from './page-layout';
 
 const HEADER = SIZES.header;
 

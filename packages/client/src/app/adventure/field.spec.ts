@@ -1,4 +1,4 @@
-import { emptyField, secondsLeft, type Field } from './field';
+import { emptyField, type Field, secondsLeft } from './field';
 
 const field = (timeLimitMs: number | null, stageStart = 4000): Field => ({
   ...emptyField([]),

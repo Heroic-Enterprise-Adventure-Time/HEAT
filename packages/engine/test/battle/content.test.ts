@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ABILITIES, MONSTERS, MONSTER_TYPES, RESOURCE_NODES, RESOURCE_TYPES, UNIT_PROFILES } from "../../src/index.js";
+
+import { ABILITIES, MONSTER_TYPES, MONSTERS, RESOURCE_NODES, RESOURCE_TYPES, UNIT_PROFILES } from "../../src/index.js";
 
 describe("The battle's content", () => {
   const profiles = [...Object.values(UNIT_PROFILES), ...Object.values(MONSTERS)];

@@ -1,16 +1,18 @@
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { Refusal } from '../../hub';
+
+import { must } from '@heat/engine';
+
+import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
 import { routes } from '../../app.routes';
-import { Game, type AdventureView, type HeroView } from '../../game';
+import { type AdventureView, Game, type HeroView } from '../../game';
+import { Refusal } from '../../hub';
 import { Session } from '../../session';
+import { TEST_LAYOUT_SIZES } from '../../testing/layout-sizes';
 import { CAMP_SCENE_FACTORY } from '../camp';
 import { LAYOUT_SIZES } from '../layout-sizes';
-import { TEST_LAYOUT_SIZES } from '../../testing/layout-sizes';
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
-import { must } from '@heat/engine';
 
 function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): HeroView {
   return {

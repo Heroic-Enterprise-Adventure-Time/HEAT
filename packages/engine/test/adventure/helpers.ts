@@ -2,12 +2,12 @@
 
 import {
   ADVENTURE_CONTENT,
-  UNIT_PROFILES,
   type AdventureContent,
   type AdventureEvent,
   type AdventureSnapshot,
   type Job,
   type SnapshotHero,
+  UNIT_PROFILES,
   type UnitStats,
   type UnitType,
 } from "../../src/index.js";

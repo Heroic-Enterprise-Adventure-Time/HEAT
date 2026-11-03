@@ -3,6 +3,7 @@ import { type ApplicationConfig, inject, provideAppInitializer, provideBrowserGl
 import { provideRouter } from '@angular/router';
 import { InMemoryCache } from '@apollo/client';
 import { provideApollo } from 'apollo-angular';
+
 import { routes } from './app.routes';
 import { Config } from './config';
 import possibleTypes from './graphql/generated/possible-types';

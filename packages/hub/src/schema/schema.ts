@@ -1,38 +1,37 @@
 import { constantCase } from "es-toolkit";
+import { GraphQLError } from "graphql";
+
 import {
   ADVENTURE_OUTCOMES,
+  type AdventureSnapshot,
   FACILITY_KINDS,
-  JOBS,
-  MATERIALS,
-  STAGE_ENDINGS,
-  STAGE_KINDS,
-  UNIT_TYPES,
   hallCapacity,
-  location,
-  warehouseCapacity,
   type Job,
+  JOBS,
+  location,
+  MATERIALS,
   type Requirement,
   type Reward,
   type SnapshotHero,
+  STAGE_ENDINGS,
+  STAGE_KINDS,
   type StageResult,
+  UNIT_TYPES,
   type UnitStats,
-  type AdventureSnapshot,
+  warehouseCapacity,
 } from "@heat/engine";
-import { GraphQLError } from "graphql";
-import { builder } from "./builder.js";
-import { callerId } from "../context.js";
+
 import { buildFacility } from "../build.js";
-import { recruitHero } from "../recruit.js";
-import { retireHero } from "../retire.js";
-import { startAdventure } from "../start.js";
-import { submitAdventure, type OverrideInput } from "../submit.js";
+import { callerId } from "../context.js";
+import { type AdventureRecord, type Camp, campLevels, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 import { discardAdventure } from "../discard.js";
-import { heroesSeenAt, type Sighting } from "../seen.js";
+import { recruitHero } from "../recruit.js";
 import {
   AdventureDiscarded,
   AdventureOpen,
   AdventureSettled,
   AdventureVerifiable,
+  badInput,
   Conflict,
   EngineUpdated,
   HallFull,
@@ -43,12 +42,15 @@ import {
   HeroRetired,
   InsufficientResources,
   MaxLevel,
-  Requires,
-  badInput,
   type Refusal,
+  Requires,
   type Shortfall,
 } from "../refusals.js";
-import { campLevels, type AdventureRecord, type Camp, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
+import { retireHero } from "../retire.js";
+import { heroesSeenAt, type Sighting } from "../seen.js";
+import { startAdventure } from "../start.js";
+import { type OverrideInput, submitAdventure } from "../submit.js";
+import { builder } from "./builder.js";
 
 /**
  * The graph: a public player; their camps, heroes and the open adventure

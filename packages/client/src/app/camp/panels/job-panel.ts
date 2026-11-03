@@ -1,13 +1,15 @@
-import { Component, computed, inject, signal } from '@angular/core';
 import { LowerCasePipe } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { FACILITIES, MAX_PARTY, type FacilityKind, type Stage } from '@heat/engine';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { upperFirst } from 'es-toolkit';
-import { Refusal } from '../../hub';
+
+import { FACILITIES, type FacilityKind, MAX_PARTY, type Stage } from '@heat/engine';
+
 import { Game } from '../../game';
+import { Refusal } from '../../hub';
 import { CampState } from '../camp-state';
-import { creditWords, credits, jobAt, retreatWords, stageWords } from './job-words';
+import { credits, creditWords, jobAt, retreatWords, stageWords } from './job-words';
 
 /**
  * The hub's refusals of a start, by type, in the player's words; any other is

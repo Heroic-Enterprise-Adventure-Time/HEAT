@@ -1,14 +1,17 @@
 import { randomUUID } from "node:crypto";
-import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { must } from "@heat/engine";
+
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { HeroChanged, Repository, type Hero, type HeroStatus } from "../src/db/repository.js";
+import { type Hero, HeroChanged, type HeroStatus, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
-import { retireHero } from "../src/retire.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
+import { retireHero } from "../src/retire.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
-import { must } from "@heat/engine";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;

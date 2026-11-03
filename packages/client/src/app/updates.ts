@@ -1,7 +1,8 @@
-import { Service, InjectionToken, effect, inject, untracked } from '@angular/core';
-import { Hub } from './hub';
+import { effect, inject, InjectionToken, Service, untracked } from '@angular/core';
+
 import { Config } from './config';
 import { Game } from './game';
+import { Hub } from './hub';
 
 /** Reloads the page; a test provides one that counts. */
 export const RELOAD = new InjectionToken<() => void>('heat.reload', {

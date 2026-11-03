@@ -1,9 +1,12 @@
 import { randomUUID } from "node:crypto";
+
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { must } from "@heat/engine";
+
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
-import { must } from "@heat/engine";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,

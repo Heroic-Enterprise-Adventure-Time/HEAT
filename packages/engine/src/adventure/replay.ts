@@ -7,6 +7,7 @@
  */
 
 import { sortBy } from "es-toolkit";
+
 import { ADVENTURE_CONTENT } from "../content.js";
 import { AdventureEngine } from "./engine.js";
 import type { AdventureResult, AdventureTimeline } from "./events.js";

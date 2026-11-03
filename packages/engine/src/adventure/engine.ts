@@ -18,10 +18,10 @@
  */
 
 import { range } from "es-toolkit";
+
+import { type BattleEvent, CombatEngine, type Opponent, type PlayerOverride, SeededRng } from "../battle/index.js";
 import { ADVENTURE_CONTENT } from "../content.js";
-import { MATERIALS, type Material, type Reward } from "../index.js";
-import { CombatEngine, SeededRng, type BattleEvent, type Opponent, type PlayerOverride } from "../battle/index.js";
-import type { AdventureContent, Job, Stage } from "./job.js";
+import { type Material, MATERIALS, type Reward } from "../index.js";
 import {
   ADVENTURE_TIMELINE_SCHEMA_VERSION,
   type AdventureEvent,
@@ -31,8 +31,9 @@ import {
   type StageEnding,
   type StageResult,
 } from "./events.js";
+import type { AdventureContent, Job, Stage } from "./job.js";
 import type { AdventureLogEntry, PartyOrder } from "./override.js";
-import { MAX_PARTY, type AdventureSnapshot } from "./snapshot.js";
+import { type AdventureSnapshot, MAX_PARTY } from "./snapshot.js";
 
 /** A battle's event on the adventure's clock: every time in it moved by `offset`. */
 export function shiftEvent(event: BattleEvent, offset: number): BattleEvent {

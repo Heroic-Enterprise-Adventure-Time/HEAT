@@ -1,5 +1,6 @@
 import { JOBS } from '@heat/engine';
-import { creditWords, credits, jobAt, jobsAt, retreatWords, stageWords, yieldWords } from './job-words';
+
+import { credits, creditWords, jobAt, jobsAt, retreatWords, stageWords, yieldWords } from './job-words';
 
 const sticks = JOBS['pick-up-sticks'];
 const wolves = JOBS['wolves-on-the-mill-road'];

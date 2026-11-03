@@ -1,7 +1,8 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { Refusal } from '../../hub';
+
 import { Game, type RecruitOffer } from '../../game';
+import { Refusal } from '../../hub';
 import { CampState } from '../camp-state';
 import { FacilityBuild } from './facility-build';
 

@@ -1,6 +1,7 @@
 import { Component, computed, effect, inject } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
+import { ActivatedRoute, Router } from '@angular/router';
+
 import { Game } from '../../game';
 import { CampState } from '../camp-state';
 import { FacilityBuild } from './facility-build';

@@ -1,6 +1,7 @@
-import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { GraphQLError } from "graphql";
+
 import type { Tables } from "./db/client.js";
 import { Repository } from "./db/repository.js";
 import type { Timelines } from "./timelines.js";

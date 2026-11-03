@@ -1,9 +1,10 @@
 import { ApolloServer } from "@apollo/server";
-import { S3Client } from "@aws-sdk/client-s3";
 import { handlers, startServerAndCreateLambdaHandler } from "@as-integrations/aws-lambda";
+import { S3Client } from "@aws-sdk/client-s3";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context as LambdaContext } from "aws-lambda";
+
+import { type Context, createContextFactory } from "./context.js";
 import { configFromEnv, createDocumentClient } from "./db/client.js";
-import { createContextFactory, type Context } from "./context.js";
 import { logger, requestLogging, tracer } from "./observability.js";
 import { schema } from "./schema/schema.js";
 import { S3Timelines } from "./timelines.js";

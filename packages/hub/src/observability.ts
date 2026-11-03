@@ -1,6 +1,7 @@
+import type { ApolloServerPlugin } from "@apollo/server";
 import { Logger } from "@aws-lambda-powertools/logger";
 import { Tracer } from "@aws-lambda-powertools/tracer";
-import type { ApolloServerPlugin } from "@apollo/server";
+
 import type { Context } from "./context.js";
 
 /**

@@ -6,8 +6,8 @@
  * events, and each battle's events shifted by the time its stage started.
  */
 
-import type { Reward } from "../index.js";
 import type { BattleEvent } from "../battle/index.js";
+import type { Reward } from "../index.js";
 import type { StageKind } from "./job.js";
 import type { AdventureLogEntry, PartyOrder } from "./override.js";
 import type { SnapshotHero } from "./snapshot.js";

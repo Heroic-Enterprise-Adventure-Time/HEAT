@@ -1,8 +1,9 @@
-import { Service, inject, signal } from '@angular/core';
+import { inject, Service, signal } from '@angular/core';
 import { ApolloLink, CombinedGraphQLErrors, ServerError } from '@apollo/client';
 import { SetContextLink } from '@apollo/client/link/context';
 import { HttpLink } from 'apollo-angular/http';
 import { map } from 'rxjs';
+
 import { Config } from './config';
 import { Session } from './session';
 

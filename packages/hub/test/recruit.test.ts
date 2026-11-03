@@ -1,11 +1,14 @@
-import { sortBy } from "es-toolkit";
 import { randomUUID } from "node:crypto";
-import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { sortBy } from "es-toolkit";
 import { beforeAll, describe, expect, it } from "vitest";
-import { SPRITE_SETS, SPRITE_SET_PRESENTATION, heroNames, must, type Material } from "@heat/engine";
+
+import { heroNames, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } from "@heat/engine";
+
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { InsufficientBalance, RecruitRefused, Repository, type Hero } from "../src/db/repository.js";
+import { type Hero, InsufficientBalance, RecruitRefused, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";

@@ -1,8 +1,9 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Hub } from './hub';
+
 import { Config } from './config';
-import { Game, type AdventureView, type PlayerView, type SettledView } from './game';
+import { type AdventureView, Game, type PlayerView, type SettledView } from './game';
+import { Hub } from './hub';
 import { RELOAD, RELOADED_FROM, Updates } from './updates';
 
 const adventure: AdventureView = {

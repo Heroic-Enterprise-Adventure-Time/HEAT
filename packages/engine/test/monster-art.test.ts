@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync } from "node:fs";
+
 import { describe, expect, it } from "vitest";
-import { MONSTER_SPRITE_SETS, MONSTER_TYPES, PROP_SPRITE_SETS, RESOURCE_TYPES, must } from "../src/index.js";
+
+import { MONSTER_SPRITE_SETS, MONSTER_TYPES, must, PROP_SPRITE_SETS, RESOURCE_TYPES } from "../src/index.js";
 
 const art = new URL("../../../art/", import.meta.url);
 

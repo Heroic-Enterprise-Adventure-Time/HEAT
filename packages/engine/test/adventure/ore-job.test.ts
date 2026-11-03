@@ -1,5 +1,6 @@
 import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
+
 import { FACILITIES, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION } from "../../src/index.js";
 import { hero, ORE, snapshot } from "./helpers.js";
 

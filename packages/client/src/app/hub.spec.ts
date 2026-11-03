@@ -3,9 +3,10 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ApolloClient, InMemoryCache } from '@apollo/client';
+
 import { Config, type StackConfig } from './config';
 import { MeDocument } from './graphql/generated/graphql';
-import { ApiError, Hub, PREVIOUS, VERSION_HEADER, apiError } from './hub';
+import { ApiError, apiError, Hub, PREVIOUS, VERSION_HEADER } from './hub';
 import { Session } from './session';
 
 const config: StackConfig = {

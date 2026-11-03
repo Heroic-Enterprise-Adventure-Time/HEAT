@@ -1,6 +1,8 @@
 import { Component, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
+
 import type { Job } from '@heat/engine';
+
 import { yieldWords } from './job-words';
 
 /**

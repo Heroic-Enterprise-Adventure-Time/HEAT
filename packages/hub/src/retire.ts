@@ -1,5 +1,5 @@
-import { HeroChanged, TransactionConflict, type Hero, type Repository } from "./db/repository.js";
-import { Conflict, HeroAdventuring, badInput } from "./refusals.js";
+import { type Hero, HeroChanged, type Repository, TransactionConflict } from "./db/repository.js";
+import { badInput, Conflict, HeroAdventuring } from "./refusals.js";
 
 /**
  * Retirement (docs/design/game.md, "The heroes hall"): permanent, and the
