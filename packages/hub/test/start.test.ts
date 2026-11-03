@@ -8,13 +8,14 @@ import { must, UNIT_PROFILES } from "@heat/engine";
 import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { playerKeys } from "../src/db/keys.js";
-import { type Camp, type Hero, type HeroStatus, Repository } from "../src/db/repository.js";
+import { type AdventureRecord, type Camp, type Hero, type HeroStatus, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { AdventureOpen, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 /**
@@ -169,21 +170,20 @@ describe("startAdventure", () => {
     }
   });
 
-  it("answers AdventureOpen when another start commits between its read of the open adventure and of its party", async () => {
-    const p = player();
-    const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    const winner = await startAdventure(repo, p, version, at, wolves, [hero.id]);
-    // The first read sees no open adventure, as it would just before the other start committed.
-    let reads = 0;
-    const late = new Proxy(repo, {
-      get: (target, key, receiver): unknown =>
-        key === "openAdventure"
-          ? (id: string) => (reads++ === 0 ? Promise.resolve(undefined) : target.openAdventure(id))
-          : Reflect.get(target, key, receiver),
+  it("answers AdventureOpen, naming the winner, wherever another start of the same hero commits", async () => {
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      let winner: AdventureRecord | undefined;
+      const late = winnerBefore(repo, k, async () => (winner = await startAdventure(repo, p, version, at, wolves, [hero.id])));
+      const lost = await refusal(startAdventure(late.repo, p, version, at, wolves, [hero.id]));
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(AdventureOpen);
+      expect(lost).toMatchObject({ adventureId: winner?.adventureId });
+      return true;
     });
-    const lost = await refusal(startAdventure(late, p, version, at, wolves, [hero.id]));
-    expect(lost).toBeInstanceOf(AdventureOpen);
-    expect(lost).toMatchObject({ adventureId: winner.adventureId });
+    // Before each of openAdventure, getHero and startAdventure.
+    expect(runs).toBe(3);
   });
 });
 

@@ -269,6 +269,12 @@ function heroItem(hero: Hero): Item {
  */
 const AT_CAMP = "NOT attribute_type(adventureId, :string)";
 
+/**
+ * Every read but the sightings' is strongly consistent: the hub answers a
+ * record as it is, and a request that loses a race reads again to find the
+ * winner's writes, which an eventually consistent read may not show yet
+ * (graphql.md, rule 9). A sighting is a sample, so a stale one is harmless.
+ */
 export class Repository {
   constructor(
     private readonly db: DynamoDBDocumentClient,
@@ -300,7 +306,7 @@ export class Repository {
   }
 
   async getPlayer(id: string): Promise<Player | undefined> {
-    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.profile(id) }));
+    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.profile(id), ConsistentRead: true }));
     return r.Item ? { id: r.Item["id"] as string, name: r.Item["name"] as string } : undefined;
   }
 
@@ -359,12 +365,12 @@ export class Repository {
   }
 
   async getHero(playerId: string, heroId: string): Promise<Hero | undefined> {
-    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.hero(playerId, heroId) }));
+    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.hero(playerId, heroId), ConsistentRead: true }));
     return r.Item ? toHero(r.Item) : undefined;
   }
 
   async openAdventure(playerId: string): Promise<OpenAdventure | undefined> {
-    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.open(playerId) }));
+    const r = await this.db.send(new GetCommand({ TableName: this.tables.player, Key: playerKeys.open(playerId), ConsistentRead: true }));
     return r.Item
       ? { adventureId: r.Item["adventureId"] as string, seed: r.Item["seed"] as string, startedAt: r.Item["startedAt"] as string }
       : undefined;
@@ -372,7 +378,7 @@ export class Repository {
 
   async getAdventure(adventureId: string): Promise<AdventureRecord | undefined> {
     const r = await this.db.send(
-      new GetCommand({ TableName: this.tables.location, Key: locationKeys.adventure(adventureId) }),
+      new GetCommand({ TableName: this.tables.location, Key: locationKeys.adventure(adventureId), ConsistentRead: true }),
     );
     if (!r.Item) return undefined;
     const { PK: _pk, SK: _sk, ...record } = r.Item;
@@ -915,6 +921,7 @@ export class Repository {
           TableName: this.tables.player,
           KeyConditionExpression: "PK = :pk AND begins_with(SK, :sk)",
           ExpressionAttributeValues: { ":pk": `PLAYER#${playerId}`, ":sk": prefix },
+          ConsistentRead: true,
           ...(start ? { ExclusiveStartKey: start } : {}),
         }),
       );

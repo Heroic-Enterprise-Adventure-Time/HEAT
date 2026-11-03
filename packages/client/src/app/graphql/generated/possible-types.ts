@@ -16,6 +16,7 @@
     "DiscardAdventureResult": [
       "AdventureSettled",
       "AdventureVerifiable",
+      "Conflict",
       "DiscardAdventureSuccess"
     ],
     "Error": [

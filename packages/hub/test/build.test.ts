@@ -12,6 +12,7 @@ import { playerKeys } from "../src/db/keys.js";
 import { BuildRefused, campLevels, type Hero, InsufficientBalance, RecruitRefused, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
+import { everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
@@ -98,6 +99,20 @@ describe("buildFacility: the mine", () => {
     expect(results.every((r) => r.status === "fulfilled" && r.value.facilities.mine === 1)).toBe(true);
     expect(await balances(p)).toEqual({ timber: 40, cloth: 7 });
     expect(await ledger(p)).toHaveLength(2);
+  });
+
+  it("answers a repeat that loses the race with the camp, wherever the other commits", async () => {
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      await stock(p, { timber: 60, cloth: 3 });
+      const late = winnerBefore(repo, k, () => buildFacility(repo, p, at, "mine", 1));
+      expect((await buildFacility(late.repo, p, at, "mine", 1)).facilities).toEqual({ mine: 1 });
+      expect(await balances(p)).toEqual({ timber: 0, cloth: 0 });
+      expect(await ledger(p)).toHaveLength(2);
+      return late.ran();
+    });
+    // Before each of camps, build and the camp read after it.
+    expect(runs).toBe(3);
   });
 
   it("gives the timber of one build to one of two concurrent builds, and tells the other what is short", async () => {

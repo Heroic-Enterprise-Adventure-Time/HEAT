@@ -148,6 +148,7 @@ export type DiscardAdventureMutationVariables = Exact<{
 export type DiscardAdventureMutation = { readonly discardAdventure:
     | { readonly __typename: 'AdventureSettled', readonly message: string }
     | { readonly __typename: 'AdventureVerifiable', readonly message: string }
+    | { readonly __typename: 'Conflict', readonly message: string }
     | { readonly __typename: 'DiscardAdventureSuccess', readonly adventure: { readonly id: string } }
    | null };
 

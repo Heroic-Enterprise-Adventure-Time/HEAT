@@ -7,12 +7,13 @@ import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type 
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { locationKeys, playerKeys } from "../src/db/keys.js";
-import { type Hero, Repository, type Settlement } from "../src/db/repository.js";
+import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
-import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, EngineUpdated } from "../src/refusals.js";
+import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, EngineUpdated } from "../src/refusals.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 /**
@@ -286,6 +287,59 @@ describe("discard", () => {
     const started = await start(p, await putParty(p, ["fighter", "villager"]));
     await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(await refusal(discardAdventure(repo, p, { current: "1".repeat(40), previous: undefined }, started.adventureId))).toBeInstanceOf(AdventureSettled);
+  });
+
+  it("answers a repeat that loses the race with the adventure discarded, wherever the other commits (Issue-172)", async () => {
+    const versions = { current: version, previous };
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const heroes = await putParty(p, ["fighter", "villager"]);
+      const started = await start(p, heroes, "0".repeat(40));
+      const late = winnerBefore(repo, k, () => discardAdventure(repo, p, versions, started.adventureId));
+      expect(await discardAdventure(late.repo, p, versions, started.adventureId)).toMatchObject({ status: "DISCARDED" });
+      expect(await repo.openAdventure(p)).toBeUndefined();
+      for (const hero of heroes) expect(await repo.getHero(p, hero.id)).toMatchObject({ adventureId: null });
+      return late.ran();
+    });
+    // Before each of getAdventure and discard.
+    expect(runs).toBe(2);
+  });
+
+  /** A repository whose discard runs `first` and then fails with `error`, as a transaction that lost to it would. */
+  function failingDiscard(first: () => Promise<unknown>, error: Error): Repository {
+    return new Proxy(repo, {
+      get: (target, key, receiver): unknown =>
+        key === "discard"
+          ? async (): Promise<never> => {
+              await first();
+              throw error;
+            }
+          : Reflect.get(target, key, receiver),
+    });
+  }
+
+  it("reads again after a TransactionConflict, and answers the discard that won it (Issue-172)", async () => {
+    const versions = { current: version, previous };
+    const p = player();
+    const started = await start(p, await putParty(p, ["villager"]), "0".repeat(40));
+    const conflicted = failingDiscard(() => discardAdventure(repo, p, versions, started.adventureId), new TransactionConflict("conflict"));
+    expect(await discardAdventure(conflicted, p, versions, started.adventureId)).toMatchObject({ status: "DISCARDED" });
+  });
+
+  it("reads again after a TransactionConflict, and refuses with AdventureSettled when a submit won it (Issue-172)", async () => {
+    const p = player();
+    const started = await start(p, await putParty(p, ["fighter", "villager"]), "0".repeat(40));
+    const settle = () => submitAdventure(repo, new MemoryTimelines(), p, "0".repeat(40), started.adventureId, []);
+    const conflicted = failingDiscard(settle, new TransactionConflict("conflict"));
+    expect(await refusal(discardAdventure(conflicted, p, { current: version, previous }, started.adventureId))).toBeInstanceOf(AdventureSettled);
+  });
+
+  it("answers Conflict when the adventure is still open and no rule explains the failure (Issue-172)", async () => {
+    const p = player();
+    const started = await start(p, await putParty(p, ["villager"]), "0".repeat(40));
+    const changed = failingDiscard(() => Promise.resolve(), new HeroChanged("condition failed on item 2"));
+    expect(await refusal(discardAdventure(changed, p, { current: version, previous }, started.adventureId))).toBeInstanceOf(Conflict);
+    expect((await repo.getAdventure(started.adventureId))?.status).toBe("OPEN");
   });
 });
 

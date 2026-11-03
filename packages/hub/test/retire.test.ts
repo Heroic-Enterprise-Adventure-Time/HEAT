@@ -11,6 +11,7 @@ import { type Hero, HeroChanged, type HeroStatus, Repository } from "../src/db/r
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
+import { everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
@@ -90,6 +91,19 @@ describe("retireHero", () => {
     expect(results.map((h) => h.status)).toEqual(["RETIRED", "RETIRED"]);
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 1 });
     await expectCountsAgree(p);
+  });
+
+  it("answers a repeat that loses the race with the hero retired, wherever the other commits", async () => {
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putCamp(p, ["ALIVE", "ALIVE"]))[0], "the hero");
+      const late = winnerBefore(repo, k, () => retireHero(repo, p, hero.id));
+      expect(await retireHero(late.repo, p, hero.id)).toEqual(await repo.getHero(p, hero.id));
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+      return late.ran();
+    });
+    // Before each of getHero and retire.
+    expect(runs).toBe(2);
   });
 
   it("holds the counts in the transaction, against a hero read before another retire", async () => {

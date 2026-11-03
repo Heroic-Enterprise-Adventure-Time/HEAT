@@ -640,8 +640,8 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. A discarded adventure answers as it is. Refused with AdventureVerifiable while this deploy or the previous one could still verify it, or AdventureSettled; an adventure that is not the player's is BAD_USER_INPUT.",
-    errors: answers("DiscardAdventure", { field: "adventure", what: "the adventure, discarded" }, [AdventureVerifiable, AdventureSettled]),
+      "Discards the caller's open adventure when no deploy can verify it any more: its party comes home and nothing is credited. A discarded adventure answers as it is. Refused with AdventureVerifiable while this deploy or the previous one could still verify it, AdventureSettled, or Conflict; an adventure that is not the player's is BAD_USER_INPUT.",
+    errors: answers("DiscardAdventure", { field: "adventure", what: "the adventure, discarded" }, [AdventureVerifiable, AdventureSettled, Conflict]),
     args: { input: t.arg({ type: DiscardAdventureInput, required: true }) },
     resolve: (_root, { input }, ctx) =>
       discardAdventure(ctx.repo, callerId(ctx), { current: ctx.version, previous: ctx.previousVersion }, input.adventureId),
