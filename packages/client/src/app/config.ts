@@ -1,4 +1,5 @@
 import { Service, signal } from '@angular/core';
+import * as z from 'zod/mini';
 
 /**
  * What the client knows about the stack it runs in, read from `/config.json`
@@ -8,48 +9,37 @@ import { Service, signal } from '@angular/core';
  * fetches it from the branch's stack (`proxy.conf.mjs`). Nothing in it is
  * secret: the browser carries all of it.
  */
-export interface StackConfig {
+const StackConfigSchema = z.object({
   /** The API's path on this origin: `/graphql`. */
-  readonly graphqlPath: string;
+  graphqlPath: z.string().check(z.minLength(1)),
   /** The user pool that issues the tokens, `us-east-1_...`; its region is the prefix. */
-  readonly userPoolId: string;
+  userPoolId: z.string().check(z.minLength(1)),
   /** The stack's browser app client in that pool. */
-  readonly clientId: string;
+  clientId: z.string().check(z.minLength(1)),
   /** The pool's managed login host, `https://auth.<zone>`, with no trailing slash. */
-  readonly loginHost: string;
+  loginHost: z.string().check(z.minLength(1)),
   /**
    * Whether the login page offers email and password beside Google: true in
    * a sandbox stack, for the base's test users (Issue-86), false in dev and
    * prod. When false the client skips the login page and goes to Google.
    */
-  readonly passwordSignIn: boolean;
+  passwordSignIn: z.boolean(),
   /**
    * The deploy's version, the commit the workflow deployed (decision 0030).
    * The client sends it on every request, and the hub says when it differs
    * from its own.
    */
-  readonly version: string;
-}
+  version: z.string().check(z.minLength(1)),
+});
 
-const FIELDS = ['graphqlPath', 'userPoolId', 'clientId', 'loginHost', 'version'] as const;
+export type StackConfig = Readonly<z.output<typeof StackConfigSchema>>;
 
-/** Reads the fields out of the parsed file, or says which one is missing. */
+/** Reads the fields out of the parsed file, or says which is missing. */
 export function parseStackConfig(value: unknown): StackConfig {
-  if (typeof value !== 'object' || value === null) throw new Error('config.json is not an object');
-  const record = value as Record<string, unknown>;
-  for (const field of FIELDS) {
-    const v = record[field];
-    if (typeof v !== 'string' || v.length === 0) throw new Error(`config.json lacks ${field}`);
-  }
-  if (typeof record['passwordSignIn'] !== 'boolean') throw new Error('config.json lacks passwordSignIn');
-  return {
-    graphqlPath: record['graphqlPath'] as string,
-    userPoolId: record['userPoolId'] as string,
-    clientId: record['clientId'] as string,
-    loginHost: record['loginHost'] as string,
-    passwordSignIn: record['passwordSignIn'],
-    version: record['version'] as string,
-  };
+  const parsed = StackConfigSchema.safeParse(value);
+  if (parsed.success) return parsed.data;
+  const field = parsed.error.issues[0]?.path.join('.');
+  throw new Error(field ? `config.json lacks ${field}` : 'config.json is not an object');
 }
 
 /** The loaded configuration, or the reason it could not be loaded. */

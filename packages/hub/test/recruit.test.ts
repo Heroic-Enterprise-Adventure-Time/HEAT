@@ -132,11 +132,10 @@ describe("recruitHero: the free villager", () => {
     expect((await repo.heroes(p)).length).toBe(1);
   });
 
-  it("refuses a fighter with no ore, an unknown unit type and a request id that is not a UUID", async () => {
+  it("refuses a fighter with no ore and an unknown unit type", async () => {
     const p = player();
     expect(await refusal(recruitHero(repo, p, "fighter", randomUUID()))).toBeInstanceOf(InsufficientResources);
     expect(await refusal(recruitHero(repo, p, "dragon", randomUUID()))).toMatchObject(BAD_USER_INPUT);
-    expect(await refusal(recruitHero(repo, p, "villager", "not-a-uuid"))).toMatchObject(BAD_USER_INPUT);
     expect(await repo.heroes(p)).toEqual([]);
   });
 });

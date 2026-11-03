@@ -61,6 +61,8 @@ import type { Timelines } from "./timelines.js";
 
 /** The most entries a log may have: far beyond what a person can click in a stage's time limits. */
 export const MAX_OVERRIDES = 2000;
+/** The longest ability id a log entry may name: far beyond any in the content, so that a log cannot carry text. */
+export const MAX_ABILITY_ID = 64;
 /** Reads and writes of a settlement before it answers Conflict. */
 export const SETTLE_ATTEMPTS = 3;
 
@@ -80,19 +82,21 @@ export async function ownAdventure(repo: Repository, playerId: string, adventure
   return record;
 }
 
-/** The submitted log as the engine's entries, or BAD_USER_INPUT. */
+/**
+ * The submitted log as the engine's entries, or BAD_USER_INPUT. The input type
+ * has checked its length, each time and each ability id's length
+ * (`SubmitAdventureInput`); what is left needs the entry's kind or the party.
+ */
 export function toLog(record: AdventureRecord, inputs: readonly OverrideInput[]): AdventureLogEntry[] {
-  if (inputs.length > MAX_OVERRIDES) badInput(`a log holds at most ${MAX_OVERRIDES} entries`);
   const party = new Set(record.snapshot.heroes.map((h) => h.heroId));
   return inputs.map((input, i): AdventureLogEntry => {
     const at = input.acceptedAtSimTime;
-    if (!Number.isSafeInteger(at) || at < 0) badInput(`entry ${i}: the time is a whole number of milliseconds`);
     if (input.kind === "PARTY") {
       if (!input.order) badInput(`entry ${i}: a party entry names an order`);
       return { kind: "party", acceptedAtSimTime: at, order: input.order === "RETREAT" ? "retreat" : "press-on" };
     }
     if (!input.unitId || !party.has(input.unitId)) badInput(`entry ${i}: a unit entry names a hero of the party`);
-    if (!input.abilityId || input.abilityId.length > 64) badInput(`entry ${i}: a unit entry names an ability`);
+    if (!input.abilityId) badInput(`entry ${i}: a unit entry names an ability`);
     return {
       kind: "unit",
       acceptedAtSimTime: at,

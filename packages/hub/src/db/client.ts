@@ -1,5 +1,8 @@
 import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import * as z from "zod/mini";
+
+import { parseEnv, requiredVariable } from "../env.js";
 
 /**
  * Rule 1 of decision 0009: every AWS call goes through an SDK client whose
@@ -20,16 +23,16 @@ export interface DbConfig {
   region?: string | undefined;
 }
 
+const DbEnv = z.object({
+  HEAT_PLAYER_TABLE: requiredVariable,
+  HEAT_LOCATION_TABLE: requiredVariable,
+  DYNAMODB_ENDPOINT: z.optional(z.string()),
+  AWS_REGION: z._default(z.string(), "us-east-1"),
+});
+
 export function configFromEnv(env: NodeJS.ProcessEnv = process.env): DbConfig {
-  const player = env["HEAT_PLAYER_TABLE"];
-  const location = env["HEAT_LOCATION_TABLE"];
-  if (!player) throw new Error("HEAT_PLAYER_TABLE is not set");
-  if (!location) throw new Error("HEAT_LOCATION_TABLE is not set");
-  return {
-    tables: { player, location },
-    endpoint: env["DYNAMODB_ENDPOINT"],
-    region: env["AWS_REGION"] ?? "us-east-1",
-  };
+  const { HEAT_PLAYER_TABLE: player, HEAT_LOCATION_TABLE: location, DYNAMODB_ENDPOINT: endpoint, AWS_REGION: region } = parseEnv(DbEnv, env);
+  return { tables: { player, location }, endpoint, region };
 }
 
 /**

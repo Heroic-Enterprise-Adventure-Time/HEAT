@@ -9,8 +9,6 @@ import {
   SPRITE_SET_PRESENTATION,
   SPRITE_SETS,
   STARTING_LOCATION,
-  UNIT_TYPES,
-  type UnitType,
 } from "@heat/engine";
 
 import { retryingConflicts } from "./conflict.js";
@@ -41,12 +39,10 @@ import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Re
  *
  * The refusals, answered as data (`refusals.ts`): HallLevel, HallFull,
  * InsufficientResources (each material's amount and the camp's balance) and
- * Conflict, when the camp changed and no rule explains the failure. A
- * request id that is not a UUID, or a unit type the location does not
- * recruit, is BAD_USER_INPUT.
+ * Conflict, when the camp changed and no rule explains the failure. A unit
+ * type the location does not recruit is BAD_USER_INPUT; the request id is a
+ * lower-case UUID by the time it arrives (`RecruitHeroInput`).
  */
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type Random = (max: number) => number;
 
@@ -92,16 +88,12 @@ export function recruitHero(
 }
 
 async function recruitOnce(repo: Repository, playerId: string, unitType: string, requestId: string, random: Random, now: Date): Promise<Hero> {
-  if (!UUID.test(requestId)) badInput("requestId must be a UUID");
-  const heroId = requestId.toLowerCase();
-  const already = madeBy(await repo.getHero(playerId, heroId), requestId, unitType);
+  const already = madeBy(await repo.getHero(playerId, requestId), requestId, unitType);
   if (already) return already;
 
   const at = location(STARTING_LOCATION);
   const recruit = at?.recruits.find((r) => r.unitType === unitType);
-  if (!at || !recruit || !UNIT_TYPES.includes(unitType as UnitType)) {
-    badInput(`${at?.name ?? STARTING_LOCATION} does not recruit ${unitType}`);
-  }
+  if (!at || !recruit) badInput(`${at?.name ?? STARTING_LOCATION} does not recruit ${unitType}`);
 
   // A repeat of this request may make the hero after the read above, and the
   // camp then shows its recruit, so before any refusal the hero is read again,
@@ -110,7 +102,7 @@ async function recruitOnce(repo: Repository, playerId: string, unitType: string,
   const camp = await repo.camp(playerId, at.id);
   const refusal = barred(camp, recruit);
   if (refusal) {
-    const made = madeBy(await repo.getHero(playerId, heroId), requestId, unitType);
+    const made = madeBy(await repo.getHero(playerId, requestId), requestId, unitType);
     if (made) return made;
     throw refusal;
   }
@@ -123,7 +115,7 @@ async function recruitOnce(repo: Repository, playerId: string, unitType: string,
   const names = new Set((await repo.heroes(playerId)).filter((h) => h.location === at.id && h.status === "ALIVE").map((h) => h.name));
 
   const hero: Hero = {
-    id: heroId,
+    id: requestId,
     location: at.id,
     unitType: recruit.unitType,
     spriteSet,
@@ -142,7 +134,7 @@ async function recruitOnce(repo: Repository, playerId: string, unitType: string,
     if (!(e instanceof HeroExists || e instanceof RecruitRefused || e instanceof InsufficientBalance)) throw e;
     // The camp first and the hero after it, as above: a repeat that won the race is the answer.
     const after = await repo.camp(playerId, at.id);
-    const made = madeBy(await repo.getHero(playerId, heroId), requestId, unitType);
+    const made = madeBy(await repo.getHero(playerId, requestId), requestId, unitType);
     if (made) return made;
     throw barred(after, recruit) ?? new Conflict("the camp changed while recruiting; no hero was recruited");
   }

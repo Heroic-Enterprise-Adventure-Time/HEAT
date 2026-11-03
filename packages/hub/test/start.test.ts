@@ -114,17 +114,6 @@ describe("startAdventure", () => {
     expect(await refusal(startAdventure(repo, p, version, "atlantis", wolves, [hero.id]))).toMatchObject(BAD_USER_INPUT);
   });
 
-  it("refuses a party of none, of five, or with a hero twice", async () => {
-    const p = player();
-    const heroes = await putHeroes(p, ["ALIVE", "ALIVE", "ALIVE", "ALIVE", "ALIVE"]);
-    const ids = heroes.map((h) => h.id);
-    const first = must(ids[0], "the first id");
-    expect(await refusal(startAdventure(repo, p, version, at, wolves, []))).toMatchObject(BAD_USER_INPUT);
-    expect(await refusal(startAdventure(repo, p, version, at, wolves, ids))).toMatchObject(BAD_USER_INPUT);
-    expect(await refusal(startAdventure(repo, p, version, at, wolves, [first, first.toUpperCase()]))).toMatchObject(BAD_USER_INPUT);
-    expect(await repo.openAdventure(p)).toBeUndefined();
-  });
-
   it("refuses another player's hero, a hero elsewhere, a dead hero and a retired one", async () => {
     const p = player();
     const theirs = must((await putHeroes(player(), ["ALIVE"]))[0], "their hero");

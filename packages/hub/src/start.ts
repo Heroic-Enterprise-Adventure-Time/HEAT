@@ -6,7 +6,6 @@ import {
   type Job,
   JOBS,
   location,
-  MAX_PARTY,
   type Requirement,
   type SnapshotHero,
   UNIT_PROFILES,
@@ -40,8 +39,9 @@ import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHe
  * The refusals, answered as data (`refusals.ts`): AdventureOpen, Requires
  * (the facility that posts the job, not built), HeroDead, HeroRetired,
  * HeroNotHere and HeroAdventuring for a hero of the party, and Conflict. A
- * location or job the hub does not know, a party of the wrong size or with
- * a hero twice, or a hero that is not the player's is BAD_USER_INPUT.
+ * location or job the hub does not know, or a hero that is not the player's,
+ * is BAD_USER_INPUT; the party is 1 to MAX_PARTY distinct lower-case ids by the
+ * time it arrives (`StartAdventureInput`).
  */
 
 /** A second start answers with the adventure already open, which the client reads from `me`. */
@@ -125,12 +125,8 @@ async function startOnce(
   };
   await checkFacilities();
 
-  if (heroIds.length < 1 || heroIds.length > MAX_PARTY) badInput(`a party is 1 to ${MAX_PARTY} heroes`);
-  const ids = heroIds.map((id) => id.toLowerCase());
-  if (new Set(ids).size !== ids.length) badInput("a hero is in the party twice");
-
   const checkParty = async (): Promise<Hero[]> => {
-    const heroes = await Promise.all(ids.map((id) => repo.getHero(playerId, id)));
+    const heroes = await Promise.all(heroIds.map((id) => repo.getHero(playerId, id)));
     const party: Hero[] = [];
     for (const hero of heroes) {
       // Another player's hero is not said to exist.

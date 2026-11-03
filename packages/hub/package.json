@@ -21,9 +21,11 @@
     "@pothos/core": "4.16.0",
     "@pothos/plugin-errors": "4.9.3",
     "@pothos/plugin-scope-auth": "4.2.2",
+    "@pothos/plugin-validation": "4.3.5",
     "es-toolkit": "1.53.1",
     "graphql": "16.14.2",
-    "graphql-scalars": "2.0.1"
+    "graphql-scalars": "2.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/aws-lambda": "8.10.164",
