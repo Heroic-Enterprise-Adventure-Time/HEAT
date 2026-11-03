@@ -61,11 +61,14 @@ export default tseslint.config(
   // import-x's `order`: it is the one released monthly, and it groups by the
   // specifier's text, so it needs no module resolver to tell the groups apart.
   // A type import sorts with its module's group; side-effect imports keep
-  // their place.
+  // their place. One declaration per module, types inline, since sorting
+  // leaves two declarations of one module side by side and a new name could
+  // then go in either.
   {
     files: ['**/*.{js,mjs,ts}'],
     plugins: { perfectionist },
     rules: {
+      'no-duplicate-imports': ['error', { allowSeparateTypeImports: false }],
       'perfectionist/sort-imports': [
         'error',
         {

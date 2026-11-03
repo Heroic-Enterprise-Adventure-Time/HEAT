@@ -10,8 +10,7 @@ import { CampState } from './camp-state';
 import { LAYOUT_SIZES } from './layout-sizes';
 import { iconScale, isSideBySide, menuLabels, stackedStageHeight } from './page-layout';
 import type { CampSceneHandle, SceneCallbacks } from './scene/camp-scene';
-import { LAYOUTS } from './scene/layout';
-import type { CampLayout } from './scene/layout';
+import { type CampLayout, LAYOUTS } from './scene/layout';
 
 export type CampSceneFactory = (
   host: HTMLElement,

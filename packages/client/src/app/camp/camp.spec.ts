@@ -3,8 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
 
-import type { FacilityKind } from '@heat/engine';
-import { must } from '@heat/engine';
+import { type FacilityKind, must } from '@heat/engine';
 
 import { routes } from '../app.routes';
 import { type CampView, Game, type HeroView, type RecruitOffer, type SeenHeroView, upgradeOffer } from '../game';
