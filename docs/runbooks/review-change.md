@@ -43,6 +43,6 @@ The findings are review threads because the pull request is the review surface t
 
 One rule per finding keeps the review bound to the documents: a finding is checkable against a sentence the owner wrote, and a reviewer that cannot cite one is asked to propose the sentence instead. The cap exists because ten findings are read and forty are skimmed; the severities put a guardrail breach above a wording.
 
-The review runs on Opus because its task is bounded: one diff, the documents a table names, one rule per finding and a cap, with correctness handed to the built-in code review at a level the runbook sets. What the review's worth rests on is that its session did not write the change, not the model's tier. Owner's call, 2026-11-03 (Issue-183).
+The review runs on Opus because its task is bounded: one diff, the documents a table names, one rule per finding and a cap, with correctness handed to the built-in code review at a level the runbook sets. What the review's worth rests on is that its session did not write the change, not the model's tier. Owner's call, 2026-11-02 (Issue-183).
 
 The built-in code review runs beside the standards review because the two ask different questions: whether the code is written as this project writes it, and whether it works. Neither answers the other.
