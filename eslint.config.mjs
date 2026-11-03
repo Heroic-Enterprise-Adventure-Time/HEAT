@@ -6,6 +6,7 @@
 import js from '@eslint/js';
 import graphql from '@graphql-eslint/eslint-plugin';
 import angular from 'angular-eslint';
+import perfectionist from 'eslint-plugin-perfectionist';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
@@ -50,6 +51,29 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', ignoreRestSiblings: true },
       ],
+    },
+  },
+
+  // Imports in one order everywhere, so a new import has one place to go:
+  // Node built-ins, packages, the workspace's `@heat/*` packages, local files,
+  // a blank line between groups, and module paths and the names inside the
+  // braces sorted (docs/standards/typescript.md, rule 16). Perfectionist over
+  // import-x's `order`: it is the one released monthly, and it groups by the
+  // specifier's text, so it needs no module resolver to tell the groups apart.
+  // A type import sorts with its module's group; side-effect imports keep
+  // their place.
+  {
+    files: ['**/*.{js,mjs,ts}'],
+    plugins: { perfectionist },
+    rules: {
+      'perfectionist/sort-imports': [
+        'error',
+        {
+          groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index'], 'unknown'],
+          internalPattern: ['^@heat/'],
+        },
+      ],
+      'perfectionist/sort-named-imports': 'error',
     },
   },
 
