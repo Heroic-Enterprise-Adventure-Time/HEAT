@@ -25,7 +25,7 @@ One HEAT environment: the two tables, the replay bucket, one function per entry 
 | Alarm, where `alarm_email` is set | `<prefix>-hub-conflicts-answered` | The hub's `ConflictAnswered`, namespace `<prefix>`, `service = heat-hub`, Sum ≥ 1 in one five-minute period (decision 0040) |
 | Alarms, per table, where `alarm_email` is set | `<prefix>-<table>-transaction-conflicts`, `-failed-conditions` | `AWS/DynamoDB` by `TableName`: `TransactionConflict` and `ConditionalCheckFailedRequests`, SampleCount ≥ 5 in one five-minute period; SampleCount because Sum counts each item of a transaction (decision 0040) |
 
-Nothing here is provisioned capacity, a VPC, or a resource that costs money at rest; the eight standard-resolution alarms of one function and two tables are inside the ten alarm metrics CloudWatch's free tier lists (its pricing page, read 2026-11-03), the hub's own metrics are charged only for the hours they are sent,  and the topic's emails are priced per message sent.
+Nothing here is provisioned capacity, a VPC, or a resource that costs money at rest; the eight standard-resolution alarms of one function and two tables are inside the ten alarm metrics CloudWatch's free tier lists (its pricing page, read 2026-11-03), the hub's own metrics are charged only for the hours they are sent, and the topic's emails are priced per message sent.
 
 ## The code
 
