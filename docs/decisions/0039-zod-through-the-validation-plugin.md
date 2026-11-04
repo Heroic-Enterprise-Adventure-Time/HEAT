@@ -1,6 +1,6 @@
 # 0039: The contract's scalars and zod check every boundary, and the Pothos validation plugin is where zod runs on the API
 
-- **Status:** Decided
+- **Status:** Decided; the replay bucket's check, left unsettled here, moved by Issue-206
 - **Date:** 2026-11-03
 - **Settles:** Issue-198, from the library review of 2026-11-03: what replaces the hand-written shape checks in the hub's verbs, the hub's reading of its environment and the client's reading of `config.json`. Amends decision 0038's "every identifier is `ID`" for a request id the client makes.
 
