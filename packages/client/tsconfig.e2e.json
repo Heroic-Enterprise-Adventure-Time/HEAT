@@ -1,0 +1,9 @@
+// The browser smoke test and its configuration, which Playwright runs under
+// Node against a deployed stack, outside the Angular build.
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"]
+  },
+  "include": ["e2e/**/*.ts", "playwright.config.ts"]
+}

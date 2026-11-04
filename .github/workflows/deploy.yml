@@ -12,9 +12,9 @@
 # release.yml (Issue-41). A row with code (dev) bundles the
 # functions before planning, because the root hashes the bundle, and after
 # the apply publishes the client build with config.json, creates the test
-# users, runs the smoke test through the environment's hostname and reads the
-# cold start, as sandbox.yml does for a per-issue stack; sandbox-base has no
-# code and skips those steps.
+# users, runs the smoke test through the environment's hostname, reads the
+# cold start and runs the browser test (decision 0045), as sandbox.yml does for
+# a per-issue stack; sandbox-base has no code and skips those steps.
 #
 # Why pull_request_target and not pull_request: the pull request's plan must
 # run under the root's environment to see its real values, and the
@@ -373,6 +373,8 @@ jobs:
         run: |
           {
             echo
+            echo '### Stack test, through the API'
+            echo
             echo '```text'
             cat "$RUNNER_TEMP/e2e.log"
             echo '```'
@@ -381,3 +383,42 @@ jobs:
       - name: Report the cold start
         if: matrix.code
         run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
+
+      # The browser test (decision 0045): the page as a player meets it, after
+      # the API has passed. Installed on every run, not cached: Playwright's CI
+      # page, read 2026-11-04, says "Caching browser binaries is not
+      # recommended", because a restore takes about as long as a download and
+      # Linux's OS dependencies cannot be cached.
+      - name: Install Chromium for the browser test
+        if: matrix.code
+        run: npx playwright install --with-deps chromium
+
+      - name: Use the page in a browser as that user
+        id: browser
+        if: matrix.code
+        env:
+          FORCE_COLOR: "0"
+        run: |
+          set -eu
+          zone_name="$(terraform -chdir="terraform/environment/$ROOT" output -raw zone_name)"
+          export E2E_STACK="$STACK" E2E_USERNAME="e2e@$zone_name"
+          npm run e2e --workspace @heat/client | tee -a "$RUNNER_TEMP/browser.log"
+
+      - name: Put the browser test's log on the run's page
+        if: ${{ !cancelled() && (steps.browser.outcome == 'success' || steps.browser.outcome == 'failure') }}
+        run: sh scripts/report-browser-test.sh "$RUNNER_TEMP/browser.log" "${{ steps.browser.outcome }}"
+
+      # Encrypted before it leaves the runner: a trace holds the test user's
+      # password and tokens, and a public repository's artifacts are public.
+      - name: Encrypt the browser test's trace
+        if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
+        run: sh scripts/seal-browser-trace.sh packages/client/test-results "$RUNNER_TEMP/browser-trace.tgz.cms"
+
+      - name: Keep the encrypted trace as a run artifact
+        if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-trace
+          path: ${{ runner.temp }}/browser-trace.tgz.cms
+          if-no-files-found: error
+          retention-days: 7
