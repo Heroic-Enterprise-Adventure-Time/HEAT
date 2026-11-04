@@ -26,9 +26,10 @@
 The order is forced by the previous route: until the deploy before the current one is also on ElectroDB, its `Put`s go on writing items without identifiers.
 
 1. **Every read takes `ignoreOwnership: true`** as Issue-201 moves it, so nothing depends on the identifiers yet. Writes make items whole as they touch them.
-2. **After Issue-201 has reached an environment twice,** so that `/previous/graphql` is on ElectroDB too, the backfill runs in that environment, the sandbox stack first: a `Scan` of each table, and for each item without `__edb_e__` a conditional `UpdateItem` setting both identifiers and the composite attributes, which the sort key gives. `attribute_not_exists` on the identifier makes it safe to repeat and safe beside live writes. `test/electrodb.test.ts` holds its shape.
-3. **What it leaves:** the spike's `HOLDING#<material>` items, which no entity's key matches and nothing reads (decision 0026). Sightings are not worth writing: they expire within a week, so the table is whole once a week has passed with the previous route on ElectroDB.
-4. **It is done when a count of items without `__edb_e__`, those left aside apart, is zero.** Then `ignoreOwnership` comes off every read but the camps' below.
+2. **Issue-201 adds the entities for the items the spike has none for:** the profile (`PROFILE`), the open adventure (`OPEN`), a facility (`AT#<location>#FACILITY#<kind>`) and, in the location table, the adventure record (`ADVENTURE#<id>`, `RECORD`). They come with the verbs that use them, because the record's nested snapshot and result are the hardest to model and are only proven by those verbs' tests.
+3. **After Issue-201 has reached an environment twice,** so that `/previous/graphql` is on ElectroDB too, the backfill runs in that environment, the sandbox stack first: a `Scan` of each table that pages until `LastEvaluatedKey` is absent, and for each item without `__edb_e__` a conditional `UpdateItem` setting both identifiers and the composite attributes, which the keys give. `attribute_not_exists` on the identifier makes it safe to repeat and safe beside live writes. `test/electrodb.test.ts` holds its shape for the hero, the camp, the holding and the ledger entry, over one partition; the other four item types, and a whole table, are Issue-201's to prove.
+4. **What it leaves:** the spike's `HOLDING#<material>` items, which no entity's key matches and nothing reads (decision 0026). Sightings are not worth writing: they expire within a week, so the table is whole once a week has passed with the previous route on ElectroDB.
+5. **It is done when a count of items without `__edb_e__`, those left aside apart, is zero.** Then `ignoreOwnership` comes off every read but the camps' below.
 
 What runs it is the pipeline, under the apply role: the hub's role has no `dynamodb:Scan` (`terraform/modules/environment/functions.tf`) and the plan role is denied item reads, while the apply role's `AdministratorAccess` under a boundary allowing `dynamodb:*` covers it. That was read from the modules, not exercised; Issue-201 exercises it in the sandbox stack first.
 
@@ -39,6 +40,8 @@ What runs it is the pipeline, under the apply role: the hub's role has no `dynam
 **A sightings window needs `raw` for its count.** `limit` is DynamoDB's `Limit`, applied before the filter on expiry, which is decision 0029's bound. `count` goes on reading until it has that many, and is not. `heroesSeenAt` needs how many items were read, `ScannedCount`, and `go()` keeps only `data` and `cursor`, so that read also takes `data: "raw"` and `parse`. The upper bound of the window is `SEEN#g`, above every hex hero id, where the old code writes `SEEN$`, because a template cannot state `SEEN$`.
 
 **`ConsistentRead` is the `consistent: true` option,** on `get` and on a query alike.
+
+**An attribute no entity declares is dropped without an error,** where the hand-written `Put` stored every field. `db/entities.ts` therefore checks at compile time that the entities cover `Hero` and `Sighting`, and each entity Issue-201 adds for a type written whole, the adventure record above all, joins that check.
 
 **What ElectroDB does not spare.** A `where` with several conditions is still joined by hand, `${op.eq(...)} AND ${op.gt(...)}`, and "not a string" is `NOT ${op.type(a.adventureId, "S")}`. The names and values are the library's; the shape of the condition stays visible, which is no loss.
 
@@ -75,7 +78,7 @@ Measured on 2026-11-03 for the two verbs, with one esbuild configuration, `scrip
 All on 2026-11-03.
 
 - **ElectroDB 3.9.3's published source and DynamoDB Local** (`packages/hub/test/electrodb.test.ts`): the identifiers, `ignoreOwnership`, the transaction across the tables committed and cancelled from either side, the collection's key condition, `limit` against `count`, `raw` and `parse`.
-- **A real race on `heat-sb200`, as a test user:** eight concurrent copies of one recruit and of one retire, ten rounds. DynamoDB Local answered twelve concurrent retires over twenty rounds with no `TransactionConflict`, so the code's mapping is shown only here: 24 "transaction conflict; running again" warnings, twelve per verb, each a cancelled item's `TransactionConflict` mapped and retried; no `Conflict` answered, no refusal, no error in the log, and the camp's counts back at zero. The gateway's throttle turned away 22 of the 160 calls.
+- **A real race on `heat-sb200`, as a test user:** eight concurrent copies of one recruit and of one retire, ten rounds. DynamoDB Local answered twelve concurrent retires over twenty rounds with no `TransactionConflict`, so the test cancels through an SDK middleware and only this race shows DynamoDB's own: 24 "transaction conflict; running again" warnings, twelve per verb, each a cancelled item's `TransactionConflict` mapped and retried; no `Conflict` answered, no refusal, no error in the log, and the camp's counts back at zero. The gateway's throttle turned away 22 of the 160 calls.
 
 ## Where it is described
 

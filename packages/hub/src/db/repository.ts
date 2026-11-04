@@ -26,6 +26,7 @@ import { type Sighting, sightingOf } from "../seen.js";
 import type { Tables } from "./client.js";
 import { createService, type HeatService } from "./entities.js";
 import { locationKeys, playerKeys } from "./keys.js";
+import type { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
 
 /**
  * The transactions the architecture names, as DynamoDB transactions: start
@@ -123,7 +124,7 @@ export function buildCause(location: string, kind: FacilityKind, level: number):
   return `build-${location}-${kind}-${level}`;
 }
 
-export type HeroStatus = "ALIVE" | "DEAD" | "RETIRED";
+export type HeroStatus = (typeof HERO_STATUSES)[number];
 
 /**
  * A hero's item (overview, "Camps, heroes and resources"). The stat-boost
@@ -177,7 +178,7 @@ export interface AdventureRecord {
   discardedAt?: string;
 }
 
-export type AdventureStatus = "OPEN" | "SETTLED" | "DISCARDED";
+export type AdventureStatus = (typeof ADVENTURE_STATUSES)[number];
 
 /** One hero at settlement: the XP it gained, its totals after, and whether it died. */
 export interface HeroOutcome {
@@ -280,7 +281,8 @@ function throwIfCancelled(
   const i = result.data.findIndex((item) => item.code === "ConditionalCheckFailed");
   const Err = failures[i];
   if (Err) throw new Err(`condition failed on item ${i}`);
-  throw new Error(`transaction cancelled: ${result.data.flatMap((item) => item.code ?? []).join(", ")}`);
+  const reasons = result.data.flatMap((item) => (item.code && item.code !== "None" ? [`${item.code}: ${item.message ?? "no message"}`] : []));
+  throw new Error(`transaction cancelled: ${reasons.join(", ")}`);
 }
 
 /**

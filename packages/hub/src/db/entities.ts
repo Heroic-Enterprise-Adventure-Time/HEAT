@@ -1,9 +1,12 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { Entity, Service } from "electrodb";
+import { Entity, type EntityItem, Service } from "electrodb";
 
 import { MATERIALS, UNIT_TYPES } from "@heat/engine";
 
+import type { Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
+import type { Hero } from "./repository.js";
+import { HERO_STATUSES } from "./statuses.js";
 
 /**
  * The items recruit and retire write, as ElectroDB entities (decision 0041).
@@ -21,6 +24,7 @@ const service = "heat";
 const version = "1";
 
 const playerId = { type: "string", required: true } as const;
+const playerPk = { field: "PK", composite: ["playerId"], template: "PLAYER#${playerId}", casing: "none" } as const;
 const text = { type: "string", required: true } as const;
 const count = { type: "number", required: true } as const;
 
@@ -33,7 +37,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
       attributes: { playerId, location: text, hallLevel: count, warehouseLevel: count, activeHeroes: count, livingHeroes: count },
       indexes: {
         primary: {
-          pk: { field: "PK", composite: ["playerId"], template: "PLAYER#${playerId}", casing: "none" },
+          pk: playerPk,
           sk: { field: "SK", composite: ["location"], template: "AT#${location}#CAMP", casing: "none" },
         },
       },
@@ -54,13 +58,13 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         level: count,
         xp: count,
         picks: { type: "list", items: { type: "string" }, required: true },
-        status: { type: ["ALIVE", "DEAD", "RETIRED"] as const, required: true },
+        status: { type: HERO_STATUSES, required: true },
         retiredAt: { type: "string" },
         adventureId: { type: "string" },
       },
       indexes: {
         primary: {
-          pk: { field: "PK", composite: ["playerId"], template: "PLAYER#${playerId}", casing: "none" },
+          pk: playerPk,
           sk: { field: "SK", composite: ["id"], template: "HERO#${id}", casing: "none" },
         },
       },
@@ -73,7 +77,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
       attributes: { playerId, location: text, material: { type: MATERIALS, required: true }, balance: count },
       indexes: {
         primary: {
-          pk: { field: "PK", composite: ["playerId"], template: "PLAYER#${playerId}", casing: "none" },
+          pk: playerPk,
           sk: { field: "SK", composite: ["location", "material"], template: "AT#${location}#HOLDING#${material}", casing: "none" },
         },
       },
@@ -94,7 +98,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
       },
       indexes: {
         primary: {
-          pk: { field: "PK", composite: ["playerId"], template: "PLAYER#${playerId}", casing: "none" },
+          pk: playerPk,
           sk: { field: "SK", composite: ["cause", "entry"], template: "LEDGER#${cause}#${entry}", casing: "none" },
         },
       },
@@ -127,3 +131,14 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
 }
 
 export type HeatService = ReturnType<typeof createService>;
+
+/**
+ * ElectroDB drops an attribute its entity does not declare, without an error,
+ * so a field added to a type written whole is an error here instead of a field
+ * never stored. `never` is the only thing each line accepts.
+ */
+type NothingUndeclared<Undeclared extends never> = Undeclared;
+export type EntitiesCoverTheirItems = [
+  NothingUndeclared<Exclude<keyof Hero, keyof EntityItem<HeatService["entities"]["hero"]>>>,
+  NothingUndeclared<Exclude<keyof Sighting, keyof EntityItem<HeatService["entities"]["sighting"]>>>,
+];

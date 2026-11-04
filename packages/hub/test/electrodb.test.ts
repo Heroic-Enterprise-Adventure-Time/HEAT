@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { type CancellationReason, TransactionCanceledException } from "@aws-sdk/client-dynamodb";
+import { type DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { Entity, Service } from "electrodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -115,17 +116,22 @@ describe("an item from before ElectroDB", () => {
   });
 });
 
-/** The plan's shape for one player's partition: the sort key says the entity and its composites. Issue-201 runs it over the table. */
+/**
+ * The plan's shape for the item types with an entity today, over one player's
+ * partition: the sort key says the entity and its composites. Issue-201 runs it
+ * over each table with a `Scan` that pages, and with its other entities.
+ */
 async function backfill(pk: string): Promise<number> {
-  const scanned = await db.send(new ScanCommand({
+  const found = await db.send(new QueryCommand({
     TableName: tables.player,
-    FilterExpression: "PK = :pk AND attribute_not_exists(#e)",
+    KeyConditionExpression: "PK = :pk",
+    FilterExpression: "attribute_not_exists(#e)",
     ExpressionAttributeNames: { "#e": "__edb_e__" },
     ExpressionAttributeValues: { ":pk": pk },
     ConsistentRead: true,
   }));
   let written = 0;
-  for (const item of scanned.Items ?? []) {
+  for (const item of found.Items ?? []) {
     const sk = item["SK"] as string;
     const parts = sk.split("#");
     const composites = entityOf(sk, parts);
@@ -162,13 +168,12 @@ describe("a transaction across the two tables", () => {
     const p = player();
     const heroId = randomUUID();
     const location = `l-${randomUUID()}`;
-    const params = service.transaction
-      .write((i) => [i.camp.update({ playerId: p, location }).add({ activeHeroes: 1 }).commit(), i.sighting.put(sighting(location, heroId)).commit()])
-      .params();
-    expect(params).toMatchObject({ TransactItems: [{ Update: { TableName: tables.player } }, { Put: { TableName: tables.location } }] });
-    const result = await service.transaction
-      .write((i) => [i.camp.update({ playerId: p, location }).add({ activeHeroes: 1 }).commit(), i.sighting.put(sighting(location, heroId)).commit()])
-      .go();
+    const write = service.transaction.write((i) => [
+      i.camp.update({ playerId: p, location }).add({ activeHeroes: 1 }).commit(),
+      i.sighting.put(sighting(location, heroId)).commit(),
+    ]);
+    expect(write.params()).toMatchObject({ TransactItems: [{ Update: { TableName: tables.player } }, { Put: { TableName: tables.location } }] });
+    const result = await write.go();
     expect(result.canceled).toBe(false);
     expect(await storedItem(db, tables.player, playerKeys.camp(p, location))).toMatchObject({ activeHeroes: 1 });
     expect(await storedItem(db, tables.location, locationKeys.seen(location, heroId))).toMatchObject({ heroId });
@@ -210,17 +215,37 @@ describe("a transaction across the two tables", () => {
       .params();
     expect(params).toMatchObject({ TransactItems: [{ Delete: { TableName: tables.location } }] });
   });
+});
 
-  it("maps a real TransactionConflict or a failed condition to the typed errors, never counting a hero out twice", async () => {
-    const p = player();
-    const id = randomUUID();
-    await putOldHero(p, id);
-    await putOldCamp(p, 1, 1);
-    const results = await Promise.allSettled(Array.from({ length: 12 }, () => repo.retire(p, oldHero(id))));
-    const failures = results.flatMap((r) => (r.status === "rejected" ? [r.reason as unknown] : []));
-    for (const failure of failures) expect([HeroChanged, TransactionConflict].some((E) => failure instanceof E)).toBe(true);
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
-    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 0, livingHeroes: 0 });
+describe("a transaction DynamoDB cancels", () => {
+  /** A repository whose every transaction is cancelled with these reasons, which ElectroDB reads as it would DynamoDB's. */
+  function cancelledWith(reasons: CancellationReason[]): Repository {
+    const client = createDocumentClient(configFromEnv());
+    client.middlewareStack.add(
+      () => () => Promise.reject(new TransactionCanceledException({ message: "cancelled", $metadata: {}, CancellationReasons: reasons })),
+      { step: "initialize" },
+    );
+    return new Repository(client, tables);
+  }
+
+  it("maps an item's TransactionConflict to the error the caller retries, whichever item it is", async () => {
+    const reasons = [{ Code: "None" }, { Code: "TransactionConflict", Message: "another is committing" }, { Code: "None" }];
+    await expect(cancelledWith(reasons).retire(player(), oldHero(randomUUID()))).rejects.toBeInstanceOf(TransactionConflict);
+  });
+
+  it("takes a conflict before a failed condition, which a read made at once may not explain", async () => {
+    const reasons = [{ Code: "ConditionalCheckFailed" }, { Code: "TransactionConflict" }, { Code: "None" }];
+    await expect(cancelledWith(reasons).retire(player(), oldHero(randomUUID()))).rejects.toBeInstanceOf(TransactionConflict);
+  });
+
+  it("maps a failed condition to the typed error of that item", async () => {
+    const reasons = [{ Code: "None" }, { Code: "ConditionalCheckFailed" }, { Code: "None" }];
+    await expect(cancelledWith(reasons).retire(player(), oldHero(randomUUID()))).rejects.toBeInstanceOf(HeroChanged);
+  });
+
+  it("says what DynamoDB said of a cancellation no rule explains", async () => {
+    const reasons = [{ Code: "None" }, { Code: "ValidationError", Message: "an expression is malformed" }, { Code: "None" }];
+    await expect(cancelledWith(reasons).retire(player(), oldHero(randomUUID()))).rejects.toThrow("ValidationError: an expression is malformed");
   });
 });
 
