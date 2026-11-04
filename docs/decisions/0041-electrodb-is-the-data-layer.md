@@ -1,6 +1,6 @@
 # 0041: ElectroDB is the data layer
 
-- **Status:** Decided; every method moved by Issue-201, whose findings amend the migration plan: see 0042
+- **Status:** Decided; every method moved by Issue-201, whose findings amend the migration plan: see 0042; `ignoreOwnership` off by Issue-213
 - **Date:** 2026-11-03
 - **Settles:** Issue-200: how ElectroDB is adopted, from the library review of 2026-11-03 (row 1), where the owner chose it over dynamodb-toolbox that day. The adoption of the rest is Issue-201.
 

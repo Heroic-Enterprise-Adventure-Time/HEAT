@@ -13,7 +13,7 @@ import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, En
 import { startAdventure } from "../src/start.js";
 import { SETTLE_ATTEMPTS, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { player, storedItem } from "./data.js";
+import { player, storedItem, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -55,15 +55,15 @@ async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): P
     recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
   }));
   for (const hero of heroes) {
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.hero(p, hero.id), ...hero } }));
+    await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
     await db.send(new PutCommand({
       TableName: tables.location,
-      Item: { ...locationKeys.seen(at, hero.id), heroId: hero.id, level: 1, seenAt: "2026-01-01T00:00:00.000Z", expiresAt: 1 },
+      Item: whole("sighting", { ...locationKeys.seen(at, hero.id), heroId: hero.id, level: 1, seenAt: "2026-01-01T00:00:00.000Z", expiresAt: 1 }),
     }));
   }
   await db.send(new PutCommand({
     TableName: tables.player,
-    Item: { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel, activeHeroes: heroes.length, livingHeroes: heroes.length },
+    Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel, activeHeroes: heroes.length, livingHeroes: heroes.length }),
   }));
   return heroes;
 }

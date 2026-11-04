@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 
+import { ITEM_VERSION } from "../src/db/keys.js";
 import { playerKeys } from "./keys.js";
 
 /**
@@ -10,6 +11,9 @@ import { playerKeys } from "./keys.js";
  */
 
 export const player = () => `p-${randomUUID()}`;
+
+/** An item a test puts past the repository, with what ElectroDB finds it by. */
+export const whole = <Item extends object>(entity: string, item: Item) => ({ ...item, __edb_e__: entity, __edb_v__: ITEM_VERSION });
 
 export async function storedItem(db: DynamoDBDocumentClient, table: string, key: { PK: string; SK: string }) {
   return (await db.send(new GetCommand({ TableName: table, Key: key, ConsistentRead: true }))).Item;

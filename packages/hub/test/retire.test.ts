@@ -10,7 +10,7 @@ import { type Hero, HeroChanged, type HeroStatus, Repository, TransactionConflic
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
-import { player } from "./data.js";
+import { player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -35,14 +35,14 @@ async function putCamp(p: string, statuses: HeroStatus[]): Promise<Hero[]> {
     recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status, retiredAt: null, adventureId: null,
   }));
   for (const hero of heroes) {
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.hero(p, hero.id), ...hero } }));
+    await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
   }
   const active = statuses.filter((s) => s !== "RETIRED").length;
   const living = statuses.filter((s) => s === "ALIVE").length;
   await db.send(
     new PutCommand({
       TableName: tables.player,
-      Item: { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: active, livingHeroes: living },
+      Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: active, livingHeroes: living }),
     }),
   );
   return heroes;
