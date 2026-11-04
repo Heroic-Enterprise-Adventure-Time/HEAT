@@ -1,6 +1,6 @@
 # 0026: Camps, heroes and resources, and the camp ahead of the core loop
 
-- **Status:** Decided
+- **Status:** Decided; the keys are written through ElectroDB's templates per 0041
 - **Date:** 2026-10-19
 - **Settles:** Issue-78: how locations and camps relate, recruitment end to end, the keys of the camp and the hero, and where the camp goes in the build order.
 

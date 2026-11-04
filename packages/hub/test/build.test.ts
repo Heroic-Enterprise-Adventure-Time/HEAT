@@ -8,11 +8,11 @@ import type { Material } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { playerKeys } from "../src/db/keys.js";
 import { BuildRefused, campLevels, type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
 import { player } from "./data.js";
+import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 

@@ -12,7 +12,8 @@
 #   push      checks, bundle and client build, cap, plan with the
 #             allow-list, apply, the client published to the stack's
 #             bucket with config.json, the stack test through the stack's
-#             hostname; the URL in the job summary, on the deployment and,
+#             hostname, the backfill of decision 0042 until Issue-213; the
+#             URL in the job summary, on the deployment and,
 #             when the branch has an open pull request, in one comment on
 #             it. The checks run here so that a stack always holds a commit
 #             that typechecks and passes the tests (0017); they also run in
@@ -309,6 +310,14 @@ jobs:
 
       - name: Report the cold start
         run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
+
+      # Items from before ElectroDB made whole, and the count left, on every
+      # apply until Issue-213 removes this step (decision 0042).
+      - name: Backfill ElectroDB's identifiers
+        env:
+          HEAT_PLAYER_TABLE: ${{ env.STACK }}-player
+          HEAT_LOCATION_TABLE: ${{ env.STACK }}-location
+        run: npm run --silent backfill --workspace @heat/hub | tee -a "$GITHUB_STEP_SUMMARY"
 
   # -------------------------------------------------------- pull request --
   comment-url:

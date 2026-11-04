@@ -1,6 +1,6 @@
 # 0041: ElectroDB is the data layer
 
-- **Status:** Decided
+- **Status:** Decided; every method moved by Issue-201, whose findings amend the migration plan: see 0042
 - **Date:** 2026-11-03
 - **Settles:** Issue-200: how ElectroDB is adopted, from the library review of 2026-11-03 (row 1), where the owner chose it over dynamodb-toolbox that day. The adoption of the rest is Issue-201.
 
@@ -82,4 +82,4 @@ All on 2026-11-03.
 
 ## Where it is described
 
-`docs/standards/graphql.md`, rules 17 and 18. `docs/standards/typescript.md`, rule 17. `packages/hub/src/db/entities.ts`, `packages/hub/test/electrodb.test.ts`.
+`docs/standards/graphql.md`, rules 17 and 18. `docs/standards/typescript.md`, rule 17. `packages/hub/src/db/entities.ts`, `packages/hub/test/electrodb.test.ts`. Decision 0042 says what Issue-201 changed.

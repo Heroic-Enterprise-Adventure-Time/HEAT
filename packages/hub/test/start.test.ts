@@ -7,7 +7,6 @@ import { must, UNIT_PROFILES } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { playerKeys } from "../src/db/keys.js";
 import { type AdventureRecord, type Camp, type Hero, type HeroStatus, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { AdventureOpen, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires } from "../src/refusals.js";
@@ -16,6 +15,7 @@ import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
 import { player } from "./data.js";
+import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
