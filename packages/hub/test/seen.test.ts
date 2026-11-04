@@ -144,6 +144,9 @@ describe("sightings written by the flows that change a hero", () => {
       level: 1,
       seenAt: made.recruitedAt,
       expiresAt: recruited + 7 * 24 * 60 * 60,
+      // ElectroDB's identifiers, which say what the item is and nothing of whose (decision 0041).
+      __edb_e__: "sighting",
+      __edb_v__: "1",
     });
     expect(JSON.stringify(r.Item)).not.toContain(p);
   });

@@ -7,7 +7,7 @@ import {
   TransactWriteCommand,
   UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
-import { range } from "es-toolkit";
+import { omit, range } from "es-toolkit";
 
 import {
   type AdventureOutcome,
@@ -24,6 +24,7 @@ import {
 
 import { type Sighting, sightingOf } from "../seen.js";
 import type { Tables } from "./client.js";
+import { createService, type HeatService } from "./entities.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -45,6 +46,9 @@ import { locationKeys, playerKeys } from "./keys.js";
  * location table. Recruit and retire do too, for the hero's sighting at its
  * location (decision 0029). TransactWriteItems spans tables in one account and
  * region, so the split of decision 0023 costs the transactions nothing.
+ *
+ * Recruit and retire go through ElectroDB (entities.ts, decision 0041); the
+ * rest are hand-written expressions until Issue-201.
  */
 
 export class AdventureAlreadyOpen extends Error {}
@@ -254,20 +258,30 @@ function toHero(i: Item): Hero {
 }
 
 /**
- * A hero's item as written: a hero on no adventure has no adventureId
- * attribute at all.
- */
-function heroItem(hero: Hero): Item {
-  const { adventureId, ...rest } = hero;
-  return adventureId === null ? rest : { ...rest, adventureId };
-}
-
-/**
  * True of a hero on no adventure: no adventureId attribute, or a null one,
  * which a hero item written whole with `adventureId: null` would carry.
  * Needs `:string` bound to "S".
  */
 const AT_CAMP = "NOT attribute_type(adventureId, :string)";
+
+/**
+ * What ElectroDB answers for a transaction: `failures` maps the index of a
+ * cancelled item to the error to throw when its condition failed; a conflict
+ * with another transaction throws TransactionConflict for the caller to
+ * retry. As in `transact`, no ClientRequestToken.
+ */
+function throwIfCancelled(
+  result: { canceled: boolean; data: readonly { code?: string | undefined; message?: string | undefined }[] },
+  failures: readonly (new (message: string) => Error)[],
+): void {
+  if (!result.canceled) return;
+  const conflict = result.data.find((item) => item.code === "TransactionConflict");
+  if (conflict) throw new TransactionConflict(conflict.message ?? "conflict");
+  const i = result.data.findIndex((item) => item.code === "ConditionalCheckFailed");
+  const Err = failures[i];
+  if (Err) throw new Err(`condition failed on item ${i}`);
+  throw new Error(`transaction cancelled: ${result.data.flatMap((item) => item.code ?? []).join(", ")}`);
+}
 
 /**
  * Every read but the sightings' is strongly consistent: the hub answers a
@@ -276,10 +290,14 @@ const AT_CAMP = "NOT attribute_type(adventureId, :string)";
  * (graphql.md, rule 9). A sighting is a sample, so a stale one is harmless.
  */
 export class Repository {
+  private readonly service: HeatService;
+
   constructor(
     private readonly db: DynamoDBDocumentClient,
     private readonly tables: Tables,
-  ) {}
+  ) {
+    this.service = createService(db, tables);
+  }
 
   async putPlayer(player: Player): Promise<void> {
     await this.db.send(
@@ -673,61 +691,41 @@ export class Repository {
     cost: Cost,
     living: "none" | "some" | "any",
   ): Promise<Hero> {
-    const values: Record<string, unknown> = { ":one": 1, ":location": camp.location };
-    const conditions = ["hallLevel = :level", "activeHeroes < :cap"];
-    if (living === "none") conditions.push("livingHeroes = :zero");
-    if (living === "some") conditions.push("livingHeroes > :zero");
-    if (camp.stored) {
-      Object.assign(values, { ":level": camp.hallLevel, ":cap": capacity });
-      if (living !== "any") values[":zero"] = 0;
-    }
-    const debits: TransactItems = cost.flatMap(({ material, amount }) => [
-      {
-        Update: {
-          TableName: this.tables.player,
-          Key: playerKeys.holding(playerId, camp.location, material),
-          UpdateExpression: "SET balance = balance - :amount",
-          ConditionExpression: "balance >= :amount",
-          ExpressionAttributeValues: { ":amount": amount },
-        },
-      },
-      {
-        Put: {
-          TableName: this.tables.player,
-          Item: { ...playerKeys.ledger(playerId, hero.id, `debit#${material}`), location: camp.location, material, delta: -amount },
-          ConditionExpression: "attribute_not_exists(PK)",
-        },
-      },
-    ]);
-    await this.transact([
-      {
-        Put: {
-          TableName: this.tables.player,
-          Item: { ...playerKeys.hero(playerId, hero.id), ...heroItem(hero) },
-          ConditionExpression: "attribute_not_exists(PK)",
-        },
-      },
-      {
-        Update: {
-          TableName: this.tables.player,
-          Key: playerKeys.camp(playerId, camp.location),
-          UpdateExpression:
-            "SET #location = :location, hallLevel = if_not_exists(hallLevel, :one), warehouseLevel = if_not_exists(warehouseLevel, :one) ADD activeHeroes :one, livingHeroes :one",
-          // No item is a camp at level 1 with no heroes.
-          ConditionExpression: camp.stored ? conditions.join(" AND ") : "attribute_not_exists(PK)",
-          ExpressionAttributeNames: { "#location": "location" },
-          ExpressionAttributeValues: values,
-        },
-      },
-      ...debits,
-      {
-        Put: {
-          TableName: this.tables.location,
-          Item: { ...locationKeys.seen(hero.location, hero.id), ...sightingOf(hero, new Date(hero.recruitedAt)) },
-        },
-      },
-      // A ledger entry under the hero's id exists only if the hero does, so its failure is a repeat too.
-    ], [HeroExists, RecruitRefused, ...cost.flatMap(() => [InsufficientBalance, HeroExists])]);
+    const { location } = camp;
+    const result = await this.service.transaction
+      .write((items) => [
+        // A hero being recruited is neither retired nor on an adventure, which an absent attribute says.
+        items.hero.create({ ...omit(hero, ["retiredAt", "adventureId"]), playerId }).commit(),
+        items.camp
+          .update({ playerId, location })
+          .data((a, op) => {
+            op.ifNotExists(a.hallLevel, 1);
+            op.ifNotExists(a.warehouseLevel, 1);
+            op.add(a.activeHeroes, 1);
+            op.add(a.livingHeroes, 1);
+          })
+          .where((a, op) => {
+            // No item is a camp at level 1 with no heroes, and every camp item has a hall level.
+            if (!camp.stored) return op.notExists(a.hallLevel);
+            const conditions = [op.eq(a.hallLevel, camp.hallLevel), op.lt(a.activeHeroes, capacity)];
+            if (living === "none") conditions.push(op.eq(a.livingHeroes, 0));
+            if (living === "some") conditions.push(op.gt(a.livingHeroes, 0));
+            return conditions.join(" AND ");
+          })
+          .commit(),
+        ...cost.flatMap(({ material, amount }) => [
+          items.holding
+            .update({ playerId, location, material })
+            .subtract({ balance: amount })
+            .where((a, op) => op.gte(a.balance, amount))
+            .commit(),
+          items.ledger.create({ playerId, cause: hero.id, entry: `debit#${material}`, location, material, delta: -amount }).commit(),
+        ]),
+        items.sighting.put(sightingOf(hero, new Date(hero.recruitedAt))).commit(),
+      ])
+      .go();
+    // A ledger entry under the hero's id exists only if the hero does, so its failure is a repeat too.
+    throwIfCancelled(result, [HeroExists, RecruitRefused, ...cost.flatMap(() => [InsufficientBalance, HeroExists])]);
     return hero;
   }
 
@@ -851,37 +849,25 @@ export class Repository {
    * fails.
    */
   async retire(playerId: string, hero: Hero, now = new Date()): Promise<Hero> {
-    const retired: Hero = { ...hero, status: "RETIRED", retiredAt: now.toISOString() };
+    const retiredAt = now.toISOString();
     const alive = hero.status === "ALIVE";
-    await this.transact([
-      {
-        Update: {
-          TableName: this.tables.player,
-          Key: playerKeys.hero(playerId, hero.id),
-          UpdateExpression: "SET #s = :retired, retiredAt = :at",
-          ConditionExpression: `#s = :was AND #location = :location AND ${AT_CAMP}`,
-          ExpressionAttributeNames: { "#s": "status", "#location": "location" },
-          ExpressionAttributeValues: {
-            ":retired": "RETIRED",
-            ":at": retired.retiredAt,
-            ":was": hero.status,
-            ":location": hero.location,
-            ":string": "S",
-          },
-        },
-      },
-      {
-        Update: {
-          TableName: this.tables.player,
-          Key: playerKeys.camp(playerId, hero.location),
-          UpdateExpression: alive ? "ADD activeHeroes :less, livingHeroes :less" : "ADD activeHeroes :less",
-          ConditionExpression: alive ? "activeHeroes > :zero AND livingHeroes > :zero" : "activeHeroes > :zero",
-          ExpressionAttributeValues: { ":less": -1, ":zero": 0 },
-        },
-      },
-      { Delete: { TableName: this.tables.location, Key: locationKeys.seen(hero.location, hero.id) } },
-    ], [HeroChanged, HeroChanged]);
-    return retired;
+    const result = await this.service.transaction
+      .write((items) => [
+        items.hero
+          .update({ playerId, id: hero.id })
+          .set({ status: "RETIRED", retiredAt })
+          .where((a, op) => `${op.eq(a.status, hero.status)} AND ${op.eq(a.location, hero.location)} AND NOT ${op.type(a.adventureId, "S")}`)
+          .commit(),
+        items.camp
+          .update({ playerId, location: hero.location })
+          .subtract({ activeHeroes: 1, ...(alive ? { livingHeroes: 1 } : {}) })
+          .where((a, op) => (alive ? `${op.gt(a.activeHeroes, 0)} AND ${op.gt(a.livingHeroes, 0)}` : op.gt(a.activeHeroes, 0)))
+          .commit(),
+        items.sighting.delete({ location: hero.location, heroId: hero.id }).commit(),
+      ])
+      .go();
+    throwIfCancelled(result, [HeroChanged, HeroChanged]);
+    return { ...hero, status: "RETIRED", retiredAt };
   }
 
   /**
