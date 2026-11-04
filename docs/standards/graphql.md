@@ -55,7 +55,7 @@ Standards for the API and `packages/hub`, beside `docs/standards/typescript.md`,
 
 ### Personal data
 
-23. **A field holding personal data is never public.** Personal data is what names or reaches a person, an email address above all, and a value that may hold it is treated as holding it, as `Player.name` is, because a profile made before the hub stopped reading the token's email could hold one. Such a field takes `self`, or a later scope that says who may see it, and nothing of the kind is on rule 11's public list. A test asserts that a caller the scope refuses gets none of it. From Issue-170 (decision 0043).
+23. **A field holding personal data is never public.** Personal data is what names or reaches a person, an email address above all, and a field written to hold it stays closed until a decision opens it, as `Player.name`, which was named from the token's email until decision 0043, stays closed until a public name is decided. Such a field takes `self`, or a later scope that says who may see it, and nothing of the kind is on rule 11's public list. A test asserts that a caller the scope refuses gets none of it. From Issue-170 (decision 0043).
 
 ## Held back
 

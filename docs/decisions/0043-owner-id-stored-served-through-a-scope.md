@@ -14,7 +14,7 @@
 
 **The hub stops reading the token's `email` claim** (the owner, 2026-11-04). It reads `sub` and no other claim, and a new profile is named with the player's id. The hub has no use for a person's email, so the way to keep it private is not to hold it. The client's own header goes on showing the email from the browser's token, which never reaches the hub.
 
-**`Player.name` takes `self`, and so becomes nullable** (`graphql.md`, rules 2 and 11). A profile made before this change could hold an email, so the field is treated as personal data whatever a given player's holds. `player(id)` stays public and answers only the id to anyone else. Names already stored are not changed and need no migration: they stay in the player table and are served only to their player. The client selects no `name` from `Player`, so its generated code does not change.
+**`Player.name` takes `self`, and so becomes nullable** (`graphql.md`, rules 2 and 11). No stored profile holds an email (below), so the scope protects none today. It stays because the field was written to hold one, and it is not opened until a public name is decided, and because it also closes the field on the previous route once that is on this code. `player(id)` stays public and answers only the id to anyone else. Names already stored are not changed and need no migration: they stay in the player table and are served only to their player. The client selects no `name` from `Player`, so its generated code does not change.
 
 **`graphql.md` gains rule 23,** a field holding personal data is never public, and rule 11's public list says what each listed field contains. The list had read "`player(id)` with `id` and `name`", which reviewed the field's name and not what was in it.
 
@@ -25,7 +25,7 @@ The rewritten issue says any signed-in caller holding another player's id can re
 - **What a caller could read was real:** on `heat-sb170`, on `main`'s code, `player2` read `player1`'s `name` through `player(id)`, with no error.
 - **The value was the subject, not an email.** The access token has no `email` claim and the ID token does. The client sends the access token (`packages/client/src/app/hub.ts`), and so does the stack test.
 - **An email reached a profile only if an ID token made it.** The authorizer accepts either token, and `joinPlayer` names a profile once, on its first write. On `heat-sb170`, `player1`'s profile, made with the access token, stayed the subject when later read with an ID token. No client or script in the repository's history has sent an ID token.
-- **The stored data agrees.** The owner read the names in `prod` on 2026-11-04: each is the player's GUID, and no email is there. The agent's roles are not allowed those items.
+- **The stored data agrees.** The owner read every `PROFILE` item in `prod` and `dev` on 2026-11-04: each name is the player's GUID, and no email is there. That is the only item that could hold one: `putPlayer` and `joinPlayer`, the only callers that ever used the claim's value, write it and nothing else (`git log -G playerName`). The agent's roles are not allowed those items.
 
 So the gap was latent: a real path, which no player's data had taken. It also shows that a profile's `name` is a copy of its `id`, which is what a public handle will have to replace.
 
@@ -57,7 +57,7 @@ So the gap was latent: a real path, which no player's data had taken. It also sh
 
 **The scope alone, with the claim still read.** The agent's first recommendation, as the smaller change. It would have gone on storing an email for any first call made with an ID token, to protect it afterwards.
 
-**Removing `Player.name`.** It is now a copy of the id, but a profile in an older shape may differ from it, and what a player's name is belongs to the public handle's feature.
+**Removing `Player.name`.** It is now a copy of the id, and removing it would be the tidier contract. What a player's name is belongs to the public handle's feature, which can replace it then.
 
 ## Facts checked
 

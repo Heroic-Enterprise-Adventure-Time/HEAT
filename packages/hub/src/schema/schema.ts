@@ -305,7 +305,7 @@ const PlayerRef = builder.objectRef<Player>("Player").implement({
     id: t.exposeID("id"),
     name: t.exposeString("name", {
       nullable: true,
-      description: "Private: the name the profile was made with, the player's id, or on a profile made before the hub stopped reading the token's email, possibly that email. Null, with an error on this field, for anyone else.",
+      description: "Private: the name the profile was made with, which is the player's id until a public name is decided. Null, with an error on this field, for anyone else.",
       authScopes: (player) => ({ self: player.id }),
     }),
     camps: t.field({
