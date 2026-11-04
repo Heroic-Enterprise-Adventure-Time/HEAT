@@ -1,6 +1,6 @@
 import { signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { render, screen } from '@testing-library/angular';
+import userEvent from '@testing-library/user-event';
 
 import { Game, type PlayerView } from '../game';
 import { Session, type SessionUser } from '../session';
@@ -25,7 +25,7 @@ const player: PlayerView = {
   },
 };
 
-async function render(user: SessionUser | null, loaded: PlayerView | null) {
+async function renderHeader(user: SessionUser | null, loaded: PlayerView | null) {
   const session = {
     user: signal(user),
     signInLabel: 'Sign in with Google',
@@ -41,35 +41,31 @@ async function render(user: SessionUser | null, loaded: PlayerView | null) {
     },
   };
   const game = { player: signal(loaded), location: signal('millbrook') };
-  await TestBed.configureTestingModule({
-    imports: [Header],
+  await render(Header, {
+    routes: [],
     providers: [
-      provideRouter([]),
       { provide: Session, useValue: session },
       { provide: Game, useValue: game },
     ],
-  }).compileComponents();
-  const fixture = TestBed.createComponent(Header);
-  await fixture.whenStable();
-  return { session, page: fixture.nativeElement as HTMLElement };
+  });
+  return { session };
 }
 
 describe('Header', () => {
   it('shows the title and Google sign-in to a visitor', async () => {
-    const { session, page } = await render(null, null);
-    expect(page.querySelector('.title')?.textContent).toBe('HEAT');
-    expect(page.querySelector('select')).toBeNull();
-    page.querySelector('button')?.click();
+    const { session } = await renderHeader(null, null);
+    expect(screen.getByText('HEAT')).toBeTruthy();
+    expect(screen.queryByRole('combobox', { name: 'Camp' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }));
     expect(session.signedIn).toBe(1);
   });
 
   it('shows a signed-in player their camps, a link to the open adventure and sign-out', async () => {
-    const { session, page } = await render({ email: 'player@example.com', name: null, accessToken: 't' }, player);
-    expect([...page.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['Millbrook']);
-    expect(page.querySelector('.adventure')?.textContent).toBe('Adventure in progress');
-    expect(page.querySelector('.adventure')?.getAttribute('href')).toBe('/adventure');
-    expect(page.querySelector('.who')?.textContent).toBe('player@example.com');
-    page.querySelector('button')?.click();
+    const { session } = await renderHeader({ email: 'player@example.com', name: null, accessToken: 't' }, player);
+    expect(screen.getAllByRole('option').map((o) => o.textContent)).toEqual(['Millbrook']);
+    expect(screen.getByRole<HTMLAnchorElement>('link', { name: 'Adventure in progress' }).getAttribute('href')).toBe('/adventure');
+    expect(screen.getByText('player@example.com')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(session.signedOut).toBe(1);
   });
 });
