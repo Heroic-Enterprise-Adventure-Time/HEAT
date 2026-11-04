@@ -11,7 +11,7 @@ import { type Context, createContextFactory } from "./context.js";
 import { configFromEnv, createDocumentClient } from "./db/client.js";
 import { logger, metrics, requestLogging, tracer } from "./observability.js";
 import { schema } from "./schema/schema.js";
-import { S3Timelines } from "./timelines.js";
+import { replayBucketFromEnv, S3Timelines } from "./timelines.js";
 import { outdatedFlag, previousVersionFromEnv, versionFromEnv } from "./version.js";
 
 /**
@@ -28,9 +28,7 @@ const config = configFromEnv();
 const version = versionFromEnv();
 const previousVersion = previousVersionFromEnv();
 const db = createDocumentClient(config, (client) => tracer.captureAWSv3Client(client));
-const replayBucket = process.env["HEAT_REPLAY_BUCKET"];
-if (!replayBucket) throw new Error("HEAT_REPLAY_BUCKET is not set");
-const timelines = new S3Timelines(tracer.captureAWSv3Client(new S3Client({ region: config.region ?? "us-east-1" })), replayBucket);
+const timelines = new S3Timelines(tracer.captureAWSv3Client(new S3Client({ region: config.region ?? "us-east-1" })), replayBucketFromEnv());
 
 export const server = new ApolloServer<Context>({ schema, plugins: [requestLogging(), outdatedFlag()] });
 

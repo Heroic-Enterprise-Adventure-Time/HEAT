@@ -49,6 +49,10 @@ Standards for the API and `packages/hub`, beside `docs/standards/typescript.md`,
 
 21. **The codes the response's `errors` array can carry are listed once, in rule 6.** Another document or a comment that describes the array points at rule 6 and does not repeat the list, because a code added to one copy leaves the others false. From the review of PR-210 (Issue-208), which found it in four other places.
 
+### The environment
+
+22. **A module that reads the environment names its schema, `<Name>Env`, and reads it in an exported `<name>FromEnv(env = process.env)`,** through `parseEnv` (decision 0039), so a test passes the environment it means and does not re-import the module: `DbEnv` and `configFromEnv`, `VersionEnv` and `versionFromEnv`, `ReplayEnv` and `replayBucketFromEnv`. From the review of PR-217 (Issue-206).
+
 ## Held back
 
 - **A snapshot read for a lost race** (Issue-175, 2026-11-02). Rule 9's re-read is separate reads, a `Query` of the camp and a `GetItem` of the hero, and DynamoDB isolates them from a transaction only as read-committed: while the winner's transaction is committing, a read can see some of its items new and others old (the developer guide's "Isolation levels for DynamoDB transactions"). A loser that reads in that window can still answer a refusal for a repeat it lost to; the window is the winner's commit, milliseconds, against the seconds between a request and its repeat. `TransactGetItems` over the items a verb reads closes it, at the cost of a read per verb built from keys rather than the camp's `Query`, and a retry when the read conflicts with a write. Held back as out of proportion while nothing has shown the window; a race that does is the reason to build it.
