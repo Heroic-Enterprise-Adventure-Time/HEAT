@@ -1,44 +1,76 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { Entity, type EntityItem, Service } from "electrodb";
+import { CustomAttributeType, Entity, type EntityItem, Service } from "electrodb";
 
-import { MATERIALS, UNIT_TYPES } from "@heat/engine";
+import { type AdventureSnapshot, FACILITY_KINDS, MATERIALS, UNIT_TYPES } from "@heat/engine";
 
 import type { Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
-import type { Hero } from "./repository.js";
-import { HERO_STATUSES } from "./statuses.js";
+import { ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
+import type { AdventureRecord, Hero, OpenAdventure, Player, SettledResult } from "./repository.js";
+import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
 
 /**
- * The items recruit and retire write, as ElectroDB entities (decision 0041).
- * Each key template reproduces its line in keys.ts exactly, `casing: "none"`
- * because ElectroDB lowercases a key by default; keys.ts stays the statement
- * of the layout until every verb is here (Issue-201).
+ * The items the repository reads and writes, as ElectroDB entities (decision
+ * 0041). Each key template is its line in keys.ts, `casing: "none"` because
+ * ElectroDB lowercases a key by default.
  *
  * ElectroDB writes the composite attributes of a key on the item as well as
  * in it, and its identifiers `__edb_e__` and `__edb_v__`, so a player-table
  * item gains `playerId`. A sighting's composites are its location and hero,
  * so it still holds no owner (decision 0029).
+ *
+ * An attribute an item from before ElectroDB may lack, which the repository
+ * gives a default as it reads it, is not `required`. The type written whole
+ * still names it, so a write still has it.
  */
 
 const service = "heat";
-const version = "1";
+const version = ITEM_VERSION;
 
 const playerId = { type: "string", required: true } as const;
-const playerPk = { field: "PK", composite: ["playerId"], template: "PLAYER#${playerId}", casing: "none" } as const;
+const playerPk = { field: KEY.pk, composite: ["playerId"], template: TEMPLATES.player, casing: "none" } as const;
 const text = { type: "string", required: true } as const;
 const count = { type: "number", required: true } as const;
+const number = { type: "number" } as const;
 
 /** One service over the two tables: each entity names its own, and only a collection insists on one table. */
 export function createService(client: DynamoDBDocumentClient, tables: Tables) {
   const onPlayer = { client, table: tables.player };
+  const onLocation = { client, table: tables.location };
+  const profile = new Entity(
+    {
+      model: { entity: "profile", service, version },
+      attributes: { id: text, name: text },
+      indexes: {
+        primary: {
+          pk: { field: KEY.pk, composite: ["id"], template: TEMPLATES.profilePk, casing: "none" },
+          sk: { field: KEY.sk, composite: [], template: TEMPLATES.profile, casing: "none" },
+        },
+      },
+    },
+    onPlayer,
+  );
   const camp = new Entity(
     {
       model: { entity: "camp", service, version },
-      attributes: { playerId, location: text, hallLevel: count, warehouseLevel: count, activeHeroes: count, livingHeroes: count },
+      attributes: { playerId, location: text, hallLevel: number, warehouseLevel: number, activeHeroes: number, livingHeroes: number },
       indexes: {
         primary: {
           pk: playerPk,
-          sk: { field: "SK", composite: ["location"], template: "AT#${location}#CAMP", casing: "none" },
+          sk: { field: KEY.sk, composite: ["location"], template: TEMPLATES.camp, casing: "none" },
+        },
+      },
+    },
+    onPlayer,
+  );
+  const facility = new Entity(
+    {
+      model: { entity: "facility", service, version },
+      attributes: { playerId, location: text, kind: { type: FACILITY_KINDS, required: true }, level: count },
+      indexes: {
+        primary: {
+          pk: playerPk,
+          sk: { field: KEY.sk, composite: ["location", "kind"], template: TEMPLATES.facility, casing: "none" },
         },
       },
     },
@@ -55,17 +87,17 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         spriteSet: text,
         name: text,
         recruitedAt: text,
-        level: count,
-        xp: count,
-        picks: { type: "list", items: { type: "string" }, required: true },
-        status: { type: HERO_STATUSES, required: true },
+        level: number,
+        xp: number,
+        picks: { type: "list", items: { type: "string" } },
+        status: { type: HERO_STATUSES },
         retiredAt: { type: "string" },
         adventureId: { type: "string" },
       },
       indexes: {
         primary: {
           pk: playerPk,
-          sk: { field: "SK", composite: ["id"], template: "HERO#${id}", casing: "none" },
+          sk: { field: KEY.sk, composite: ["id"], template: TEMPLATES.hero, casing: "none" },
         },
       },
     },
@@ -78,7 +110,20 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
       indexes: {
         primary: {
           pk: playerPk,
-          sk: { field: "SK", composite: ["location", "material"], template: "AT#${location}#HOLDING#${material}", casing: "none" },
+          sk: { field: KEY.sk, composite: ["location", "material"], template: TEMPLATES.holding, casing: "none" },
+        },
+      },
+    },
+    onPlayer,
+  );
+  const open = new Entity(
+    {
+      model: { entity: "open", service, version },
+      attributes: { playerId, adventureId: text, seed: text, startedAt: text },
+      indexes: {
+        primary: {
+          pk: playerPk,
+          sk: { field: KEY.sk, composite: [], template: TEMPLATES.open, casing: "none" },
         },
       },
     },
@@ -94,16 +139,47 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         location: text,
         material: { type: MATERIALS, required: true },
         delta: count,
-        lost: { type: "number" },
+        lost: number,
       },
       indexes: {
         primary: {
           pk: playerPk,
-          sk: { field: "SK", composite: ["cause", "entry"], template: "LEDGER#${cause}#${entry}", casing: "none" },
+          sk: { field: KEY.sk, composite: ["cause", "entry"], template: TEMPLATES.ledger, casing: "none" },
         },
       },
     },
     onPlayer,
+  );
+  /**
+   * The snapshot and the result are stored whole, typed from the engine's and
+   * the settlement's own types: a `map` would state them a second time, and
+   * drops a nested field it does not declare, on a write and on a read.
+   */
+  const adventure = new Entity(
+    {
+      model: { entity: "adventure", service, version },
+      attributes: {
+        adventureId: text,
+        playerId,
+        seed: text,
+        location: text,
+        jobId: text,
+        snapshot: { type: CustomAttributeType<AdventureSnapshot>("any"), required: true },
+        version: text,
+        startedAt: text,
+        status: { type: ADVENTURE_STATUSES, required: true },
+        result: { type: CustomAttributeType<SettledResult>("any") },
+        settledAt: { type: "string" },
+        discardedAt: { type: "string" },
+      },
+      indexes: {
+        primary: {
+          pk: { field: KEY.pk, composite: ["adventureId"], template: TEMPLATES.adventurePk, casing: "none" },
+          sk: { field: KEY.sk, composite: [], template: TEMPLATES.adventure, casing: "none" },
+        },
+      },
+    },
+    onLocation,
   );
   const sighting = new Entity(
     {
@@ -114,20 +190,20 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         name: text,
         unitType: { type: UNIT_TYPES, required: true },
         spriteSet: text,
-        level: count,
+        level: number,
         seenAt: text,
         expiresAt: count,
       },
       indexes: {
         primary: {
-          pk: { field: "PK", composite: ["location"], template: "LOCATION#${location}", casing: "none" },
-          sk: { field: "SK", composite: ["heroId"], template: "SEEN#${heroId}", casing: "none" },
+          pk: { field: KEY.pk, composite: ["location"], template: TEMPLATES.locationPk, casing: "none" },
+          sk: { field: KEY.sk, composite: ["heroId"], template: TEMPLATES.sighting, casing: "none" },
         },
       },
     },
-    { client, table: tables.location },
+    onLocation,
   );
-  return new Service({ camp, hero, holding, ledger, sighting }, { client });
+  return new Service({ adventure, camp, facility, hero, holding, ledger, open, profile, sighting }, { client });
 }
 
 export type HeatService = ReturnType<typeof createService>;
@@ -139,6 +215,9 @@ export type HeatService = ReturnType<typeof createService>;
  */
 type NothingUndeclared<Undeclared extends never> = Undeclared;
 export type EntitiesCoverTheirItems = [
+  NothingUndeclared<Exclude<keyof AdventureRecord, keyof EntityItem<HeatService["entities"]["adventure"]>>>,
   NothingUndeclared<Exclude<keyof Hero, keyof EntityItem<HeatService["entities"]["hero"]>>>,
+  NothingUndeclared<Exclude<keyof OpenAdventure, keyof EntityItem<HeatService["entities"]["open"]>>>,
+  NothingUndeclared<Exclude<keyof Player, keyof EntityItem<HeatService["entities"]["profile"]>>>,
   NothingUndeclared<Exclude<keyof Sighting, keyof EntityItem<HeatService["entities"]["sighting"]>>>,
 ];

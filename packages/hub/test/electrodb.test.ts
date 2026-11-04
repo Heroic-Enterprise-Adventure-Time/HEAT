@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { type CancellationReason, TransactionCanceledException } from "@aws-sdk/client-dynamodb";
-import { type DynamoDBDocumentClient, PutCommand, QueryCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { Entity, Service } from "electrodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -9,15 +9,15 @@ import { must } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
-import { locationKeys, playerKeys } from "../src/db/keys.js";
 import { type Hero, HeroChanged, Repository, TransactionConflict } from "../src/db/repository.js";
 import { player, storedItem } from "./data.js";
+import { locationKeys, playerKeys } from "./keys.js";
 
 /**
  * What decision 0041 rests on, against DynamoDB Local: how ElectroDB meets
  * items the hand-written repository wrote, the transaction across the two
- * tables, and the reads Issue-201 moves. The items here are written as that
- * code wrote them, without identifiers or the keys' composite attributes.
+ * tables, and the reads the repository makes. The old items here are written as
+ * that code wrote them, without identifiers or the keys' composite attributes.
  */
 
 let db: DynamoDBDocumentClient;
@@ -82,7 +82,7 @@ describe("an item from before ElectroDB", () => {
     expect((await service.entities.hero.get({ playerId: p, id }).go({ consistent: true })).data).toMatchObject({ id, playerId: p });
   });
 
-  it("is read by the old mappers once ElectroDB has written it, so the previous route still works", async () => {
+  it("is read back as it was once ElectroDB has written it", async () => {
     const p = player();
     const id = randomUUID();
     await putOldHero(p, id);
@@ -92,72 +92,65 @@ describe("an item from before ElectroDB", () => {
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 0, livingHeroes: 0, stored: true });
   });
 
-  it("is made whole by the backfill of decision 0041, once, leaving what no entity owns", async () => {
+  it("reads back whole through every read of the repository", async () => {
     const p = player();
     const id = randomUUID();
+    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.profile(p), id: p, name: "Old" } }));
     await putOldHero(p, id);
     await putOldCamp(p, 1, 1);
     await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.holding(p, at, "timber"), material: "timber", balance: 5 } }));
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.ledger(p, id, "debit#timber"), location: at, material: "timber", delta: -5 } }));
-    // The spike's holding, no longer read (decision 0026), which no entity's key matches.
-    const spike = { PK: `PLAYER#${p}`, SK: "HOLDING#timber" };
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...spike, material: "timber", balance: 9 } }));
+    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.facility(p, at, "mine"), location: at, kind: "mine", level: 2 } }));
+    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.open(p), adventureId: "a", seed: "s", startedAt: "2026-10-21T12:00:00.000Z" } }));
+    // A hero from before the attributes it now always has, which the repository defaults.
+    const bare = randomUUID();
+    await db.send(new PutCommand({
+      TableName: tables.player,
+      Item: { ...playerKeys.hero(p, bare), id: bare, location: at, unitType: "villager", spriteSet: "villager-01", name: "Bare", recruitedAt: "2026-10-21T12:00:00.000Z" },
+    }));
 
-    const backfilled = await backfill(`PLAYER#${p}`);
-    expect(backfilled).toBe(4);
-    expect(await backfill(`PLAYER#${p}`)).toBe(0);
+    expect(await repo.getPlayer(p)).toEqual({ id: p, name: "Old" });
+    expect(await repo.joinPlayer({ id: p, name: "New" })).toEqual({ id: p, name: "Old" });
+    expect(await repo.camp(p, at)).toEqual({
+      location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: 1, livingHeroes: 1, stored: true,
+      holdings: [{ material: "timber", balance: 5 }], facilities: { mine: 2 },
+    });
+    expect(await repo.openAdventure(p)).toEqual({ adventureId: "a", seed: "s", startedAt: "2026-10-21T12:00:00.000Z" });
+    expect(await repo.getHero(p, id)).toEqual(oldHero(id));
+    expect(await repo.getHero(p, bare)).toEqual({ ...oldHero(bare), name: "Bare" });
+    expect((await repo.heroes(p)).map((h) => h.id).sort()).toEqual([id, bare].sort());
+  });
 
-    const { hero, camp, holding, ledger } = service.entities;
-    expect((await hero.get({ playerId: p, id }).go({ consistent: true })).data).toMatchObject({ id, playerId: p });
-    expect((await camp.get({ playerId: p, location: at }).go({ consistent: true })).data).toMatchObject({ playerId: p, activeHeroes: 1 });
-    expect((await holding.get({ playerId: p, location: at, material: "timber" }).go({ consistent: true })).data).toMatchObject({ location: at, balance: 5 });
-    expect((await ledger.get({ playerId: p, cause: id, entry: "debit#timber" }).go({ consistent: true })).data).toMatchObject({ cause: id, delta: -5 });
-    expect(await storedItem(db, tables.player, spike)).toEqual({ ...spike, material: "timber", balance: 9 });
+  it("reads a settled adventure back whole, nested fields no entity declares included", async () => {
+    const adventureId = randomUUID();
+    const snapshot = { version: "v", jobId: "sticks", heroes: [{ heroId: "h", name: "Old", notDeclared: { deep: [1, null] } }] };
+    const result = { outcome: "won", endedAtMs: 12, reachedStage: 0, stages: [{ stage: 0, kind: "battle", ended: "cleared", startedAtMs: 0, endedAtMs: 12 }], rewards: [{ material: "timber", amount: 3 }], credited: [], lost: [], heroes: [] };
+    const record = {
+      adventureId, playerId: "p", seed: "s", location: at, jobId: "sticks", snapshot, version: "v", startedAt: "2026-10-21T12:00:00.000Z",
+      status: "SETTLED", result, settledAt: "2026-10-21T12:01:00.000Z",
+    };
+    await db.send(new PutCommand({ TableName: tables.location, Item: { ...locationKeys.adventure(adventureId), ...record } }));
+    expect(await repo.getAdventure(adventureId)).toEqual(record);
+  });
+
+  it("reads a record from before Issue-113, which has no snapshot, as it is", async () => {
+    const adventureId = randomUUID();
+    const record = { adventureId, playerId: "p", seed: "s", startedAt: "2026-10-01T12:00:00.000Z", status: "OPEN" };
+    await db.send(new PutCommand({ TableName: tables.location, Item: { ...locationKeys.adventure(adventureId), ...record } }));
+    expect(await repo.getAdventure(adventureId)).toEqual(record);
+  });
+
+  it("is settled and discarded by conditions that read it as the old code wrote it", async () => {
+    const p = player();
+    const adventureId = randomUUID();
+    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.open(p), adventureId, seed: "s", startedAt: "2026-10-21T12:00:00.000Z" } }));
+    const record = { adventureId, playerId: p, seed: "s", location: at, jobId: "sticks", snapshot: { version: "v", jobId: "sticks", heroes: [] }, version: "v", startedAt: "2026-10-21T12:00:00.000Z", status: "OPEN" } as const;
+    await db.send(new PutCommand({ TableName: tables.location, Item: { ...locationKeys.adventure(adventureId), ...record } }));
+    await repo.discard(p, record, new Date("2026-10-21T12:02:00.000Z"));
+    expect(await repo.openAdventure(p)).toBeUndefined();
+    expect(await repo.getAdventure(adventureId)).toEqual({ ...record, status: "DISCARDED", discardedAt: "2026-10-21T12:02:00.000Z" });
+    expect(await storedItem(db, tables.location, locationKeys.adventure(adventureId))).toMatchObject({ __edb_e__: "adventure", __edb_v__: "1" });
   });
 });
-
-/**
- * The plan's shape for the item types with an entity today, over one player's
- * partition: the sort key says the entity and its composites. Issue-201 runs it
- * over each table with a `Scan` that pages, and with its other entities.
- */
-async function backfill(pk: string): Promise<number> {
-  const found = await db.send(new QueryCommand({
-    TableName: tables.player,
-    KeyConditionExpression: "PK = :pk",
-    FilterExpression: "attribute_not_exists(#e)",
-    ExpressionAttributeNames: { "#e": "__edb_e__" },
-    ExpressionAttributeValues: { ":pk": pk },
-    ConsistentRead: true,
-  }));
-  let written = 0;
-  for (const item of found.Items ?? []) {
-    const sk = item["SK"] as string;
-    const parts = sk.split("#");
-    const composites = entityOf(sk, parts);
-    if (!composites) continue;
-    const attributes = { playerId: pk.slice("PLAYER#".length), ...composites.attributes };
-    const names = Object.keys(attributes);
-    await db.send(new UpdateCommand({
-      TableName: tables.player,
-      Key: { PK: pk, SK: sk },
-      UpdateExpression: `SET #e = :e, #v = :v, ${names.map((_, n) => `#a${n} = :a${n}`).join(", ")}`,
-      ConditionExpression: "attribute_not_exists(#e)",
-      ExpressionAttributeNames: { "#e": "__edb_e__", "#v": "__edb_v__", ...Object.fromEntries(names.map((name, n) => [`#a${n}`, name])) },
-      ExpressionAttributeValues: { ":e": composites.entity, ":v": "1", ...Object.fromEntries(Object.values(attributes).map((value, n) => [`:a${n}`, value])) },
-    }));
-    written++;
-  }
-  return written;
-}
-
-function entityOf(sk: string, [kind = "", first = "", second = "", third = ""]: string[]): { entity: string; attributes: Record<string, string> } | undefined {
-  if (kind === "HERO") return { entity: "hero", attributes: { id: first } };
-  if (kind === "LEDGER") return { entity: "ledger", attributes: { cause: first, entry: sk.slice(`LEDGER#${first}#`.length) } };
-  if (kind === "AT" && second === "CAMP") return { entity: "camp", attributes: { location: first } };
-  if (kind === "AT" && second === "HOLDING") return { entity: "holding", attributes: { location: first, material: third } };
-  return undefined;
-}
 
 describe("a transaction across the two tables", () => {
   const sighting = (location: string, heroId: string) => ({
@@ -249,7 +242,7 @@ describe("a transaction DynamoDB cancels", () => {
   });
 });
 
-describe("the reads Issue-201 moves", () => {
+describe("the reads of decision 0041", () => {
   it("reads strongly by the option, as graphql.md rule 9 asks", () => {
     const p = player();
     expect(service.entities.hero.get({ playerId: p, id: "h" }).params({ consistent: true })).toMatchObject({ ConsistentRead: true });
@@ -302,6 +295,18 @@ describe("the reads Issue-201 moves", () => {
     expect(holding.parse({ Items: items }, { ignoreOwnership: true }).data).toMatchObject([{ material: "timber", balance: 5 }]);
   });
 
+  it("reads the camps past a page, which a raw read does not do by itself", async () => {
+    const p = player();
+    const locations = ["a", "b", "c", "d"];
+    const padding = "x".repeat(350_000);
+    for (const location of locations) {
+      await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.camp(p, location), location, hallLevel: 1, padding } }));
+    }
+    const first = await service.entities.camp.query.primary({ playerId: p }).go({ consistent: true, pages: "all", ignoreOwnership: true, data: "raw" });
+    expect(first.data).toHaveProperty("LastEvaluatedKey");
+    expect((await repo.camps(p)).filter((c) => c.stored).map((c) => c.location).sort()).toEqual(locations);
+  });
+
   it("reads a sightings window as the repository does, with the limit before the filter", async () => {
     const location = `l-${randomUUID()}`;
     const now = new Date("2026-11-03T12:00:00.000Z");
@@ -313,17 +318,18 @@ describe("the reads Issue-201 moves", () => {
         Item: { ...locationKeys.seen(location, heroId), heroId, location, name: "Seen", unitType: "villager", spriteSet: "villager-01", level: 1, seenAt: now.toISOString(), expiresAt },
       }));
     }
-    // A hero id is hex, so `g` stands above every one, where the repository writes `SEEN$`.
+    // A hero id is hex, so `g` stands above every one.
     const from = service.entities.sighting.query.primary({ location }).between({ heroId: "a" }, { heroId: "g" }).where((a, op) => op.gt(a.expiresAt, seconds));
-    const hand = await repo.sightings(location, { from: "a" }, 3, now);
-    expect(hand.read).toBe(3);
+    const read = await repo.sightings(location, { from: "a" }, 3, now);
+    expect(read.read).toBe(3);
+    expect(read.sightings.map((s) => s.heroId)).toEqual(["b0"]);
 
     // `limit` is DynamoDB's Limit; the identifiers' filter is off, and `go` keeps no ScannedCount, so the count needs `raw`.
     expect(from.params({ limit: 3, ignoreOwnership: true })).toMatchObject({ Limit: 3, FilterExpression: "#expiresAt > :expiresAt0" });
     const limited = await from.go({ limit: 3, ignoreOwnership: true });
-    expect(limited.data.map((s) => s.heroId)).toEqual(hand.sightings.map((s) => s.heroId));
+    expect(limited.data.map((s) => s.heroId)).toEqual(read.sightings.map((s) => s.heroId));
     const rawRead = await from.go({ limit: 3, ignoreOwnership: true, data: "raw" });
-    expect((rawRead.data as unknown as { ScannedCount: number }).ScannedCount).toBe(hand.read);
+    expect((rawRead.data as unknown as { ScannedCount: number }).ScannedCount).toBe(read.read);
 
     // `count` goes on reading until it has that many, which is not the bound decision 0029 needs.
     const counted = await from.go({ count: 3, ignoreOwnership: true });

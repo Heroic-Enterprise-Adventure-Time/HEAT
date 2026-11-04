@@ -310,6 +310,14 @@ jobs:
       - name: Report the cold start
         run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
 
+      # Items from before ElectroDB made whole, and the count left, on every
+      # apply until Issue-213 removes this step (decision 0041).
+      - name: Backfill ElectroDB's identifiers
+        env:
+          HEAT_PLAYER_TABLE: ${{ env.STACK }}-player
+          HEAT_LOCATION_TABLE: ${{ env.STACK }}-location
+        run: npm run --silent backfill --workspace @heat/hub | tee -a "$GITHUB_STEP_SUMMARY"
+
   # -------------------------------------------------------- pull request --
   comment-url:
     name: Comment the stack's URL on the pull request

@@ -6,7 +6,6 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type UnitType, warehouseCapacity } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { locationKeys, playerKeys } from "../src/db/keys.js";
 import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
 import { logger } from "../src/observability.js";
@@ -15,6 +14,7 @@ import { startAdventure } from "../src/start.js";
 import { SETTLE_ATTEMPTS, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
 import { player, storedItem } from "./data.js";
+import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 

@@ -6,12 +6,12 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { must } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { playerKeys } from "../src/db/keys.js";
 import { type Hero, HeroChanged, type HeroStatus, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
 import { player } from "./data.js";
+import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
