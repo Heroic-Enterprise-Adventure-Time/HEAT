@@ -305,7 +305,7 @@ const PlayerRef = builder.objectRef<Player>("Player").implement({
     id: t.exposeID("id"),
     name: t.exposeString("name", {
       nullable: true,
-      description: "Private: the email in the token that made the profile, or the player's id where that token held none. Null, with an error on this field, for anyone else.",
+      description: "Private: the name the profile was made with, the player's id, or on a profile made before the hub stopped reading the token's email, possibly that email. Null, with an error on this field, for anyone else.",
       authScopes: (player) => ({ self: player.id }),
     }),
     camps: t.field({
@@ -609,9 +609,9 @@ builder.mutationFields((t) => ({
     type: PlayerRef,
     nullable: true,
     authScopes: { authenticated: true },
-    description: "Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.",
+    description: "Makes the signed-in player's profile if they have none, named with their id, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.",
     errors: answers("JoinGame", { field: "player", what: "the player's profile, made or found" }, []),
-    resolve: (_root, _args, ctx) => ctx.repo.joinPlayer({ id: callerId(ctx), name: ctx.playerName ?? callerId(ctx) }),
+    resolve: (_root, _args, ctx) => ctx.repo.joinPlayer({ id: callerId(ctx), name: callerId(ctx) }),
   }),
   recruitHero: t.field({
     type: HeroRef,

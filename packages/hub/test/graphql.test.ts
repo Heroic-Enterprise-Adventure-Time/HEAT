@@ -171,12 +171,19 @@ describe("first sign-in", () => {
 
     const joined = await gql(JOIN, {}, p);
     expect(joined.errors).toBeUndefined();
-    // No email claim in the synthesized token, so the name falls back to the subject.
     expect(joined.data?.joinGame.player).toEqual({ id: p, name: p });
 
     await repo.putPlayer({ id: p, name: "Renamed in the table" });
     const again = await gql(JOIN, {}, p);
     expect(again.data?.joinGame.player?.name).toBe("Renamed in the table");
+  });
+
+  it("stores nothing of a token's email, which an ID token carries (decision 0043)", async () => {
+    const p = `p-${randomUUID()}`;
+    const withEmail = event(JOIN, {}, p);
+    withEmail.requestContext.authorizer.jwt.claims["email"] = "player@example.com";
+    await handler(withEmail, {} as LambdaContext);
+    expect(await repo.getPlayer(p)).toEqual({ id: p, name: p });
   });
 });
 

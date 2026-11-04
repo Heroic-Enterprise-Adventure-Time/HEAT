@@ -16,8 +16,6 @@ import { VERSION_HEADER } from "./version.js";
  */
 export interface Context {
   playerId: string | undefined;
-  /** The name a profile is created with when the player has none: the token's email, else the subject. */
-  playerName: string | undefined;
   repo: Repository;
   /** The deploy's version, HEAT_VERSION (decision 0030). */
   version: string;
@@ -44,22 +42,15 @@ export function callerId(ctx: Context): string {
   return ctx.playerId;
 }
 
-export interface Identity {
-  playerId: string;
-  playerName: string;
-}
-
 /** The event as the HTTP API sends it when a route has a JWT authorizer, which every route here has; the integration types it without one, and a synthesized test event may have none. */
 interface MaybeAuthorized {
   requestContext?: { authorizer?: { jwt?: { claims?: Record<string, unknown> } } };
 }
 
-export function identityFromEvent(event: APIGatewayProxyEventV2): Identity | undefined {
-  const claims = (event as MaybeAuthorized).requestContext?.authorizer?.jwt?.claims ?? {};
-  const sub = claims["sub"];
-  if (typeof sub !== "string" || sub.length === 0) return undefined;
-  const email = claims["email"];
-  return { playerId: sub, playerName: typeof email === "string" && email.length > 0 ? email : sub };
+/** The token's subject, the one claim the hub reads (graphql.md, rule 12). */
+export function playerIdFromEvent(event: APIGatewayProxyEventV2): string | undefined {
+  const sub = (event as MaybeAuthorized).requestContext?.authorizer?.jwt?.claims?.["sub"];
+  return typeof sub === "string" && sub.length > 0 ? sub : undefined;
 }
 
 export interface Versions {
@@ -72,9 +63,8 @@ export function createContextFactory(db: DynamoDBDocumentClient, tables: Tables,
   const { version, previousVersion } = versions;
   // Apollo's context function returns a promise; nothing here waits.
   return ({ event }: { event: APIGatewayProxyEventV2 }): Promise<Context> => {
-    const identity = identityFromEvent(event);
     // Payload 2.0 lower-cases header names.
     const clientVersion = event.headers[VERSION_HEADER];
-    return Promise.resolve({ playerId: identity?.playerId, playerName: identity?.playerName, repo, version, previousVersion, timelines, clientVersion });
+    return Promise.resolve({ playerId: playerIdFromEvent(event), repo, version, previousVersion, timelines, clientVersion });
   };
 }
