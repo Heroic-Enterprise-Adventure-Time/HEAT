@@ -12,6 +12,7 @@ import { playerKeys } from "../src/db/keys.js";
 import { BuildRefused, campLevels, type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
+import { player } from "./data.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
@@ -27,7 +28,6 @@ beforeAll(() => {
 });
 
 const at = "millbrook";
-const player = () => `p-${randomUUID()}`;
 
 /** Puts stock into the camp directly, as settlement would credit it. */
 async function stock(p: string, holdings: Partial<Record<Material, number>>) {

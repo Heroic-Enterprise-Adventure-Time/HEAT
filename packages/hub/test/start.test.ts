@@ -15,6 +15,7 @@ import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { player } from "./data.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
@@ -38,7 +39,6 @@ beforeAll(() => {
 const at = "millbrook";
 const wolves = "wolves-on-the-mill-road";
 const version = "fedcba9876543210fedcba9876543210fedcba98";
-const player = () => `p-${randomUUID()}`;
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths leave them. */
 async function putHeroes(p: string, statuses: HeroStatus[], location = at): Promise<Hero[]> {

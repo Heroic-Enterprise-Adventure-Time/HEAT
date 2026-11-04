@@ -11,6 +11,7 @@ import { type Hero, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { heroesSeenAt, type Random, SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, sightingOf } from "../src/seen.js";
+import { player } from "./data.js";
 
 /**
  * The heroes seen at a location (decision 0029): recruit writes a sighting
@@ -35,7 +36,6 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const player = () => `p-${randomUUID()}`;
 /** Each test its own location, so other tests' sightings never land in its sample. */
 const place = () => `test-${randomUUID()}`;
 
@@ -144,6 +144,9 @@ describe("sightings written by the flows that change a hero", () => {
       level: 1,
       seenAt: made.recruitedAt,
       expiresAt: recruited + 7 * 24 * 60 * 60,
+      // ElectroDB's identifiers, which say what the item is and nothing of whose (decision 0041).
+      __edb_e__: "sighting",
+      __edb_v__: "1",
     });
     expect(JSON.stringify(r.Item)).not.toContain(p);
   });

@@ -67,12 +67,16 @@ export const MAX_ABILITY_ID = 64;
 export const SETTLE_ATTEMPTS = 3;
 
 /** One entry of the submitted log, as the graph takes it: flat, checked here into the engine's union. */
+/** The log's two closed sets on the wire, which the API's enums read (typescript.md, rule 18). */
+export const OVERRIDE_KINDS = ["UNIT", "PARTY"] as const;
+export const PARTY_ORDERS = ["PRESS_ON", "RETREAT"] as const;
+
 export interface OverrideInput {
-  kind: "UNIT" | "PARTY";
+  kind: (typeof OVERRIDE_KINDS)[number];
   acceptedAtSimTime: number;
   unitId?: string | null | undefined;
   abilityId?: string | null | undefined;
-  order?: "PRESS_ON" | "RETREAT" | null | undefined;
+  order?: (typeof PARTY_ORDERS)[number] | null | undefined;
 }
 
 /** The caller's adventure, or BAD_USER_INPUT: another player's is not said to exist. */

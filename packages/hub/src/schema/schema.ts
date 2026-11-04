@@ -26,6 +26,7 @@ import {
 import { buildFacility } from "../build.js";
 import { callerId } from "../context.js";
 import { type AdventureRecord, type Camp, campLevels, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
+import { ADVENTURE_STATUSES, HERO_STATUSES } from "../db/statuses.js";
 import { discardAdventure } from "../discard.js";
 import { recruitHero } from "../recruit.js";
 import {
@@ -50,7 +51,7 @@ import {
 import { retireHero } from "../retire.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
 import { startAdventure } from "../start.js";
-import { MAX_ABILITY_ID, MAX_OVERRIDES, type OverrideInput, submitAdventure } from "../submit.js";
+import { MAX_ABILITY_ID, MAX_OVERRIDES, OVERRIDE_KINDS, type OverrideInput, PARTY_ORDERS, submitAdventure } from "../submit.js";
 import { builder } from "./builder.js";
 
 /**
@@ -90,12 +91,12 @@ const StageEndingRef = enumOf("StageEnding", "How a stage ended, the engine's `S
 
 const HeroStatusRef = builder.enumType("HeroStatus", {
   description: "Alive or dead at the camp, or retired for good.",
-  values: ["ALIVE", "DEAD", "RETIRED"] as const,
+  values: HERO_STATUSES,
 });
 
 const AdventureStatusRef = builder.enumType("AdventureStatus", {
   description: "Open while the player plays it; settled once the hub verified it and paid out; discarded when no deploy could verify it any more.",
-  values: ["OPEN", "SETTLED", "DISCARDED"] as const,
+  values: ADVENTURE_STATUSES,
 });
 
 // --- Object types. ---
@@ -463,7 +464,7 @@ const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implem
     kind: t.field({
       type: builder.enumType("OverrideKind", {
         description: "What a log entry is: a hero's forced action, or an order to the whole party.",
-        values: ["UNIT", "PARTY"] as const,
+        values: OVERRIDE_KINDS,
       }),
       required: true,
     }),
@@ -476,7 +477,7 @@ const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implem
     order: t.field({
       type: builder.enumType("PartyOrder", {
         description: "The orders a party takes: press on into the next stage, or retreat home.",
-        values: ["PRESS_ON", "RETREAT"] as const,
+        values: PARTY_ORDERS,
       }),
       description: "The order, for a PARTY entry.",
     }),

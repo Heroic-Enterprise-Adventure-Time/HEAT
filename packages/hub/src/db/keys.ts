@@ -2,7 +2,8 @@
  * The key layout of the two tables (decision 0023). Terraform owns the real
  * tables; the tests create identical ones in test/setup/table.ts. Both use
  * generic key names, PK and SK, so that an item type is a sort-key prefix
- * and a new type is a new prefix, never a table change.
+ * and a new type is a new prefix, never a table change. The entities' key
+ * templates in entities.ts reproduce this layout (decision 0041).
  *
  * The player table, partitioned by player. Everything the owner asks for is
  * one item collection, read in one Query. Private: read only through the
