@@ -12,9 +12,9 @@
 # release.yml (Issue-41). A row with code (dev) bundles the
 # functions before planning, because the root hashes the bundle, and after
 # the apply publishes the client build with config.json, creates the test
-# users, runs the smoke test through the environment's hostname and reads the
-# cold start, as sandbox.yml does for a per-issue stack; sandbox-base has no
-# code and skips those steps.
+# users, runs the smoke test through the environment's hostname, reads the
+# cold start and runs the browser test (decision 0045), as sandbox.yml does for
+# a per-issue stack; sandbox-base has no code and skips those steps.
 #
 # Why pull_request_target and not pull_request: the pull request's plan must
 # run under the root's environment to see its real values, and the
@@ -364,6 +364,7 @@ jobs:
           set -eu
           zone_name="$(terraform -chdir="terraform/environment/$ROOT" output -raw zone_name)"
           echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
+          echo "username=e2e@$zone_name" >> "$GITHUB_OUTPUT"
           node scripts/e2e.mjs --stack "$STACK" --username "e2e@$zone_name" | tee -a "$RUNNER_TEMP/e2e.log"
 
       # Its own step, so the log reaches the run's page when the test fails,
@@ -373,6 +374,8 @@ jobs:
         run: |
           {
             echo
+            echo '### Stack test, through the API'
+            echo
             echo '```text'
             cat "$RUNNER_TEMP/e2e.log"
             echo '```'
@@ -381,3 +384,11 @@ jobs:
       - name: Report the cold start
         if: matrix.code
         run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
+
+      # The browser test (decision 0045), one copy with sandbox.yml's.
+      - name: Use the page in a browser as that user
+        if: matrix.code
+        uses: ./.github/actions/browser-test
+        with:
+          stack: ${{ env.STACK }}
+          username: ${{ steps.e2e.outputs.username }}

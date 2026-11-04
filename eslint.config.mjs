@@ -7,6 +7,7 @@ import js from '@eslint/js';
 import graphql from '@graphql-eslint/eslint-plugin';
 import angular from 'angular-eslint';
 import perfectionist from 'eslint-plugin-perfectionist';
+import playwright from 'eslint-plugin-playwright';
 import testingLibrary from 'eslint-plugin-testing-library';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -154,6 +155,21 @@ export default tseslint.config(
       'no-restricted-imports': ['error', { paths: [...testingImports, testBedImport] }],
     },
   },
+  // The browser test: Playwright's own rules, and `no-raw-locators`, which is in
+  // none of the plugin's presets and says what docs/standards/angular.md, rule
+  // 18, says: by role and label, no CSS.
+  {
+    files: ['packages/client/e2e/**/*.ts'],
+    extends: [playwright.configs['flat/recommended']],
+    rules: {
+      'playwright/no-raw-locators': 'error',
+      // A test's assertions are in the helper every signed-in test ends with.
+      'playwright/expect-expect': ['warn', { assertFunctionNames: ['playAndLeave'] }],
+      // The one skip says which stacks have no form, from their own config.json.
+      'playwright/no-skipped-test': ['warn', { allowConditional: true }],
+    },
+  },
+
   // A service has nothing to render, so its spec injects it through TestBed,
   // which Testing Library has no replacement for.
   {

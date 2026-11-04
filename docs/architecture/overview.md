@@ -69,12 +69,12 @@ sequenceDiagram
 ```mermaid
 flowchart TB
   subgraph branch["A working branch"]
-    push["Push"] --> sandbox["Sandbox stacks: checks, bundle, the cap, plan, the allow-list, apply the branch's stack, publish the client, the stack test at its hostname"]
+    push["Push"] --> sandbox["Sandbox stacks: checks, bundle, the cap, plan, the allow-list, apply the branch's stack, publish the client, the stack test at its hostname, the browser test"]
     pr["Pull request to main"] --> ci["Build and test: typecheck, lint, tests, schema currency, bundle, Terraform format, validate, tflint and trivy"]
     pr --> devplan["Deploy: the dev plan under the plan role, posted on the pull request"]
   end
   subgraph mainb["main"]
-    merge["Merge to main"] --> dev["Deploy: plan, the allow-list, apply dev under the apply role, publish the client, the smoke test"]
+    merge["Merge to main"] --> dev["Deploy: plan, the allow-list, apply dev under the apply role, publish the client, the smoke test, the browser test"]
     rpr["Pull request main to release"] --> guard["Release: the source guard, the prod plan posted on the pull request"]
   end
   subgraph releaseb["release"]

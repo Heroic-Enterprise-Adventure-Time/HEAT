@@ -12,7 +12,8 @@
 #   push      checks, bundle and client build, cap, plan with the
 #             allow-list, apply, the client published to the stack's
 #             bucket with config.json, the stack test through the stack's
-#             hostname; the URL in the job summary, on the deployment and,
+#             hostname, the browser test of the page (decision 0045); the
+#             URL in the job summary, on the deployment and,
 #             when the branch has an open pull request, in one comment on
 #             it. The checks run here so that a stack always holds a commit
 #             that typechecks and passes the tests (0017); they also run in
@@ -302,6 +303,8 @@ jobs:
         run: |
           {
             echo
+            echo '### Stack test, through the API'
+            echo
             echo '```text'
             cat "$RUNNER_TEMP/e2e.log"
             echo '```'
@@ -309,6 +312,13 @@ jobs:
 
       - name: Report the cold start
         run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
+
+      # The browser test (decision 0045), one copy with deploy.yml's.
+      - name: Use the page in a browser as that user
+        uses: ./.github/actions/browser-test
+        with:
+          stack: ${{ env.STACK }}
+          username: e2e-${{ env.ISSUE }}@heat-sb.dcg-games.com
 
   # -------------------------------------------------------- pull request --
   comment-url:
