@@ -561,7 +561,7 @@ builder.queryFields((t) => ({
   player: t.field({
     type: PlayerRef,
     nullable: true,
-    description: "Public: any caller may look a player up by id, and reads only the id back.",
+    description: "Public: any caller may look a player up by id, and reads only the id back, or null where the id has no profile, so it also says whether an id is a player's.",
     args: { id: t.arg.id({ required: true }) },
     resolve: (_root, args, ctx) => ctx.repo.getPlayer(args.id),
   }),
@@ -611,7 +611,7 @@ builder.mutationFields((t) => ({
     authScopes: { authenticated: true },
     description: "Makes the signed-in player's profile if they have none, named with their id, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.",
     errors: answers("JoinGame", { field: "player", what: "the player's profile, made or found" }, []),
-    resolve: (_root, _args, ctx) => ctx.repo.joinPlayer({ id: callerId(ctx), name: callerId(ctx) }),
+    resolve: (_root, _args, ctx) => ctx.repo.joinPlayer(callerId(ctx)),
   }),
   recruitHero: t.field({
     type: HeroRef,

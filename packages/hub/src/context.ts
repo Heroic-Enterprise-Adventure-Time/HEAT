@@ -10,7 +10,8 @@ import { VERSION_HEADER } from "./version.js";
 /**
  * Per-request context. Identity comes from the API Gateway JWT authorizer,
  * which validated the Cognito token before the function ran; the function
- * trusts the claims it is handed and never sees the token. Tests synthesize
+ * trusts the subject it is handed, reads no other claim and never sees the
+ * token. Tests synthesize
  * the event with claims. Rule 2 of decision 0009: the handler is a plain
  * function of an event and does not know who called it.
  */

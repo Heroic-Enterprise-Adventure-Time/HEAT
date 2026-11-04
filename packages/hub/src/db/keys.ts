@@ -8,7 +8,7 @@
  *
  * The player table, partitioned by player. Everything the owner asks for is
  * one item collection, read in one Query. Private: read only through the
- * hub, under the `self` scope.
+ * hub, each field under the `self` scope but for the player's id.
  *
  *   PLAYER#<id>    | PROFILE                           the player
  *   PLAYER#<id>    | AT#<location>#CAMP                hall and warehouse levels, the counts of active and living heroes

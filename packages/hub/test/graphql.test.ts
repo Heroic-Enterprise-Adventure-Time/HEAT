@@ -101,7 +101,7 @@ async function invalid(query: string, variables: Record<string, unknown>, player
   return JSON.parse(res.body ?? "{}") as Reply<unknown>;
 }
 
-const JOIN = `mutation { joinGame { ... on JoinGameSuccess { player { id name } } } }` as Query<{ joinGame: Result<"player", { id: string; name: string }> }>;
+const JOIN = `mutation { joinGame { ... on JoinGameSuccess { player { id name } } } }` as Query<{ joinGame: Result<"player", { id: string; name: string | null }> }>;
 const START = `mutation($heroIds: [ID!]!) {
   startAdventure(input: { location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds }) {
     __typename

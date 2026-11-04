@@ -16,7 +16,7 @@
 
 **`Player.name` takes `self`, and so becomes nullable** (`graphql.md`, rules 2 and 11). No stored profile holds an email (below), so the scope protects none today. It stays because the field was written to hold one, and it is not opened until a public name is decided, and because it also closes the field on the previous route once that is on this code. `player(id)` stays public and answers only the id to anyone else. Names already stored are not changed and need no migration: they stay in the player table and are served only to their player. The client selects no `name` from `Player`, so its generated code does not change.
 
-**`graphql.md` gains rule 23,** a field holding personal data is never public, and rule 11's public list says what each listed field contains. The list had read "`player(id)` with `id` and `name`", which reviewed the field's name and not what was in it.
+**`graphql.md` gains rule 23,** a field holding personal data is never public, and rule 11's public list says what each listed field contains. The list had read "`player(id)` with `id` and `name`", which reviewed the field's name and not what was in it. It also gains rule 24, that a reader of the location table other than the hub is given no owner id, because this decision rests on the hub being its only reader and decision 0023 names later ones.
 
 ## What the exposure turned out to be
 
@@ -41,7 +41,7 @@ So the gap was latent: a real path, which no player's data had taken. It also sh
 
 **`@pothos/plugin-scope-auth` has no such option at 4.2.2.** Its options are `unauthorizedError`, `cacheKey`, `runScopesOnType`, `treatErrorsAsUnauthorized`, `authorizeOnSubscribe`, `defaultStrategy` and `authScopes` (`src/types.ts`), and `wrapResolve` returns a field with no scopes unwrapped (`src/index.ts`). The nearest it offers is `authScopes` on a type, which covers that type's fields and does nothing for a new type, and a field opts out of it with `skipTypeScopes`.
 
-**The same effect is a test, and it is not built here.** Walk the schema from the root types, stop at any field with a scope, and fail on any field reached that is not on a reviewed list matching rule 11's. A new field is then closed until someone lists it. It is an issue of its own, if the owner wants it, because it starts by listing every field reachable today.
+**The same effect is a test, and it is not built here.** Walk the schema from the root types and fail on any field reached that is not on a reviewed list matching rule 11's, so that a new field is closed until someone lists it. It starts by listing every field reachable today, so it is an issue of its own, Issue-224, which holds the agreed shape.
 
 ## Considered and not chosen
 
@@ -51,7 +51,7 @@ So the gap was latent: a real path, which no player's data had taken. It also sh
 
 **A chosen display name in place of the scope.** It needs a form, validation and a decision about offensive names, and it is the public handle that waits for its feature. That feature adds its own public field, and `name` stays private.
 
-**Removing `player(id)`.** Nothing in the client or the stack test calls it, and it now answers only an id. It is left for the feature that decides what a public player is, because removing it is a contract change this issue does not need.
+**Removing `player(id)`.** Nothing in the client or the stack test calls it, and it now echoes its argument, so that all it serves is whether an id has a profile. Ids are not guessable, so that tells little. It is left for the feature that decides what a public player is, because removing it is a contract change that also rewrites the scope tests, which read `camps` and `heroes` through it.
 
 **Renaming `name` to `email`.** It changes the contract and the stored attribute, protects nothing more, and would now name something the hub does not hold.
 
@@ -69,4 +69,4 @@ All on 2026-11-04.
 
 ## Where it is described
 
-`docs/standards/graphql.md`, rules 11, 13 and 23. `docs/architecture/overview.md`, "Services and data". `packages/hub/src/db/keys.ts`, `packages/hub/src/schema/schema.ts`.
+`docs/standards/graphql.md`, rules 11, 12, 13, 23 and 24. `docs/architecture/overview.md`, "Services and data". `packages/hub/src/context.ts`, `packages/hub/src/db/keys.ts`, `packages/hub/src/schema/schema.ts`.

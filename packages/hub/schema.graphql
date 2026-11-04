@@ -483,7 +483,7 @@ type Query {
   me: Player
 
   """
-  Public: any caller may look a player up by id, and reads only the id back.
+  Public: any caller may look a player up by id, and reads only the id back, or null where the id has no profile, so it also says whether an id is a player's.
   """
   player(id: ID!): Player
 
