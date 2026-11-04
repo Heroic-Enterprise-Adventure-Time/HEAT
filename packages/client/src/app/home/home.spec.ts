@@ -1,36 +1,29 @@
 import { signal } from '@angular/core';
-import { screen, waitFor } from '@testing-library/angular/zoneless';
+import { provideRouter, Router } from '@angular/router';
+import { render, screen, waitFor } from '@testing-library/angular/zoneless';
 import userEvent from '@testing-library/user-event';
 
-import { CAMP_SCENE_FACTORY } from '../camp/camp';
 import { Config } from '../config';
 import { Game } from '../game';
 import { Session } from '../session';
 import { Blank } from '../testing/blank';
-import { fakeCampScene } from '../testing/fake-camp-scene';
 import { fakeSession, PLAYER } from '../testing/fake-session';
-import { testLayoutSizes } from '../testing/layout-sizes';
-import { renderAt } from '../testing/render-at';
 import { Home } from './home';
 
-function renderHome(session: ReturnType<typeof fakeSession>, configError: string | null = null) {
+/** Home itself, not in an outlet, so that it stays on the page after it sends a player on. */
+async function renderHome(session: ReturnType<typeof fakeSession>, configError: string | null = null) {
   const config = new Config();
   config.error.set(configError);
-  return renderAt(
-    '/',
-    [
-      { path: '', component: Home },
-      { path: 'camp/:location', component: Blank },
-    ],
-    [
+  const user = userEvent.setup();
+  const { fixture } = await render(Home, {
+    providers: [
+      provideRouter([{ path: 'camp/:location', component: Blank }]),
       { provide: Session, useValue: session },
       { provide: Config, useValue: config },
-      // The camp's own collaborators, standing in: no hub and no WebGL in a test.
-      { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), recruits: signal([]), error: signal(null) } },
-      { provide: CAMP_SCENE_FACTORY, useValue: fakeCampScene },
-      testLayoutSizes,
+      { provide: Game, useValue: { location: signal('millbrook') } },
     ],
-  );
+  });
+  return { user, router: fixture.debugElement.injector.get(Router) };
 }
 
 describe('Home', () => {
@@ -41,8 +34,8 @@ describe('Home', () => {
 
   it('offers Google sign-in when nobody is signed in, and signs in on the click', async () => {
     const session = fakeSession(null);
-    await renderHome(session);
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }));
+    const { user } = await renderHome(session);
+    await user.click(screen.getByRole('button', { name: 'Sign in with Google' }));
     expect(session.signedIn).toBe(1);
   });
 
@@ -55,6 +48,6 @@ describe('Home', () => {
   it('says so when the stack configuration did not load', async () => {
     await renderHome(fakeSession(null), 'GET /config.json answered 404');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.getByText(/could not load its stack configuration: GET \/config\.json answered 404/)).toBeInTheDocument();
+    expect(screen.getByText('The page could not load its stack configuration: GET /config.json answered 404.')).toBeInTheDocument();
   });
 });

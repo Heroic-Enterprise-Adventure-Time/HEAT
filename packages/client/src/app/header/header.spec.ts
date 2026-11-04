@@ -28,9 +28,10 @@ const player: PlayerView = {
   },
 };
 
-async function renderHeader(user: SessionUser | null, loaded: PlayerView | null) {
-  const session = fakeSession(user);
+async function renderHeader(signedIn: SessionUser | null, loaded: PlayerView | null) {
+  const session = fakeSession(signedIn);
   const game = { player: signal(loaded), location: signal('millbrook') };
+  const user = userEvent.setup();
   await render(Header, {
     providers: [
       provideRouter([]),
@@ -38,24 +39,24 @@ async function renderHeader(user: SessionUser | null, loaded: PlayerView | null)
       { provide: Game, useValue: game },
     ],
   });
-  return { session };
+  return { session, user };
 }
 
 describe('Header', () => {
   it('shows the title and Google sign-in to a visitor', async () => {
-    const { session } = await renderHeader(null, null);
+    const { session, user } = await renderHeader(null, null);
     expect(screen.getByText('HEAT')).toBeInTheDocument();
-    expect(screen.queryByRole('combobox', { name: 'Camp' })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Sign in with Google' }));
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sign in with Google' }));
     expect(session.signedIn).toBe(1);
   });
 
   it('shows a signed-in player their camps, a link to the open adventure and sign-out', async () => {
-    const { session } = await renderHeader(PLAYER, player);
+    const { session, user } = await renderHeader(PLAYER, player);
     expect(textsOf(screen.getAllByRole('option'))).toEqual(['Millbrook']);
     expect(screen.getByRole('link', { name: 'Adventure in progress' })).toHaveAttribute('href', '/adventure');
     expect(screen.getByText('player@example.com')).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(session.signedOut).toBe(1);
   });
 });

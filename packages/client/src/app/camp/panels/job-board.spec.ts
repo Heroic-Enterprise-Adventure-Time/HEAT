@@ -1,6 +1,5 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
-import userEvent from '@testing-library/user-event';
 
 import { must } from '@heat/engine';
 
@@ -12,6 +11,7 @@ import { Session } from '../../session';
 import { fakeCampScene } from '../../testing/fake-camp-scene';
 import { fakeSession, PLAYER } from '../../testing/fake-session';
 import { testLayoutSizes } from '../../testing/layout-sizes';
+import { itemHolding, listItems, menu, panel, panelBox } from '../../testing/page';
 import { renderAt } from '../../testing/render-at';
 import { textsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
@@ -106,22 +106,18 @@ function renderJobs(game: ReturnType<typeof fakeGame>, url: string) {
 
 const WOLVES = '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road';
 
-const panel = () => within(screen.getByRole('complementary'));
-const menu = () => within(screen.getByRole('navigation', { name: 'Facilities' }));
-const boxes = () => screen.queryAllByRole<HTMLInputElement>('checkbox');
+const box = (name: string) => screen.getByRole('checkbox', { name });
 const depart = () => screen.getByRole('button', { name: 'Depart' });
-/** The items of the panel's list at `index`, in the order the panel shows its lists. */
-const listItems = (index: number) => within(must(panel().getAllByRole('list')[index], `list ${index}`)).getAllByRole('listitem');
+const job = (name: string) => within(itemHolding('Jobs', 'link', name));
 
 describe('Job board', () => {
   it("lists the board's jobs, easiest first, with what each brings home, each linked to its detail", async () => {
     await renderJobs(fakeGame([]), '/camp/millbrook/job-board');
     expect(panel().getByRole('heading', { name: 'Job board', level: 2 })).toBeInTheDocument();
-    const jobs = listItems(0);
-    expect(jobs.map((li) => within(li).getByRole('link').textContent)).toEqual(['Pick up sticks', 'Timber from the near woods', 'Wolves on the mill road']);
-    expect(jobs[0]).toHaveTextContent('up to 40 timber');
-    expect(jobs[1]).toHaveTextContent('3 cloth and up to 60 timber');
-    expect(jobs[2]).toHaveTextContent('10 cloth');
+    expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Pick up sticks', 'Timber from the near woods', 'Wolves on the mill road']);
+    expect(job('Pick up sticks').getByText('up to 40 timber')).toBeInTheDocument();
+    expect(job('Timber from the near woods').getByText('3 cloth and up to 60 timber')).toBeInTheDocument();
+    expect(job('Wolves on the mill road').getByText('10 cloth')).toBeInTheDocument();
     expect(panel().getByRole('link', { name: 'Pick up sticks' })).toHaveAttribute('href', '/camp/millbrook/job-board/jobs/pick-up-sticks');
     expect(menu().getByRole('link', { name: 'Job board', current: 'page' })).toBeInTheDocument();
   });
@@ -129,8 +125,8 @@ describe('Job board', () => {
   it("shows a job's stages in order, its credits beside the camp's balance and room, and its retreat penalty", async () => {
     await renderJobs(fakeGame([must(party[0], 'the first of the party')]), '/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
     expect(panel().getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
-    expect(textsOf(listItems(0))).toEqual(['Travel', 'Gather timber from 3 trees, up to 60', 'Fight a wolf', 'Arrive']);
-    expect(textsOf(listItems(1))).toEqual([
+    expect(textsOf(listItems('Stages'))).toEqual(['Travel', 'Gather timber from 3 trees, up to 60', 'Fight a wolf', 'Arrive']);
+    expect(textsOf(listItems('Reward'))).toEqual([
       '3 cloth. Millbrook holds 0, with room for 100 more.',
       'Up to 60 timber. Millbrook holds 90, with room for 10 more.',
       '15 XP to each hero who comes back.',
@@ -141,69 +137,73 @@ describe('Job board', () => {
   });
 
   it('picks one to four living heroes, never the dead, and Departs only with one picked', async () => {
-    await renderJobs(fakeGame([...party, hero('h6', 'Rook', 'DEAD')]), WOLVES);
+    const { user } = await renderJobs(fakeGame([...party, hero('h6', 'Rook', 'DEAD')]), WOLVES);
     expect(screen.queryByRole('checkbox', { name: 'Rook' })).not.toBeInTheDocument();
-    expect(boxes()).toHaveLength(5);
+    expect(screen.getAllByRole('checkbox')).toHaveLength(5);
     expect(depart()).toBeDisabled();
 
-    for (const box of boxes().slice(0, 4)) await userEvent.click(box);
+    for (const name of ['Wren', 'Moss', 'Lark', 'Fen']) await user.click(box(name));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
-    expect(boxes().map((b) => b.disabled)).toEqual([false, false, false, false, true]);
+    expect(box('Wren')).toBeEnabled();
+    expect(box('Fen')).toBeEnabled();
+    expect(box('Ash')).toBeDisabled();
 
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Wren' }));
-    await waitFor(() => { expect(boxes().map((b) => b.disabled)).toEqual([false, false, false, false, false]); });
+    await user.click(box('Wren'));
+    await waitFor(() => { expect(box('Ash')).toBeEnabled(); });
   });
 
   it('Departs through startAdventure and goes to the adventure, which shows the job and the party', async () => {
     const game = fakeGame(party);
-    const { router } = await renderJobs(game, WOLVES);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Wren' }));
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Lark' }));
+    const { router, user } = await renderJobs(game, WOLVES);
+    await user.click(box('Wren'));
+    await user.click(box('Lark'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
-    await userEvent.click(depart());
+    await user.click(depart());
     await waitFor(() => { expect(router.url).toBe('/adventure'); });
     expect(game.started).toEqual([{ location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: ['h1', 'h3'] }]);
 
     expect(await screen.findByRole('heading', { name: 'Wolves on the mill road', level: 2 })).toBeInTheDocument();
     // The run starts once the scene has loaded, or failed to as it does in jsdom.
     const heroes = await screen.findAllByRole('group', { name: /next action$/ });
-    expect(heroes.map((group) => group.getAttribute('aria-label'))).toEqual(['Wren next action', 'Lark next action']);
+    expect(heroes).toHaveLength(2);
+    expect(heroes[0]).toHaveAccessibleName('Wren next action');
+    expect(heroes[1]).toHaveAccessibleName('Lark next action');
   });
 
   it("shows a start's refusal in place, in the player's words", async () => {
     const game = fakeGame(party, () => new Refusal('HeroDead', 'hero h1 is dead'));
-    const { router } = await renderJobs(game, WOLVES);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Wren' }));
+    const { router, user } = await renderJobs(game, WOLVES);
+    await user.click(box('Wren'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
-    await userEvent.click(depart());
-    expect(await screen.findByRole('alert')).toHaveTextContent('A hero in the party is dead.');
+    await user.click(depart());
+    expect(await screen.findByText('A hero in the party is dead.')).toHaveRole('alert');
     expect(router.url).toBe(WOLVES);
   });
 
   it("says to build the facility when the hub refuses a facility's job with Requires (Issue-133)", async () => {
     const game = fakeGame(party, () => new Refusal('Requires', 'Ore from the hill needs a level 1 mine first'));
-    await renderJobs(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Wren' }));
+    const { user } = await renderJobs(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    await user.click(box('Wren'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
-    await userEvent.click(depart());
-    expect(await screen.findByRole('alert')).toHaveTextContent('Build the mine first.');
+    await user.click(depart());
+    expect(await screen.findByText('Build the mine first.')).toHaveRole('alert');
     expect(game.started[0]?.jobId).toBe('ore-from-the-hill');
   });
 
   it("shows a refusal it has no words for as the hub put it", async () => {
     const game = fakeGame(party, () => new Refusal('SomethingNew', 'something new'));
-    await renderJobs(game, WOLVES);
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Wren' }));
+    const { user } = await renderJobs(game, WOLVES);
+    await user.click(box('Wren'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
-    await userEvent.click(depart());
-    expect(await screen.findByRole('alert')).toHaveTextContent('something new');
+    await user.click(depart());
+    expect(await screen.findByText('something new')).toHaveRole('alert');
   });
 
   it('sends a camp with no living hero to the hall', async () => {
     await renderJobs(fakeGame([hero('h6', 'Rook', 'DEAD')]), WOLVES);
-    expect(boxes()).toHaveLength(0);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Depart' })).not.toBeInTheDocument();
-    expect(screen.getByRole('complementary')).toHaveTextContent('No hero here is alive.');
+    expect(panelBox()).toHaveTextContent('No hero here is alive.');
     expect(panel().getByRole('link', { name: 'heroes hall' })).toHaveAttribute('href', '/camp/millbrook/heroes-hall');
   });
 
@@ -225,7 +225,7 @@ describe('Job board', () => {
 
   it('says so for a job the board does not post', async () => {
     await renderJobs(fakeGame(party), '/camp/millbrook/job-board/jobs/nothing');
-    expect(screen.getByRole('complementary')).toHaveTextContent('The job board has no such job.');
+    expect(panel().getByText('The job board has no such job.')).toBeInTheDocument();
   });
 
   it('sends /adventure to the camp when no adventure is open', async () => {

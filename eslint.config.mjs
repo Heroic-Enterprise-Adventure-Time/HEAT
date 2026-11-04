@@ -15,7 +15,7 @@ const testingImports = [
   { name: '@testing-library/angular', message: 'Import from @testing-library/angular/zoneless.' },
   { name: '@angular/router/testing', message: 'Reach a page through renderAt in testing/render-at.ts.' },
 ];
-const testBedImport = { name: '@angular/core/testing', importNames: ['TestBed'], message: 'Render the component through Testing Library.' };
+const testBedImport = { name: '@angular/core/testing', importNames: ['TestBed', 'getTestBed'], message: 'Render the component through Testing Library.' };
 
 export default tseslint.config(
   // Build output, Angular's cache, the client's copy of the art, and the
@@ -143,10 +143,14 @@ export default tseslint.config(
   // (docs/standards/angular.md, rule 15), and one way in. The main entry point
   // is refused because it imports the deprecated RouterTestingModule; a spec
   // that renders a component has no use for TestBed or the router's harness.
+  // The two user-event rules are in none of the plugin's presets; the library
+  // recommends an instance from setup() over its direct calls.
   {
     files: ['packages/client/src/**/*.spec.ts', 'packages/client/src/app/testing/**/*.ts'],
     extends: [testingLibrary.configs['flat/angular']],
     rules: {
+      'testing-library/prefer-user-event': 'error',
+      'testing-library/prefer-user-event-setup': 'error',
       'no-restricted-imports': ['error', { paths: [...testingImports, testBedImport] }],
     },
   },

@@ -1,6 +1,5 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
-import userEvent from '@testing-library/user-event';
 
 import { type AdventureEvent, type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
 
@@ -8,6 +7,7 @@ import { type AdventureResultView, type AdventureView, Game, type SettledView } 
 import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
 import { testLayoutSizes } from '../testing/layout-sizes';
+import { itemHolding, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf } from '../testing/texts-of';
 import { Adventure, BATTLE_SCENE_FACTORY, FRAME_LOOP } from './adventure';
@@ -120,7 +120,7 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
 
 async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
   let onFrame: (ms: number) => void = () => undefined;
-  const { router, settle } = await renderAt(
+  const { router, settle, user } = await renderAt(
     '/adventure',
     [
       { path: 'adventure', component: Adventure },
@@ -141,15 +141,15 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeSc
     for (let left = ms; left > 0; left -= 250) onFrame(Math.min(250, left));
     await settle();
   };
-  return { settle, run, router };
+  return { run, router, user };
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
 /** What a hero may do next: the group of its ability buttons. */
 const abilities = (hero: string) => within(screen.getByRole('group', { name: `${hero} next action` }));
+/** A hero's item in the party, which holds what it will do next. */
+const heroItem = (hero: string) => within(itemHolding('Party', 'group', `${hero} next action`));
 const stage = (text: string | RegExp) => screen.getByText(text);
-/** The items of the panel's list at `index`, in the order the panel shows its lists. */
-const listItems = (index: number) => textsOf(within(must(screen.getAllByRole('list')[index], `list ${index}`)).getAllByRole('listitem'));
 
 describe('Adventure', () => {
   beforeEach(() => { localStorage.clear(); });
@@ -168,51 +168,48 @@ describe('Adventure', () => {
   });
 
   it("queues a forced action until the hero's turn uses it, and logs it then", async () => {
-    const { run, settle } = await renderAdventure(fakeGame());
+    const { run, user } = await renderAdventure(fakeGame());
     // By 7 s the villager has stepped up to the front line, where the trees are in reach.
     await run(7000);
-    await userEvent.click(abilities('Wren').getByRole('button', { name: 'Chop' }));
-    await settle();
+    await user.click(abilities('Wren').getByRole('button', { name: 'Chop' }));
+    expect(await heroItem('Wren').findByText('Next: Chop')).toBeInTheDocument();
     expect(abilities('Wren').getByRole('button', { name: 'Chop' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('Next: Chop')).toBeInTheDocument();
     await run(3000);
-    expect(screen.queryByText(/^Next:/)).not.toBeInTheDocument();
+    expect(heroItem('Wren').queryByText(/^Next:/)).not.toBeInTheDocument();
     expect(loadRun('a1')?.log).toEqual([
       { kind: 'unit', acceptedAtSimTime: expect.any(Number) as number, unitId: 'h2', override: { kind: 'force-action', abilityId: 'chop' } },
     ]);
   });
 
   it('drops a forced action its hero cannot use at its turn, and logs nothing', async () => {
-    const { run, settle } = await renderAdventure(fakeGame());
+    const { run, user } = await renderAdventure(fakeGame());
     await run(4100);
     // No ore vein in the near woods.
-    await userEvent.click(abilities('Wren').getByRole('button', { name: 'Mine' }));
-    await settle();
+    await user.click(abilities('Wren').getByRole('button', { name: 'Mine' }));
+    expect(await heroItem('Wren').findByText('Next: Mine')).toBeInTheDocument();
     await run(3000);
-    expect(screen.queryByText(/^Next:/)).not.toBeInTheDocument();
+    expect(heroItem('Wren').queryByText(/^Next:/)).not.toBeInTheDocument();
     expect(loadRun('a1')?.log).toEqual([]);
   });
 
   it('pauses, and runs at the speed picked', async () => {
-    const { run, settle } = await renderAdventure(fakeGame());
-    await userEvent.click(button('Pause'));
+    const { run, user } = await renderAdventure(fakeGame());
+    await user.click(button('Pause'));
     await run(1000);
     expect(stage('Stage 1 of 4: Travel')).toBeInTheDocument();
-    await userEvent.click(button('Resume'));
-    await userEvent.click(button('4×'));
-    await settle();
-    expect(button('4×')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(button('Resume'));
+    await user.click(button('4×'));
+    await waitFor(() => { expect(button('4×')).toHaveAttribute('aria-pressed', 'true'); });
     await run(1100);
     expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
   });
 
   it('orders a retreat, which stays selected, and the run ends with it in the log', async () => {
     const game = fakeGame();
-    const { run, settle } = await renderAdventure(game);
+    const { run, user } = await renderAdventure(game);
     await run(4100);
-    await userEvent.click(button('Retreat'));
-    await settle();
-    expect(button('Retreat')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(button('Retreat'));
+    await waitFor(() => { expect(button('Retreat')).toHaveAttribute('aria-pressed', 'true'); });
     expect(button('Press on')).toHaveAttribute('aria-pressed', 'false');
     await run(60_000);
     expect(game.submitted).toHaveLength(1);
@@ -253,18 +250,18 @@ describe('Adventure', () => {
 
   it("submits the log at the end, shows the result in the player's words, and goes back to camp", async () => {
     const game = fakeGame();
-    const { run, router } = await renderAdventure(game);
+    const { run, router, user } = await renderAdventure(game);
     await run(120_000);
     expect(game.submitted).toHaveLength(1);
     expect(loadRun('a1')).toBeNull();
     expect(await screen.findByText('Job done.')).toBeInTheDocument();
-    expect(listItems(0)).toEqual(['travel: done', 'gather: won', 'fight: won', 'arrive: done']);
-    expect(listItems(1)).toEqual(['60 timber', '3 cloth']);
+    expect(textsOf(listItems('Stages'))).toEqual(['travel: done', 'gather: won', 'fight: won', 'arrive: done']);
+    expect(textsOf(listItems('Rewards'))).toEqual(['60 timber', '3 cloth']);
     expect(screen.getByText('10 timber lost: the warehouse was full.')).toBeInTheDocument();
     expect(screen.queryByText(/cloth lost/)).not.toBeInTheDocument();
-    expect(listItems(2)).toEqual(['Wat +15 XP, level 2 level up', 'Wren died']);
+    expect(textsOf(listItems('Heroes'))).toEqual(['Wat +15 XP, level 2 level up', 'Wren died']);
 
-    await userEvent.click(button('Back to Millbrook'));
+    await user.click(button('Back to Millbrook'));
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
     expect(game.settled()).toBeNull();
   });
@@ -272,9 +269,9 @@ describe('Adventure', () => {
   it('replays the stored timeline in the scene from its start, and goes back to the result', async () => {
     const scene = fakeScene();
     const game = fakeGame();
-    const { run } = await renderAdventure(game, scene);
+    const { run, user } = await renderAdventure(game, scene);
     await run(120_000);
-    await userEvent.click(await screen.findByRole('button', { name: 'Watch the replay' }));
+    await user.click(await screen.findByRole('button', { name: 'Watch the replay' }));
     await waitFor(() => { expect(scene.resets).toHaveLength(2); });
     expect(game.timelines).toEqual(['a1']);
     expect(scene.resets[1]).toMatchObject({ field: { stage: 0, outcome: null }, enter: true });
@@ -285,27 +282,27 @@ describe('Adventure', () => {
     expect(scene.fed.length).toBeGreaterThan(before);
     expect(game.submitted).toHaveLength(1);
 
-    await userEvent.click(button('Back to the result'));
+    await user.click(button('Back to the result'));
     expect(await screen.findByText('Job done.')).toBeInTheDocument();
   });
 
   it('says so when the adventure was lost to a game update', async () => {
     const { run } = await renderAdventure(fakeGame(() => null));
     await run(120_000);
-    expect(await screen.findByRole('alert')).toHaveTextContent('This adventure was lost to a game update. The party came home with nothing.');
+    expect(await screen.findByText('This adventure was lost to a game update. The party came home with nothing.')).toHaveRole('alert');
     expect(button('Back to Millbrook')).toBeInTheDocument();
   });
 
   it('keeps the log and offers to try again when the hub cannot be reached', async () => {
     let failing = true;
     const game = fakeGame(() => (failing ? new ApiError('the hub answered 502', null) : result));
-    const { run } = await renderAdventure(game);
+    const { run, user } = await renderAdventure(game);
     await run(120_000);
-    expect(await screen.findByRole('alert')).toHaveTextContent('The run could not be sent: the hub answered 502');
+    expect(await screen.findByText('The run could not be sent: the hub answered 502')).toHaveRole('alert');
     expect(loadRun('a1')).not.toBeNull();
 
     failing = false;
-    await userEvent.click(button('Try again'));
+    await user.click(button('Try again'));
     expect(await screen.findByText('Job done.')).toBeInTheDocument();
     expect(game.submitted).toHaveLength(2);
     expect(game.submitted[1]).toEqual(game.submitted[0]);
