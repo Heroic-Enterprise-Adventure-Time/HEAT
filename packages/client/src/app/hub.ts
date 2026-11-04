@@ -9,9 +9,8 @@ import { Session } from './session';
 
 /**
  * An entry of a response's `errors` array, with its code where it has one:
- * what is not the game's business, malformed input (`BAD_USER_INPUT`), a
- * caller who is not signed in (`UNAUTHENTICATED`), a failure nobody expected
- * (docs/standards/graphql.md, rule 6); or the hub not reached at all.
+ * what is not the game's business (docs/standards/graphql.md, rule 6); or the
+ * hub not reached at all.
  */
 export class ApiError extends Error {
   constructor(

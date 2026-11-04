@@ -103,7 +103,7 @@ input BuildFacilityInput {
   """
   The level being built: the next one. A level already built answers the camp and charges nothing.
   """
-  level: Int!
+  level: PositiveInt!
 
   """The camp's location."""
   location: ID!
@@ -322,8 +322,10 @@ type InsufficientResources implements Error {
   short: [Shortfall!]!
 }
 
-"""A JSON value, served as it was stored."""
-scalar JSON
+"""
+The `JSON` scalar type represents JSON values as specified by [ECMA-404](http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf).
+"""
+scalar JSON @specifiedBy(url: "http://www.ecma-international.org/publications/files/ECMA-ST/ECMA-404.pdf")
 
 """
 A job a location posts, on its job board or at a facility, from the static content; the client reads its stages from the engine it loaded.
@@ -403,15 +405,18 @@ type Mutation {
   submitAdventure(input: SubmitAdventureInput!): SubmitAdventureResult
 }
 
+"""Integers that will have a value of 0 or more."""
+scalar NonNegativeInt
+
 """
 One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up.
 """
 input OverrideInput {
-  """The ability forced, for a UNIT entry."""
+  """The ability forced, for a UNIT entry: at most 64 characters."""
   abilityId: String
 
   """Milliseconds on the adventure's clock."""
-  acceptedAtSimTime: Int!
+  acceptedAtSimTime: NonNegativeInt!
   kind: OverrideKind!
 
   """The order, for a PARTY entry."""
@@ -453,6 +458,9 @@ type Player {
   openAdventure: Adventure
 }
 
+"""Integers that will have a value greater than 0."""
+scalar PositiveInt
+
 """
 What a signed-in player reads: a player by id, themselves, the deploy's version, an adventure, and the heroes other players have left at a location.
 """
@@ -484,7 +492,7 @@ input RecruitHeroInput {
   """
   A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made.
   """
-  requestId: ID!
+  requestId: UUID!
 
   """A unit type on the location's recruitment list."""
   unitType: UnitType!
@@ -641,7 +649,7 @@ input SubmitAdventureInput {
   adventureId: ID!
 
   """
-  The override log, as the engine kept it; empty when the player forced nothing.
+  The override log, as the engine kept it; empty when the player forced nothing, and at most 2000 entries.
   """
   overrides: [OverrideInput!]!
 }
@@ -655,6 +663,11 @@ union SubmitAdventureResult = AdventureDiscarded | Conflict | EngineUpdated | Su
 type SubmitAdventureSuccess {
   adventure: Adventure!
 }
+
+"""
+A field whose value is a generic Universally Unique Identifier: https://en.wikipedia.org/wiki/Universally_unique_identifier.
+"""
+scalar UUID
 
 """A unit's numbers in battle."""
 type UnitStats {
