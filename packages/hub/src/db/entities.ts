@@ -19,9 +19,9 @@ import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
  * item gains `playerId`. A sighting's composites are its location and hero,
  * so it still holds no owner (decision 0029).
  *
- * `required` is enforced on a write and not on a read. An item from before
- * ElectroDB may lack some of these, which the repository says where it reads
- * them (decision 0042).
+ * `required` is enforced on a write and not on a read. An item written before
+ * some of these attributes existed may lack them, which the repository says
+ * where it reads them (decision 0042).
  */
 
 const service = "heat";

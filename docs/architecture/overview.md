@@ -6,7 +6,7 @@ How the system delivers the game described in `docs/design/game.md`: services, d
 
 Each diagram draws the system as of commit `1d2a55c` on `main`, 2026-11-02. The prose below is the authority where they differ.
 
-**The system.** One environment, whether a branch's sandbox stack, `dev` or `prod`: the browser reaches one hostname, sign-in goes through Cognito to Google, every request for data goes through the hub, and the hub is the only identity that reads or writes the tables and the replay bucket, but for the pipeline's apply role, which until Issue-213 scans and updates the tables to backfill ElectroDB's identifiers (decision 0042).
+**The system.** One environment, whether a branch's sandbox stack, `dev` or `prod`: the browser reaches one hostname, sign-in goes through Cognito to Google, every request for data goes through the hub, and the hub is the only identity that reads or writes the tables and the replay bucket.
 
 ```mermaid
 flowchart LR
@@ -128,7 +128,7 @@ Each item carries a status. **Decided** items are settled by the project owner. 
 - **Working assumption.** Private causes, such as which facility granted a bonus, are resolved by the hub at start into the snapshot's effective numbers and are never recorded in the timeline.
 - **Working assumption.** The engine is one TypeScript package in this repository, used by both the Angular client and the hub.
 - **Decided.** The hub's cold start, measured on 2026-10-17 on the first sandbox stack (`heat-sb38`, Issue-38), the first request after the deploy: 627 ms of initialization, then 234 ms for the request itself; warm requests about 50 ms; 127 MB used of 1024; arm64; a 4.1 MB unminified bundle holding the SDK, Apollo, Pothos and Powertools, with tracing active. Acceptable for a game request, so nothing is bought: no provisioned concurrency. The levers if it grows: minify the bundle, leave the source map out of the zip, trim imports. Reported on every deploy in the run summary by the stack test, so the number is watched rather than remeasured.
-- **Built (Issue-201, decisions 0041 and 0042).** The repository, `packages/hub/src/db/repository.ts`, is the hub's only caller of DynamoDB and is made of ElectroDB: nine entities in `db/entities.ts`, whose key templates are the `TEMPLATES` of `db/keys.ts`, the one statement of the layout. `db/backfill.ts`, a step in the pipeline after every apply, is the one other caller: it makes items from before ElectroDB whole until Issue-213 removes it.
+- **Built (Issue-201, decisions 0041 and 0042).** The repository, `packages/hub/src/db/repository.ts`, is the only caller of DynamoDB and is made of ElectroDB: nine entities in `db/entities.ts`, whose key templates are the `TEMPLATES` of `db/keys.ts`, the one statement of the layout. The tables were made whole by a backfill in the pipeline, removed by Issue-213.
 
 ## The adventure loop
 

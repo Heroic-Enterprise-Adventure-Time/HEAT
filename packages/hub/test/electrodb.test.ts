@@ -10,7 +10,7 @@ import { must } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
 import { type Hero, HeroChanged, Repository, TransactionConflict } from "../src/db/repository.js";
-import { player, putOldCampsPastAPage, storedItem } from "./data.js";
+import { player, putOldCampsPastAPage, storedItem, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -92,32 +92,39 @@ describe("an item from before ElectroDB", () => {
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 0, livingHeroes: 0, stored: true });
   });
 
-  it("reads back whole through every read of the repository", async () => {
+  it("defaults through every read what an item written before an attribute existed lacks", async () => {
     const p = player();
-    const id = randomUUID();
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.profile(p), id: p, name: "Old" } }));
-    await putOldHero(p, id);
-    await putOldCamp(p, 1, 1);
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.holding(p, at, "timber"), material: "timber", balance: 5 } }));
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.facility(p, at, "mine"), location: at, kind: "mine", level: 2 } }));
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.open(p), adventureId: "a", seed: "s", startedAt: "2026-10-21T12:00:00.000Z" } }));
-    // A hero from before the attributes it now always has, which the repository defaults.
     const bare = randomUUID();
     await db.send(new PutCommand({
       TableName: tables.player,
-      Item: { ...playerKeys.hero(p, bare), id: bare, location: at, unitType: "villager", spriteSet: "villager-01", name: "Bare", recruitedAt: "2026-10-21T12:00:00.000Z" },
+      Item: whole("hero", { ...playerKeys.hero(p, bare), id: bare, location: at, unitType: "villager", spriteSet: "villager-01", name: "Bare", recruitedAt: "2026-10-21T12:00:00.000Z" }),
     }));
-
-    expect(await repo.getPlayer(p)).toEqual({ id: p, name: "Old" });
-    expect(await repo.joinPlayer({ id: p, name: "New" })).toEqual({ id: p, name: "Old" });
-    expect(await repo.camp(p, at)).toEqual({
-      location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: 1, livingHeroes: 1, stored: true,
-      holdings: [{ material: "timber", balance: 5 }], facilities: { mine: 2 },
-    });
-    expect(await repo.openAdventure(p)).toEqual({ adventureId: "a", seed: "s", startedAt: "2026-10-21T12:00:00.000Z" });
-    expect(await repo.getHero(p, id)).toEqual(oldHero(id));
+    await db.send(new PutCommand({ TableName: tables.player, Item: whole("camp", { ...playerKeys.camp(p, at), location: at }) }));
     expect(await repo.getHero(p, bare)).toEqual({ ...oldHero(bare), name: "Bare" });
-    expect((await repo.heroes(p)).map((h) => h.id).sort()).toEqual([id, bare].sort());
+    expect((await repo.heroes(p)).map((h) => h.id)).toEqual([bare]);
+    expect(await repo.camp(p, at)).toMatchObject({ hallLevel: 1, warehouseLevel: 1, activeHeroes: 0, livingHeroes: 0, stored: true });
+  });
+
+  it("is not returned by a read that does not ignore ownership", async () => {
+    const p = player();
+    const id = randomUUID();
+    await putOldHero(p, id);
+    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.open(p), adventureId: "a", seed: "s", startedAt: "2026-10-21T12:00:00.000Z" } }));
+    expect(await repo.getHero(p, id)).toBeUndefined();
+    expect(await repo.heroes(p)).toEqual([]);
+    expect(await repo.openAdventure(p)).toBeUndefined();
+  });
+
+  it("is a sighting still returned until it expires, because `parse` goes by its keys", async () => {
+    const location = `l-${randomUUID()}`;
+    const now = new Date("2026-11-03T12:00:00.000Z");
+    const item = (heroId: string) => ({ ...locationKeys.seen(location, heroId), heroId, location, name: "Seen", unitType: "villager", spriteSet: "villager-01", level: 1, seenAt: now.toISOString(), expiresAt: 4000000000 });
+    await db.send(new PutCommand({ TableName: tables.location, Item: item("a0") }));
+    await db.send(new PutCommand({ TableName: tables.location, Item: whole("sighting", item("b0")) }));
+    await db.send(new PutCommand({ TableName: tables.location, Item: whole("sighting", item("c0")) }));
+    const { sightings, read } = await repo.sightings(location, { from: "a" }, 2, now);
+    expect(read).toBe(2);
+    expect(sightings.map((s) => s.heroId)).toEqual(["a0", "b0"]);
   });
 
   it("reads a settled adventure back whole, nested fields no entity declares included", async () => {
@@ -128,14 +135,14 @@ describe("an item from before ElectroDB", () => {
       adventureId, playerId: "p", seed: "s", location: at, jobId: "sticks", snapshot, version: "v", startedAt: "2026-10-21T12:00:00.000Z",
       status: "SETTLED", result, settledAt: "2026-10-21T12:01:00.000Z",
     };
-    await db.send(new PutCommand({ TableName: tables.location, Item: { ...locationKeys.adventure(adventureId), ...record } }));
+    await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
     expect(await repo.getAdventure(adventureId)).toEqual(record);
   });
 
   it("reads a record from before Issue-113, which has no snapshot, as it is", async () => {
     const adventureId = randomUUID();
     const record = { adventureId, playerId: "p", seed: "s", startedAt: "2026-10-01T12:00:00.000Z", status: "OPEN" };
-    await db.send(new PutCommand({ TableName: tables.location, Item: { ...locationKeys.adventure(adventureId), ...record } }));
+    await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
     expect(await repo.getAdventure(adventureId)).toEqual(record);
   });
 
@@ -146,7 +153,7 @@ describe("an item from before ElectroDB", () => {
     const record = { adventureId, playerId: p, seed: "s", location: at, jobId: "sticks", snapshot: { version: "v", jobId: "sticks", heroes: [] }, version: "v", startedAt: "2026-10-21T12:00:00.000Z", status: "OPEN" } as const;
     await db.send(new PutCommand({ TableName: tables.location, Item: { ...locationKeys.adventure(adventureId), ...record } }));
     await repo.discard(p, record, new Date("2026-10-21T12:02:00.000Z"));
-    expect(await repo.openAdventure(p)).toBeUndefined();
+    expect(await storedItem(db, tables.player, playerKeys.open(p))).toBeUndefined();
     expect(await repo.getAdventure(adventureId)).toEqual({ ...record, status: "DISCARDED", discardedAt: "2026-10-21T12:02:00.000Z" });
     expect(await storedItem(db, tables.location, locationKeys.adventure(adventureId))).toMatchObject({ __edb_e__: "adventure", __edb_v__: "1" });
   });

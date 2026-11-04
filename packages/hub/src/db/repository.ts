@@ -231,17 +231,12 @@ function rawPage(response: { data: unknown }): RawPage {
   return response.data as RawPage;
 }
 
-/**
- * Every read takes `ignoreOwnership`, so that it finds an item from before
- * ElectroDB, by its keys, until the backfill has made them whole (decision
- * 0041; Issue-213 takes it off).
- */
-const STRONG = { consistent: true, ignoreOwnership: true } as const;
-const FROM_BEFORE = { ignoreOwnership: true } as const;
+const STRONG = { consistent: true } as const;
 
 /**
  * An item as it is read. `required` holds on a write and not on a read, and an
- * item from before ElectroDB may lack these, which their readers default.
+ * item written before these attributes existed may lack them, which their
+ * readers default.
  */
 type MayLack<T, Absent extends keyof T> = Omit<T, Absent> & Partial<Pick<T, Absent>>;
 type Stored<Name extends keyof HeatService["entities"]> = EntityItem<HeatService["entities"][Name]>;
@@ -372,9 +367,8 @@ export class Repository {
   /**
    * Every camp of the player, with its holdings, from one Query of the
    * `AT#` items (decision 0026). The starting location is always a camp, item
-   * or not. The location is read from the sort key, because an item from
-   * before ElectroDB may not hold it, and the query keeps `ignoreOwnership` for
-   * good: without it, it is filtered to camps alone (decision 0041).
+   * or not. The query takes `ignoreOwnership` for good: without it, it is
+   * filtered to camps alone (decision 0041).
    */
   async camps(playerId: string): Promise<Camp[]> {
     const { camp: campEntity, facility: facilityEntity, holding: holdingEntity } = this.service.entities;
@@ -389,12 +383,12 @@ export class Repository {
       if (!location) continue;
       const camp = campAt(location);
       if (kind === "CAMP") {
-        Object.assign(camp, campCounts(must(campEntity.parse({ Item: item }, FROM_BEFORE).data, "a camp's item")));
+        Object.assign(camp, campCounts(must(campEntity.parse({ Item: item }).data, "a camp's item")));
       } else if (kind === "HOLDING") {
-        const i = must(holdingEntity.parse({ Item: item }, FROM_BEFORE).data, "a holding's item");
+        const i = must(holdingEntity.parse({ Item: item }).data, "a holding's item");
         camp.holdings.push({ material: i.material, balance: i.balance });
       } else if (kind === "FACILITY") {
-        const i = must(facilityEntity.parse({ Item: item }, FROM_BEFORE).data, "a facility's item");
+        const i = must(facilityEntity.parse({ Item: item }).data, "a facility's item");
         camp.facilities[i.kind] = i.level;
       }
     }
@@ -889,9 +883,9 @@ export class Repository {
         .primary({ location })
         .between({ heroId: lo }, { heroId: hi })
         .where((a, op) => op.gt(a.expiresAt, seconds))
-        .go({ limit, ignoreOwnership: true, data: "raw" }),
+        .go({ limit, data: "raw" }),
     );
-    return { sightings: sighting.parse({ Items: page.Items }, FROM_BEFORE).data.map(toSighting), read: page.ScannedCount };
+    return { sightings: sighting.parse({ Items: page.Items }).data.map(toSighting), read: page.ScannedCount };
   }
 
   /** The player's `AT#` items, raw, every page: a raw read answers one page whatever `pages` says. */
@@ -902,7 +896,7 @@ export class Repository {
     do {
       // ElectroDB takes a raw page's LastEvaluatedKey back as `cursor` as it is, though it types a cursor a string.
       const cursor = (start ?? null) as unknown as string | null;
-      const page: RawPage = rawPage(await query.go({ ...STRONG, data: "raw", cursor }));
+      const page: RawPage = rawPage(await query.go({ ...STRONG, ignoreOwnership: true, data: "raw", cursor }));
       items.push(...page.Items);
       start = page.LastEvaluatedKey;
     } while (start);

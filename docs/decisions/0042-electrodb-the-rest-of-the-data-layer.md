@@ -1,6 +1,6 @@
 # 0042: The rest of the data layer on ElectroDB, and how the backfill runs
 
-- **Status:** Decided
+- **Status:** Decided; the backfill finished and was removed by Issue-213, with no week's wait for sightings
 - **Date:** 2026-11-03
 - **Settles:** Issue-201, on the plan of decision 0041, which it amends where the work showed that plan wrong or chose between what it left open. The backfill's end is Issue-213.
 
@@ -51,4 +51,4 @@ All on 2026-11-03, on `heat-sb201` unless it says otherwise.
 
 ## Where it is described
 
-`docs/standards/graphql.md`, rules 17 and 18. `docs/architecture/overview.md`, "Services and data". `docs/process/deployment.md`, rule 4. `packages/hub/src/db/entities.ts`, `packages/hub/src/db/backfill.ts`, `packages/hub/test/backfill.test.ts`.
+`docs/standards/graphql.md`, rules 17 and 18. `docs/architecture/overview.md`, "Services and data". `docs/process/deployment.md`, rule 4. `packages/hub/src/db/entities.ts`. The backfill's code is in the history, as PR-214 merged it.
