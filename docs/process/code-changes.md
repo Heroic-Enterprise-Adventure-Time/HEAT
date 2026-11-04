@@ -71,7 +71,7 @@ How one checkpoint moves through the rules above, from the start of a session to
 
 **The pull request is reviewed by a session that did not write it.** Lint is the deterministic floor and the owner's reading is the last word; between them a model reviews the pull request against the standards, from a session of its own, so that the reviewer is not the writer by construction and the findings are threads a person reads, answers and resolves on the pull request (decision 0033). Auto-fix is on per pull request so that a red run, a conflict or a thread reaches the session that owns the branch, and only that; every thread still goes through rule 24.
 
-**Production through a release branch.** The tag applied `prod` in the run that planned it, and a private repository on the Team plan has no required reviewers, so nobody could read the `prod` plan before the apply. A pull request from `main` to `release` is a review surface that already exists; the tag then records the release instead of causing it (decision 0021).
+**Production through a release branch.** The tag applied `prod` in the run that planned it, and the repository, private on the Team plan at the time, could have no required reviewers, so nobody could read the `prod` plan before the apply. A pull request from `main` to `release` is a review surface that already exists; the tag then records the release instead of causing it (decision 0021). The repository has been public since Issue-177, which makes required reviewers available; whether to add them is Issue-228.
 
 **One issue per session.** A long session accumulates context the next issue does not need. A fresh session finds everything from the issue, the private working context and the documents `AGENTS.md` names.
 
