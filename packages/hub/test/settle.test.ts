@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type UnitType, warehouseCapacity } from "@heat/engine";
@@ -14,6 +14,7 @@ import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, En
 import { startAdventure } from "../src/start.js";
 import { SETTLE_ATTEMPTS, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { player, storedItem } from "./data.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
@@ -46,7 +47,6 @@ const at = "millbrook";
 const wolves = JOBS["wolves-on-the-mill-road"];
 const version = "0123456789abcdef0123456789abcdef01234567";
 const previous = "fedcba9876543210fedcba9876543210fedcba98";
-const player = () => `p-${randomUUID()}`;
 
 /** Living heroes of the given unit types and a camp that counts them, with their sightings. */
 async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): Promise<Hero[]> {
@@ -73,10 +73,6 @@ async function start(p: string, heroes: Hero[], issuedBy = version) {
 }
 
 
-async function item(table: string, key: Record<string, string>) {
-  return (await db.send(new GetCommand({ TableName: table, Key: key }))).Item;
-}
-
 async function cloth(p: string) {
   return (await repo.holdings(p, at)).find((h) => h.material === "cloth")?.balance;
 }
@@ -101,13 +97,13 @@ describe("a party that completes the job", () => {
     expect(await repo.getAdventure(started.adventureId)).toMatchObject({ status: "SETTLED", result: settled.result });
     expect(await repo.openAdventure(p)).toBeUndefined();
     expect(await cloth(p)).toBe(10);
-    expect(await item(tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
 
     const level = levelForXp(wolves.xp);
     expect(level).toBeGreaterThan(1);
     for (const hero of heroes) {
       expect(await repo.getHero(p, hero.id)).toMatchObject({ xp: wolves.xp, level, status: "ALIVE", adventureId: null });
-      const seen = await item(tables.location, locationKeys.seen(at, hero.id));
+      const seen = await storedItem(db, tables.location, locationKeys.seen(at, hero.id));
       expect(seen).toMatchObject({ level, name: hero.name });
       expect(seen?.["expiresAt"]).toBeGreaterThan(Date.now() / 1000);
     }
@@ -195,7 +191,7 @@ describe("the warehouse's cap", () => {
     expect(settled.result?.credited).toEqual([{ material: "cloth", amount: 4 }]);
     expect(settled.result?.lost).toEqual([{ material: "cloth", amount: 6 }]);
     expect(await cloth(p)).toBe(cap);
-    expect(await item(tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 4, lost: 6 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 4, lost: 6 });
   });
 
   it("credits nothing to a full warehouse and still settles", async () => {
@@ -208,7 +204,7 @@ describe("the warehouse's cap", () => {
     expect(settled.result?.credited).toEqual([]);
     expect(settled.result?.lost).toEqual(wolves.pay);
     expect(await cloth(p)).toBe(cap);
-    expect(await item(tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 0, lost: 10 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 0, lost: 10 });
   });
 
   it("reads again when a balance moves between the read and the write", async () => {
@@ -246,7 +242,7 @@ describe("a death", () => {
     expect(settled.result?.heroes).toEqual([expect.objectContaining({ heroId: villager.id, dead: true, xpGained: 0, health: 0 })]);
     expect(await repo.getHero(p, villager.id)).toMatchObject({ status: "DEAD", xp: 0, level: 1, adventureId: null });
     expect(await repo.camp(p, at)).toMatchObject({ livingHeroes: 0, activeHeroes: 1 });
-    expect(await item(tables.location, locationKeys.seen(at, villager.id))).toBeUndefined();
+    expect(await storedItem(db, tables.location, locationKeys.seen(at, villager.id))).toBeUndefined();
     expect(await repo.holdings(p, at)).toEqual([]);
   });
 });

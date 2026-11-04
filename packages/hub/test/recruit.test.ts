@@ -11,6 +11,7 @@ import { playerKeys } from "../src/db/keys.js";
 import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
+import { player } from "./data.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
@@ -26,7 +27,6 @@ beforeAll(() => {
 });
 
 const at = "millbrook";
-const player = () => `p-${randomUUID()}`;
 
 /** A camp in a given state, as the transactions that kill heroes will leave it. */
 async function putCamp(p: string, activeHeroes: number, livingHeroes: number) {

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, GetCommand, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, PutCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { Entity, Service } from "electrodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -10,6 +10,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { createService, type HeatService } from "../src/db/entities.js";
 import { locationKeys, playerKeys } from "../src/db/keys.js";
 import { type Hero, HeroChanged, Repository, TransactionConflict } from "../src/db/repository.js";
+import { player, storedItem } from "./data.js";
 
 /**
  * What decision 0041 rests on, against DynamoDB Local: how ElectroDB meets
@@ -32,7 +33,6 @@ beforeAll(() => {
 });
 
 const at = "millbrook";
-const player = () => `p-${randomUUID()}`;
 
 const oldHero = (id: string): Hero => ({
   id, location: at, unitType: "villager", spriteSet: "villager-01", name: "Old", recruitedAt: "2026-10-21T12:00:00.000Z",
@@ -49,10 +49,6 @@ async function putOldCamp(p: string, active: number, living: number) {
     TableName: tables.player,
     Item: { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: active, livingHeroes: living },
   }));
-}
-
-async function raw(table: string, key: { PK: string; SK: string }) {
-  return (await db.send(new GetCommand({ TableName: table, Key: key, ConsistentRead: true }))).Item;
 }
 
 describe("an item from before ElectroDB", () => {
@@ -73,12 +69,12 @@ describe("an item from before ElectroDB", () => {
     const id = randomUUID();
     await putOldHero(p, id);
     await putOldCamp(p, 1, 1);
-    const before = must(await raw(tables.player, playerKeys.hero(p, id)), "the old hero");
+    const before = must(await storedItem(db, tables.player, playerKeys.hero(p, id)), "the old hero");
     const retired = await repo.retire(p, oldHero(id), new Date("2026-11-03T12:00:00.000Z"));
-    expect(await raw(tables.player, playerKeys.hero(p, id))).toEqual({
+    expect(await storedItem(db, tables.player, playerKeys.hero(p, id))).toEqual({
       ...before, status: "RETIRED", retiredAt: retired.retiredAt, playerId: p, __edb_e__: "hero", __edb_v__: "1",
     });
-    expect(await raw(tables.player, playerKeys.camp(p, at))).toEqual({
+    expect(await storedItem(db, tables.player, playerKeys.camp(p, at))).toEqual({
       ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: 0, livingHeroes: 0,
       playerId: p, __edb_e__: "camp", __edb_v__: "1",
     });
@@ -115,7 +111,7 @@ describe("an item from before ElectroDB", () => {
     expect((await camp.get({ playerId: p, location: at }).go({ consistent: true })).data).toMatchObject({ playerId: p, activeHeroes: 1 });
     expect((await holding.get({ playerId: p, location: at, material: "timber" }).go({ consistent: true })).data).toMatchObject({ location: at, balance: 5 });
     expect((await ledger.get({ playerId: p, cause: id, entry: "debit#timber" }).go({ consistent: true })).data).toMatchObject({ cause: id, delta: -5 });
-    expect(await raw(tables.player, spike)).toEqual({ ...spike, material: "timber", balance: 9 });
+    expect(await storedItem(db, tables.player, spike)).toEqual({ ...spike, material: "timber", balance: 9 });
   });
 });
 
@@ -174,8 +170,8 @@ describe("a transaction across the two tables", () => {
       .write((i) => [i.camp.update({ playerId: p, location }).add({ activeHeroes: 1 }).commit(), i.sighting.put(sighting(location, heroId)).commit()])
       .go();
     expect(result.canceled).toBe(false);
-    expect(await raw(tables.player, playerKeys.camp(p, location))).toMatchObject({ activeHeroes: 1 });
-    expect(await raw(tables.location, locationKeys.seen(location, heroId))).toMatchObject({ heroId });
+    expect(await storedItem(db, tables.player, playerKeys.camp(p, location))).toMatchObject({ activeHeroes: 1 });
+    expect(await storedItem(db, tables.location, locationKeys.seen(location, heroId))).toMatchObject({ heroId });
   });
 
   it("writes neither when a condition in the player table fails, and says which item", async () => {
@@ -190,7 +186,7 @@ describe("a transaction across the two tables", () => {
       .go();
     expect(result.canceled).toBe(true);
     expect(result.data.map((item) => [item.rejected, item.code])).toEqual([[true, "ConditionalCheckFailed"], [false, "None"]]);
-    expect(await raw(tables.location, locationKeys.seen(location, heroId))).toBeUndefined();
+    expect(await storedItem(db, tables.location, locationKeys.seen(location, heroId))).toBeUndefined();
   });
 
   it("writes neither when a condition in the location table fails", async () => {
@@ -204,7 +200,7 @@ describe("a transaction across the two tables", () => {
       ])
       .go();
     expect(result.data.map((item) => item.code)).toEqual(["None", "ConditionalCheckFailed"]);
-    expect(await raw(tables.player, playerKeys.camp(p, location))).toBeUndefined();
+    expect(await storedItem(db, tables.player, playerKeys.camp(p, location))).toBeUndefined();
   });
 
   it("also takes the maintainer's per-commit table, which this shape does not need", () => {

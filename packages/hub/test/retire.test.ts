@@ -11,6 +11,7 @@ import { type Hero, HeroChanged, type HeroStatus, Repository, TransactionConflic
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
+import { player } from "./data.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
@@ -26,7 +27,6 @@ beforeAll(() => {
 });
 
 const at = "millbrook";
-const player = () => `p-${randomUUID()}`;
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths will leave them. */
 async function putCamp(p: string, statuses: HeroStatus[]): Promise<Hero[]> {
