@@ -25,7 +25,11 @@ The rewritten issue says any signed-in caller holding another player's id can re
 - **An email reaches a profile only if an ID token makes it.** The authorizer accepts either token, and `joinPlayer` names a profile once, on its first write. On `heat-sb170`, `player1`'s profile, made with the access token, stayed the subject when later read with an ID token. No client or script in the repository's history has sent an ID token.
 - **Not read:** the names stored in `dev` and `prod`. The agent's roles are not allowed their items, so a profile made by hand with an ID token cannot be ruled out.
 
-So this closes a gap that was latent for players who signed in through the page, and a real one for any profile an ID token made. It also shows that `Player.name` as the client's own token leaves it is a copy of `Player.id`.
+So this closes a gap that was latent for players who signed in through the page, and a real one for any profile an ID token made. It also shows that a profile made by the client's own token holds a `name` that is a copy of its `id`.
+
+## When it takes effect
+
+**One deploy later than the merge, in each environment.** `/previous/graphql` runs the deploy before the current one (decision 0030), so that route goes on serving `name` until a second deploy of this code or later. On `heat-sb170`, with this change current and `da5d313` as the previous route, `player2` read `player1`'s name there. No shim is taken for it: the window is one deploy, and what it serves is what every route has served until now. Issue-222 confirms the close in `dev` and `prod`.
 
 ## Whether `player(id)` was called with another player's id
 
