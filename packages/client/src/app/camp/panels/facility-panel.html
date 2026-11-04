@@ -10,7 +10,7 @@
       @if (stock().length === 0) {
         <p>The warehouse is empty.</p>
       } @else {
-        <ul class="stock">
+        <ul class="stock" aria-label="Stock">
           @for (holding of stock(); track holding.material) {
             <li>{{ holding.balance }} of {{ game.camp()?.resourceCapacity }} {{ holding.material }}</li>
           }
