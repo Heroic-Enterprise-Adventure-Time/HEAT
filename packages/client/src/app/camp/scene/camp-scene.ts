@@ -105,6 +105,9 @@ function show(sprite: Sprite, texture: Texture, foot: number, mirrored: boolean,
  * facility shows: 0 for one the camp has not built, an unfinished building
  * (docs/process/assets.md, rule 17).
  */
+/** What the canvas is called, to a screen reader and to the browser test. */
+const SCENE_LABEL = 'The camp';
+
 export async function createCampScene(
   host: HTMLElement,
   layout: CampLayout,
@@ -117,6 +120,8 @@ export async function createCampScene(
   await app.init({ width: MAP_WIDTH, height: MAP_HEIGHT, background: '#4f7f2a', antialias: false, resolution: 1, roundPixels: true });
   app.canvas.style.imageRendering = 'pixelated';
   app.canvas.style.display = 'block';
+  app.canvas.setAttribute('role', 'img');
+  app.canvas.setAttribute('aria-label', SCENE_LABEL);
   host.appendChild(app.canvas);
 
   const tileset = (await (await fetch(`/art/ground/${layout.ground}/tileset.json`)).json()) as TilesetJson;

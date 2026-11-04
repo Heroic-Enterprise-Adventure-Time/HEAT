@@ -12,6 +12,9 @@ export default defineConfig({
   forbidOnly: true,
   workers: 1,
   timeout: 120_000,
+  // A runner draws in software, so a canvas can take longer than the default
+  // five seconds. No retries: one would hide a page that only sometimes works.
+  expect: { timeout: 15_000 },
   reporter: 'list',
   use: { ...devices['Desktop Chrome'], trace: 'retain-on-failure' },
 });
