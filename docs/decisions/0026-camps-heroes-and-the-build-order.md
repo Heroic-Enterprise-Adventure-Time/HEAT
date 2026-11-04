@@ -1,6 +1,6 @@
 # 0026: Camps, heroes and resources, and the camp ahead of the core loop
 
-- **Status:** Decided
+- **Status:** Decided; the keys are written through ElectroDB's templates per 0041
 - **Date:** 2026-10-19
 - **Settles:** Issue-78: how locations and camps relate, recruitment end to end, the keys of the camp and the hero, and where the camp goes in the build order.
 
@@ -18,6 +18,8 @@
 - `AT#<location>#FACILITY#<kind>` and `AT#<location>#HOLDING#<resource>`. The spike's `HOLDING#<material>` items move under their location; the old items in `dev` and `prod` are spike data, are no longer read, and are left in place.
 - `HERO#<heroId>`, with the location an attribute: a sort key cannot change, and a hero can move.
 - `LEDGER#<causeId>#<entry>`, the cause now an adventure id or a hero id.
+
+ElectroDB's templates reproduce these keys exactly, and the one `Query` by prefix stays one `Query` (decision 0041).
 
 **Recruitment.** `recruitHero(unitType, requestId)`: the request id becomes the hero id, so a repeated request is refused by the put's condition and answered with the hero already made. The hub draws the sprite set and the name; the client never chooses them.
 

@@ -1,6 +1,6 @@
 # 0023: Two tables, named for their partition key: player and location
 
-- **Status:** Decided
+- **Status:** Decided; the keys are written through ElectroDB's templates per 0041
 - **Date:** 2026-10-17
 - **Amends:** 0013, "separate tables with separate access roles" for private and public data: the split stands, and its reason and its names are these.
 
@@ -11,6 +11,8 @@ Game data lives in two DynamoDB tables per environment, `heat-<environment>-play
 **The player table** is partitioned by player: `PK = PLAYER#<id>`. Its item collection is everything the owner asks for in one read: the profile, heroes, holdings and facilities per location, the ledger, the open adventure. It is private: read only through the hub, under field-level authorization.
 
 **The location table** is partitioned by location, `PK = LOCATION#<id>`, and by adventure for the record settle looks up by id, `PK = ADVENTURE#<id>`. Its collections are what everyone may see: the adventures recently completed here, the heroes present, offered jobs, shared projects. One global secondary index with generic keys serves "replays of this job" and "my history" when the location view is built.
+
+ElectroDB's templates reproduce these keys exactly (decision 0041).
 
 **What is free to change, and what is not.** Items have no schema: an entity grows richer by writing more attributes, with old items defaulting in code. A new entity type is a new sort-key prefix in an existing collection. A new way of asking is a global secondary index, added to a live table and backfilled. The partition key is the one decision that is a new table and a copy, so each table is partitioned by the thing its readers ask for, and the register of access patterns in the overview is written before a feature, not after (0013).
 
