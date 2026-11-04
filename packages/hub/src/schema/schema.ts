@@ -55,8 +55,8 @@ import { MAX_ABILITY_ID, MAX_OVERRIDES, OVERRIDE_KINDS, type OverrideInput, PART
 import { builder } from "./builder.js";
 
 /**
- * The graph: a public player; their camps, heroes and the open adventure
- * behind the `self` scope; other players' heroes seen at a location, by
+ * The graph: a player's public id; their name, camps, heroes and the open
+ * adventure behind the `self` scope; other players' heroes seen at a location, by
  * their public fields only; a settled adventure, with its result and its
  * timeline; the deploy's version; joining, recruiting, retiring, building, and an
  * adventure started from the job board or a facility, submitted for verification and
@@ -300,10 +300,14 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
 });
 
 const PlayerRef = builder.objectRef<Player>("Player").implement({
-  description: "A player: the id and name anyone may read, and the camps, heroes and open adventure only the player may.",
+  description: "A player: the id anyone may read, and the name, camps, heroes and open adventure only the player may.",
   fields: (t) => ({
     id: t.exposeID("id"),
-    name: t.exposeString("name"),
+    name: t.exposeString("name", {
+      nullable: true,
+      description: "Private: the name the profile was made with, which is the player's id until a public name is decided. Null, with an error on this field, for anyone else.",
+      authScopes: (player) => ({ self: player.id }),
+    }),
     camps: t.field({
       type: [CampRef],
       nullable: true,
@@ -557,7 +561,7 @@ builder.queryFields((t) => ({
   player: t.field({
     type: PlayerRef,
     nullable: true,
-    description: "Public: any caller may look a player up by id.",
+    description: "Public: any caller may look a player up by id, and reads only the id back, or null where the id has no profile, so it also says whether an id is a player's.",
     args: { id: t.arg.id({ required: true }) },
     resolve: (_root, args, ctx) => ctx.repo.getPlayer(args.id),
   }),
@@ -605,9 +609,9 @@ builder.mutationFields((t) => ({
     type: PlayerRef,
     nullable: true,
     authScopes: { authenticated: true },
-    description: "Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.",
+    description: "Makes the signed-in player's profile if they have none, named with their id, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.",
     errors: answers("JoinGame", { field: "player", what: "the player's profile, made or found" }, []),
-    resolve: (_root, _args, ctx) => ctx.repo.joinPlayer({ id: callerId(ctx), name: ctx.playerName ?? callerId(ctx) }),
+    resolve: (_root, _args, ctx) => ctx.repo.joinPlayer(callerId(ctx)),
   }),
   recruitHero: t.field({
     type: HeroRef,
