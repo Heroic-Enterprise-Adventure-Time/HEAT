@@ -1,4 +1,7 @@
 import { GetObjectCommand, PutObjectCommand, type S3Client, S3ServiceException } from "@aws-sdk/client-s3";
+import * as z from "zod/mini";
+
+import { parseEnv, requiredVariable } from "./env.js";
 
 /**
  * The replay bucket (overview, "Services and data"; decision 0030): one
@@ -23,6 +26,12 @@ export interface Timelines {
   putIfAbsent(adventureId: string, body: string): Promise<boolean>;
   /** The stored body, or undefined if there is none. */
   get(adventureId: string): Promise<string | undefined>;
+}
+
+const ReplayEnv = z.object({ HEAT_REPLAY_BUCKET: requiredVariable });
+
+export function replayBucketFromEnv(env: NodeJS.ProcessEnv = process.env): string {
+  return parseEnv(ReplayEnv, env).HEAT_REPLAY_BUCKET;
 }
 
 const key = (adventureId: string) => `${adventureId}.json`;
