@@ -1,6 +1,6 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { EntityItem } from "electrodb";
-import { omit, range } from "es-toolkit";
+import { omit } from "es-toolkit";
 
 import {
   type AdventureOutcome,
@@ -219,13 +219,12 @@ type RawItem = { SK: string } & Record<string, unknown>;
 
 /**
  * What a read with `data: "raw"` answers, whatever `go`'s type says: one
- * DynamoDB page, whatever `pages` says. ElectroDB takes the page's
- * LastEvaluatedKey back as `cursor` as it is, though it types a cursor a string.
+ * DynamoDB page, whatever `pages` says.
  */
 interface RawPage {
   Items: RawItem[];
   ScannedCount: number;
-  LastEvaluatedKey?: string;
+  LastEvaluatedKey?: Record<string, unknown>;
 }
 
 function rawPage(response: { data: unknown }): RawPage {
@@ -240,7 +239,26 @@ function rawPage(response: { data: unknown }): RawPage {
 const STRONG = { consistent: true, ignoreOwnership: true } as const;
 const FROM_BEFORE = { ignoreOwnership: true } as const;
 
-function toSighting(i: EntityItem<HeatService["entities"]["sighting"]>): Sighting {
+/**
+ * An item as it is read. `required` holds on a write and not on a read, and an
+ * item from before ElectroDB may lack these, which their readers default.
+ */
+type MayLack<T, Absent extends keyof T> = Omit<T, Absent> & Partial<Pick<T, Absent>>;
+type Stored<Name extends keyof HeatService["entities"]> = EntityItem<HeatService["entities"][Name]>;
+
+/**
+ * Keeps each item of a transaction beside the error its condition throws, in
+ * the order of the items, for `throwIfCancelled`; an item whose write has no
+ * condition takes its verb's, which nothing can then raise.
+ */
+function failing(failures: Failure[]) {
+  return <Item>(failure: Failure, item: Item): Item => {
+    failures.push(failure);
+    return item;
+  };
+}
+
+function toSighting(i: MayLack<Stored<"sighting">, "level">): Sighting {
   return {
     heroId: i.heroId,
     location: i.location,
@@ -257,7 +275,17 @@ function emptyCamp(location: string): Camp {
   return { location, hallLevel: 1, warehouseLevel: 1, activeHeroes: 0, livingHeroes: 0, holdings: [], facilities: {}, stored: false };
 }
 
-function toHero(i: EntityItem<HeatService["entities"]["hero"]>): Hero {
+function campCounts(i: MayLack<Stored<"camp">, "hallLevel" | "warehouseLevel" | "activeHeroes" | "livingHeroes">) {
+  return {
+    hallLevel: i.hallLevel ?? 1,
+    warehouseLevel: i.warehouseLevel ?? 1,
+    activeHeroes: i.activeHeroes ?? 0,
+    livingHeroes: i.livingHeroes ?? 0,
+    stored: true,
+  };
+}
+
+function toHero(i: MayLack<Stored<"hero">, "level" | "xp" | "picks" | "status">): Hero {
   return {
     id: i.id,
     location: i.location,
@@ -361,14 +389,7 @@ export class Repository {
       if (!location) continue;
       const camp = campAt(location);
       if (kind === "CAMP") {
-        const i = must(campEntity.parse({ Item: item }, FROM_BEFORE).data, "a camp's item");
-        Object.assign(camp, {
-          hallLevel: i.hallLevel ?? 1,
-          warehouseLevel: i.warehouseLevel ?? 1,
-          activeHeroes: i.activeHeroes ?? 0,
-          livingHeroes: i.livingHeroes ?? 0,
-          stored: true,
-        });
+        Object.assign(camp, campCounts(must(campEntity.parse({ Item: item }, FROM_BEFORE).data, "a camp's item")));
       } else if (kind === "HOLDING") {
         const i = must(holdingEntity.parse({ Item: item }, FROM_BEFORE).data, "a holding's item");
         camp.holdings.push({ material: i.material, balance: i.balance });
@@ -427,28 +448,36 @@ export class Repository {
     const started: AdventureRecord = { ...record, playerId, status: "OPEN" };
     const { adventureId, seed, startedAt, location } = record;
     const heroIds = record.snapshot.heroes.map((h) => h.heroId);
+    const failures: Failure[] = [];
+    const on = failing(failures);
     const result = await this.service.transaction
       .write((items) => [
-        items.open.create({ playerId, adventureId, seed, startedAt }).commit(),
+        on(AdventureAlreadyOpen, items.open.create({ playerId, adventureId, seed, startedAt }).commit()),
         // A record being started has no result and no end, which an absent attribute says.
-        items.adventure.create(omit(started, ["result", "settledAt", "discardedAt"])).commit(),
+        on(AlreadyApplied, items.adventure.create(omit(started, ["result", "settledAt", "discardedAt"])).commit()),
         ...heroIds.map((id) =>
-          items.hero
-            .update({ playerId, id })
-            .set({ adventureId })
-            // True of a hero on no adventure: no adventureId attribute, or a null one, which a hero item written whole would carry.
-            .where((a, op) => `${op.eq(a.status, "ALIVE")} AND ${op.eq(a.location, location)} AND NOT ${op.type(a.adventureId, "S")}`)
-            .commit(),
+          on(
+            HeroChanged,
+            items.hero
+              .update({ playerId, id })
+              .set({ adventureId })
+              // True of a hero on no adventure: no adventureId attribute, or a null one, which a hero item written whole would carry.
+              .where((a, op) => `${op.eq(a.status, "ALIVE")} AND ${op.eq(a.location, location)} AND NOT ${op.type(a.adventureId, "S")}`)
+              .commit(),
+          ),
         ),
         ...needs.map((r) =>
-          items.facility
-            .check({ playerId, location, kind: r.kind })
-            .where((a, op) => op.gte(a.level, r.level))
-            .commit(),
+          on(
+            FacilityMissing,
+            items.facility
+              .check({ playerId, location, kind: r.kind })
+              .where((a, op) => op.gte(a.level, r.level))
+              .commit(),
+          ),
         ),
       ])
       .go();
-    throwIfCancelled(result, [AdventureAlreadyOpen, AlreadyApplied, ...heroIds.map(() => HeroChanged), ...needs.map(() => FacilityMissing)]);
+    throwIfCancelled(result, failures);
     return started;
   }
 
@@ -459,17 +488,22 @@ export class Repository {
    */
   async debit(playerId: string, location: string, causeId: string, material: Material, amount: number): Promise<void> {
     if (amount <= 0) throw new RangeError("amount must be positive");
+    const failures: Failure[] = [];
+    const on = failing(failures);
     const result = await this.service.transaction
       .write((items) => [
-        items.holding
-          .update({ playerId, location, material })
-          .subtract({ balance: amount })
-          .where((a, op) => op.gte(a.balance, amount))
-          .commit(),
-        items.ledger.create({ playerId, cause: causeId, entry: `debit#${material}`, location, material, delta: -amount }).commit(),
+        on(
+          InsufficientBalance,
+          items.holding
+            .update({ playerId, location, material })
+            .subtract({ balance: amount })
+            .where((a, op) => op.gte(a.balance, amount))
+            .commit(),
+        ),
+        on(AlreadyApplied, items.ledger.create({ playerId, cause: causeId, entry: `debit#${material}`, location, material, delta: -amount }).commit()),
       ])
       .go();
-    throwIfCancelled(result, [InsufficientBalance, AlreadyApplied]);
+    throwIfCancelled(result, failures);
   }
 
   /**
@@ -494,67 +528,80 @@ export class Repository {
    */
   async settle(playerId: string, s: Settlement, now = new Date()): Promise<void> {
     const { adventureId, location, warehouseLevel, dead } = s;
+    const failures: Failure[] = [];
+    const on = failing(failures);
     const write = await this.service.transaction
       .write((items) => [
-        items.open
-          .delete({ playerId })
-          .where((a, op) => op.eq(a.adventureId, adventureId))
-          .commit(),
-        items.adventure
-          .update({ adventureId })
-          .set({ status: "SETTLED", result: s.result, settledAt: now.toISOString() })
-          .where((a, op) => op.eq(a.status, "OPEN"))
-          .commit(),
-        dead.length > 0
-          ? items.camp
-              .update({ playerId, location })
-              .subtract({ livingHeroes: dead.length })
-              .where((a, op) => `${op.eq(a.warehouseLevel, warehouseLevel)} AND ${op.gte(a.livingHeroes, dead.length)}`)
-              .commit()
-          : items.camp
-              .check({ playerId, location })
-              .where((a, op) => op.eq(a.warehouseLevel, warehouseLevel))
-              .commit(),
-        ...s.survivors.flatMap(({ hero, xp, level }) => [
-          items.hero
-            .update({ playerId, id: hero.id })
-            .set({ xp, level })
-            .remove(["adventureId"])
+        on(
+          AdventureClosed,
+          items.open
+            .delete({ playerId })
             .where((a, op) => op.eq(a.adventureId, adventureId))
             .commit(),
-          items.sighting.put(sightingOf({ ...hero, xp, level }, now)).commit(),
+        ),
+        on(
+          AdventureClosed,
+          items.adventure
+            .update({ adventureId })
+            .set({ status: "SETTLED", result: s.result, settledAt: now.toISOString() })
+            .where((a, op) => op.eq(a.status, "OPEN"))
+            .commit(),
+        ),
+        on(
+          CampChanged,
+          dead.length > 0
+            ? items.camp
+                .update({ playerId, location })
+                .subtract({ livingHeroes: dead.length })
+                .where((a, op) => `${op.eq(a.warehouseLevel, warehouseLevel)} AND ${op.gte(a.livingHeroes, dead.length)}`)
+                .commit()
+            : items.camp
+                .check({ playerId, location })
+                .where((a, op) => op.eq(a.warehouseLevel, warehouseLevel))
+                .commit(),
+        ),
+        ...s.survivors.flatMap(({ hero, xp, level }) => [
+          on(
+            HeroChanged,
+            items.hero
+              .update({ playerId, id: hero.id })
+              .set({ xp, level })
+              .remove(["adventureId"])
+              .where((a, op) => op.eq(a.adventureId, adventureId))
+              .commit(),
+          ),
+          on(HeroChanged, items.sighting.put(sightingOf({ ...hero, xp, level }, now)).commit()),
         ]),
         ...dead.flatMap((hero) => [
-          items.hero
-            .update({ playerId, id: hero.id })
-            .set({ status: "DEAD" })
-            .remove(["adventureId"])
-            .where((a, op) => `${op.eq(a.status, "ALIVE")} AND ${op.eq(a.adventureId, adventureId)}`)
-            .commit(),
-          items.sighting.delete({ location: hero.location, heroId: hero.id }).commit(),
+          on(
+            HeroChanged,
+            items.hero
+              .update({ playerId, id: hero.id })
+              .set({ status: "DEAD" })
+              .remove(["adventureId"])
+              .where((a, op) => `${op.eq(a.status, "ALIVE")} AND ${op.eq(a.adventureId, adventureId)}`)
+              .commit(),
+          ),
+          on(HeroChanged, items.sighting.delete({ location: hero.location, heroId: hero.id }).commit()),
         ]),
         ...s.holdings.flatMap(({ material, read, credit, lost }) => [
           ...(credit > 0
             ? [
-                items.holding
-                  .update({ playerId, location, material })
-                  .set({ balance: (read ?? 0) + credit })
-                  .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
-                  .commit(),
+                on(
+                  CampChanged,
+                  items.holding
+                    .update({ playerId, location, material })
+                    .set({ balance: (read ?? 0) + credit })
+                    .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
+                    .commit(),
+                ),
               ]
             : []),
-          items.ledger.create({ playerId, cause: adventureId, entry: `credit#${material}`, location, material, delta: credit, lost }).commit(),
+          on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `credit#${material}`, location, material, delta: credit, lost }).commit()),
         ]),
       ])
       .go();
-    throwIfCancelled(write, [
-      AdventureClosed,
-      AdventureClosed,
-      CampChanged,
-      ...s.survivors.flatMap(() => [HeroChanged, HeroChanged]),
-      ...dead.flatMap(() => [HeroChanged, HeroChanged]),
-      ...s.holdings.flatMap((h) => (h.credit > 0 ? [CampChanged, AdventureClosed] : [AdventureClosed])),
-    ]);
+    throwIfCancelled(write, failures);
   }
 
   /**
@@ -567,27 +614,38 @@ export class Repository {
   async discard(playerId: string, record: AdventureRecord, now = new Date()): Promise<void> {
     const { adventureId } = record;
     const heroIds = record.snapshot.heroes.map((h) => h.heroId);
+    const failures: Failure[] = [];
+    const on = failing(failures);
     const result = await this.service.transaction
       .write((items) => [
-        items.open
-          .delete({ playerId })
-          .where((a, op) => op.eq(a.adventureId, adventureId))
-          .commit(),
-        items.adventure
-          .update({ adventureId })
-          .set({ status: "DISCARDED", discardedAt: now.toISOString() })
-          .where((a, op) => `${op.eq(a.status, "OPEN")} AND ${op.eq(a.playerId, playerId)}`)
-          .commit(),
-        ...heroIds.map((id) =>
-          items.hero
-            .update({ playerId, id })
-            .remove(["adventureId"])
+        on(
+          AdventureClosed,
+          items.open
+            .delete({ playerId })
             .where((a, op) => op.eq(a.adventureId, adventureId))
             .commit(),
         ),
+        on(
+          AdventureClosed,
+          items.adventure
+            .update({ adventureId })
+            .set({ status: "DISCARDED", discardedAt: now.toISOString() })
+            .where((a, op) => `${op.eq(a.status, "OPEN")} AND ${op.eq(a.playerId, playerId)}`)
+            .commit(),
+        ),
+        ...heroIds.map((id) =>
+          on(
+            HeroChanged,
+            items.hero
+              .update({ playerId, id })
+              .remove(["adventureId"])
+              .where((a, op) => op.eq(a.adventureId, adventureId))
+              .commit(),
+          ),
+        ),
       ])
       .go();
-    throwIfCancelled(result, [AdventureClosed, AdventureClosed, ...heroIds.map(() => HeroChanged)]);
+    throwIfCancelled(result, failures);
   }
 
   /**
@@ -620,40 +678,48 @@ export class Repository {
     living: "none" | "some" | "any",
   ): Promise<Hero> {
     const { location } = camp;
+    const failures: Failure[] = [];
+    const on = failing(failures);
     const result = await this.service.transaction
       .write((items) => [
         // A hero being recruited is neither retired nor on an adventure, which an absent attribute says.
-        items.hero.create({ ...omit(hero, ["retiredAt", "adventureId"]), playerId }).commit(),
-        items.camp
-          .update({ playerId, location })
-          .data((a, op) => {
-            op.ifNotExists(a.hallLevel, 1);
-            op.ifNotExists(a.warehouseLevel, 1);
-            op.add(a.activeHeroes, 1);
-            op.add(a.livingHeroes, 1);
-          })
-          .where((a, op) => {
-            // No item is a camp at level 1 with no heroes, and every camp item has a hall level.
-            if (!camp.stored) return op.notExists(a.hallLevel);
-            const conditions = [op.eq(a.hallLevel, camp.hallLevel), op.lt(a.activeHeroes, capacity)];
-            if (living === "none") conditions.push(op.eq(a.livingHeroes, 0));
-            if (living === "some") conditions.push(op.gt(a.livingHeroes, 0));
-            return conditions.join(" AND ");
-          })
-          .commit(),
-        ...cost.flatMap(({ material, amount }) => [
-          items.holding
-            .update({ playerId, location, material })
-            .subtract({ balance: amount })
-            .where((a, op) => op.gte(a.balance, amount))
+        on(HeroExists, items.hero.create({ ...omit(hero, ["retiredAt", "adventureId"]), playerId }).commit()),
+        on(
+          RecruitRefused,
+          items.camp
+            .update({ playerId, location })
+            .data((a, op) => {
+              op.ifNotExists(a.hallLevel, 1);
+              op.ifNotExists(a.warehouseLevel, 1);
+              op.add(a.activeHeroes, 1);
+              op.add(a.livingHeroes, 1);
+            })
+            .where((a, op) => {
+              // No item is a camp at level 1 with no heroes, and every camp item has a hall level.
+              if (!camp.stored) return op.notExists(a.hallLevel);
+              const conditions = [op.eq(a.hallLevel, camp.hallLevel), op.lt(a.activeHeroes, capacity)];
+              if (living === "none") conditions.push(op.eq(a.livingHeroes, 0));
+              if (living === "some") conditions.push(op.gt(a.livingHeroes, 0));
+              return conditions.join(" AND ");
+            })
             .commit(),
-          items.ledger.create({ playerId, cause: hero.id, entry: `debit#${material}`, location, material, delta: -amount }).commit(),
+        ),
+        ...cost.flatMap(({ material, amount }) => [
+          on(
+            InsufficientBalance,
+            items.holding
+              .update({ playerId, location, material })
+              .subtract({ balance: amount })
+              .where((a, op) => op.gte(a.balance, amount))
+              .commit(),
+          ),
+          // A ledger entry under the hero's id exists only if the hero does, so its failure is a repeat too.
+          on(HeroExists, items.ledger.create({ playerId, cause: hero.id, entry: `debit#${material}`, location, material, delta: -amount }).commit()),
         ]),
-        items.sighting.put(sightingOf(hero, new Date(hero.recruitedAt))).commit(),
+        on(HeroExists, items.sighting.put(sightingOf(hero, new Date(hero.recruitedAt))).commit()),
       ])
       .go();
-    // A ledger entry under the hero's id exists only if the hero does, so its failure is a repeat too.
-    throwIfCancelled(result, [HeroExists, RecruitRefused, ...cost.flatMap(() => [InsufficientBalance, HeroExists])]);
+    throwIfCancelled(result, failures);
     return hero;
   }
 
@@ -685,63 +751,79 @@ export class Repository {
     // No item is a camp at level 1 with no heroes, which no requirement above level 1 is met by.
     if (onCamp && !camp.stored && campChecks.length > 0) throw new BuildRefused("a requirement is not met");
     const cause = buildCause(location, b.kind, level);
+    const failures: Failure[] = [];
+    const on = failing(failures);
 
     const result = await this.service.transaction
       .write((items) => {
         const levels = onCamp
           ? [
-              items.camp
-                .update({ playerId, location })
-                .data((a, op) => {
-                  op.set(a[onCamp], level);
-                  op.ifNotExists(onCamp === "hallLevel" ? a.warehouseLevel : a.hallLevel, 1);
-                  op.ifNotExists(a.activeHeroes, 0);
-                  op.ifNotExists(a.livingHeroes, 0);
-                })
-                .where((a, op) =>
-                  camp.stored
-                    ? [op.eq(a[onCamp], b.from), ...campChecks.map((check) => op.gte(a[check.attribute], check.level))].join(" AND ")
-                    : op.notExists(a.hallLevel),
-                )
-                .commit(),
+              on(
+                BuildRefused,
+                items.camp
+                  .update({ playerId, location })
+                  .data((a, op) => {
+                    op.set(a[onCamp], level);
+                    op.ifNotExists(onCamp === "hallLevel" ? a.warehouseLevel : a.hallLevel, 1);
+                    op.ifNotExists(a.activeHeroes, 0);
+                    op.ifNotExists(a.livingHeroes, 0);
+                  })
+                  .where((a, op) =>
+                    camp.stored
+                      ? [op.eq(a[onCamp], b.from), ...campChecks.map((check) => op.gte(a[check.attribute], check.level))].join(" AND ")
+                      : op.notExists(a.hallLevel),
+                  )
+                  .commit(),
+              ),
             ]
           : [
-              items.facility
-                .update({ playerId, location, kind: b.kind })
-                .set({ level })
-                .where((a, op) => (b.from === 0 ? op.notExists(a.level) : op.eq(a.level, b.from)))
-                .commit(),
+              on(
+                BuildRefused,
+                items.facility
+                  .update({ playerId, location, kind: b.kind })
+                  .set({ level })
+                  .where((a, op) => (b.from === 0 ? op.notExists(a.level) : op.eq(a.level, b.from)))
+                  .commit(),
+              ),
               ...(campChecks.length > 0
                 ? [
-                    items.camp
-                      .check({ playerId, location })
-                      .where((a, op) => campChecks.map((check) => op.gte(a[check.attribute], check.level)).join(" AND "))
-                      .commit(),
+                    on(
+                      BuildRefused,
+                      items.camp
+                        .check({ playerId, location })
+                        .where((a, op) => campChecks.map((check) => op.gte(a[check.attribute], check.level)).join(" AND "))
+                        .commit(),
+                    ),
                   ]
                 : []),
             ];
         return [
           ...levels,
           ...facilityChecks.map((r) =>
-            items.facility
-              .check({ playerId, location, kind: r.kind })
-              .where((a, op) => op.gte(a.level, r.level))
-              .commit(),
+            on(
+              BuildRefused,
+              items.facility
+                .check({ playerId, location, kind: r.kind })
+                .where((a, op) => op.gte(a.level, r.level))
+                .commit(),
+            ),
           ),
           ...b.cost.flatMap(({ material, amount }) => [
-            items.holding
-              .update({ playerId, location, material })
-              .subtract({ balance: amount })
-              .where((a, op) => op.gte(a.balance, amount))
-              .commit(),
-            items.ledger.create({ playerId, cause, entry: `debit#${material}`, location, material, delta: -amount }).commit(),
+            on(
+              InsufficientBalance,
+              items.holding
+                .update({ playerId, location, material })
+                .subtract({ balance: amount })
+                .where((a, op) => op.gte(a.balance, amount))
+                .commit(),
+            ),
+            // A ledger entry under the build's cause exists only if the level was built, so its failure is a repeat too.
+            on(BuildRefused, items.ledger.create({ playerId, cause, entry: `debit#${material}`, location, material, delta: -amount }).commit()),
           ]),
         ];
       })
       .go();
-    const checks = (onCamp ? 1 : campChecks.length > 0 ? 2 : 1) + facilityChecks.length;
-    // A ledger entry under the build's cause exists only if the level was built, so its failure is a repeat too.
-    throwIfCancelled(result, [...range(checks).map(() => BuildRefused), ...b.cost.flatMap(() => [InsufficientBalance, BuildRefused])]);
+    throwIfCancelled(result, failures);
   }
 
   /**
@@ -757,22 +839,30 @@ export class Repository {
   async retire(playerId: string, hero: Hero, now = new Date()): Promise<Hero> {
     const retiredAt = now.toISOString();
     const alive = hero.status === "ALIVE";
+    const failures: Failure[] = [];
+    const on = failing(failures);
     const result = await this.service.transaction
       .write((items) => [
-        items.hero
-          .update({ playerId, id: hero.id })
-          .set({ status: "RETIRED", retiredAt })
-          .where((a, op) => `${op.eq(a.status, hero.status)} AND ${op.eq(a.location, hero.location)} AND NOT ${op.type(a.adventureId, "S")}`)
-          .commit(),
-        items.camp
-          .update({ playerId, location: hero.location })
-          .subtract({ activeHeroes: 1, ...(alive ? { livingHeroes: 1 } : {}) })
-          .where((a, op) => (alive ? `${op.gt(a.activeHeroes, 0)} AND ${op.gt(a.livingHeroes, 0)}` : op.gt(a.activeHeroes, 0)))
-          .commit(),
-        items.sighting.delete({ location: hero.location, heroId: hero.id }).commit(),
+        on(
+          HeroChanged,
+          items.hero
+            .update({ playerId, id: hero.id })
+            .set({ status: "RETIRED", retiredAt })
+            .where((a, op) => `${op.eq(a.status, hero.status)} AND ${op.eq(a.location, hero.location)} AND NOT ${op.type(a.adventureId, "S")}`)
+            .commit(),
+        ),
+        on(
+          HeroChanged,
+          items.camp
+            .update({ playerId, location: hero.location })
+            .subtract({ activeHeroes: 1, ...(alive ? { livingHeroes: 1 } : {}) })
+            .where((a, op) => (alive ? `${op.gt(a.activeHeroes, 0)} AND ${op.gt(a.livingHeroes, 0)}` : op.gt(a.activeHeroes, 0)))
+            .commit(),
+        ),
+        on(HeroChanged, items.sighting.delete({ location: hero.location, heroId: hero.id }).commit()),
       ])
       .go();
-    throwIfCancelled(result, [HeroChanged, HeroChanged]);
+    throwIfCancelled(result, failures);
     return { ...hero, status: "RETIRED", retiredAt };
   }
 
@@ -808,12 +898,14 @@ export class Repository {
   private async atItems(playerId: string): Promise<RawItem[]> {
     const query = this.service.entities.camp.query.primary({ playerId });
     const items: RawItem[] = [];
-    let cursor: string | null = null;
+    let start: RawPage["LastEvaluatedKey"];
     do {
+      // ElectroDB takes a raw page's LastEvaluatedKey back as `cursor` as it is, though it types a cursor a string.
+      const cursor = (start ?? null) as unknown as string | null;
       const page: RawPage = rawPage(await query.go({ ...STRONG, data: "raw", cursor }));
       items.push(...page.Items);
-      cursor = page.LastEvaluatedKey ?? null;
-    } while (cursor);
+      start = page.LastEvaluatedKey;
+    } while (start);
     return items;
   }
 }

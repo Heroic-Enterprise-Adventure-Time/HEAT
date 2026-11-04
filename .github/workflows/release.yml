@@ -28,7 +28,7 @@
 #           anonymous half of scripts/e2e.mjs, because prod has no
 #           password-flow client and no test user (Issue-41). No test users
 #           are created and no cold start is read, since nothing invokes the
-#           function. Then the backfill of decision 0041, until Issue-213.
+#           function. Then the backfill of decision 0042, until Issue-213.
 #   tag     after the smoke test: the date-based tag on the merge commit and
 #           the GitHub Release from the pull request (scripts/tag-release.sh).
 #           The tag is documentation; it triggers nothing.
@@ -322,8 +322,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       # Items from before ElectroDB made whole, and the count left, on every
-      # apply until Issue-213 removes this step (decision 0041).
+      # apply until Issue-213 removes this step (decision 0042). prod is live by
+      # now, so a failure stays on this step and does not cost the release its
+      # tag (docs/process/deployment.md, rule 4).
       - name: Backfill ElectroDB's identifiers
+        continue-on-error: true
         env:
           HEAT_PLAYER_TABLE: ${{ env.STACK }}-player
           HEAT_LOCATION_TABLE: ${{ env.STACK }}-location

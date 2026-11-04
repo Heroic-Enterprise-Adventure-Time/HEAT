@@ -1,19 +1,21 @@
 import { randomUUID } from "node:crypto";
 
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import { TransactionConflictException } from "@aws-sdk/client-dynamodb";
 import { DeleteCommand, type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { must } from "@heat/engine";
 
 import { backfill, makeWhole } from "../src/db/backfill.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
-import { player, storedItem } from "./data.js";
+import { player, putOldCampsPastAPage, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
-import { ensureTable } from "./setup/table.js";
+import { ensureTables } from "./setup/table.js";
 
 /**
- * The backfill of decision 0041, over whole tables of its own: every other test
- * file writes items without identifiers into the shared ones.
+ * The backfill of decision 0042, over whole tables, a pair for each test: every
+ * other test file writes items without identifiers into the shared ones.
  */
 
 let db: DynamoDBDocumentClient;
@@ -22,14 +24,12 @@ let service: HeatService;
 
 const at = "millbrook";
 
-beforeAll(async () => {
+beforeEach(async () => {
   const config = configFromEnv();
   db = createDocumentClient(config);
   tables = { player: `backfill-player-${randomUUID()}`, location: `backfill-location-${randomUUID()}` };
   service = createService(db, tables);
-  const client = new DynamoDBClient({ region: "us-east-1", endpoint: config.endpoint ?? "" });
-  await ensureTable(client, tables.player);
-  await ensureTable(client, tables.location);
+  await ensureTables(must(config.endpoint, "DYNAMODB_ENDPOINT"), tables.player, tables.location);
 });
 
 const putPlayerItem = (item: Record<string, unknown>) => db.send(new PutCommand({ TableName: tables.player, Item: item }));
@@ -74,24 +74,32 @@ describe("the backfill", () => {
     const key = playerKeys.open(player());
     await putPlayerItem({ ...key, adventureId: "a", seed: "s", startedAt: "2026-10-21T12:00:00.000Z" });
     await db.send(new DeleteCommand({ TableName: tables.player, Key: key }));
-    expect(await makeWhole(db, tables.player, key)).toBe(false);
+    expect(await makeWhole(db, tables.player, key)).toBe("not needed");
     expect(await storedItem(db, tables.player, key)).toBeUndefined();
   });
 
   it("leaves a whole item as it is", async () => {
     const p = player();
     await service.entities.profile.put({ id: p, name: "New" }).go();
-    expect(await makeWhole(db, tables.player, playerKeys.profile(p))).toBe(false);
+    expect(await makeWhole(db, tables.player, playerKeys.profile(p))).toBe("not needed");
+  });
+
+  it("leaves an item a transaction is committing on unmade, and counts it as remaining", async () => {
+    const key = playerKeys.profile(player());
+    await putPlayerItem({ ...key, id: "p", name: "Old" });
+    const client = createDocumentClient(configFromEnv());
+    client.middlewareStack.add(
+      () => () => Promise.reject(new TransactionConflictException({ message: "committing", $metadata: {} })),
+      { step: "initialize" },
+    );
+    expect(await makeWhole(client, tables.player, key)).toBe("not made");
+    expect(await storedItem(db, tables.player, key)).not.toHaveProperty("__edb_e__");
   });
 
   it("reads past a page of the scan, and counts an item it does not know as remaining", async () => {
     const p = player();
-    const padding = "x".repeat(350_000);
-    for (const location of ["a", "b", "c", "d"]) {
-      await putPlayerItem({ ...playerKeys.camp(p, location), location, hallLevel: 1, padding });
-    }
+    await putOldCampsPastAPage(db, tables.player, p, ["a", "b", "c", "d"]);
     await putPlayerItem({ PK: `PLAYER#${p}`, SK: "UNKNOWN#item" });
-    expect(await backfill(db, tables)).toEqual({ written: 4, remaining: 1, leftAside: 2 });
-    await db.send(new DeleteCommand({ TableName: tables.player, Key: { PK: `PLAYER#${p}`, SK: "UNKNOWN#item" } }));
+    expect(await backfill(db, tables)).toEqual({ written: 4, remaining: 1, leftAside: 0 });
   });
 });

@@ -51,7 +51,11 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Shared test helpers
 
-19. **A helper shared by a package's test files is written once**, in one module under the package's `test/` that every test file imports, never copied into each; `packages/hub/test/refusal.ts` holds `refusal` and `BAD_USER_INPUT`. From the review of PR-192, which found five copies.
+19. **A helper shared by a package's test files is written once**, in one module under the package's `test/` that every test file imports, never copied into each; `packages/hub/test/refusal.ts` holds `refusal` and `BAD_USER_INPUT`. This covers a block of set-up repeated across test files, named or not. From the review of PR-192, which found five copies, and of PR-214.
+
+### Types over a library's
+
+20. **A type that corrects a library's says the value's true shape, and any cast the library's signature needs stands at the call.** A type bent so that a value passes reads as true everywhere it is used; the cast at the call says once where the library's signature is wrong. From the review of PR-214, on `RawPage.LastEvaluatedKey`.
 
 ## Held back
 

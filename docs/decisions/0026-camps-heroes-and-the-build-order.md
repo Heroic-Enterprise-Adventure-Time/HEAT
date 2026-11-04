@@ -19,8 +19,6 @@
 - `HERO#<heroId>`, with the location an attribute: a sort key cannot change, and a hero can move.
 - `LEDGER#<causeId>#<entry>`, the cause now an adventure id or a hero id.
 
-ElectroDB's templates reproduce these keys exactly, and the one `Query` by prefix stays one `Query` (decision 0041).
-
 **Recruitment.** `recruitHero(unitType, requestId)`: the request id becomes the hero id, so a repeated request is refused by the put's condition and answered with the hero already made. The hub draws the sprite set and the name; the client never chooses them.
 
 **The build order.** Step 2 becomes "Camp and core loop": the camp's art, the camp scene with the heroes hall and the free villager, Issue-15 starting adventures from the job board, then paid recruitment with the roster and retirement, which needs the resources adventures bring in. A party needs heroes, and heroes come from the hall, so the camp is a prerequisite of the loop, not a later view. Step 3 becomes the shared camp.

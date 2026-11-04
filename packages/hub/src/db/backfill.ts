@@ -7,7 +7,7 @@ import { ITEM_VERSION } from "./keys.js";
 /**
  * Makes the items the hand-written repository wrote whole for ElectroDB:
  * their identifiers and the composite attributes of their keys, which the keys
- * give (decision 0041, step 3). The pipeline runs it under the apply role, after
+ * give (decisions 0041 and 0042). The pipeline runs it under the apply role, after
  * every apply, until Issue-213 removes it; the one code outside the repository
  * that calls DynamoDB (graphql.md, rule 17), because no entity can read an item
  * none owns. It reads only keys, and tells only counts.
@@ -16,7 +16,7 @@ import { ITEM_VERSION } from "./keys.js";
 export interface Backfilled {
   /** Items made whole by this run. */
   written: number;
-  /** Items still without identifiers afterwards, which only a later run can see through: a conflict, or a write from the previous route. */
+  /** Items it could not make whole, which a later run tries again: a conflict with a transaction, or an item of a kind it does not know. */
   remaining: number;
   /** Items left as they are: the spike's holdings, which nothing reads, and sightings, which expire within a week. */
   leftAside: number;
@@ -53,11 +53,11 @@ function isLeftAside(pk: string, sk: string): boolean {
  * deleted the item since the scan from having it written back as a husk, which
  * an open item would make of a player who can never start again.
  * `attribute_not_exists` on the identifier makes it safe to repeat and safe
- * beside live writes. Answers whether it wrote.
+ * beside live writes.
  */
-export async function makeWhole(db: DynamoDBDocumentClient, table: string, key: { PK: string; SK: string }): Promise<boolean> {
+export async function makeWhole(db: DynamoDBDocumentClient, table: string, key: { PK: string; SK: string }): Promise<"written" | "not needed" | "not made"> {
   const whole = wholeOf(key.PK, key.SK);
-  if (!whole) return false;
+  if (!whole) return "not made";
   const attributes = Object.entries({ __edb_e__: whole.entity, __edb_v__: ITEM_VERSION, ...whole.attributes });
   try {
     await db.send(new UpdateCommand({
@@ -68,9 +68,10 @@ export async function makeWhole(db: DynamoDBDocumentClient, table: string, key: 
       ExpressionAttributeNames: { "#e": "__edb_e__", ...Object.fromEntries(attributes.map(([name], n) => [`#a${n}`, name])) },
       ExpressionAttributeValues: Object.fromEntries(attributes.map(([, value], n) => [`:a${n}`, value])),
     }));
-    return true;
+    return "written";
   } catch (e) {
-    if (e instanceof ConditionalCheckFailedException || e instanceof TransactionConflictException) return false;
+    if (e instanceof ConditionalCheckFailedException) return "not needed";
+    if (e instanceof TransactionConflictException) return "not made";
     throw e;
   }
 }
@@ -81,7 +82,6 @@ async function* keysWithoutIdentifiers(db: DynamoDBDocumentClient, table: string
     ProjectionExpression: "PK, SK",
     FilterExpression: "attribute_not_exists(#e)",
     ExpressionAttributeNames: { "#e": "__edb_e__" },
-    ConsistentRead: true,
   });
   for await (const page of pages) yield* (page.Items ?? []) as { PK: string; SK: string }[];
 }
@@ -90,11 +90,13 @@ export async function backfill(db: DynamoDBDocumentClient, tables: Tables): Prom
   const count: Backfilled = { written: 0, remaining: 0, leftAside: 0 };
   for (const table of [tables.player, tables.location]) {
     for await (const key of keysWithoutIdentifiers(db, table)) {
-      if (!isLeftAside(key.PK, key.SK) && (await makeWhole(db, table, key))) count.written++;
-    }
-    for await (const key of keysWithoutIdentifiers(db, table)) {
-      if (isLeftAside(key.PK, key.SK)) count.leftAside++;
-      else count.remaining++;
+      if (isLeftAside(key.PK, key.SK)) {
+        count.leftAside++;
+        continue;
+      }
+      const made = await makeWhole(db, table, key);
+      if (made === "written") count.written++;
+      if (made === "not made") count.remaining++;
     }
   }
   return count;

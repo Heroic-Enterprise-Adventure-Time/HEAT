@@ -12,8 +12,6 @@ Game data lives in two DynamoDB tables per environment, `heat-<environment>-play
 
 **The location table** is partitioned by location, `PK = LOCATION#<id>`, and by adventure for the record settle looks up by id, `PK = ADVENTURE#<id>`. Its collections are what everyone may see: the adventures recently completed here, the heroes present, offered jobs, shared projects. One global secondary index with generic keys serves "replays of this job" and "my history" when the location view is built.
 
-ElectroDB's templates reproduce these keys exactly (decision 0041).
-
 **What is free to change, and what is not.** Items have no schema: an entity grows richer by writing more attributes, with old items defaulting in code. A new entity type is a new sort-key prefix in an existing collection. A new way of asking is a global secondary index, added to a live table and backfilled. The partition key is the one decision that is a new table and a copy, so each table is partitioned by the thing its readers ask for, and the register of access patterns in the overview is written before a feature, not after (0013).
 
 **Why two and not one.** AWS's guidance is as few tables as possible, with the stated exception of "datasets that have very different access patterns" (DynamoDB developer guide, "NoSQL design for DynamoDB", read 2026-10-17). These two differ in every per-table property: partition key, reader, stream and backup. A role that reads the location table, the live-channel function or the reporting export, cannot read a player's holdings, which only a table boundary gives cleanly. Start and settle write to both tables in one `TransactWriteItems`, which spans tables in one account and region, so the split costs the transactions nothing.

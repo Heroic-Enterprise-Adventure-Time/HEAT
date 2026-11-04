@@ -10,7 +10,7 @@ import { must } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
 import { type Hero, HeroChanged, Repository, TransactionConflict } from "../src/db/repository.js";
-import { player, storedItem } from "./data.js";
+import { player, putOldCampsPastAPage, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -298,10 +298,8 @@ describe("the reads of decision 0041", () => {
   it("reads the camps past a page, which a raw read does not do by itself", async () => {
     const p = player();
     const locations = ["a", "b", "c", "d"];
-    const padding = "x".repeat(350_000);
-    for (const location of locations) {
-      await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.camp(p, location), location, hallLevel: 1, padding } }));
-    }
+    await putOldCampsPastAPage(db, tables.player, p, locations);
+    // `pages` has no effect on a raw read, which is why the repository pages by hand (decision 0042).
     const first = await service.entities.camp.query.primary({ playerId: p }).go({ consistent: true, pages: "all", ignoreOwnership: true, data: "raw" });
     expect(first.data).toHaveProperty("LastEvaluatedKey");
     expect((await repo.camps(p)).filter((c) => c.stored).map((c) => c.location).sort()).toEqual(locations);

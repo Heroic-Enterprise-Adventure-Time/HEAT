@@ -13,7 +13,7 @@
 # functions before planning, because the root hashes the bundle, and after
 # the apply publishes the client build with config.json, creates the test
 # users, runs the smoke test through the environment's hostname, reads the
-# cold start and runs the backfill of decision 0041 until Issue-213, as
+# cold start and runs the backfill of decision 0042 until Issue-213, as
 # sandbox.yml does for a per-issue stack; sandbox-base has no code and skips
 # those steps.
 #
@@ -384,7 +384,7 @@ jobs:
         run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
 
       # Items from before ElectroDB made whole, and the count left, on every
-      # apply until Issue-213 removes this step (decision 0041).
+      # apply until Issue-213 removes this step (decision 0042).
       - name: Backfill ElectroDB's identifiers
         if: matrix.code
         env:

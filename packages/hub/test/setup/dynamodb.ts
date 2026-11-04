@@ -1,7 +1,6 @@
-import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
-import { ensureTable } from "./table.js";
+import { ensureTables } from "./table.js";
 
 /**
  * Vitest global setup: one DynamoDB Local container for the whole run,
@@ -33,9 +32,7 @@ export async function setup(): Promise<void> {
   // against the in-memory store, and the bucket by the stack test.
   process.env["HEAT_REPLAY_BUCKET"] = "heat-test-replays";
 
-  const client = new DynamoDBClient({ region: "us-east-1", endpoint });
-  await ensureTable(client, "heat-test-player");
-  await ensureTable(client, "heat-test-location");
+  await ensureTables(endpoint, "heat-test-player", "heat-test-location");
 }
 
 export async function teardown(): Promise<void> {

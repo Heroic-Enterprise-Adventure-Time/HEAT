@@ -19,9 +19,9 @@ import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
  * item gains `playerId`. A sighting's composites are its location and hero,
  * so it still holds no owner (decision 0029).
  *
- * An attribute an item from before ElectroDB may lack, which the repository
- * gives a default as it reads it, is not `required`. The type written whole
- * still names it, so a write still has it.
+ * `required` is enforced on a write and not on a read. An item from before
+ * ElectroDB may lack some of these, which the repository says where it reads
+ * them (decision 0042).
  */
 
 const service = "heat";
@@ -31,7 +31,6 @@ const playerId = { type: "string", required: true } as const;
 const playerPk = { field: KEY.pk, composite: ["playerId"], template: TEMPLATES.player, casing: "none" } as const;
 const text = { type: "string", required: true } as const;
 const count = { type: "number", required: true } as const;
-const number = { type: "number" } as const;
 
 /** One service over the two tables: each entity names its own, and only a collection insists on one table. */
 export function createService(client: DynamoDBDocumentClient, tables: Tables) {
@@ -53,7 +52,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
   const camp = new Entity(
     {
       model: { entity: "camp", service, version },
-      attributes: { playerId, location: text, hallLevel: number, warehouseLevel: number, activeHeroes: number, livingHeroes: number },
+      attributes: { playerId, location: text, hallLevel: count, warehouseLevel: count, activeHeroes: count, livingHeroes: count },
       indexes: {
         primary: {
           pk: playerPk,
@@ -87,10 +86,10 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         spriteSet: text,
         name: text,
         recruitedAt: text,
-        level: number,
-        xp: number,
-        picks: { type: "list", items: { type: "string" } },
-        status: { type: HERO_STATUSES },
+        level: count,
+        xp: count,
+        picks: { type: "list", items: { type: "string" }, required: true },
+        status: { type: HERO_STATUSES, required: true },
         retiredAt: { type: "string" },
         adventureId: { type: "string" },
       },
@@ -139,7 +138,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         location: text,
         material: { type: MATERIALS, required: true },
         delta: count,
-        lost: number,
+        lost: { type: "number" },
       },
       indexes: {
         primary: {
@@ -190,7 +189,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         name: text,
         unitType: { type: UNIT_TYPES, required: true },
         spriteSet: text,
-        level: number,
+        level: count,
         seenAt: text,
         expiresAt: count,
       },
