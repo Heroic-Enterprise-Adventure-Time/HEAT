@@ -1,6 +1,6 @@
 # Best practices first
 
-How decisions are made, especially about security and platform management, and three practices every change follows: the page is responsive, a decision is challenged when it turns out wrong, and a gap in the documents is closed where it is found. These rules apply in every session.
+How decisions are made, especially about security and platform management, and three practices every change follows: the page is responsive, a decision is challenged when it turns out wrong, and a gap in the documents is closed where it is found. Rule 13 is about the pipeline's roles. These rules apply in every session.
 
 "Security and platform management" covers: accounts and organization structure; identity and access for people, pipelines and services; credentials and secrets; network exposure; data protection; logging and audit; Terraform state; build, release and deployment controls; cost controls.
 
@@ -18,6 +18,7 @@ How decisions are made, especially about security and platform management, and t
 10. **The page is responsive.** What the player sees follows their font size, screen and window: the client is laid out in relative units, `rem` and fractions of the viewport, from sizes declared once in the stylesheet's tokens or measured from the rendered page, and the arithmetic that predicts a layout reads those same sizes at runtime. No constant in TypeScript copies a value the stylesheet holds (`docs/standards/angular.md`, rule 17). A pixel is written only where the thing is a pixel: the whole-number scale of pixel art, a one-pixel line.
 11. **A decision is challenged when it turns out wrong.** A recorded decision, or a shape that was never decided but inherited, is reopened the moment work shows it incorrect or no longer right, by anyone, in the branch that found it: the shape changes there, with its decision record (`docs/decisions/`) and the old record's status line. The age of a decision is not a reason to keep it.
 12. **A gap in these documents is closed in the pull request that found it.** When work shows a practice that belongs in this document or in a standard and is not there, or one written there that is wrong, the document changes in the same branch and pull request as the work, and the pull request's description lists it. It is not filed as an issue for later: an issue filed for a document is a gap that stays open.
+13. **A step that runs downloaded code holds no apply role's credentials.** What it needs from AWS is read before it, under the role, and handed over by environment. Issue-231 holds the steps that do not meet this yet.
 
 ## Why
 
@@ -30,3 +31,5 @@ The sentence added to rule 3 on 2026-10-13, and rules 7 and 8, come from the org
 Rule 9 was added on 2026-10-16, after the Terraform layout changed from one configuration per stack to one root directory per environment (decision 0016). The first shape had been fitted to a second environment with a `-reconfigure` flag and a map of account ids. It worked, it would have been built upon, and the owner asked for the question to be put the other way round. A workaround hides the mismatch; the next requirement lands on the workaround, and the cost of moving compounds. Paying for the move early is the cheaper habit, and a periodic review is how the need for one is noticed.
 
 Rules 10 to 12 were added on 2026-11-02 (Issue-186), when the review of its pull request found the header's height written twice, as `2.25rem` in the stylesheet and `36` in the layout arithmetic, each true only at the browser's default font size, and the first answer offered was to decline the finding as older than the change. The owner's call was the opposite: the page follows the player's settings, a shape found wrong is reopened where it is found, and the practice goes into the documents in the same pull request, because a note or an issue for later is how the two copies had survived.
+
+Rule 13 was added on 2026-11-04 (Issue-202), from the review of PR-230, which found the browser test's install step and Chromium running with the apply role's keys in their environment when the test needed one parameter read. A browser and a package's install step run code the project did not write, and the role can change the stack.

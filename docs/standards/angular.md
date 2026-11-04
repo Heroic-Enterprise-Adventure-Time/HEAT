@@ -44,7 +44,7 @@ Standards for `packages/client`, the Angular application, beside `docs/standards
 
 ### The page in a browser
 
-18. **A running stack's page is tested by Playwright; everything else stays in the unit tests** (decision 0045). `packages/client/e2e/` asks one question, whether a real browser gets from the stack's hostname to a drawn camp and back: signing in and out, the scene's canvas, a broken page or missing art, and one path through the panels. A panel's words, a refusal, an edge of the rules or a layout is a spec's (rules 15 and 16), and what the hub answers is `scripts/e2e.mjs`'s; a test added here for one of those is slow and tells the reader less. It finds things as the specs do, by role and label. A trace holds a password and tokens and never leaves the runner unencrypted (`scripts/seal-browser-trace.sh`), because the repository is public.
+18. **A running stack's page is tested by Playwright; everything else stays in the unit tests** (decision 0045). `packages/client/e2e/` asks one question, whether a real browser gets from the stack's hostname to a drawn camp and back: signing in and out, the scene's canvas, a broken page or missing art, and one path through the panels. A panel's words, a refusal, an edge of the rules or a layout is a spec's (rules 15 and 16), and what the hub answers is `scripts/e2e.mjs`'s; a test added here for one of those is slow and tells the reader less. It finds things as the specs do, by role and label, which `playwright/no-raw-locators` holds it to. It watches for a broken page from before its first navigation. A trace holds a password and tokens and never leaves the runner unencrypted (`scripts/seal-browser-trace.sh`), because the repository is public.
 
 ## Held back
 
