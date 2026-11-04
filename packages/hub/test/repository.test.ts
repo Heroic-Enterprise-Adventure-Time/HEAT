@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+
 import { beforeAll, describe, expect, it } from "vitest";
+
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import {
   AdventureAlreadyOpen,
@@ -7,6 +9,7 @@ import {
   InsufficientBalance,
   Repository,
 } from "../src/db/repository.js";
+import { player } from "./data.js";
 
 let repo: Repository;
 
@@ -15,7 +18,6 @@ beforeAll(() => {
   repo = new Repository(createDocumentClient(config), config.tables);
 });
 
-const player = () => `p-${randomUUID()}`;
 const at = "millbrook";
 
 /** An adventure with no party: these tests are of the open item and the record, not the heroes. */

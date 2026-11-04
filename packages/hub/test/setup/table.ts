@@ -1,9 +1,10 @@
 import {
   CreateTableCommand,
   DescribeTableCommand,
+  DynamoDBClient,
   ResourceNotFoundException,
-  type DynamoDBClient,
 } from "@aws-sdk/client-dynamodb";
+
 import { KEY } from "../../src/db/keys.js";
 
 /**
@@ -12,7 +13,12 @@ import { KEY } from "../../src/db/keys.js";
  * (terraform/modules/environment/tables.tf), and the two definitions are
  * kept the same by hand, which is why both are this short.
  */
-export async function ensureTable(client: DynamoDBClient, tableName: string): Promise<void> {
+export async function ensureTables(endpoint: string, ...tableNames: string[]): Promise<void> {
+  const client = new DynamoDBClient({ region: "us-east-1", endpoint });
+  await Promise.all(tableNames.map((name) => ensureTable(client, name)));
+}
+
+async function ensureTable(client: DynamoDBClient, tableName: string): Promise<void> {
   try {
     await client.send(new DescribeTableCommand({ TableName: tableName }));
     return;

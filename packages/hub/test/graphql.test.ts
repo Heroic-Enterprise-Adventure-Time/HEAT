@@ -1,9 +1,13 @@
 import { randomUUID } from "node:crypto";
+
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
 import { beforeAll, describe, expect, it } from "vitest";
+
+import { MAX_PARTY, must } from "@heat/engine";
+
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
-import { must } from "@heat/engine";
+import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
@@ -105,7 +109,7 @@ const START = `mutation($heroIds: [ID!]!) {
     ... on AdventureOpen { adventureId }
   }
 }` as Query<{ startAdventure: Result<"adventure", { id: string; seed: string }> }>;
-const RECRUIT = `mutation($id: ID!) {
+const RECRUIT = `mutation($id: UUID!) {
   recruitHero(input: { unitType: VILLAGER, requestId: $id }) {
     __typename
     ... on RecruitHeroSuccess { hero { id name unitType spriteSet status } }
@@ -133,6 +137,7 @@ describe("authorization at the field level", () => {
     expect(asOther.data?.player.camps).toBeNull();
     expect(asOther.data?.player.heroes).toBeNull();
     expect(asOther.errors?.map((e) => e.path)).toEqual(expect.arrayContaining([["player", "camps"], ["player", "heroes"]]));
+    expect(asOther.errors?.map((e) => e.extensions?.["code"])).toEqual(["FORBIDDEN", "FORBIDDEN"]);
 
     const asOwner = await gql(q as Query<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>, { id: owner }, owner);
     expect(asOwner.errors).toBeUndefined();
@@ -142,6 +147,13 @@ describe("authorization at the field level", () => {
     const anonymous = await gql(`{ me { id } }` as Query<{ me: unknown }>);
     expect(anonymous.data?.me).toBeNull();
     expect(anonymous.errors?.[0]?.path).toEqual(["me"]);
+    expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
+
+    // The same code for an anonymous caller failing `self`: it is the caller that decides, not the scope.
+    const anonymousOwner = await gql(q as Query<{ player: { name: string; camps: unknown; heroes: unknown } }>, { id: owner });
+    expect(anonymousOwner.data?.player.name).toBe("Owner");
+    expect(anonymousOwner.data?.player.camps).toBeNull();
+    expect(anonymousOwner.errors?.map((e) => e.extensions?.["code"])).toEqual(["UNAUTHENTICATED", "UNAUTHENTICATED"]);
   });
 });
 
@@ -297,11 +309,96 @@ describe("the adventure loop through the graph", () => {
     const p = `p-${randomUUID()}`;
     await gql(JOIN, {}, p);
     // A unit type outside the enum, and a mutation called with its old positional arguments.
-    const dragon = await invalid(`mutation($id: ID!) { recruitHero(input: { unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
+    const dragon = await invalid(`mutation($id: UUID!) { recruitHero(input: { unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
     expect(dragon.data).toBeUndefined();
     expect(dragon.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
     const positional = await invalid(`mutation { recruitHero(unitType: VILLAGER, requestId: "x") { __typename } }`, {}, p);
     expect(positional.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+  });
+
+  describe("every boundary of the contract", () => {
+    const code = (reply: Reply<unknown>) => reply.errors?.[0]?.extensions?.["code"];
+    const message = (reply: Reply<unknown>) => reply.errors?.[0]?.message;
+    const ANY_LOG = `mutation($log: [OverrideInput!]!) { submitAdventure(input: { adventureId: "any", overrides: $log }) { __typename } }`;
+    const BUILD = `mutation($level: PositiveInt!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename } }`;
+    const unitEntry = { kind: "UNIT", acceptedAtSimTime: 0, unitId: "any", abilityId: "swing" };
+
+    it.each(["not-a-uuid", 7])("refuses the request id %s by its scalar", async (id) => {
+      const reply = await invalid(RECRUIT, { id }, `p-${randomUUID()}`);
+      expect(code(reply)).toBe("BAD_USER_INPUT");
+      expect(message(reply)).toContain("$id");
+    });
+
+    it("refuses what the scalar lets through as a UUID", async () => {
+      const reply = await gql(RECRUIT, { id: `${randomUUID()}}` }, `p-${randomUUID()}`);
+      expect(code(reply)).toBe("BAD_USER_INPUT");
+      expect(message(reply)).toContain("a request id is a UUID");
+    });
+
+    it("takes a request id in any case as one request", async () => {
+      const p = `p-${randomUUID()}`;
+      await gql(JOIN, {}, p);
+      const id = randomUUID();
+      const first = await gql(RECRUIT, { id: id.toUpperCase() }, p);
+      const repeat = await gql(RECRUIT, { id }, p);
+      expect(first.data?.recruitHero).toMatchObject({ __typename: "RecruitHeroSuccess", hero: { id } });
+      expect(repeat.data?.recruitHero).toMatchObject({ __typename: "RecruitHeroSuccess", hero: { id } });
+    });
+
+    it("refuses a party of none, of too many, or with a hero twice", async () => {
+      const p = `p-${randomUUID()}`;
+      const id = randomUUID();
+      for (const [heroIds, words] of [
+        [[], `a party is 1 to ${MAX_PARTY} heroes`],
+        [Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()), `a party is 1 to ${MAX_PARTY} heroes`],
+        [[id, id.toUpperCase()], "a hero is in the party twice"],
+      ] as const) {
+        const reply = await gql(START, { heroIds }, p);
+        expect(code(reply)).toBe("BAD_USER_INPUT");
+        expect(message(reply)).toContain(words);
+      }
+      expect(await repo.openAdventure(p)).toBeUndefined();
+    });
+
+    it("refuses a malformed party before a refusal: an open adventure is not read first", async () => {
+      const p = `p-${randomUUID()}`;
+      await gql(JOIN, {}, p);
+      const villager = randomUUID();
+      await gql(RECRUIT, { id: villager }, p);
+      await gql(START, { heroIds: [villager] }, p);
+      const open = must(await repo.openAdventure(p), "the open adventure");
+
+      const reply = await gql(START, { heroIds: Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()) }, p);
+      expect(code(reply)).toBe("BAD_USER_INPUT");
+      expect((await repo.openAdventure(p))?.adventureId).toBe(open.adventureId);
+    });
+
+    it("refuses a log of too many entries and an ability id of too many characters", async () => {
+      const p = `p-${randomUUID()}`;
+      const long = await gql(ANY_LOG, { log: Array.from({ length: MAX_OVERRIDES + 1 }, () => unitEntry) }, p);
+      expect(code(long)).toBe("BAD_USER_INPUT");
+      expect(message(long)).toContain(`a log holds at most ${MAX_OVERRIDES} entries`);
+      const named = await gql(ANY_LOG, { log: [{ ...unitEntry, abilityId: "a".repeat(MAX_ABILITY_ID + 1) }] }, p);
+      expect(code(named)).toBe("BAD_USER_INPUT");
+      expect(message(named)).toContain(`an ability id is at most ${MAX_ABILITY_ID} characters`);
+    });
+
+    it.each([-1, 1.5, "7abc", 1e21])("refuses the time %s", async (acceptedAtSimTime) => {
+      const reply = await invalid(ANY_LOG, { log: [{ ...unitEntry, acceptedAtSimTime }] }, `p-${randomUUID()}`);
+      expect(code(reply)).toBe("BAD_USER_INPUT");
+      expect(message(reply)).toContain("acceptedAtSimTime");
+    });
+
+    it.each([0, -1, 1.5, "2abc", 1e21])("refuses the level %s", async (level) => {
+      const reply = await invalid(BUILD, { level }, `p-${randomUUID()}`);
+      expect(code(reply)).toBe("BAD_USER_INPUT");
+      expect(message(reply)).toContain("$level");
+    });
+
+    it("checks input before a scope, and a well-formed request still needs the scope", async () => {
+      expect(code(await gql(START, { heroIds: [] }))).toBe("BAD_USER_INPUT");
+      expect(code(await gql(START, { heroIds: [randomUUID()] }))).toBe("UNAUTHENTICATED");
+    });
   });
 });
 

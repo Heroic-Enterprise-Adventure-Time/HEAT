@@ -1,24 +1,26 @@
 import { clamp, range } from 'es-toolkit';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
+
 import {
   ABILITY_EFFECTS,
-  MONSTER_SPRITE_SETS,
-  PROP_SPRITE_SETS,
-  UNIT_PROFILES,
-  WEAPON_SPRITES,
-  must,
   type AbilityId,
   type AdventureEvent,
   type Line,
+  MONSTER_SPRITE_SETS,
   type MonsterType,
+  must,
+  PROP_SPRITE_SETS,
   type ResourceType,
+  UNIT_PROFILES,
   type UnitType,
+  WEAPON_SPRITES,
 } from '@heat/engine';
+
 import { layGround, type Terrain, type TilesetJson } from '../../camp/scene/ground';
 import type { Field, FieldUnit } from '../field';
-import { battleView, entryOffset, spots, type BattleView } from './battle-layout';
-import { loadEffectArt, loadUnitArt, loadWeaponArt, type EffectArt, type Frames, type UnitArt, type WeaponArt } from './battle-art';
 import { effectFrameAt, heldFrame } from './action-sprites';
+import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type WeaponArt } from './battle-art';
+import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
 
 /**
  * The battle scene, drawn with PixiJS like the camp (decision 0028): the

@@ -7,8 +7,8 @@
  * the version that verifies, never frozen here. The seed travels beside it.
  */
 
-import type { UnitType } from "../content.js";
 import type { UnitStats } from "../battle/index.js";
+import type { UnitType } from "../content.js";
 
 /** The most heroes a party takes; the fewest is one. */
 export const MAX_PARTY = 4;

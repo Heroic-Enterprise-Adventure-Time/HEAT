@@ -1,10 +1,15 @@
 import { ApolloServer } from "@apollo/server";
-import { S3Client } from "@aws-sdk/client-s3";
 import { handlers, startServerAndCreateLambdaHandler } from "@as-integrations/aws-lambda";
+import { injectLambdaContext } from "@aws-lambda-powertools/logger/middleware";
+import { logMetrics } from "@aws-lambda-powertools/metrics/middleware";
+import { captureLambdaHandler } from "@aws-lambda-powertools/tracer/middleware";
+import { S3Client } from "@aws-sdk/client-s3";
+import middy from "@middy/core";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context as LambdaContext } from "aws-lambda";
+
+import { type Context, createContextFactory } from "./context.js";
 import { configFromEnv, createDocumentClient } from "./db/client.js";
-import { createContextFactory, type Context } from "./context.js";
-import { logger, requestLogging, tracer } from "./observability.js";
+import { logger, metrics, requestLogging, tracer } from "./observability.js";
 import { schema } from "./schema/schema.js";
 import { S3Timelines } from "./timelines.js";
 import { outdatedFlag, previousVersionFromEnv, versionFromEnv } from "./version.js";
@@ -36,10 +41,16 @@ const graphql = startServerAndCreateLambdaHandler(
 );
 
 /**
- * Adds the invocation's request id and function details to every log line
- * of the request, then hands the event to Apollo.
+ * Apollo innermost, with Powertools' three middlewares around it (decision
+ * 0040): the invocation's request id and function details on every log line,
+ * the handler's subsegment in the trace, and the metrics flushed with the
+ * cold start counted. The response stays out of the trace, because a GraphQL
+ * response can hold a player's whole camp (graphql.md, rule 16). middy's early
+ * timeout is off: it would answer while a verb is still pending, and Lambda
+ * freezes that verb and resumes it in the next invocation, where a timeout left
+ * to Lambda resets the environment.
  */
-export const handler = async (event: APIGatewayProxyEventV2, context: LambdaContext): Promise<APIGatewayProxyResultV2> => {
-  logger.addContext(context);
-  return graphql(event, context, () => undefined) as Promise<APIGatewayProxyResultV2>;
-};
+export const handler = middy((event: APIGatewayProxyEventV2, context: LambdaContext) => graphql(event, context, () => undefined) as Promise<APIGatewayProxyResultV2>, { timeoutEarlyInMillis: 0 })
+  .use(injectLambdaContext(logger))
+  .use(captureLambdaHandler(tracer, { captureResponse: false }))
+  .use(logMetrics(metrics, { captureColdStartMetric: true }));

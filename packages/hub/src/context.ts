@@ -1,6 +1,7 @@
-import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+import type { APIGatewayProxyEventV2 } from "aws-lambda";
 import { GraphQLError } from "graphql";
+
 import type { Tables } from "./db/client.js";
 import { Repository } from "./db/repository.js";
 import type { Timelines } from "./timelines.js";
@@ -28,13 +29,18 @@ export interface Context {
   clientVersion: string | undefined;
 }
 
+/** What a caller who is not signed in is told, by a scope or by `callerId`. */
+export function notSignedIn(): GraphQLError {
+  return new GraphQLError("not signed in", { extensions: { code: "UNAUTHENTICATED" } });
+}
+
 /**
  * The signed-in player's id. Every field that reads it declares the
  * `authenticated` scope, which the scope-auth plugin checks before the
  * resolver runs, so the throw is a guard against a field that forgot to.
  */
 export function callerId(ctx: Context): string {
-  if (ctx.playerId === undefined) throw new GraphQLError("not signed in", { extensions: { code: "UNAUTHENTICATED" } });
+  if (ctx.playerId === undefined) throw notSignedIn();
   return ctx.playerId;
 }
 

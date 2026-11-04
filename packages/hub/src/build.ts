@@ -1,13 +1,14 @@
-import { FACILITIES, buildRefusal, location, nextLevel, type FacilityKind } from "@heat/engine";
+import { buildRefusal, FACILITIES, type FacilityKind, location, nextLevel } from "@heat/engine";
+
+import { retryingConflicts } from "./conflict.js";
 import {
   BuildRefused,
-  InsufficientBalance,
-  TransactionConflict,
-  campLevels,
   type Camp,
+  campLevels,
+  InsufficientBalance,
   type Repository,
 } from "./db/repository.js";
-import { Conflict, InsufficientResources, MaxLevel, Requires, badInput } from "./refusals.js";
+import { badInput, Conflict, InsufficientResources, MaxLevel, Requires } from "./refusals.js";
 
 /**
  * Building and upgrading a facility (Issue-93, decision 0032): the client
@@ -45,7 +46,11 @@ function refuseIfBarred(camp: Camp, kind: FacilityKind): void {
   }
 }
 
-export async function buildFacility(repo: Repository, playerId: string, locationId: string, kind: string, level: number): Promise<Camp> {
+export function buildFacility(repo: Repository, playerId: string, locationId: string, kind: string, level: number): Promise<Camp> {
+  return retryingConflicts("build", "the camp changed while building; nothing was built", () => buildOnce(repo, playerId, locationId, kind, level));
+}
+
+async function buildOnce(repo: Repository, playerId: string, locationId: string, kind: string, level: number): Promise<Camp> {
   const at = location(locationId);
   const camp = at && (await repo.camps(playerId)).find((c) => c.location === at.id);
   if (!at || !camp) badInput(`there is no camp of yours at ${locationId}`);
@@ -65,7 +70,7 @@ export async function buildFacility(repo: Repository, playerId: string, location
   try {
     await repo.build(playerId, camp, { kind: facility, from, cost: next.cost, requires: next.requires });
   } catch (e) {
-    if (!(e instanceof BuildRefused || e instanceof InsufficientBalance || e instanceof TransactionConflict)) throw e;
+    if (!(e instanceof BuildRefused || e instanceof InsufficientBalance)) throw e;
     const now = await repo.camp(playerId, at.id);
     if ((campLevels(now)[facility] ?? 0) >= level) return now;
     refuseIfBarred(now, facility);

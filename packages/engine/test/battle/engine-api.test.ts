@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+
 import { CombatEngine, resolveBattle } from "../../src/index.js";
 import { hero, ofKind, opponent, runAll, setup } from "./helpers.js";
 

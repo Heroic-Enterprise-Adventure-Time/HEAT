@@ -1,18 +1,23 @@
 import { randomUUID } from "node:crypto";
-import { PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { UNIT_PROFILES, must } from "@heat/engine";
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { playerKeys } from "../src/db/keys.js";
-import { Repository, type Camp, type Hero, type HeroStatus } from "../src/db/repository.js";
+
+import { must, UNIT_PROFILES } from "@heat/engine";
+
 import { buildFacility } from "../src/build.js";
+import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type AdventureRecord, type Camp, type Hero, type HeroStatus, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { AdventureOpen, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires } from "../src/refusals.js";
-import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { player } from "./data.js";
+import { playerKeys } from "./keys.js";
+import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 /**
  * startAdventure against DynamoDB Local: the job on the location's board,
@@ -34,7 +39,6 @@ beforeAll(() => {
 const at = "millbrook";
 const wolves = "wolves-on-the-mill-road";
 const version = "fedcba9876543210fedcba9876543210fedcba98";
-const player = () => `p-${randomUUID()}`;
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths leave them. */
 async function putHeroes(p: string, statuses: HeroStatus[], location = at): Promise<Hero[]> {
@@ -110,17 +114,6 @@ describe("startAdventure", () => {
     expect(await refusal(startAdventure(repo, p, version, "atlantis", wolves, [hero.id]))).toMatchObject(BAD_USER_INPUT);
   });
 
-  it("refuses a party of none, of five, or with a hero twice", async () => {
-    const p = player();
-    const heroes = await putHeroes(p, ["ALIVE", "ALIVE", "ALIVE", "ALIVE", "ALIVE"]);
-    const ids = heroes.map((h) => h.id);
-    const first = must(ids[0], "the first id");
-    expect(await refusal(startAdventure(repo, p, version, at, wolves, []))).toMatchObject(BAD_USER_INPUT);
-    expect(await refusal(startAdventure(repo, p, version, at, wolves, ids))).toMatchObject(BAD_USER_INPUT);
-    expect(await refusal(startAdventure(repo, p, version, at, wolves, [first, first.toUpperCase()]))).toMatchObject(BAD_USER_INPUT);
-    expect(await repo.openAdventure(p)).toBeUndefined();
-  });
-
   it("refuses another player's hero, a hero elsewhere, a dead hero and a retired one", async () => {
     const p = player();
     const theirs = must((await putHeroes(player(), ["ALIVE"]))[0], "their hero");
@@ -166,21 +159,29 @@ describe("startAdventure", () => {
     }
   });
 
-  it("answers AdventureOpen when another start commits between its read of the open adventure and of its party", async () => {
-    const p = player();
-    const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    const winner = await startAdventure(repo, p, version, at, wolves, [hero.id]);
-    // The first read sees no open adventure, as it would just before the other start committed.
-    let reads = 0;
-    const late = new Proxy(repo, {
-      get: (target, key, receiver): unknown =>
-        key === "openAdventure"
-          ? (id: string) => (reads++ === 0 ? Promise.resolve(undefined) : target.openAdventure(id))
-          : Reflect.get(target, key, receiver),
+  /** Two starts of one hero, the winner placed by `place`: the loser answers AdventureOpen, naming it. */
+  function lostStart(place: (k: number, winner: () => Promise<unknown>) => Race): Promise<number> {
+    return everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      let winner: AdventureRecord | undefined;
+      const late = place(k, async () => (winner = await startAdventure(repo, p, version, at, wolves, [hero.id])));
+      const lost = await refusal(startAdventure(late.repo, p, version, at, wolves, [hero.id]));
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(AdventureOpen);
+      expect(lost).toMatchObject({ adventureId: winner?.adventureId });
+      return true;
     });
-    const lost = await refusal(startAdventure(late, p, version, at, wolves, [hero.id]));
-    expect(lost).toBeInstanceOf(AdventureOpen);
-    expect(lost).toMatchObject({ adventureId: winner.adventureId });
+  }
+
+  it("answers AdventureOpen, naming the winner, wherever another start of the same hero commits", async () => {
+    // Before each of openAdventure, getHero and startAdventure.
+    expect(await lostStart((k, winner) => winnerBefore(repo, k, winner))).toBe(3);
+  });
+
+  it("retries a start cancelled by another start still committing, and answers AdventureOpen", async () => {
+    // Before each of the next run's openAdventure, getHero and startAdventure.
+    expect(await lostStart((k, winner) => cancelled(repo, "startAdventure", new TransactionConflict("conflict"), k, winner))).toBe(3);
   });
 });
 

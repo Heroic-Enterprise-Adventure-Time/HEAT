@@ -1,3 +1,5 @@
+import { sortBy } from 'es-toolkit';
+
 import {
   AdventureEngine,
   type AdventureEvent,
@@ -6,8 +8,8 @@ import {
   type AdventureTimeline,
   type PartyOrder,
 } from '@heat/engine';
+
 import { isEntry } from './field';
-import { sortBy } from 'es-toolkit';
 
 /**
  * What the page plays: a run of the engine, or a stored timeline replayed

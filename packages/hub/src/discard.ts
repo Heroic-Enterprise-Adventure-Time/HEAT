@@ -1,5 +1,6 @@
-import { AdventureClosed, type AdventureRecord, type Repository } from "./db/repository.js";
-import { AdventureSettled, AdventureVerifiable } from "./refusals.js";
+import { retryingConflicts } from "./conflict.js";
+import { AdventureClosed, type AdventureRecord, HeroChanged, type Repository } from "./db/repository.js";
+import { AdventureSettled, AdventureVerifiable, Conflict } from "./refusals.js";
 import { ownAdventure } from "./submit.js";
 
 /**
@@ -16,14 +17,26 @@ import { ownAdventure } from "./submit.js";
  * when it planned the deploy (terraform/modules/environment/previous.tf).
  *
  * A discarded adventure answers as it is, so a repeat is harmless; a settled
- * one is refused with AdventureSettled.
+ * one is refused with AdventureSettled. A discard that loses a race reads
+ * the record again and answers the same way; Conflict when it is still open
+ * and nothing explains the failure (graphql.md, rule 9).
  */
-export async function discardAdventure(
+export function discardAdventure(
   repo: Repository,
   playerId: string,
   versions: { current: string; previous: string | undefined },
   adventureId: string,
   now = new Date(),
+): Promise<AdventureRecord> {
+  return retryingConflicts("discard", "the adventure changed while discarding; nothing was discarded", () => discardOnce(repo, playerId, versions, adventureId, now));
+}
+
+async function discardOnce(
+  repo: Repository,
+  playerId: string,
+  versions: { current: string; previous: string | undefined },
+  adventureId: string,
+  now: Date,
 ): Promise<AdventureRecord> {
   const record = await ownAdventure(repo, playerId, adventureId);
   if (record.status === "DISCARDED") return record;
@@ -34,10 +47,11 @@ export async function discardAdventure(
   try {
     await repo.discard(playerId, record, now);
   } catch (e) {
-    if (!(e instanceof AdventureClosed)) throw e;
+    if (!(e instanceof AdventureClosed || e instanceof HeroChanged)) throw e;
     const after = await repo.getAdventure(adventureId);
     if (after?.status === "DISCARDED") return after;
-    throw new AdventureSettled("the adventure is settled");
+    if (after?.status === "SETTLED") throw new AdventureSettled("the adventure is settled");
+    throw new Conflict("the adventure changed while discarding; nothing was discarded");
   }
   return { ...record, status: "DISCARDED", discardedAt: now.toISOString() };
 }

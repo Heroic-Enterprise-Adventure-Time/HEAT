@@ -1,0 +1,18 @@
+#import "./result-fields.graphql"
+
+mutation SubmitAdventure($input: SubmitAdventureInput!) {
+  submitAdventure(input: $input) {
+    __typename
+    ... on Error {
+      message
+    }
+    ... on SubmitAdventureSuccess {
+      adventure {
+        id
+        result {
+          ...ResultFields
+        }
+      }
+    }
+  }
+}

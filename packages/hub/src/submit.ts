@@ -1,26 +1,29 @@
 import { clamp } from "es-toolkit";
+
 import {
-  levelForXp,
-  replay,
-  warehouseCapacity,
   type AdventureLogEntry,
   type AdventureResult,
   type AdventureTimeline,
+  levelForXp,
   type Material,
+  replay,
   type Reward,
+  warehouseCapacity,
 } from "@heat/engine";
+
+import { countingConflicts, pause } from "./conflict.js";
 import {
   AdventureClosed,
-  CampChanged,
-  TransactionConflict,
   type AdventureRecord,
+  CampChanged,
   type Hero,
   type HeroOutcome,
   type Repository,
   type Settlement,
+  TransactionConflict,
 } from "./db/repository.js";
 import { logger } from "./observability.js";
-import { AdventureDiscarded, Conflict, EngineUpdated, badInput } from "./refusals.js";
+import { AdventureDiscarded, badInput, Conflict, EngineUpdated } from "./refusals.js";
 import type { Timelines } from "./timelines.js";
 
 /**
@@ -58,16 +61,22 @@ import type { Timelines } from "./timelines.js";
 
 /** The most entries a log may have: far beyond what a person can click in a stage's time limits. */
 export const MAX_OVERRIDES = 2000;
+/** The longest ability id a log entry may name: far beyond any in the content, so that a log cannot carry text. */
+export const MAX_ABILITY_ID = 64;
 /** Reads and writes of a settlement before it answers Conflict. */
 export const SETTLE_ATTEMPTS = 3;
 
 /** One entry of the submitted log, as the graph takes it: flat, checked here into the engine's union. */
+/** The log's two closed sets on the wire, which the API's enums read (typescript.md, rule 18). */
+export const OVERRIDE_KINDS = ["UNIT", "PARTY"] as const;
+export const PARTY_ORDERS = ["PRESS_ON", "RETREAT"] as const;
+
 export interface OverrideInput {
-  kind: "UNIT" | "PARTY";
+  kind: (typeof OVERRIDE_KINDS)[number];
   acceptedAtSimTime: number;
   unitId?: string | null | undefined;
   abilityId?: string | null | undefined;
-  order?: "PRESS_ON" | "RETREAT" | null | undefined;
+  order?: (typeof PARTY_ORDERS)[number] | null | undefined;
 }
 
 /** The caller's adventure, or BAD_USER_INPUT: another player's is not said to exist. */
@@ -77,19 +86,21 @@ export async function ownAdventure(repo: Repository, playerId: string, adventure
   return record;
 }
 
-/** The submitted log as the engine's entries, or BAD_USER_INPUT. */
+/**
+ * The submitted log as the engine's entries, or BAD_USER_INPUT. The input type
+ * has checked its length, each time and each ability id's length
+ * (`SubmitAdventureInput`); what is left needs the entry's kind or the party.
+ */
 export function toLog(record: AdventureRecord, inputs: readonly OverrideInput[]): AdventureLogEntry[] {
-  if (inputs.length > MAX_OVERRIDES) badInput(`a log holds at most ${MAX_OVERRIDES} entries`);
   const party = new Set(record.snapshot.heroes.map((h) => h.heroId));
   return inputs.map((input, i): AdventureLogEntry => {
     const at = input.acceptedAtSimTime;
-    if (!Number.isSafeInteger(at) || at < 0) badInput(`entry ${i}: the time is a whole number of milliseconds`);
     if (input.kind === "PARTY") {
       if (!input.order) badInput(`entry ${i}: a party entry names an order`);
       return { kind: "party", acceptedAtSimTime: at, order: input.order === "RETREAT" ? "retreat" : "press-on" };
     }
     if (!input.unitId || !party.has(input.unitId)) badInput(`entry ${i}: a unit entry names a hero of the party`);
-    if (!input.abilityId || input.abilityId.length > 64) badInput(`entry ${i}: a unit entry names an ability`);
+    if (!input.abilityId) badInput(`entry ${i}: a unit entry names an ability`);
     return {
       kind: "unit",
       acceptedAtSimTime: at,
@@ -173,7 +184,7 @@ async function closed(repo: Repository, adventureId: string): Promise<AdventureR
   throw new Conflict("the adventure changed while settling; nothing was settled");
 }
 
-export async function submitAdventure(
+export function submitAdventure(
   repo: Repository,
   timelines: Timelines,
   playerId: string,
@@ -182,6 +193,10 @@ export async function submitAdventure(
   overrides: readonly OverrideInput[],
   now = new Date(),
 ): Promise<AdventureRecord> {
+  return countingConflicts("settle", () => submitOnce(repo, timelines, playerId, version, adventureId, overrides, now));
+}
+
+async function submitOnce(repo: Repository, timelines: Timelines, playerId: string, version: string, adventureId: string, overrides: readonly OverrideInput[], now: Date): Promise<AdventureRecord> {
   const record = await ownAdventure(repo, playerId, adventureId);
   if (record.status === "SETTLED") return record;
   if (record.status === "DISCARDED") throw new AdventureDiscarded("the adventure was discarded");
@@ -217,6 +232,8 @@ export async function submitAdventure(
     } catch (e) {
       if (e instanceof AdventureClosed) return closed(repo, adventureId);
       if (!(e instanceof CampChanged || e instanceof TransactionConflict)) throw e;
+      // Another transaction is still committing: wait for it before reading again (conflict.ts).
+      if (e instanceof TransactionConflict && attempt + 1 < SETTLE_ATTEMPTS) await pause(attempt + 1, "settle");
     }
   }
   throw new Conflict("the camp kept changing while settling; nothing was settled");

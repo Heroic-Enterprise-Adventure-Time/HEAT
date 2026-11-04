@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { BATTLE_CONTENT, JOBS, LEVEL_XP, MATERIALS, RETREAT, levelForXp, location } from "../../src/index.js";
+
+import { BATTLE_CONTENT, JOBS, LEVEL_XP, levelForXp, location, MATERIALS, RETREAT } from "../../src/index.js";
 
 describe("The adventure's content", () => {
   it("gives every job a known location, stages that end with arrive, known opponents and positive limits", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { SeededRng } from "../../src/index.js";
 
 describe("SeededRng", () => {

@@ -1,0 +1,35 @@
+# trivy: the misconfiguration scanner beside tflint in "Build and test"
+# (docs/standards/terraform.md, rule 17), run over every root and module from
+# this directory as `trivy config .`, on a laptop and in CI alike; this file
+# is what both read. Pinned like everything here: the checks bundle at a
+# release rather than trivy's floating major, so a new check arrives on a
+# branch of its own and not on main's next pull request. Dependabot does not
+# read this file or the workflow's version, so trivy and the bundle are taken
+# by hand together.
+
+# Any finding fails the run, at every severity: the floor is the strictest
+# tier taken whole, as lint's is (docs/standards/typescript.md, rule 16). A
+# finding is fixed, or excused with its reason: by id in .trivyignore for a
+# scale-down a rule already states, or inline on the one resource it is
+# about (rule 17).
+exit-code: 1
+
+misconfiguration:
+  # trivy's default is the floating major, mirror.gcr.io/aquasec/trivy-checks:2.
+  checks-bundle-repository: mirror.gcr.io/aquasec/trivy-checks:2.3.0
+
+  # Only Terraform lives under this directory.
+  scanners:
+    - terraform
+
+  # The table shows the lines that caused a finding, so a run's log reads
+  # without the file open.
+  render-cause:
+    - terraform
+
+scan:
+  # Nothing leaves the run but the bundle's download.
+  disable-telemetry: true
+
+  # The notice about a newer release is noise against a pinned one.
+  skip-version-check: true

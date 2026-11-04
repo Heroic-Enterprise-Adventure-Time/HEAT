@@ -1,8 +1,12 @@
 import SchemaBuilder from "@pothos/core";
 import ErrorsPlugin from "@pothos/plugin-errors";
 import ScopeAuthPlugin from "@pothos/plugin-scope-auth";
-import { DateTimeResolver } from "graphql-scalars";
-import type { Context } from "../context.js";
+import ValidationPlugin from "@pothos/plugin-validation";
+import { GraphQLError, type GraphQLScalarType } from "graphql";
+import { DateTimeResolver, JSONResolver, NonNegativeIntResolver, PositiveIntResolver, UUIDResolver } from "graphql-scalars";
+
+import { type Context, notSignedIn } from "../context.js";
+import { badInput } from "../refusals.js";
 
 /**
  * Pothos, code-first, with scope-auth for field-level authorization and the
@@ -10,7 +14,10 @@ import type { Context } from "../context.js";
  * and 11). Two scopes: `authenticated` (any signed-in player) and `self`
  * (the field's owner is the caller). Scopes are declared on types and fields
  * and resolved once per request; a field the caller may not read is an error
- * for that field, not for the whole query.
+ * for that field, not for the whole query. The plugin's own error keeps its
+ * code off `extensions`, where Apollo would answer INTERNAL_SERVER_ERROR, so
+ * the refusal is built here: UNAUTHENTICATED for a caller not signed in,
+ * FORBIDDEN for one signed in who failed the scope (rule 11).
  *
  * Fields are non-null unless declared `nullable: true`, so the printed
  * contract says what is guaranteed rather than defaulting to "maybe".
@@ -20,6 +27,13 @@ import type { Context } from "../context.js";
  * throw stays in the response's `errors` array. It is listed first, as its
  * documentation asks, so that it wraps the fields before the other plugins
  * do.
+ *
+ * The validation plugin runs zod on what the scalars cannot say (rule 14). It
+ * maps a field's arguments outside every plugin's wrapper, whatever the order
+ * here, so input is checked before a scope is: what it can tell a caller is
+ * the shape the printed schema publishes, and nothing of any player. A failure
+ * is `badInput`, as every other malformed input is, and says which field and
+ * why.
  */
 export const builder = new SchemaBuilder<{
   Context: Context;
@@ -38,22 +52,51 @@ export const builder = new SchemaBuilder<{
     // A stored timeline, display only and a union of many event types, is
     // served as the JSON it was written as (Issue-114).
     JSON: { Input: unknown; Output: unknown };
+    // What the contract can say about an input by its type alone (rule 4).
+    UUID: { Input: string; Output: string };
+    NonNegativeInt: { Input: number; Output: number };
+    PositiveInt: { Input: number; Output: number };
   };
 }>({
-  plugins: [ErrorsPlugin, ScopeAuthPlugin],
+  plugins: [ErrorsPlugin, ScopeAuthPlugin, ValidationPlugin],
   defaultFieldNullability: false,
   scopeAuth: {
     authScopes: (ctx) => ({
       authenticated: ctx.playerId !== undefined,
       self: (ownerId: string) => ctx.playerId === ownerId,
     }),
+    unauthorizedError: (_parent, ctx, _info, { message }) =>
+      ctx.playerId === undefined ? notSignedIn() : new GraphQLError(message, { extensions: { code: "FORBIDDEN" } }),
   },
   errors: {
     defaultTypes: [],
   },
+  validation: {
+    validationError: ({ issues }) =>
+      badInput(issues.map(({ path = [], message }) => `${path.map((part) => String(typeof part === "object" ? part.key : part)).join(".")}: ${message}`).join("; ")),
+  },
 });
 
+/**
+ * graphql-scalars reads an integer variable with `parseInt`, so 1.5 would
+ * arrive as 1, "7abc" as 7, and 1e21, which stringifies as "1e+21", as 1. `Int`
+ * refuses all three, and so does this contract: a value that is not a safe
+ * whole number never reaches the library.
+ */
+function wholeNumbersOnly(scalar: GraphQLScalarType) {
+  return {
+    parseValue(value: unknown): number {
+      if (!Number.isSafeInteger(value)) throw new GraphQLError(`Value is not a safe whole number: ${String(value)}`);
+      return scalar.parseValue(value) as number;
+    },
+  };
+}
+
 builder.addScalarType("DateTime", DateTimeResolver);
+builder.addScalarType("JSON", JSONResolver);
+builder.addScalarType("UUID", UUIDResolver);
+builder.addScalarType("NonNegativeInt", NonNegativeIntResolver, wholeNumbersOnly(NonNegativeIntResolver));
+builder.addScalarType("PositiveInt", PositiveIntResolver, wholeNumbersOnly(PositiveIntResolver));
 
 builder.queryType({
   description: "What a signed-in player reads: a player by id, themselves, the deploy's version, an adventure, and the heroes other players have left at a location.",

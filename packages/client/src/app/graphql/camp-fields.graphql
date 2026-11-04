@@ -1,0 +1,18 @@
+fragment CampFields on Camp {
+  activeHeroes
+  hallLevel
+  heroCapacity
+  livingHeroes
+  location
+  name
+  resourceCapacity
+  warehouseLevel
+  facilities {
+    kind
+    level
+  }
+  holdings {
+    balance
+    material
+  }
+}

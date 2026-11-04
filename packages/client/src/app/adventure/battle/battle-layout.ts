@@ -1,5 +1,6 @@
-import type { Line, Side } from '@heat/engine';
 import { groupBy } from 'es-toolkit';
+
+import type { Line, Side } from '@heat/engine';
 
 /**
  * Where the battle scene puts things (game.md, "How the game looks" and

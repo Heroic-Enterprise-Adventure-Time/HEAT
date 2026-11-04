@@ -36,6 +36,10 @@ locals {
   ]
 }
 
+# No point-in-time recovery on a sandbox stack's tables, the literal below
+# (docs/process/development.md, rule 9); trivy's AVD-AWS-0024 is excused on
+# this root alone, so dev's and prod's tables stay checked.
+#trivy:ignore:AVD-AWS-0024
 module "environment" {
   source = "../../modules/environment"
 

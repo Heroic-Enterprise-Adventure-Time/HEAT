@@ -1,13 +1,15 @@
-import { Component, DestroyRef, ElementRef, InjectionToken, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, InjectionToken, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
-import { ABILITIES, JOBS, UNIT_PROFILES, location, must, type AbilityId, type JobId, type PartyOrder, type UnitType } from '@heat/engine';
-import { Game, type AdventureResultView } from '../game';
+
+import { ABILITIES, type AbilityId, type JobId, JOBS, location, must, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
+
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
+import { stageWords } from '../camp/panels/job-words';
+import { type AdventureResultView, Game } from '../game';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
-import { stageWords } from '../camp/panels/job-words';
 import { secondsLeft } from './field';
 import { Play, SPEEDS } from './play';
 

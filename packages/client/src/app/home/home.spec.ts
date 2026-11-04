@@ -1,14 +1,15 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
-import { Config } from '../config';
-import { Session, type SessionUser } from '../session';
+import { provideRouter, Router } from '@angular/router';
+
 import { CAMP_SCENE_FACTORY } from '../camp/camp';
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
-import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
+import { Config } from '../config';
 import { Game } from '../game';
-import { Home } from './home';
+import { Session, type SessionUser } from '../session';
 import { Blank } from '../testing/blank';
+import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
+import { Home } from './home';
 
 /** A session with a settable user and recorded actions, in place of the real one. */
 function fakeSession(user: SessionUser | null) {
@@ -40,7 +41,7 @@ async function render(session: ReturnType<typeof fakeSession>, configError: stri
       { provide: Session, useValue: session },
       { provide: Config, useValue: config },
       // The camp's own collaborators, standing in: no hub and no WebGL in a test.
-      { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), recruits: signal([]), busy: signal(false), error: signal(null) } },
+      { provide: Game, useValue: { heroesHere: signal([]), location: signal('millbrook'), camp: signal(null), recruits: signal([]), error: signal(null) } },
       { provide: CAMP_SCENE_FACTORY, useValue: () => Promise.resolve({ setHeroes: () => undefined, setLevels: () => undefined, destroy: () => undefined }) },
       { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
     ],

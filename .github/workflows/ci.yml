@@ -2,10 +2,12 @@
 #
 # The gate on every pull request and on main: does the repository build, does
 # it lint clean, do its tests pass, does the client build for production, is
-# the committed GraphQL schema current, does every function bundle, is
-# every Terraform root formatted and valid, and does every workflow lint
-# clean under actionlint. It runs with no AWS credentials; the integration tests start their own containers
-# (decision 0009) and the Terraform roots are initialised without a backend.
+# the committed GraphQL schema current and the client's generated code with
+# it, does every function bundle, is every Terraform root formatted, valid
+# and clean under tflint and trivy, and does every workflow lint clean under
+# actionlint. It runs with no AWS
+# credentials; the integration tests start their own containers (decision
+# 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
 # roots, under their GitHub environments, and sandbox.yml the per-issue
 # stacks (decision 0017).
@@ -64,11 +66,18 @@ jobs:
           npm run schema:print
           git diff --exit-code -- packages/hub/schema.graphql
 
+      # The client's operations and types are generated from that schema
+      # (codegen.mjs); a stale file fails here as a stale schema does.
+      - name: Check that the client's generated GraphQL code matches the schema and its operations
+        run: |
+          npm run codegen
+          git diff --exit-code -- packages/client/src/app/graphql/generated
+
       - name: Bundle every function for Lambda
         run: npm run bundle
 
   terraform:
-    name: Terraform format, validate and lint
+    name: Terraform format, validate, lint and scan
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
@@ -113,6 +122,48 @@ jobs:
         working-directory: terraform
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+      # trivy's misconfiguration checks, pinned, from its release archive,
+      # verified before it runs the way trivy's own document says (read
+      # 2026-11-02): cosign checks the archive against the Sigstore bundle
+      # published beside it, with the signer pinned to trivy's release
+      # workflow at this tag. The archive and the bundle come from the
+      # release's own URL, not through the API: the aquasecurity
+      # organization's IP allow list refuses a runner's token on its API,
+      # which is where `gh release download` failed on the first run
+      # (41548590530), so the attestation route actionlint takes below is
+      # closed here. The install script trivy's document offers pipes a fetch
+      # into sh, which this project does not do. The options and the pinned
+      # checks bundle are terraform/trivy.yaml, the standing excuses
+      # terraform/.trivyignore (docs/standards/terraform.md, rule 17).
+      # The exact release: the installer publishes no floating major tag.
+      - name: Set up cosign
+        uses: sigstore/cosign-installer@v4.1.2
+        with:
+          cosign-release: v3.1.4
+
+      - name: Set up trivy
+        env:
+          TRIVY_VERSION: 0.76.1
+        run: |
+          set -eu
+          archive="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          release="https://github.com/aquasecurity/trivy/releases/download/v$TRIVY_VERSION"
+          curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/$archive" "$release/$archive"
+          curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/$archive.sigstore.json" "$release/$archive.sigstore.json"
+          cosign verify-blob "$RUNNER_TEMP/$archive" \
+            --bundle "$RUNNER_TEMP/$archive.sigstore.json" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            --certificate-identity "https://github.com/aquasecurity/trivy/.github/workflows/reusable-release.yaml@refs/tags/v$TRIVY_VERSION"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" trivy
+          "$RUNNER_TEMP/trivy" --version
+
+      # The command a laptop runs (docs/process/development.md, rule 2): the
+      # roots and modules, with trivy.yaml and .trivyignore read from here.
+      - name: Scan every root and module for misconfigurations
+        run: |
+          "$RUNNER_TEMP/trivy" config .
+        working-directory: terraform
 
   workflows:
     name: Lint the workflows

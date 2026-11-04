@@ -6,8 +6,10 @@
 #
 # No versioning: the objects are a build artifact, written again on every
 # push from the commit that is checked out, so there is nothing to recover
-# that git does not already hold. force_destroy for the same reason: a
-# destroy, on the branch's deletion, empties the bucket itself.
+# that git does not already hold (docs/standards/terraform.md, rule 12;
+# the excuse below is for trivy's AVD-AWS-0090). force_destroy for the same
+# reason: a destroy, on the branch's deletion, empties the bucket itself.
+#trivy:ignore:AVD-AWS-0090
 resource "aws_s3_bucket" "client" {
   bucket        = "${var.name_prefix}-client"
   force_destroy = true

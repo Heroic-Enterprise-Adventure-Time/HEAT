@@ -1,26 +1,27 @@
 import { randomUUID } from "node:crypto";
+
 import {
-  FACILITIES,
-  JOBS,
-  MAX_PARTY,
-  UNIT_PROFILES,
-  location,
   type AdventureSnapshot,
+  FACILITIES,
   type Job,
+  JOBS,
+  location,
   type Requirement,
   type SnapshotHero,
+  UNIT_PROFILES,
 } from "@heat/engine";
+
+import { retryingConflicts } from "./conflict.js";
 import {
   AdventureAlreadyOpen,
-  FacilityMissing,
-  HeroChanged,
-  TransactionConflict,
-  campLevels,
   type AdventureRecord,
+  campLevels,
+  FacilityMissing,
   type Hero,
+  HeroChanged,
   type Repository,
 } from "./db/repository.js";
-import { AdventureOpen, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires, badInput, type Refusal } from "./refusals.js";
+import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, type Refusal, Requires } from "./refusals.js";
 
 /**
  * Starting an adventure from a location's job board, or from a facility the
@@ -38,8 +39,9 @@ import { AdventureOpen, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRe
  * The refusals, answered as data (`refusals.ts`): AdventureOpen, Requires
  * (the facility that posts the job, not built), HeroDead, HeroRetired,
  * HeroNotHere and HeroAdventuring for a hero of the party, and Conflict. A
- * location or job the hub does not know, a party of the wrong size or with
- * a hero twice, or a hero that is not the player's is BAD_USER_INPUT.
+ * location or job the hub does not know, or a hero that is not the player's,
+ * is BAD_USER_INPUT; the party is 1 to MAX_PARTY distinct lower-case ids by the
+ * time it arrives (`StartAdventureInput`).
  */
 
 /** A second start answers with the adventure already open, which the client reads from `me`. */
@@ -82,7 +84,7 @@ function snapshotHero(hero: Hero): SnapshotHero {
   };
 }
 
-export async function startAdventure(
+export function startAdventure(
   repo: Repository,
   playerId: string,
   version: string,
@@ -90,6 +92,18 @@ export async function startAdventure(
   jobId: string,
   heroIds: readonly string[],
   now = new Date(),
+): Promise<AdventureRecord> {
+  return retryingConflicts("start", "the party changed while starting; no adventure was started", () => startOnce(repo, playerId, version, locationId, jobId, heroIds, now));
+}
+
+async function startOnce(
+  repo: Repository,
+  playerId: string,
+  version: string,
+  locationId: string,
+  jobId: string,
+  heroIds: readonly string[],
+  now: Date,
 ): Promise<AdventureRecord> {
   const open = await repo.openAdventure(playerId);
   if (open) refuseOpen(open.adventureId);
@@ -111,12 +125,8 @@ export async function startAdventure(
   };
   await checkFacilities();
 
-  if (heroIds.length < 1 || heroIds.length > MAX_PARTY) badInput(`a party is 1 to ${MAX_PARTY} heroes`);
-  const ids = heroIds.map((id) => id.toLowerCase());
-  if (new Set(ids).size !== ids.length) badInput("a hero is in the party twice");
-
   const checkParty = async (): Promise<Hero[]> => {
-    const heroes = await Promise.all(ids.map((id) => repo.getHero(playerId, id)));
+    const heroes = await Promise.all(heroIds.map((id) => repo.getHero(playerId, id)));
     const party: Hero[] = [];
     for (const hero of heroes) {
       // Another player's hero is not said to exist.
@@ -150,7 +160,7 @@ export async function startAdventure(
       startedAt: now.toISOString(),
     }, needs);
   } catch (e) {
-    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof FacilityMissing || e instanceof TransactionConflict)) throw e;
+    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof FacilityMissing)) throw e;
     // Another request got there first: answer with what it changed.
     const winner = await repo.openAdventure(playerId);
     if (winner) refuseOpen(winner.adventureId);

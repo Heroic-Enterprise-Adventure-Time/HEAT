@@ -6,15 +6,15 @@
 
 import {
   BATTLE_CONTENT,
-  CombatEngine,
-  UNIT_PROFILES,
   type BattleContent,
   type BattleEvent,
   type BattleSetup,
+  CombatEngine,
   type CombatProfile,
   type MonsterProfile,
   type Opponent,
   type PartyMember,
+  UNIT_PROFILES,
   type UnitType,
 } from "../../src/index.js";
 

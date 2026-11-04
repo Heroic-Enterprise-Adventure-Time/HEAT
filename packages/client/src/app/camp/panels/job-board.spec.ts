@@ -1,16 +1,18 @@
 import { computed, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { Router, provideRouter } from '@angular/router';
+import { provideRouter, Router } from '@angular/router';
 import { RouterTestingHarness } from '@angular/router/testing';
-import { Refusal } from '../../api';
+
+import { must } from '@heat/engine';
+
+import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
 import { routes } from '../../app.routes';
-import { Game, type AdventureView, type HeroView } from '../../game';
+import { type AdventureView, Game, type HeroView } from '../../game';
+import { Refusal } from '../../hub';
 import { Session } from '../../session';
+import { TEST_LAYOUT_SIZES } from '../../testing/layout-sizes';
 import { CAMP_SCENE_FACTORY } from '../camp';
 import { LAYOUT_SIZES } from '../layout-sizes';
-import { TEST_LAYOUT_SIZES } from '../../testing/layout-sizes';
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
-import { must } from '@heat/engine';
 
 function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): HeroView {
   return {
@@ -56,7 +58,6 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
     adventure: open,
     settled: signal(null),
-    busy: signal(false),
     error: signal<string | null>(null),
     started: [] as { location: string; jobId: string; heroIds: readonly string[] }[],
     startAdventure: (location: string, jobId: string, heroIds: readonly string[]) => {

@@ -1,5 +1,8 @@
 import type { ApolloServerPlugin } from "@apollo/server";
+import * as z from "zod/mini";
+
 import type { Context } from "./context.js";
+import { parseEnv, requiredVariable } from "./env.js";
 
 /**
  * One version for the whole app (decision 0030): the commit the workflow
@@ -11,11 +14,13 @@ import type { Context } from "./context.js";
  */
 export const VERSION_HEADER = "heat-version";
 
+const VersionEnv = z.object({ HEAT_VERSION: requiredVariable });
+
 export function versionFromEnv(env: NodeJS.ProcessEnv = process.env): string {
-  const version = env["HEAT_VERSION"];
-  if (!version) throw new Error("HEAT_VERSION is not set");
-  return version;
+  return parseEnv(VersionEnv, env).HEAT_VERSION;
 }
+
+const PreviousVersionEnv = z.object({ HEAT_PREVIOUS_VERSION: z.optional(z.string()) });
 
 /**
  * The version the previous alias runs (decision 0030), HEAT_PREVIOUS_VERSION,
@@ -24,8 +29,8 @@ export function versionFromEnv(env: NodeJS.ProcessEnv = process.env): string {
  * Only a discard reads it.
  */
 export function previousVersionFromEnv(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  const previous = env["HEAT_PREVIOUS_VERSION"];
-  return previous === undefined || previous === "" ? undefined : previous;
+  const previous = parseEnv(PreviousVersionEnv, env).HEAT_PREVIOUS_VERSION;
+  return previous === "" ? undefined : previous;
 }
 
 /**

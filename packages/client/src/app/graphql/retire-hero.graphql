@@ -1,0 +1,15 @@
+#import "./hero-fields.graphql"
+
+mutation RetireHero($input: RetireHeroInput!) {
+  retireHero(input: $input) {
+    __typename
+    ... on Error {
+      message
+    }
+    ... on RetireHeroSuccess {
+      hero {
+        ...HeroFields
+      }
+    }
+  }
+}

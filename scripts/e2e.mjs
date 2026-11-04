@@ -187,7 +187,7 @@ const camp = await graphql(token, campQuery);
 const millbrook = camp.data?.me?.camps?.find((c) => c.location === "millbrook");
 check(!camp.errors && millbrook, `me shows the starting camp: ${JSON.stringify(millbrook)} (${camp.ms} ms)`);
 const recruitFields = `__typename ... on Error { message } ... on InsufficientResources { short { material amount balance } } ... on RecruitHeroSuccess { hero { id unitType spriteSet name status } }`;
-const recruitMutation = `mutation($id: ID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { ${recruitFields} } }`;
+const recruitMutation = `mutation($id: UUID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { ${recruitFields} } }`;
 if (millbrook.livingHeroes === 0) {
   const requestId = crypto.randomUUID();
   const recruited = await graphql(token, recruitMutation, { id: requestId });
@@ -207,7 +207,7 @@ if (millbrook.livingHeroes === 0) {
 // failed between the ore and the fighter leaves the ore, and the next skips it.
 const oreAtStart = (await graphql(token, `{ me { camps { location holdings { material balance } } } }`)).data?.me?.camps?.find((c) => c.location === "millbrook")?.holdings?.find((h) => h.material === "ORE")?.balance ?? 0;
 if (oreAtStart < 40) {
-  const fighter = await graphql(token, `mutation($id: ID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
+  const fighter = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
   const refused = fighter.data?.recruitHero;
   check(!fighter.errors && refused?.__typename === "InsufficientResources" && refused.short?.[0]?.material === "ORE" && refused.short[0].amount === 40, `a fighter is refused for want of ore, as data: ${JSON.stringify(refused)} (${fighter.ms} ms)`);
 } else {
@@ -316,7 +316,7 @@ check(success(dismissed, "retireHero", "hero")?.status === "RETIRED", `the paid 
 // checks the refusal, the run that can builds it, and every run after checks
 // that a repeat charges nothing and that the mine has no second level here.
 const facilitiesQuery = `{ me { camps { location holdings { material balance } facilities { kind level } } } }`;
-const buildMutation = `mutation($level: Int!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename ... on Error { message } ... on BuildFacilitySuccess { camp { location holdings { material balance } facilities { kind level } } } } }`;
+const buildMutation = `mutation($level: PositiveInt!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename ... on Error { message } ... on BuildFacilitySuccess { camp { location holdings { material balance } facilities { kind level } } } } }`;
 const campIn = (me) => me?.camps?.find((c) => c.location === "millbrook");
 const mineLevel = (camp) => camp?.facilities?.find((f) => f.kind === "MINE")?.level;
 const stockOf = (camp, material) => camp?.holdings?.find((h) => h.material === material)?.balance ?? 0;
@@ -365,7 +365,7 @@ if (mineLevel(atMine) === 0) {
   check(!settled.errors && oreResult?.outcome === "COMPLETE" && sorted(engineRewards(oreResult.rewards)) === sorted(expectedOre.rewards), `the villager came home from the hill: ${sorted(oreResult?.rewards ?? [])} (${settled.ms} ms)`);
   const withOre = campIn((await graphql(token, facilitiesQuery)).data?.me);
   check(stockOf(withOre, "ORE") >= 40, `the camp holds ${stockOf(withOre, "ORE")} ore, enough for a fighter`);
-  const hired = await graphql(token, `mutation($id: ID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
+  const hired = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
   const fighter = success(hired, "recruitHero", "hero");
   check(!hired.errors && fighter?.unitType === "FIGHTER" && fighter.status === "ALIVE", `recruitHero sold a fighter for the ore: ${JSON.stringify(hired.data)} (${hired.ms} ms)`);
   const paidOre = campIn((await graphql(token, facilitiesQuery)).data?.me);

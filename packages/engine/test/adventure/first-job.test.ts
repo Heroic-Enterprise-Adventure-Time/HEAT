@@ -1,6 +1,7 @@
 import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
-import { AdventureEngine, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION, type AdventureResult } from "../../src/index.js";
+
+import { AdventureEngine, type AdventureResult, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION } from "../../src/index.js";
 import { hero, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 // The first progression (decision 0031): a new player's free villager cannot

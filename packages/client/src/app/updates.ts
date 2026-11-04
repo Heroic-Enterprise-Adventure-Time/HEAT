@@ -1,7 +1,8 @@
-import { Service, InjectionToken, effect, inject, untracked } from '@angular/core';
-import { Api } from './api';
+import { effect, inject, InjectionToken, Service, untracked } from '@angular/core';
+
 import { Config } from './config';
 import { Game } from './game';
+import { Hub } from './hub';
 
 /** Reloads the page; a test provides one that counts. */
 export const RELOAD = new InjectionToken<() => void>('heat.reload', {
@@ -26,14 +27,14 @@ export const RELOADED_FROM = 'heat.reloadedFrom';
  */
 @Service()
 export class Updates {
-  private readonly api = inject(Api);
+  private readonly hub = inject(Hub);
   private readonly config = inject(Config);
   private readonly game = inject(Game);
   private readonly reload = inject(RELOAD);
 
   constructor() {
     effect(() => {
-      if (!this.api.outdated()) return;
+      if (!this.hub.outdated()) return;
       const player = this.game.player();
       // Before the player is read, an open adventure cannot be ruled out.
       if (!player || player.openAdventure || this.game.settled()) return;

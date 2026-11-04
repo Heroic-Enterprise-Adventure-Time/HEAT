@@ -1,6 +1,8 @@
-import type { Point, Rect } from './layout';
-import { must } from '@heat/engine';
 import { sumBy } from 'es-toolkit';
+
+import { must } from '@heat/engine';
+
+import type { Point, Rect } from './layout';
 
 /**
  * How a hero mills about the camp, for flavour (game.md, "Locations and

@@ -1,5 +1,6 @@
 import { inject } from '@angular/core';
-import { Router, type CanActivateFn, type Routes } from '@angular/router';
+import { type CanActivateFn, Router, type Routes } from '@angular/router';
+
 import { Camp } from './camp/camp';
 import { FacilityPanel } from './camp/panels/facility-panel';
 import { HallPanel } from './camp/panels/hall-panel';

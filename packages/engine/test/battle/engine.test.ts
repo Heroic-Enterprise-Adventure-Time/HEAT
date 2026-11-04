@@ -8,7 +8,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { CombatEngine, chargeMs, findNextUnit, must, resolveBattle, type UnitState } from "../../src/index.js";
+
+import { chargeMs, CombatEngine, findNextUnit, must, resolveBattle, type UnitState } from "../../src/index.js";
 import { contentWith, hero, ofKind, opponent, runAll, setup } from "./helpers.js";
 
 function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = {}): UnitState {

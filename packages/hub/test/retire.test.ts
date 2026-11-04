@@ -1,14 +1,19 @@
 import { randomUUID } from "node:crypto";
-import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
+
+import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { playerKeys } from "../src/db/keys.js";
-import { HeroChanged, Repository, type Hero, type HeroStatus } from "../src/db/repository.js";
-import { recruitHero } from "../src/recruit.js";
-import { retireHero } from "../src/retire.js";
-import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
-import { BAD_USER_INPUT, refusal } from "./refusal.js";
+
 import { must } from "@heat/engine";
+
+import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Hero, HeroChanged, type HeroStatus, Repository, TransactionConflict } from "../src/db/repository.js";
+import { recruitHero } from "../src/recruit.js";
+import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
+import { retireHero } from "../src/retire.js";
+import { player } from "./data.js";
+import { playerKeys } from "./keys.js";
+import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
 let tables: Tables;
@@ -22,7 +27,6 @@ beforeAll(() => {
 });
 
 const at = "millbrook";
-const player = () => `p-${randomUUID()}`;
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths will leave them. */
 async function putCamp(p: string, statuses: HeroStatus[]): Promise<Hero[]> {
@@ -87,6 +91,32 @@ describe("retireHero", () => {
     expect(results.map((h) => h.status)).toEqual(["RETIRED", "RETIRED"]);
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 1 });
     await expectCountsAgree(p);
+  });
+
+  it("answers a repeat that loses the race with the hero retired, wherever the other commits", async () => {
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putCamp(p, ["ALIVE", "ALIVE"]))[0], "the hero");
+      const late = winnerBefore(repo, k, () => retireHero(repo, p, hero.id));
+      expect(await retireHero(late.repo, p, hero.id)).toEqual(await repo.getHero(p, hero.id));
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+      return late.ran();
+    });
+    // Before each of getHero and retire.
+    expect(runs).toBe(2);
+  });
+
+  it("retries a retire cancelled by its repeat, still committing, and answers the hero retired", async () => {
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putCamp(p, ["ALIVE", "ALIVE"]))[0], "the hero");
+      const late = cancelled(repo, "retire", new TransactionConflict("conflict"), k, () => retireHero(repo, p, hero.id));
+      expect(await retireHero(late.repo, p, hero.id)).toEqual(await repo.getHero(p, hero.id));
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+      return late.ran();
+    });
+    // Before each of the next run's getHero and retire.
+    expect(runs).toBe(2);
   });
 
   it("holds the counts in the transaction, against a hero read before another retire", async () => {

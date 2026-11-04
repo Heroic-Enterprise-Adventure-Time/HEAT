@@ -1,0 +1,12 @@
+fragment HeroFields on Hero {
+  id
+  level
+  location
+  name
+  recruitedAt
+  retiredAt
+  spriteSet
+  status
+  unitType
+  xp
+}

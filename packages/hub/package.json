@@ -7,23 +7,29 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
-    "schema:print": "node --import tsx scripts/print-schema.ts"
+    "schema:print": "node --import tsx scripts/print-schema.ts",
+    "backfill": "node --import tsx scripts/backfill.ts"
   },
   "dependencies": {
     "@apollo/server": "5.5.1",
     "@as-integrations/aws-lambda": "4.1.0",
     "@aws-lambda-powertools/logger": "2.36.0",
+    "@aws-lambda-powertools/metrics": "2.36.0",
     "@aws-lambda-powertools/tracer": "2.36.0",
     "@aws-sdk/client-dynamodb": "3.1157.0",
     "@aws-sdk/client-s3": "3.1157.0",
     "@aws-sdk/lib-dynamodb": "3.1157.0",
     "@heat/engine": "0.0.0",
+    "@middy/core": "7.9.2",
     "@pothos/core": "4.16.0",
     "@pothos/plugin-errors": "4.9.3",
     "@pothos/plugin-scope-auth": "4.2.2",
+    "@pothos/plugin-validation": "4.3.5",
+    "electrodb": "3.9.3",
     "es-toolkit": "1.53.1",
     "graphql": "16.14.2",
-    "graphql-scalars": "2.0.1"
+    "graphql-scalars": "2.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@types/aws-lambda": "8.10.164",

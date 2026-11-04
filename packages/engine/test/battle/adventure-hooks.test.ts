@@ -1,8 +1,9 @@
 /** The battle engine's two hooks for the adventure (Issue-112): the retreat and the carry limit. */
 
 import { describe, expect, it } from "vitest";
+
 import { CombatEngine, resolveBattle } from "../../src/index.js";
-import { hero, opponent, ofKind, runAll, setup } from "./helpers.js";
+import { hero, ofKind, opponent, runAll, setup } from "./helpers.js";
 
 describe("Retreat", () => {
   it("ends a battle in progress as a retreat at the given time", () => {

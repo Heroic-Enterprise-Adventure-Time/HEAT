@@ -1,0 +1,11 @@
+# No `... on Error` here: nothing refuses joinGame, so its union has no Error member.
+mutation JoinGame {
+  joinGame {
+    __typename
+    ... on JoinGameSuccess {
+      player {
+        id
+      }
+    }
+  }
+}

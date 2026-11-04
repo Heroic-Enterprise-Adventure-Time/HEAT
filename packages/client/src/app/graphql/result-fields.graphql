@@ -1,0 +1,27 @@
+fragment ResultFields on AdventureResult {
+  outcome
+  credited {
+    amount
+    material
+  }
+  heroes {
+    dead
+    heroId
+    level
+    xp
+    xpGained
+  }
+  lost {
+    amount
+    material
+  }
+  rewards {
+    amount
+    material
+  }
+  stages {
+    ended
+    kind
+    stage
+  }
+}

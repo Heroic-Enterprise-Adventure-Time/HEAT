@@ -1,16 +1,22 @@
 import { randomUUID } from "node:crypto";
-import { GetCommand, PutCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { beforeAll, describe, expect, it } from "vitest";
-import { JOBS, LEVEL_XP, levelForXp, replay, warehouseCapacity, must, type AdventureTimeline, type UnitType } from "@heat/engine";
+
+import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+
+import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type UnitType, warehouseCapacity } from "@heat/engine";
+
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { locationKeys, playerKeys } from "../src/db/keys.js";
-import { Repository, type Hero, type Settlement } from "../src/db/repository.js";
+import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
-import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, EngineUpdated } from "../src/refusals.js";
-import { BAD_USER_INPUT, refusal } from "./refusal.js";
+import { logger } from "../src/observability.js";
+import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, EngineUpdated } from "../src/refusals.js";
 import { startAdventure } from "../src/start.js";
-import { submitAdventure } from "../src/submit.js";
+import { SETTLE_ATTEMPTS, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
+import { player, storedItem } from "./data.js";
+import { locationKeys, playerKeys } from "./keys.js";
+import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
+import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 /**
  * Submit, settlement and discard against DynamoDB Local, with the replay
@@ -41,7 +47,6 @@ const at = "millbrook";
 const wolves = JOBS["wolves-on-the-mill-road"];
 const version = "0123456789abcdef0123456789abcdef01234567";
 const previous = "fedcba9876543210fedcba9876543210fedcba98";
-const player = () => `p-${randomUUID()}`;
 
 /** Living heroes of the given unit types and a camp that counts them, with their sightings. */
 async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): Promise<Hero[]> {
@@ -68,10 +73,6 @@ async function start(p: string, heroes: Hero[], issuedBy = version) {
 }
 
 
-async function item(table: string, key: Record<string, string>) {
-  return (await db.send(new GetCommand({ TableName: table, Key: key }))).Item;
-}
-
 async function cloth(p: string) {
   return (await repo.holdings(p, at)).find((h) => h.material === "cloth")?.balance;
 }
@@ -96,13 +97,13 @@ describe("a party that completes the job", () => {
     expect(await repo.getAdventure(started.adventureId)).toMatchObject({ status: "SETTLED", result: settled.result });
     expect(await repo.openAdventure(p)).toBeUndefined();
     expect(await cloth(p)).toBe(10);
-    expect(await item(tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
 
     const level = levelForXp(wolves.xp);
     expect(level).toBeGreaterThan(1);
     for (const hero of heroes) {
       expect(await repo.getHero(p, hero.id)).toMatchObject({ xp: wolves.xp, level, status: "ALIVE", adventureId: null });
-      const seen = await item(tables.location, locationKeys.seen(at, hero.id));
+      const seen = await storedItem(db, tables.location, locationKeys.seen(at, hero.id));
       expect(seen).toMatchObject({ level, name: hero.name });
       expect(seen?.["expiresAt"]).toBeGreaterThan(Date.now() / 1000);
     }
@@ -132,6 +133,51 @@ describe("a party that completes the job", () => {
     expect(await cloth(p)).toBe(20);
     for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(2 * wolves.xp);
   });
+
+  /**
+   * A submit raced by its own repeat, which commits as `race` places it:
+   * the loser answers the record as settled, and the camp is paid once. A
+   * party of one, so that no read of the party runs beside another (race.ts).
+   */
+  async function lostSubmit(race: (p: string, adventureId: string, winner: () => Promise<unknown>) => Race): Promise<boolean> {
+    const p = player();
+    const started = await start(p, await putParty(p, ["fighter"]));
+    const timelines = new MemoryTimelines();
+    const late = race(p, started.adventureId, () => submitAdventure(repo, timelines, p, version, started.adventureId, []));
+    const lost = await submitAdventure(late.repo, timelines, p, version, started.adventureId, []);
+    const stored = must(await repo.getAdventure(started.adventureId), "the record");
+    expect(stored.status).toBe("SETTLED");
+    expect(lost.result).toEqual(stored.result);
+    expect(await cloth(p)).toBe(stored.result?.credited.find((c) => c.material === "cloth")?.amount);
+    return late.ran();
+  }
+
+  it("answers a repeat that loses the race with the record settled, wherever the other commits", async () => {
+    const runs = await everyInterleaving((k) => lostSubmit((_p, _id, winner) => winnerBefore(repo, k, winner)));
+    // Before each of getAdventure, camp, getHero and settle.
+    expect(runs).toBe(4);
+  });
+
+  it("retries a settlement cancelled by its repeat in flight, and answers the record settled", async () => {
+    const runs = await everyInterleaving((k) => lostSubmit((_p, _id, winner) => cancelled(repo, "settle", new TransactionConflict("conflict"), k, winner)));
+    // Before each of the next attempt's camp, getHero and settle.
+    expect(runs).toBe(3);
+  });
+
+  it("waits only before an attempt that follows, and then answers Conflict", async () => {
+    const p = player();
+    const started = await start(p, await putParty(p, ["fighter"]));
+    const settle = vi.spyOn(Repository.prototype, "settle").mockRejectedValue(new TransactionConflict("conflict"));
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await refusal(submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []))).toBeInstanceOf(Conflict);
+      expect(settle).toHaveBeenCalledTimes(SETTLE_ATTEMPTS);
+      expect(warn.mock.calls.filter(([message]) => message === "transaction conflict; running again")).toHaveLength(SETTLE_ATTEMPTS - 1);
+    } finally {
+      settle.mockRestore();
+      warn.mockRestore();
+    }
+  });
 });
 
 describe("the warehouse's cap", () => {
@@ -145,7 +191,7 @@ describe("the warehouse's cap", () => {
     expect(settled.result?.credited).toEqual([{ material: "cloth", amount: 4 }]);
     expect(settled.result?.lost).toEqual([{ material: "cloth", amount: 6 }]);
     expect(await cloth(p)).toBe(cap);
-    expect(await item(tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 4, lost: 6 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 4, lost: 6 });
   });
 
   it("credits nothing to a full warehouse and still settles", async () => {
@@ -158,7 +204,7 @@ describe("the warehouse's cap", () => {
     expect(settled.result?.credited).toEqual([]);
     expect(settled.result?.lost).toEqual(wolves.pay);
     expect(await cloth(p)).toBe(cap);
-    expect(await item(tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 0, lost: 10 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 0, lost: 10 });
   });
 
   it("reads again when a balance moves between the read and the write", async () => {
@@ -196,7 +242,7 @@ describe("a death", () => {
     expect(settled.result?.heroes).toEqual([expect.objectContaining({ heroId: villager.id, dead: true, xpGained: 0, health: 0 })]);
     expect(await repo.getHero(p, villager.id)).toMatchObject({ status: "DEAD", xp: 0, level: 1, adventureId: null });
     expect(await repo.camp(p, at)).toMatchObject({ livingHeroes: 0, activeHeroes: 1 });
-    expect(await item(tables.location, locationKeys.seen(at, villager.id))).toBeUndefined();
+    expect(await storedItem(db, tables.location, locationKeys.seen(at, villager.id))).toBeUndefined();
     expect(await repo.holdings(p, at)).toEqual([]);
   });
 });
@@ -283,6 +329,58 @@ describe("discard", () => {
     const started = await start(p, await putParty(p, ["fighter", "villager"]));
     await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(await refusal(discardAdventure(repo, p, { current: "1".repeat(40), previous: undefined }, started.adventureId))).toBeInstanceOf(AdventureSettled);
+  });
+
+  it("answers a repeat that loses the race with the adventure discarded, wherever the other commits (Issue-172)", async () => {
+    const versions = { current: version, previous };
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const heroes = await putParty(p, ["fighter", "villager"]);
+      const started = await start(p, heroes, "0".repeat(40));
+      const late = winnerBefore(repo, k, () => discardAdventure(repo, p, versions, started.adventureId));
+      expect(await discardAdventure(late.repo, p, versions, started.adventureId)).toMatchObject({ status: "DISCARDED" });
+      expect(await repo.openAdventure(p)).toBeUndefined();
+      for (const hero of heroes) expect(await repo.getHero(p, hero.id)).toMatchObject({ adventureId: null });
+      return late.ran();
+    });
+    // Before each of getAdventure and discard.
+    expect(runs).toBe(2);
+  });
+
+  it("retries a discard cancelled by another in flight, and answers the discard that won (Issue-172)", async () => {
+    const versions = { current: version, previous };
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const started = await start(p, await putParty(p, ["villager"]), "0".repeat(40));
+      const late = cancelled(repo, "discard", new TransactionConflict("conflict"), k, () => discardAdventure(repo, p, versions, started.adventureId));
+      expect(await discardAdventure(late.repo, p, versions, started.adventureId)).toMatchObject({ status: "DISCARDED" });
+      return late.ran();
+    });
+    // Before each of the retry's getAdventure and discard.
+    expect(runs).toBe(2);
+  });
+
+  it("retries a discard cancelled by a submit in flight, and refuses with AdventureSettled (Issue-172)", async () => {
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const started = await start(p, await putParty(p, ["fighter", "villager"]), "0".repeat(40));
+      const settle = () => submitAdventure(repo, new MemoryTimelines(), p, "0".repeat(40), started.adventureId, []);
+      const late = cancelled(repo, "discard", new TransactionConflict("conflict"), k, settle);
+      const lost = await refusal(discardAdventure(late.repo, p, { current: version, previous }, started.adventureId));
+      // Past the last call the submit never commits, and the discard is the one that wins.
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(AdventureSettled);
+      return true;
+    });
+    expect(runs).toBe(2);
+  });
+
+  it("answers Conflict when the adventure is still open and no rule explains the failure (Issue-172)", async () => {
+    const p = player();
+    const started = await start(p, await putParty(p, ["villager"]), "0".repeat(40));
+    const changed = cancelled(repo, "discard", new HeroChanged("condition failed on item 2"), 1, () => Promise.resolve());
+    expect(await refusal(discardAdventure(changed.repo, p, { current: version, previous }, started.adventureId))).toBeInstanceOf(Conflict);
+    expect((await repo.getAdventure(started.adventureId))?.status).toBe("OPEN");
   });
 });
 

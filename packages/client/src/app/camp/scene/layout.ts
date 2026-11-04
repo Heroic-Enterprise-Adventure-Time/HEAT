@@ -1,5 +1,7 @@
-import type { FacilityKind } from '@heat/engine';
 import { range } from 'es-toolkit';
+
+import type { FacilityKind } from '@heat/engine';
+
 import type { Terrain } from './ground';
 
 /**

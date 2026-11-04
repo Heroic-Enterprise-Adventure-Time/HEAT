@@ -1,5 +1,6 @@
-import { MONSTERS, RESOURCE_NODES, jobsPostedBy, type FacilityKind, type Job, type Stage } from '@heat/engine';
 import { uniq } from 'es-toolkit';
+
+import { type FacilityKind, type Job, jobsPostedBy, MONSTERS, RESOURCE_NODES, type Stage } from '@heat/engine';
 
 /** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133). */
 export function jobsAt(location: string, poster: FacilityKind): Job[] {
