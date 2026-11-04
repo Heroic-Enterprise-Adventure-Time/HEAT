@@ -50,6 +50,7 @@
 - `oidc-client-ts` 3.5.0, read from its package: the user's key is `oidc.user:<authority>:<client id>`, and `toStorageString` writes `id_token`, `session_state`, `access_token`, `refresh_token`, `token_type`, `scope`, `profile` and `expires_at`.
 - On the runner, 2026-11-04, run 41896960143 on `heat-sb202`: `ubuntu-latest` has no GPU, and the scene drew anyway, with the seeded session's test green through the canvas, the recruit and the card. WebGL there is software rendering, as it was in the same headless Chromium on a laptop (`ANGLE`, `SwiftShader`).
 - The sealed artifact, from that run's real failure, a selector of the test's own: read as an archive it is refused; decrypted with the private key it holds `trace.zip` and `error-context.md`. The run's public log held no bearer token and no JWT.
+- The composite action's path, by a deliberate failure, run 41908178826 on `heat-sb202`: only the forced test failed, `browser-trace` was uploaded and decrypted to its `trace.zip`, and the run's public log held no bearer token and no JWT. The failure was reverted in the next commit.
 - Encryption: `openssl cms -encrypt` and `-decrypt` on a real 2.7 MB trace, 2026-11-04, returned it byte for byte, about 700 bytes larger.
 
 ## Where it is described

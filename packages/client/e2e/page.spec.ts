@@ -112,7 +112,7 @@ test('a signed-out visitor is handed off to Google', async ({ page }) => {
   await page.goto(siteUrl);
   await expect(page.getByRole('heading', { name: 'HEAT', level: 1 })).toBeVisible();
   await signInButton(page).click();
-  expect(await handedTo).toMatch(/^https:\/\/forced-failure\.invalid\//);
+  expect(await handedTo).toMatch(/^https:\/\/accounts\.google\.com\//);
   expect(problems).toEqual([]);
 });
 
