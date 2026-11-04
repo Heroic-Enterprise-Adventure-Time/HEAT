@@ -45,9 +45,12 @@ const graphql = startServerAndCreateLambdaHandler(
  * 0040): the invocation's request id and function details on every log line,
  * the handler's subsegment in the trace, and the metrics flushed with the
  * cold start counted. The response stays out of the trace, because a GraphQL
- * response can hold a player's whole camp (graphql.md, rule 16).
+ * response can hold a player's whole camp (graphql.md, rule 16). middy's early
+ * timeout is off: it would answer while a verb is still pending, and Lambda
+ * freezes that verb and resumes it in the next invocation, where a timeout left
+ * to Lambda resets the environment.
  */
-export const handler = middy((event: APIGatewayProxyEventV2, context: LambdaContext) => graphql(event, context, () => undefined) as Promise<APIGatewayProxyResultV2>)
+export const handler = middy((event: APIGatewayProxyEventV2, context: LambdaContext) => graphql(event, context, () => undefined) as Promise<APIGatewayProxyResultV2>, { timeoutEarlyInMillis: 0 })
   .use(injectLambdaContext(logger))
   .use(captureLambdaHandler(tracer, { captureResponse: false }))
   .use(logMetrics(metrics, { captureColdStartMetric: true }));

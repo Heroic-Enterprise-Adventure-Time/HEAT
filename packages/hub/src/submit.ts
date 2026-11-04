@@ -11,7 +11,7 @@ import {
   warehouseCapacity,
 } from "@heat/engine";
 
-import { conflictAnswered, pause } from "./conflict.js";
+import { countingConflicts, pause } from "./conflict.js";
 import {
   AdventureClosed,
   type AdventureRecord,
@@ -23,7 +23,7 @@ import {
   TransactionConflict,
 } from "./db/repository.js";
 import { logger } from "./observability.js";
-import { AdventureDiscarded, badInput, EngineUpdated } from "./refusals.js";
+import { AdventureDiscarded, badInput, Conflict, EngineUpdated } from "./refusals.js";
 import type { Timelines } from "./timelines.js";
 
 /**
@@ -177,10 +177,10 @@ async function closed(repo: Repository, adventureId: string): Promise<AdventureR
   const now = await repo.getAdventure(adventureId);
   if (now?.status === "SETTLED") return now;
   if (now?.status === "DISCARDED") throw new AdventureDiscarded("the adventure was discarded");
-  throw conflictAnswered("settle", "the adventure changed while settling; nothing was settled");
+  throw new Conflict("the adventure changed while settling; nothing was settled");
 }
 
-export async function submitAdventure(
+export function submitAdventure(
   repo: Repository,
   timelines: Timelines,
   playerId: string,
@@ -189,6 +189,10 @@ export async function submitAdventure(
   overrides: readonly OverrideInput[],
   now = new Date(),
 ): Promise<AdventureRecord> {
+  return countingConflicts("settle", () => submitOnce(repo, timelines, playerId, version, adventureId, overrides, now));
+}
+
+async function submitOnce(repo: Repository, timelines: Timelines, playerId: string, version: string, adventureId: string, overrides: readonly OverrideInput[], now: Date): Promise<AdventureRecord> {
   const record = await ownAdventure(repo, playerId, adventureId);
   if (record.status === "SETTLED") return record;
   if (record.status === "DISCARDED") throw new AdventureDiscarded("the adventure was discarded");
@@ -207,7 +211,7 @@ export async function submitAdventure(
   let result = verified.result;
   if (!(await timelines.putIfAbsent(adventureId, JSON.stringify(verified.timeline)))) {
     const body = await timelines.get(adventureId);
-    if (body === undefined) throw conflictAnswered("settle", "the stored timeline could not be read; nothing was settled");
+    if (body === undefined) throw new Conflict("the stored timeline could not be read; nothing was settled");
     const stored = JSON.parse(body) as AdventureTimeline;
     result = replay(record.snapshot, record.seed, stored.overrideLog).result;
   }
@@ -225,8 +229,8 @@ export async function submitAdventure(
       if (e instanceof AdventureClosed) return closed(repo, adventureId);
       if (!(e instanceof CampChanged || e instanceof TransactionConflict)) throw e;
       // Another transaction is still committing: wait for it before reading again (conflict.ts).
-      if (e instanceof TransactionConflict) await pause(attempt + 1, "settle");
+      if (e instanceof TransactionConflict && attempt + 1 < SETTLE_ATTEMPTS) await pause(attempt + 1, "settle");
     }
   }
-  throw conflictAnswered("settle", "the camp kept changing while settling; nothing was settled");
+  throw new Conflict("the camp kept changing while settling; nothing was settled");
 }

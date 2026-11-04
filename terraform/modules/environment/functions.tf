@@ -5,6 +5,12 @@
 # least it needs, and its own log group with retention. The second alias,
 # previous, and how it learns what live was, are in previous.tf.
 
+locals {
+  # The service each function names itself in its logs, traces and metrics. One
+  # expression, because an alarm reads it (alarms.tf; terraform.md, rule 19).
+  service_names = { for name, _ in var.functions : name => "heat-${name}" }
+}
+
 data "archive_file" "function" {
   for_each = var.functions
 
@@ -157,7 +163,7 @@ resource "aws_lambda_function" "function" {
     variables = {
       HEAT_PLAYER_TABLE       = aws_dynamodb_table.player.name
       HEAT_LOCATION_TABLE     = aws_dynamodb_table.location.name
-      POWERTOOLS_SERVICE_NAME = "heat-${each.key}"
+      POWERTOOLS_SERVICE_NAME = local.service_names[each.key]
       POWERTOOLS_LOG_LEVEL    = var.log_level
       # Each stack's own namespace: sandbox stacks share an account, and the
       # service dimension is the same in every environment (decision 0040).

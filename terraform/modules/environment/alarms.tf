@@ -14,11 +14,12 @@
 # subscription that was never confirmed (its documentation, read
 # 2026-10-18), so the address is confirmed once and then left alone.
 #
-# The metrics are Lambda's per function, by FunctionName, which counts
+# The three function alarms read Lambda's metrics by FunctionName, which counts
 # every version and alias together: what the routes invoke through the live
 # alias is included. Missing data is not breaching, because a quiet hour has
-# no invocations and no errors. Each alarm notifies on entering ALARM and on
-# returning to OK, so a message is always followed by its all-clear.
+# no invocations, no errors and no conflicts. Each alarm notifies on entering
+# ALARM and on returning to OK, so a message is always followed by its
+# all-clear.
 
 locals {
   alarms_enabled = var.alarm_email != null
@@ -128,7 +129,9 @@ resource "aws_cloudwatch_metric_alarm" "function_duration" {
 # as a failed invocation is. The hub writes this metric itself, as EMF lines
 # in its log, under its stack's namespace and the service dimension alone;
 # the alarm must name a metric's dimensions exactly, which is why the hub
-# emits the count without the verb as well as with it (conflict.ts).
+# emits the count without the verb as well as with it (conflict.ts). The
+# service is the name the function is given, so a rename fails the plan rather
+# than leaving an alarm on a metric nothing emits.
 resource "aws_cloudwatch_metric_alarm" "conflicts_answered" {
   count = local.alarms_enabled ? 1 : 0
 
@@ -137,7 +140,7 @@ resource "aws_cloudwatch_metric_alarm" "conflicts_answered" {
 
   namespace   = var.name_prefix
   metric_name = "ConflictAnswered"
-  dimensions  = { service = "heat-hub" }
+  dimensions  = { service = local.service_names["hub"] }
 
   statistic           = "Sum"
   period              = 300
