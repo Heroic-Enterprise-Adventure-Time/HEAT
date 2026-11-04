@@ -31,6 +31,9 @@ const config = {
           DateTime: "string",
           // The engine's own AdventureTimeline, which the client narrows where it reads it.
           JSON: "unknown",
+          UUID: "string",
+          NonNegativeInt: "number",
+          PositiveInt: "number",
         },
       },
     },

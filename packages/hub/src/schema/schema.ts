@@ -1,5 +1,6 @@
-import { constantCase } from "es-toolkit";
+import { constantCase, uniq } from "es-toolkit";
 import { GraphQLError } from "graphql";
+import * as z from "zod/mini";
 
 import {
   ADVENTURE_OUTCOMES,
@@ -10,6 +11,7 @@ import {
   JOBS,
   location,
   MATERIALS,
+  MAX_PARTY,
   type Requirement,
   type Reward,
   type SnapshotHero,
@@ -31,7 +33,6 @@ import {
   AdventureOpen,
   AdventureSettled,
   AdventureVerifiable,
-  badInput,
   Conflict,
   EngineUpdated,
   HallFull,
@@ -49,7 +50,7 @@ import {
 import { retireHero } from "../retire.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
 import { startAdventure } from "../start.js";
-import { type OverrideInput, submitAdventure } from "../submit.js";
+import { MAX_ABILITY_ID, MAX_OVERRIDES, type OverrideInput, submitAdventure } from "../submit.js";
 import { builder } from "./builder.js";
 
 /**
@@ -60,18 +61,13 @@ import { builder } from "./builder.js";
  * adventure started from the job board or a facility, submitted for verification and
  * settlement, or discarded when no deploy can verify it.
  *
- * The shape is docs/standards/graphql.md, rules 4 to 6: an id is an ID, a
+ * The shape is docs/standards/graphql.md, rules 4 to 6: an id the hub issues is an ID, a
  * timestamp a DateTime, a set the engine closes an enum; a mutation takes
  * one input object and answers a result union, its success wrapping what it
  * changed and each refusal an object type implementing Error (Issue-155,
- * decision 0038).
+ * decision 0038). Its inputs carry their shape: a scalar where the type can
+ * say it, a zod schema where it cannot (rules 4 and 14; decision 0039).
  */
-
-builder.scalarType("JSON", {
-  description: "A JSON value, served as it was stored.",
-  serialize: (value) => value,
-  parseValue: (value) => value,
-});
 
 // --- Enums: the engine's closed sets, their values in the API's UPPER_CASE,
 // mapped onto the engine's own strings so that nothing else changes. ---
@@ -471,9 +467,12 @@ const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implem
       }),
       required: true,
     }),
-    acceptedAtSimTime: t.int({ required: true, description: "Milliseconds on the adventure's clock." }),
+    acceptedAtSimTime: t.field({ type: "NonNegativeInt", required: true, description: "Milliseconds on the adventure's clock." }),
     unitId: t.string({ description: "The hero, for a UNIT entry." }),
-    abilityId: t.string({ description: "The ability forced, for a UNIT entry." }),
+    abilityId: t.string({
+      description: `The ability forced, for a UNIT entry: at most ${MAX_ABILITY_ID} characters.`,
+      validate: z.string().check(z.maxLength(MAX_ABILITY_ID, `an ability id is at most ${MAX_ABILITY_ID} characters`)),
+    }),
     order: t.field({
       type: builder.enumType("PartyOrder", {
         description: "The orders a party takes: press on into the next stage, or retreat home.",
@@ -488,7 +487,14 @@ const RecruitHeroInput = builder.inputType("RecruitHeroInput", {
   description: "What to recruit, and the request's id.",
   fields: (t) => ({
     unitType: t.field({ type: UnitTypeRef, required: true, description: "A unit type on the location's recruitment list." }),
-    requestId: t.id({ required: true, description: "A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made." }),
+    requestId: t.field({
+      type: "UUID",
+      required: true,
+      description: "A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made.",
+      // The scalar passes any case and a stray closing brace, and this value is a key: one
+      // request has one spelling, or a repeat in another case would make a second hero.
+      validate: z.uuid("a request id is a UUID").check(z.toLowerCase()),
+    }),
   }),
 });
 
@@ -497,7 +503,7 @@ const BuildFacilityInput = builder.inputType("BuildFacilityInput", {
   fields: (t) => ({
     location: t.id({ required: true, description: "The camp's location." }),
     kind: t.field({ type: FacilityKindRef, required: true, description: "One of the camp's own facilities." }),
-    level: t.int({ required: true, description: "The level being built: the next one. A level already built answers the camp and charges nothing." }),
+    level: t.field({ type: "PositiveInt", required: true, description: "The level being built: the next one. A level already built answers the camp and charges nothing." }),
   }),
 });
 
@@ -506,12 +512,22 @@ const RetireHeroInput = builder.inputType("RetireHeroInput", {
   fields: (t) => ({ heroId: t.id({ required: true }) }),
 });
 
+const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
+
 const StartAdventureInput = builder.inputType("StartAdventureInput", {
   description: "Which job to start, where, and with whom.",
   fields: (t) => ({
     location: t.id({ required: true, description: "The camp's location, which posts the job." }),
     jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built." }),
-    heroIds: t.idList({ required: true, description: "The party: one to four of the player's living heroes at that camp." }),
+    heroIds: t.idList({
+      required: true,
+      description: "The party: one to four of the player's living heroes at that camp.",
+      validate: z.array(z.string().check(z.toLowerCase())).check(
+        z.minLength(1, PARTY_SIZE),
+        z.maxLength(MAX_PARTY, PARTY_SIZE),
+        z.refine((ids) => uniq(ids).length === ids.length, "a hero is in the party twice"),
+      ),
+    }),
   }),
 });
 
@@ -519,7 +535,12 @@ const SubmitAdventureInput = builder.inputType("SubmitAdventureInput", {
   description: "Which adventure to submit, with its override log.",
   fields: (t) => ({
     adventureId: t.id({ required: true }),
-    overrides: t.field({ type: [OverrideInputRef], required: true, description: "The override log, as the engine kept it; empty when the player forced nothing." }),
+    overrides: t.field({
+      type: [OverrideInputRef],
+      required: true,
+      description: `The override log, as the engine kept it; empty when the player forced nothing, and at most ${MAX_OVERRIDES} entries.`,
+      validate: z.array(z.unknown()).check(z.maxLength(MAX_OVERRIDES, `a log holds at most ${MAX_OVERRIDES} entries`)),
+    }),
   }),
 });
 
@@ -568,11 +589,13 @@ builder.queryFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description: "A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.",
-    args: { location: t.arg.id({ required: true }) },
-    resolve: (_root, args, ctx) => {
-      if (!location(args.location)) badInput(`no location ${args.location}`);
-      return heroesSeenAt(ctx.repo, callerId(ctx), args.location);
+    args: {
+      location: t.arg.id({
+        required: true,
+        validate: z.string().check(z.refine((id) => location(id) !== undefined, { error: ({ input }) => `no location ${String(input)}` })),
+      }),
     },
+    resolve: (_root, args, ctx) => heroesSeenAt(ctx.repo, callerId(ctx), args.location),
   }),
 }));
 
