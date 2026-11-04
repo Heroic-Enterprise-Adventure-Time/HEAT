@@ -4,7 +4,7 @@ import { password, seedSession, siteUrl, stack, stackConfig, username } from './
 
 /**
  * The page on a running stack, as a player meets it (decision 0045;
- * `docs/standards/angular.md`, rule 17). What the page does with each answer
+ * `docs/standards/angular.md`, rule 18). What the page does with each answer
  * is the unit tests', and what the hub answers is `scripts/e2e.mjs`'s: this
  * asks whether a real browser gets from the hostname to a drawn camp and back.
  */
@@ -18,7 +18,7 @@ async function signInWithTheForm(page: Page): Promise<void> {
   await page.goto(siteUrl);
   await signInButton(page).click();
   await page.getByLabel('Email address').fill(username);
-  await page.getByLabel('Password').fill(password);
+  await page.getByLabel('Password', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Sign in', exact: true }).click();
   await page.waitForURL(`${siteUrl}/**`);
 }
@@ -78,7 +78,7 @@ test('a signed-out visitor sees the page and is sent to sign in', async ({ page 
   await signInButton(page).click();
   if (config.passwordSignIn) {
     await page.waitForURL(`${config.loginHost}/login**`);
-    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.getByLabel('Password', { exact: true })).toBeVisible();
   } else {
     await page.waitForURL('https://accounts.google.com/**');
   }
