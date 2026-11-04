@@ -1,6 +1,5 @@
 import SchemaBuilder from "@pothos/core";
 import ScopeAuthPlugin from "@pothos/plugin-scope-auth";
-import { isEqual } from "es-toolkit";
 import { getNamedType, type GraphQLField, type GraphQLNamedType, type GraphQLSchema, isAbstractType, isInterfaceType, isObjectType } from "graphql";
 import { describe, expect, it } from "vitest";
 
@@ -10,11 +9,13 @@ import { schema } from "../src/schema/schema.js";
  * Who may read what (docs/standards/graphql.md, rule 11). The scope-auth plugin
  * leaves a field with no scope open and cannot deny by default (decision 0043),
  * so this test does: the walk works out each field's access from the built
- * schema and compares it with the table, and a new field fails until someone
- * says here who may read it.
+ * schema and compares it with the table, and a new field the walk reaches fails
+ * until someone says here who may read it.
  *
- * A mutation is not in the table: one with a scope answers the caller's own
- * work, so the walk stops there, and one without appears as "anyone" and fails.
+ * The walk stops at `self` and at a mutation with a scope, so a new field that
+ * only those reach, on `Hero` or `Camp`, is not in the table. A mutation with a
+ * scope answers the caller's own work; one without appears as "anyone" and fails.
+ * A scope with no group here fails the walk, so a new one is given a group first.
  * The test sees scopes and nothing else: what a resolver decides at run time, as
  * `adventure(id)` does for an adventure that is not settled, and what a field
  * holds, are read in review.
@@ -46,28 +47,39 @@ const ACCESS = {
 
 type Access = keyof typeof ACCESS;
 
-/** The table as the walk answers it: `Type.field` to who may read it. */
-function listed(): Record<string, Access> {
-  return Object.fromEntries(
-    Object.entries(ACCESS).flatMap(([who, types]) =>
-      Object.entries(types).flatMap(([type, fields]) => fields.map((field) => [`${type}.${field}`, who as Access])),
-    ),
-  );
+/** The table as the walk answers it: `Type.field` to who may read it. A field listed twice says two things, and fails. */
+function listed(table: Record<string, Record<string, readonly string[]>> = ACCESS): Record<string, string> {
+  const fields: Record<string, string> = {};
+  for (const [who, types] of Object.entries(table)) {
+    for (const [type, names] of Object.entries(types)) {
+      for (const name of names) {
+        if (Object.hasOwn(fields, `${type}.${name}`)) throw new Error(`${type}.${name} is listed twice`);
+        fields[`${type}.${name}`] = who;
+      }
+    }
+  }
+  return fields;
 }
 
 /**
- * The options Pothos keeps on the built field, where the plugin reads them too.
- * Were an upgrade to move them, no scope would be read and the table would fail.
+ * The names a field's scope declares, from the options Pothos keeps on the built
+ * field, where the plugin reads them too. A scope written as a function is called
+ * with an empty parent, which is enough to name its scopes; what it returns other
+ * than an object of names reads as itself, which no group matches. Were an upgrade
+ * to move the options, no scope would be read and the table would fail.
  */
-function scopeOf(field: GraphQLField<unknown, unknown>): unknown {
-  return (field.extensions["pothosOptions"] as { authScopes?: unknown } | undefined)?.authScopes;
+function scopeOf(field: GraphQLField<unknown, unknown>): string | undefined {
+  const scope = (field.extensions["pothosOptions"] as { authScopes?: unknown } | undefined)?.authScopes;
+  if (scope === undefined) return undefined;
+  const declared: unknown = typeof scope === "function" ? (scope as (parent: object) => unknown)({}) : scope;
+  return typeof declared === "object" && declared !== null ? Object.keys(declared).join(" and ") : String(declared);
 }
 
 /**
  * Walks from the root types. `authenticated` alone walks on, because every
- * player passes it, so it keeps nothing from another player; any other scope
- * says who may read the field and stops the walk there. A field reached by two
- * paths takes the wider.
+ * player passes it, so it keeps nothing from another player; `self` alone stops
+ * the walk; any other scope fails it, because nothing here says who that lets
+ * read. A field reached by two paths takes the wider.
  */
 function accessOf(built: GraphQLSchema): Record<string, Access> {
   const access: Record<string, Access> = {};
@@ -85,10 +97,11 @@ function accessOf(built: GraphQLSchema): Record<string, Access> {
       const scope = scopeOf(field);
       if (type === built.getMutationType() && scope !== undefined) continue;
       const name = `${type.name}.${field.name}`;
-      if (scope !== undefined && !isEqual(scope, { authenticated: true })) {
+      if (scope === "self") {
         access[name] = "only the owner";
         continue;
       }
+      if (scope !== undefined && scope !== "authenticated") throw new Error(`${name}: the table has no group for the scope ${scope}`);
       access[name] = scope === undefined ? path : "any signed-in player";
       visit(getNamedType(field.type), access[name]);
     }
@@ -106,16 +119,24 @@ describe("who may read what", () => {
   });
 });
 
-describe("the walk", () => {
-  const small = new SchemaBuilder<{
-    Context: object;
-    DefaultFieldNullability: false;
-    AuthScopes: { authenticated: boolean; self: string };
-  }>({
-    plugins: [ScopeAuthPlugin],
-    defaultFieldNullability: false,
-    scopeAuth: { authScopes: () => ({ authenticated: true, self: () => true }) },
+describe("the table", () => {
+  it("fails on a field listed in two groups", () => {
+    expect(() => listed({ anyone: { Player: ["name"] }, "only the owner": { Player: ["name"] } })).toThrow("Player.name is listed twice");
   });
+});
+
+describe("the walk", () => {
+  const smallBuilder = () =>
+    new SchemaBuilder<{
+      Context: object;
+      DefaultFieldNullability: false;
+      AuthScopes: { authenticated: boolean; self: string; friend: string };
+    }>({
+      plugins: [ScopeAuthPlugin],
+      defaultFieldNullability: false,
+      scopeAuth: { authScopes: () => ({ authenticated: true, self: () => true, friend: () => true }) },
+    });
+  const small = smallBuilder();
   const id = { resolve: () => "id" };
   const signedIn = { authScopes: { authenticated: true } };
 
@@ -133,6 +154,11 @@ describe("the walk", () => {
     }),
   });
   const Both = small.objectRef<object>("Both").implement({ fields: (t) => ({ id: t.id(id) }) });
+  const Beneath = small.objectRef<object>("Beneath").implement({ fields: (t) => ({ id: t.id(id) }) });
+  const NarrowFirst = small.objectRef<object>("NarrowFirst").implement({
+    fields: (t) => ({ beneath: t.field({ type: Beneath, resolve: () => ({}) }) }),
+  });
+  const SignedInByFunction = small.objectRef<object>("SignedInByFunction").implement({ fields: (t) => ({ id: t.id(id) }) });
   const Member = small.objectRef<object>("Member").implement({ fields: (t) => ({ id: t.id(id) }) });
   const Either = small.unionType("Either", { types: [Member], resolveType: () => Member });
   const OwnWork = small.objectRef<object>("OwnWork").implement({ fields: (t) => ({ id: t.id(id) }) });
@@ -144,6 +170,10 @@ describe("the walk", () => {
       signedIn: t.field({ type: OnlySignedIn, ...signedIn, resolve: () => ({}) }),
       both: t.field({ type: Both, resolve: () => ({}) }),
       bothSignedIn: t.field({ type: Both, ...signedIn, resolve: () => ({}) }),
+      // Pothos sorts the built schema's fields, so these names make the walk take the narrow path first.
+      firstSignedIn: t.field({ type: NarrowFirst, ...signedIn, resolve: () => ({}) }),
+      thenOpen: t.field({ type: NarrowFirst, resolve: () => ({}) }),
+      signedInByFunction: t.field({ type: SignedInByFunction, authScopes: () => ({ authenticated: true }), resolve: () => ({}) }),
       either: t.field({ type: Either, resolve: () => ({}) }),
     }),
   });
@@ -159,19 +189,36 @@ describe("the walk", () => {
     expect(walked["Open.unlisted"]).toBe("anyone");
   });
 
-  it("stops at a scope that says who may read", () => {
+  it("stops at self", () => {
     expect(walked["Open.secret"]).toBe("only the owner");
     expect(walked["OnlySignedIn.behindSecret"]).toBe("only the owner");
-    expect(walked).not.toHaveProperty("BehindSecret.id");
+    expect(Object.keys(walked)).not.toContain("BehindSecret.id");
   });
 
-  it("walks on past authenticated, which every player passes", () => {
+  it("walks on past authenticated, which every player passes, however it is written", () => {
     expect(walked["Query.signedIn"]).toBe("any signed-in player");
     expect(walked["OnlySignedIn.unlisted"]).toBe("any signed-in player");
+    expect(walked["SignedInByFunction.id"]).toBe("any signed-in player");
   });
 
-  it("gives a field reached by two paths the wider access", () => {
+  it("fails on a scope the table has no group for", () => {
+    const scopes = [
+      { name: "another scope", authScopes: () => ({ friend: "owner" }) },
+      { name: "two scopes, either of which lets a caller read", authScopes: { authenticated: true, self: "owner" } },
+      { name: "a function that declares two", authScopes: () => ({ authenticated: true, self: "owner" }) },
+      { name: "a function that answers without naming a scope", authScopes: () => true },
+    ];
+    for (const { name, authScopes } of scopes) {
+      const builder = smallBuilder();
+      builder.queryType({ fields: (t) => ({ field: t.id({ ...id, authScopes }) }) });
+      expect(() => accessOf(builder.toSchema()), name).toThrow("Query.field: the table has no group");
+    }
+  });
+
+  it("gives a field reached by two paths the wider access, in either order", () => {
     expect(walked["Both.id"]).toBe("anyone");
+    expect(walked["NarrowFirst.beneath"]).toBe("anyone");
+    expect(walked["Beneath.id"]).toBe("anyone");
   });
 
   it("walks a union's members", () => {
@@ -179,8 +226,8 @@ describe("the walk", () => {
   });
 
   it("stops at a mutation with a scope, and reaches one without", () => {
-    expect(walked).not.toHaveProperty("Mutation.scoped");
-    expect(walked).not.toHaveProperty("OwnWork.id");
+    expect(Object.keys(walked)).not.toContain("Mutation.scoped");
+    expect(Object.keys(walked)).not.toContain("OwnWork.id");
     expect(walked["Mutation.unscoped"]).toBe("anyone");
     expect(walked["Unscoped.id"]).toBe("anyone");
   });
