@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { setTimeout as sleep } from "node:timers/promises";
 
 /**
  * The stack test: signs in to the base pool as a test user through the ci
@@ -145,6 +146,33 @@ const { replay, levelForXp } = await import("@heat/engine");
 
 const token = await signIn();
 console.log(`signed in as ${username} through client ${clientId}`);
+
+// An apply can finish with the previous version still answering /graphql, 53
+// and 78 seconds after the alias moved in the two runs measured, and both
+// versions in turn within one test (Issue-232). So the test waits until the
+// live route has answered this deploy's version several times in a row, then
+// says how long that took, which measures the lag on every run. A deploy
+// whose version never arrives fails here, naming both.
+const versionAnswersInARow = 10;
+const versionPollMs = 2_000;
+const versionWaitMs = 5 * 60_000;
+const waitStarted = performance.now();
+const waited = () => Math.round((performance.now() - waitStarted) / 1000);
+const otherVersions = new Set();
+for (let inARow = 0; inARow < versionAnswersInARow; ) {
+  if (performance.now() - waitStarted > versionWaitMs) {
+    throw new Error(`/graphql did not answer config.json's version ${config.version} ${versionAnswersInARow} times in a row within ${waited()} s; other answers: ${[...otherVersions].join(", ") || "none"}`);
+  }
+  const answer = (await graphql(token, `{ version }`)).data?.version;
+  if (answer === config.version) {
+    inARow += 1;
+  } else {
+    inARow = 0;
+    otherVersions.add(answer);
+  }
+  if (inARow < versionAnswersInARow) await sleep(versionPollMs);
+}
+console.log(`ok: /graphql answered this deploy's version ${versionAnswersInARow} times in a row after ${waited()} s; other answers on the way: ${[...otherVersions].join(", ") || "none"}`);
 
 // First sign-in makes the profile, and a repeat changes nothing; the
 // client calls joinGame after every sign-in in the same way.
