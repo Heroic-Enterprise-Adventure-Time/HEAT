@@ -342,17 +342,18 @@ export class Repository {
   }
 
   /**
-   * The profile on first sign-in: written if absent, left alone if present,
-   * in one call, so a repeat or a race between two tabs is harmless.
+   * The profile on first sign-in, named with the player's id (decision 0043):
+   * written if absent, left alone if present, in one call, so a repeat or a
+   * race between two tabs is harmless.
    */
-  async joinPlayer(player: Player): Promise<Player> {
+  async joinPlayer(id: string): Promise<Player> {
     const { data } = await this.service.entities.profile
-      .update({ id: player.id })
+      .update({ id })
       .data((a, op) => {
-        op.ifNotExists(a.name, player.name);
+        op.ifNotExists(a.name, id);
       })
       .go({ response: "all_new" });
-    return { id: player.id, name: must(data.name, "the profile's name") };
+    return { id, name: must(data.name, "the profile's name") };
   }
 
   async getPlayer(id: string): Promise<Player | undefined> {

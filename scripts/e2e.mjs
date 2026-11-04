@@ -149,7 +149,8 @@ console.log(`signed in as ${username} through client ${clientId}`);
 // First sign-in makes the profile, and a repeat changes nothing; the
 // client calls joinGame after every sign-in in the same way.
 const joined = await graphql(token, `mutation { joinGame { __typename ... on JoinGameSuccess { player { id name } } } }`);
-check(!joined.errors && joined.data?.joinGame?.player?.id, `joinGame answered the profile (${joined.ms} ms)`);
+const joinedPlayer = joined.data?.joinGame?.player;
+check(!joined.errors && joinedPlayer?.id && joinedPlayer.name === joinedPlayer.id, `joinGame answered the profile, named with the player's id (${joined.ms} ms)`);
 
 /** The success's field of a mutation's answer, or null when the hub refused it. */
 const success = (reply, mutation, field) => (reply.data?.[mutation]?.__typename === `${mutation[0].toUpperCase()}${mutation.slice(1)}Success` ? reply.data[mutation][field] : null);

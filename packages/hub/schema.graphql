@@ -380,7 +380,7 @@ type Mutation {
   discardAdventure(input: DiscardAdventureInput!): DiscardAdventureResult
 
   """
-  Makes the signed-in player's profile if they have none, named from the token, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.
+  Makes the signed-in player's profile if they have none, named with their id, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.
   """
   joinGame: JoinGameResult
 
@@ -443,7 +443,7 @@ enum PartyOrder {
 }
 
 """
-A player: the id and name anyone may read, and the camps, heroes and open adventure only the player may.
+A player: the id anyone may read, and the name, camps, heroes and open adventure only the player may.
 """
 type Player {
   """
@@ -454,7 +454,11 @@ type Player {
   """Private: only the player may read their own heroes."""
   heroes: [Hero!]
   id: ID!
-  name: String!
+
+  """
+  Private: the name the profile was made with, which is the player's id until a public name is decided. Null, with an error on this field, for anyone else.
+  """
+  name: String
   openAdventure: Adventure
 }
 
@@ -478,7 +482,9 @@ type Query {
   """The signed-in player, or null before joinGame has made their profile."""
   me: Player
 
-  """Public: any caller may look a player up by id."""
+  """
+  Public: any caller may look a player up by id, and reads only the id back, or null where the id has no profile, so it also says whether an id is a player's.
+  """
   player(id: ID!): Player
 
   """

@@ -1,6 +1,6 @@
 # 0029: The heroes seen at a location
 
-- **Status:** Decided; the item also carries ElectroDB's identifiers per 0041, which say what it is and nothing of whose
+- **Status:** Decided; the item also carries ElectroDB's identifiers per 0041, which say what it is and nothing of whose; a sighting still stores no owner, and 0043 says what happens when a feature needs one; a profile's name is no longer the token's email, per 0043
 - **Date:** 2026-10-21
 - **Settles:** Issue-100: the location table's first collection, the heroes seen at a location, which the overview's "Open" item and decision 0026 left to be designed before step 3: the key, what counts as being seen, how long a sighting lasts, and how the sample is bounded and read.
 
