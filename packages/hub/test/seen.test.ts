@@ -10,7 +10,7 @@ import { type Hero, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { heroesSeenAt, type Random, SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, sightingOf } from "../src/seen.js";
-import { player } from "./data.js";
+import { player, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -47,11 +47,11 @@ function hero(location: string, overrides: Partial<Hero> = {}): Hero {
 }
 
 async function putSighting(h: Hero, at = new Date()): Promise<void> {
-  await db.send(new PutCommand({ TableName: tables.location, Item: { ...locationKeys.seen(h.location, h.id), ...sightingOf(h, at) } }));
+  await db.send(new PutCommand({ TableName: tables.location, Item: whole("sighting", { ...locationKeys.seen(h.location, h.id), ...sightingOf(h, at) }) }));
 }
 
 async function putOwnHero(p: string, h: Hero): Promise<void> {
-  await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.hero(p, h.id), ...h } }));
+  await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, h.id), ...h }) }));
 }
 
 /** Items the location table's Queries read during `run`, and how many Queries there were. */

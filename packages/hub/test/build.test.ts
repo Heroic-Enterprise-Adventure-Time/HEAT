@@ -11,7 +11,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { BuildRefused, campLevels, type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
-import { player } from "./data.js";
+import { player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -181,7 +181,7 @@ describe("buildFacility: the hall and the warehouse", () => {
     await db.send(
       new PutCommand({
         TableName: tables.player,
-        Item: { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: 4, livingHeroes: 0 },
+        Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: 4, livingHeroes: 0 }),
       }),
     );
     expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(HallFull);

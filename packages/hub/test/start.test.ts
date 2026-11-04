@@ -14,7 +14,7 @@ import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { player } from "./data.js";
+import { player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -47,16 +47,16 @@ async function putHeroes(p: string, statuses: HeroStatus[], location = at): Prom
     recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status, retiredAt: null, adventureId: null,
   }));
   for (const hero of heroes) {
-    await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.hero(p, hero.id), ...hero } }));
+    await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
   }
   await db.send(
     new PutCommand({
       TableName: tables.player,
-      Item: {
+      Item: whole("camp", {
         ...playerKeys.camp(p, location), location, hallLevel: 1, warehouseLevel: 1,
         activeHeroes: statuses.filter((s) => s !== "RETIRED").length,
         livingHeroes: statuses.filter((s) => s === "ALIVE").length,
-      },
+      }),
     }),
   );
   return heroes;

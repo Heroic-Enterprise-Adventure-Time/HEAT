@@ -10,7 +10,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
-import { player } from "./data.js";
+import { player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -33,7 +33,7 @@ async function putCamp(p: string, activeHeroes: number, livingHeroes: number) {
   await db.send(
     new PutCommand({
       TableName: tables.player,
-      Item: { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes, livingHeroes },
+      Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes, livingHeroes }),
     }),
   );
 }
