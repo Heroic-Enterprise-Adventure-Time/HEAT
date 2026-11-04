@@ -9,15 +9,18 @@ import * as z from 'zod/mini';
  * fetches it from the branch's stack (`proxy.conf.mjs`). Nothing in it is
  * secret: the browser carries all of it.
  */
+/** A field the client cannot run without: a string, and not empty. */
+const present = z.string().check(z.minLength(1));
+
 const StackConfigSchema = z.object({
   /** The API's path on this origin: `/graphql`. */
-  graphqlPath: z.string().check(z.minLength(1)),
+  graphqlPath: present,
   /** The user pool that issues the tokens, `us-east-1_...`; its region is the prefix. */
-  userPoolId: z.string().check(z.minLength(1)),
+  userPoolId: present,
   /** The stack's browser app client in that pool. */
-  clientId: z.string().check(z.minLength(1)),
+  clientId: present,
   /** The pool's managed login host, `https://auth.<zone>`, with no trailing slash. */
-  loginHost: z.string().check(z.minLength(1)),
+  loginHost: present,
   /**
    * Whether the login page offers email and password beside Google: true in
    * a sandbox stack, for the base's test users (Issue-86), false in dev and
@@ -29,7 +32,7 @@ const StackConfigSchema = z.object({
    * The client sends it on every request, and the hub says when it differs
    * from its own.
    */
-  version: z.string().check(z.minLength(1)),
+  version: present,
 });
 
 export type StackConfig = Readonly<z.output<typeof StackConfigSchema>>;

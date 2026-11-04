@@ -79,13 +79,14 @@ export const builder = new SchemaBuilder<{
 
 /**
  * graphql-scalars reads an integer variable with `parseInt`, so 1.5 would
- * arrive as 1 and "7abc" as 7. `Int` refuses both, and so does this contract:
- * a value that is not a whole number never reaches the library.
+ * arrive as 1, "7abc" as 7, and 1e21, which stringifies as "1e+21", as 1. `Int`
+ * refuses all three, and so does this contract: a value that is not a safe
+ * whole number never reaches the library.
  */
 function wholeNumbersOnly(scalar: GraphQLScalarType) {
   return {
     parseValue(value: unknown): number {
-      if (!Number.isInteger(value)) throw new GraphQLError(`Value is not a whole number: ${String(value)}`);
+      if (!Number.isSafeInteger(value)) throw new GraphQLError(`Value is not a safe whole number: ${String(value)}`);
       return scalar.parseValue(value) as number;
     },
   };

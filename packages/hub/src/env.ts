@@ -2,9 +2,10 @@ import * as z from "zod/mini";
 
 /**
  * The environment Terraform sets on the function, read through zod like every
- * other boundary (decision 0039). Each module declares the variables it reads
- * and reads them here, so a variable that is missing fails the import, saying
- * which, and the function never starts half configured.
+ * other boundary (decision 0039); HEAT_REPLAY_BUCKET is the one variable not
+ * read here yet, in `handler.ts` until Issue-206. Each module declares the
+ * variables it reads and reads them here, so a variable that is missing fails
+ * the import, saying which, and the function never starts half configured.
  */
 
 /** A variable the hub cannot run without: present and not empty. */

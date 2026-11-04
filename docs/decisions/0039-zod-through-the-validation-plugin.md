@@ -2,7 +2,7 @@
 
 - **Status:** Decided
 - **Date:** 2026-11-03
-- **Settles:** Issue-198, from the library review of 2026-11-03: what replaces the hand-written shape checks in the hub's verbs, the hub's reading of its environment and the client's reading of `config.json`.
+- **Settles:** Issue-198, from the library review of 2026-11-03: what replaces the hand-written shape checks in the hub's verbs, the hub's reading of its environment and the client's reading of `config.json`. Amends decision 0038's "every identifier is `ID`" for a request id the client makes.
 
 ## Decision
 
@@ -21,7 +21,7 @@ The reason is the owner's weighting of 2026-11-03: the application is built as a
 Each of these was read from the installed source on 2026-11-03 and has a test through the handler.
 
 - **`UUIDResolver` passes any case and a stray closing brace.** Its pattern makes both braces optional separately, and it returns the value as it came, so `<uuid>}` passes with the brace on it, and upper case stays upper case. This value becomes a hero's id, so a repeat in another case would make a second hero. The issue's shape removed the regex and the `toLowerCase`; the field keeps both in zod, `z.uuid(...).check(z.toLowerCase())`, behind the scalar. The contract says `UUID`; the validator holds one request to one spelling.
-- **`NonNegativeIntResolver` and `PositiveIntResolver` read a variable with `parseInt`,** so 1.5 would arrive as 1 and `"7abc"` as 7, where `Int` refuses both. `builder.ts` refuses a value that is not a whole number before the library sees it, through `addScalarType`'s options.
+- **`NonNegativeIntResolver` and `PositiveIntResolver` read a variable with `parseInt`,** so 1.5 would arrive as 1, `"7abc"` as 7 and `1e21` as 1, where `Int` refuses all three. `builder.ts` refuses a value that is not a safe whole number before the library sees it, through `addScalarType`'s options.
 - **The plugin validates before a scope is checked,** whatever the order of the plugins: it maps arguments outside every plugin's wrapper. An anonymous caller with a malformed input is told it is malformed. That says nothing beyond the published schema's shape, and the authorizer has already refused an anonymous request at the gateway (decision 0024).
 
 ### What changes on the wire

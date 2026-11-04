@@ -48,7 +48,7 @@ export type Material =
 
 /** One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up. */
 export type OverrideInput = {
-  /** The ability forced, for a UNIT entry. */
+  /** The ability forced, for a UNIT entry: at most 64 characters. */
   readonly abilityId?: string | null | undefined;
   /** Milliseconds on the adventure's clock. */
   readonly acceptedAtSimTime: number;
@@ -110,7 +110,7 @@ export type StartAdventureInput = {
 /** Which adventure to submit, with its override log. */
 export type SubmitAdventureInput = {
   readonly adventureId: string | number;
-  /** The override log, as the engine kept it; empty when the player forced nothing. */
+  /** The override log, as the engine kept it; empty when the player forced nothing, and at most 2000 entries. */
   readonly overrides: ReadonlyArray<OverrideInput>;
 };
 

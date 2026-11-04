@@ -61,7 +61,7 @@ import { builder } from "./builder.js";
  * adventure started from the job board or a facility, submitted for verification and
  * settlement, or discarded when no deploy can verify it.
  *
- * The shape is docs/standards/graphql.md, rules 4 to 6: an id is an ID, a
+ * The shape is docs/standards/graphql.md, rules 4 to 6: an id the hub issues is an ID, a
  * timestamp a DateTime, a set the engine closes an enum; a mutation takes
  * one input object and answers a result union, its success wrapping what it
  * changed and each refusal an object type implementing Error (Issue-155,
@@ -470,7 +470,7 @@ const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implem
     acceptedAtSimTime: t.field({ type: "NonNegativeInt", required: true, description: "Milliseconds on the adventure's clock." }),
     unitId: t.string({ description: "The hero, for a UNIT entry." }),
     abilityId: t.string({
-      description: "The ability forced, for a UNIT entry.",
+      description: `The ability forced, for a UNIT entry: at most ${MAX_ABILITY_ID} characters.`,
       validate: z.string().check(z.maxLength(MAX_ABILITY_ID, `an ability id is at most ${MAX_ABILITY_ID} characters`)),
     }),
     order: t.field({
@@ -493,7 +493,7 @@ const RecruitHeroInput = builder.inputType("RecruitHeroInput", {
       description: "A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made.",
       // The scalar passes any case and a stray closing brace, and this value is a key: one
       // request has one spelling, or a repeat in another case would make a second hero.
-      validate: z.uuid("requestId must be a UUID").check(z.toLowerCase()),
+      validate: z.uuid("a request id is a UUID").check(z.toLowerCase()),
     }),
   }),
 });
@@ -512,6 +512,8 @@ const RetireHeroInput = builder.inputType("RetireHeroInput", {
   fields: (t) => ({ heroId: t.id({ required: true }) }),
 });
 
+const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
+
 const StartAdventureInput = builder.inputType("StartAdventureInput", {
   description: "Which job to start, where, and with whom.",
   fields: (t) => ({
@@ -521,8 +523,8 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
       required: true,
       description: "The party: one to four of the player's living heroes at that camp.",
       validate: z.array(z.string().check(z.toLowerCase())).check(
-        z.minLength(1, `a party is 1 to ${MAX_PARTY} heroes`),
-        z.maxLength(MAX_PARTY, `a party is 1 to ${MAX_PARTY} heroes`),
+        z.minLength(1, PARTY_SIZE),
+        z.maxLength(MAX_PARTY, PARTY_SIZE),
         z.refine((ids) => uniq(ids).length === ids.length, "a hero is in the party twice"),
       ),
     }),
@@ -536,7 +538,7 @@ const SubmitAdventureInput = builder.inputType("SubmitAdventureInput", {
     overrides: t.field({
       type: [OverrideInputRef],
       required: true,
-      description: "The override log, as the engine kept it; empty when the player forced nothing.",
+      description: `The override log, as the engine kept it; empty when the player forced nothing, and at most ${MAX_OVERRIDES} entries.`,
       validate: z.array(z.unknown()).check(z.maxLength(MAX_OVERRIDES, `a log holds at most ${MAX_OVERRIDES} entries`)),
     }),
   }),

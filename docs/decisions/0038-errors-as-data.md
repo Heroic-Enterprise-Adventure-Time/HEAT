@@ -1,6 +1,6 @@
 # 0038: Refusals as data in a result union per mutation, one input object per mutation, and the engine's sets as enums
 
-- **Status:** Decided; amended 2026-11-02 by Issue-156: the client's mapping back is typed from the enums GraphQL Code Generator emits, not by its `enumValues`, which sets the runtime value of a generated TypeScript enum that Apollo does not translate on the wire
+- **Status:** Decided; amended 2026-11-02 by Issue-156: the client's mapping back is typed from the enums GraphQL Code Generator emits, not by its `enumValues`, which sets the runtime value of a generated TypeScript enum that Apollo does not translate on the wire; amended 2026-11-03 by decision 0039: a request id the client makes is `UUID`, and an identifier the hub issues stays `ID`
 - **Date:** 2026-11-02
 - **Settles:** Issue-155: how a mutation refuses, how it takes its arguments, and how ids, timestamps and the engine's closed sets appear in the API; agreed in shape on 2026-10-24 (Issue-145), when `docs/standards/graphql.md` stated the accepted practice as rules 4 to 6 and held the code back until this issue.
 

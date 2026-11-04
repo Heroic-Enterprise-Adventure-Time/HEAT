@@ -332,7 +332,7 @@ describe("the adventure loop through the graph", () => {
     it("refuses what the scalar lets through as a UUID", async () => {
       const reply = await gql(RECRUIT, { id: `${randomUUID()}}` }, `p-${randomUUID()}`);
       expect(code(reply)).toBe("BAD_USER_INPUT");
-      expect(message(reply)).toContain("requestId must be a UUID");
+      expect(message(reply)).toContain("a request id is a UUID");
     });
 
     it("takes a request id in any case as one request", async () => {
@@ -345,7 +345,7 @@ describe("the adventure loop through the graph", () => {
       expect(repeat.data?.recruitHero).toMatchObject({ __typename: "RecruitHeroSuccess", hero: { id } });
     });
 
-    it("refuses a party of none, of too many, or with a hero twice, before any read", async () => {
+    it("refuses a party of none, of too many, or with a hero twice", async () => {
       const p = `p-${randomUUID()}`;
       const id = randomUUID();
       for (const [heroIds, words] of [
@@ -357,6 +357,20 @@ describe("the adventure loop through the graph", () => {
         expect(code(reply)).toBe("BAD_USER_INPUT");
         expect(message(reply)).toContain(words);
       }
+      expect(await repo.openAdventure(p)).toBeUndefined();
+    });
+
+    it("refuses a malformed party before a refusal: an open adventure is not read first", async () => {
+      const p = `p-${randomUUID()}`;
+      await gql(JOIN, {}, p);
+      const villager = randomUUID();
+      await gql(RECRUIT, { id: villager }, p);
+      await gql(START, { heroIds: [villager] }, p);
+      const open = must(await repo.openAdventure(p), "the open adventure");
+
+      const reply = await gql(START, { heroIds: Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()) }, p);
+      expect(code(reply)).toBe("BAD_USER_INPUT");
+      expect((await repo.openAdventure(p))?.adventureId).toBe(open.adventureId);
     });
 
     it("refuses a log of too many entries and an ability id of too many characters", async () => {
@@ -369,13 +383,13 @@ describe("the adventure loop through the graph", () => {
       expect(message(named)).toContain(`an ability id is at most ${MAX_ABILITY_ID} characters`);
     });
 
-    it.each([-1, 1.5, "7abc"])("refuses the time %s", async (acceptedAtSimTime) => {
+    it.each([-1, 1.5, "7abc", 1e21])("refuses the time %s", async (acceptedAtSimTime) => {
       const reply = await invalid(ANY_LOG, { log: [{ ...unitEntry, acceptedAtSimTime }] }, `p-${randomUUID()}`);
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect(message(reply)).toContain("acceptedAtSimTime");
     });
 
-    it.each([0, -1, 1.5, "2abc"])("refuses the level %s", async (level) => {
+    it.each([0, -1, 1.5, "2abc", 1e21])("refuses the level %s", async (level) => {
       const reply = await invalid(BUILD, { level }, `p-${randomUUID()}`);
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect(message(reply)).toContain("$level");
