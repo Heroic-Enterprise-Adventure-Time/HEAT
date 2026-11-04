@@ -18,6 +18,13 @@ set -eu
 results="${1:?results directory}"
 output="${2:?output file}"
 recipient="$(dirname "$0")/browser-trace-recipient.pem"
+
+# A test that fails before it starts writes no results, and has nothing to keep.
+if [ ! -d "$results" ]; then
+  echo "no results in $results: nothing to seal"
+  exit 0
+fi
+
 packed="$(mktemp)"
 trap 'rm -f "$packed"' EXIT
 

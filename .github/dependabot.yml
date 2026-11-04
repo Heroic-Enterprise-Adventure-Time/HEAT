@@ -34,7 +34,10 @@ updates:
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
-    directory: /
+    # The workflows, and the composite actions they share.
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: weekly
     groups:
