@@ -24,7 +24,7 @@ function refuseAdventuring(heroId: string): never {
 }
 
 export function retireHero(repo: Repository, playerId: string, heroId: string, now = new Date()): Promise<Hero> {
-  return retryingConflicts("the hero changed while retiring; nothing was retired", () => retireOnce(repo, playerId, heroId, now));
+  return retryingConflicts("retire", "the hero changed while retiring; nothing was retired", () => retireOnce(repo, playerId, heroId, now));
 }
 
 async function retireOnce(repo: Repository, playerId: string, heroId: string, now: Date): Promise<Hero> {

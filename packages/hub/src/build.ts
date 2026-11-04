@@ -47,7 +47,7 @@ function refuseIfBarred(camp: Camp, kind: FacilityKind): void {
 }
 
 export function buildFacility(repo: Repository, playerId: string, locationId: string, kind: string, level: number): Promise<Camp> {
-  return retryingConflicts("the camp changed while building; nothing was built", () => buildOnce(repo, playerId, locationId, kind, level));
+  return retryingConflicts("build", "the camp changed while building; nothing was built", () => buildOnce(repo, playerId, locationId, kind, level));
 }
 
 async function buildOnce(repo: Repository, playerId: string, locationId: string, kind: string, level: number): Promise<Camp> {

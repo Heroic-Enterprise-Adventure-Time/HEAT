@@ -20,7 +20,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 ### Testing
 
 8. **Vitest, in every package, run by `npm test` at the root.** Unit tests need nothing installed. Integration tests start their own containers through Testcontainers, so they need Docker and nothing else, on a laptop and on CI alike (decision 0009). A package's `tsconfig.json` covers its tests and its `vitest.config.ts` as well as its source, so `npm run typecheck` and the typed lint (rule 16) see them; a package that emits, the engine, builds from `tsconfig.build.json`, which narrows that to `src`.
-9. **Handlers are tested as functions.** A Lambda handler is exercised by calling it with a synthesized event of the exact shape AWS sends, never through a mocked SDK inside the code under test.
+9. **Handlers are tested as functions.** A Lambda handler is exercised by calling it with a synthesized event of the exact shape AWS sends, never through a mocked SDK inside the code under test. What a handler's middleware does is tested the same way, by calling the handler, not by calling the library in its place: from the review of PR-209, where a test flushed the metrics itself and so no test showed `logMetrics` doing it.
 
 ### The hub
 
@@ -29,7 +29,7 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 ### Bundling
 
-12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild into `dist/<name>/`, targeting the Node major in `.node-version`, dependencies included, Powertools among them. Terraform zips that directory and passes it to the function with its hash, so a code change is a change in the plan (decision 0017). Logging goes through the Powertools logger as JSON lines and tracing through its tracer; both are configured by the environment variables Terraform sets on the function.
+12. **One ESM file per function.** `scripts/bundle.mjs` bundles each function from the manifest with esbuild into `dist/<name>/`, targeting the Node major in `.node-version`, dependencies included, Powertools among them. Terraform zips that directory and passes it to the function with its hash, so a code change is a change in the plan (decision 0017). Logging goes through the Powertools logger as JSON lines, tracing through its tracer and metrics through its metrics as embedded metric format lines in the log, all at one version, configured by the environment variables Terraform sets on the function. `@middy/core` wraps a handler with the three Powertools middlewares, `injectLambdaContext`, `captureLambdaHandler` and `logMetrics`, with the function's own handler innermost, and only those: what middy's other middlewares do, Apollo's plugins and the integration's own option already do for the hub. Its early timeout is off, `timeoutEarlyInMillis: 0`, so that a function never answers with work still pending (decision 0040).
 
 ### The client
 

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type UnitType, warehouseCapacity } from "@heat/engine";
 
@@ -9,9 +9,10 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { locationKeys, playerKeys } from "../src/db/keys.js";
 import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
+import { logger } from "../src/observability.js";
 import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, EngineUpdated } from "../src/refusals.js";
 import { startAdventure } from "../src/start.js";
-import { submitAdventure } from "../src/submit.js";
+import { SETTLE_ATTEMPTS, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -165,6 +166,21 @@ describe("a party that completes the job", () => {
     const runs = await everyInterleaving((k) => lostSubmit((_p, _id, winner) => cancelled(repo, "settle", new TransactionConflict("conflict"), k, winner)));
     // Before each of the next attempt's camp, getHero and settle.
     expect(runs).toBe(3);
+  });
+
+  it("waits only before an attempt that follows, and then answers Conflict", async () => {
+    const p = player();
+    const started = await start(p, await putParty(p, ["fighter"]));
+    const settle = vi.spyOn(Repository.prototype, "settle").mockRejectedValue(new TransactionConflict("conflict"));
+    const warn = vi.spyOn(logger, "warn").mockImplementation(() => undefined);
+    try {
+      expect(await refusal(submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []))).toBeInstanceOf(Conflict);
+      expect(settle).toHaveBeenCalledTimes(SETTLE_ATTEMPTS);
+      expect(warn.mock.calls.filter(([message]) => message === "transaction conflict; running again")).toHaveLength(SETTLE_ATTEMPTS - 1);
+    } finally {
+      settle.mockRestore();
+      warn.mockRestore();
+    }
   });
 });
 
