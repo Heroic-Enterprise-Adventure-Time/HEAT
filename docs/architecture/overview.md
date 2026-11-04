@@ -113,7 +113,7 @@ Each item carries a status. **Decided** items are settled by the project owner. 
   | Data | Store | Written by |
   | --- | --- | --- |
   | Players; per location, the camp, own facilities and resources; heroes; the materials ledger; the open-adventure item | DynamoDB, the player table | the hub |
-  | Adventure records: status, seed, the version that issued it, the location, the job, the frozen snapshot of the party, the start time, and at settlement the result; later the location feed, the heroes seen there, offers and shared projects | DynamoDB, the location table | the hub at start and at submit |
+  | Adventure records: status, the player's id, which only the hub reads (decision 0043), seed, the version that issued it, the location, the job, the frozen snapshot of the party, the start time, and at settlement the result; later the location feed, the heroes seen there, offers and shared projects | DynamoDB, the location table | the hub at start and at submit |
   | Replay timelines, one object per adventure, `<adventureId>.json`, stamped with the version that wrote it | S3, a private bucket per environment, read through the hub | the hub at submit |
   | Static content: unit types, jobs, abilities, locations with their shared facilities and recruitment lists, facility levels and caps, hero names, the sprite sets each unit type allows | the engine package, as TypeScript data | the repository; imported by the client and the hub |
 

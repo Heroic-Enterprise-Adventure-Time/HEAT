@@ -26,10 +26,12 @@
  * items in dev and prod are no longer read and are left in place.
  *
  * The location table, partitioned by location, and by adventure for the one
- * record settle looks up by id. Public: what every player may see.
+ * record settle looks up by id. Public: what every player may see, but for an
+ * owner id stored for the hub's own checks, which no field serves without a
+ * scope (decision 0043).
  *
- *   ADVENTURE#<id> | RECORD                         status, seed, location, job, the frozen snapshot, the
- *                                                   version that issued it, start time; at settlement the result
+ *   ADVENTURE#<id> | RECORD                         status, the player's id, seed, location, job, the frozen snapshot,
+ *                                                   the version that issued it, start time; at settlement the result
  *   LOCATION#<id>  | SEEN#<heroId>                  a hero seen there: public fields only, no owner, and
  *                                                   expiresAt, the table's TTL attribute (decision 0029)
  *   LOCATION#<id>  | ...                            the feed, offers: the rest of build order step 3

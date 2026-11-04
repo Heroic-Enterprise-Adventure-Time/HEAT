@@ -127,20 +127,25 @@ describe("authorization at the field level", () => {
   it("serves public fields to anyone and private fields only to the owner", async () => {
     const owner = `p-${randomUUID()}`;
     const other = `p-${randomUUID()}`;
-    await repo.putPlayer({ id: owner, name: "Owner" });
+    const email = "owner@example.com";
+    await repo.putPlayer({ id: owner, name: email });
     await repo.setBalance(owner, "millbrook", "timber", 5);
 
     const q = `query($id: ID!) { player(id: $id) { id name camps { location holdings { material balance } } heroes { id } } }`;
 
-    const asOther = await gql(q as Query<{ player: { name: string; camps: unknown; heroes: unknown } }>, { id: owner }, other);
-    expect(asOther.data?.player.name).toBe("Owner");
+    // The name holds the player's email, which is personal data and never public (graphql.md, rule 23).
+    const asOther = await gql(q as Query<{ player: { id: string; name: string | null; camps: unknown; heroes: unknown } }>, { id: owner }, other);
+    expect(asOther.data?.player.id).toBe(owner);
+    expect(asOther.data?.player.name).toBeNull();
     expect(asOther.data?.player.camps).toBeNull();
     expect(asOther.data?.player.heroes).toBeNull();
-    expect(asOther.errors?.map((e) => e.path)).toEqual(expect.arrayContaining([["player", "camps"], ["player", "heroes"]]));
-    expect(asOther.errors?.map((e) => e.extensions?.["code"])).toEqual(["FORBIDDEN", "FORBIDDEN"]);
+    expect(asOther.errors?.map((e) => e.path)).toEqual(expect.arrayContaining([["player", "name"], ["player", "camps"], ["player", "heroes"]]));
+    expect(asOther.errors?.map((e) => e.extensions?.["code"])).toEqual(["FORBIDDEN", "FORBIDDEN", "FORBIDDEN"]);
+    expect(JSON.stringify(asOther)).not.toContain(email);
 
-    const asOwner = await gql(q as Query<{ player: { camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>, { id: owner }, owner);
+    const asOwner = await gql(q as Query<{ player: { name: string | null; camps: { location: string; holdings: { material: string; balance: number }[] }[] } }>, { id: owner }, owner);
     expect(asOwner.errors).toBeUndefined();
+    expect(asOwner.data?.player.name).toBe(email);
     // The engine's `timber` is the enum value TIMBER on the wire (graphql.md, rule 4).
     expect(asOwner.data?.player.camps).toEqual([{ location: "millbrook", holdings: [{ material: "TIMBER", balance: 5 }] }]);
 
@@ -150,10 +155,11 @@ describe("authorization at the field level", () => {
     expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
 
     // The same code for an anonymous caller failing `self`: it is the caller that decides, not the scope.
-    const anonymousOwner = await gql(q as Query<{ player: { name: string; camps: unknown; heroes: unknown } }>, { id: owner });
-    expect(anonymousOwner.data?.player.name).toBe("Owner");
+    const anonymousOwner = await gql(q as Query<{ player: { name: string | null; camps: unknown; heroes: unknown } }>, { id: owner });
+    expect(anonymousOwner.data?.player.name).toBeNull();
     expect(anonymousOwner.data?.player.camps).toBeNull();
-    expect(anonymousOwner.errors?.map((e) => e.extensions?.["code"])).toEqual(["UNAUTHENTICATED", "UNAUTHENTICATED"]);
+    expect(anonymousOwner.errors?.map((e) => e.extensions?.["code"])).toEqual(["UNAUTHENTICATED", "UNAUTHENTICATED", "UNAUTHENTICATED"]);
+    expect(JSON.stringify(anonymousOwner)).not.toContain(email);
   });
 });
 
