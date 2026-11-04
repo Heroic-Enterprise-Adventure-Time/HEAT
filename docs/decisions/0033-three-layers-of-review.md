@@ -1,6 +1,6 @@
 # 0033: Three layers of review: lint in CI, the review skill on a pull request, the checkup skill at a pause; the model-driven layers run from sessions on the subscription
 
-- **Status:** Decided. The repository went public with Issue-177 (PR-179, merged 2026-11-02), which is the condition "Deferred" below names for CodeQL; whether to take it is Issue-228.
+- **Status:** Decided. The repository went public on 2026-11-02 (Issue-178), which is the condition "Deferred" below names for CodeQL, and CodeQL's default setup has been on since then.
 - **Date:** 2026-10-23; the review skill's surface decided 2026-10-25 (Issue-146); the checkup's surface decided 2026-10-26 in decision 0034 (Issue-147)
 - **Settles:** Issues 144 to 147: how a change and the tree are reviewed beyond the owner's reading, and where the reviewing model runs and is paid for.
 

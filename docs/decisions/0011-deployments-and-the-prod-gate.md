@@ -1,6 +1,6 @@
 # 0011: Deployments: code through the pipeline, infrastructure through Terraform, prod behind a tag
 
-- **Status:** Decided; the "Two paths, never crossed" rule and the Lambda code path are superseded by 0017 on 2026-10-16. The OIDC identity stays. The prod gate is amended by 0021 on 2026-10-17: a pull request merged to `release`, with the tag written afterwards as documentation. The artifact list was amended by 0012. The account ids moved from repository variables to repository secrets by 0035 on 2026-11-02. The repository went public with Issue-177 (PR-179, merged 2026-11-02); "required reviewers" below were not added then, and whether they still should be, with 0021's gate in place, is Issue-228.
+- **Status:** Decided; the "Two paths, never crossed" rule and the Lambda code path are superseded by 0017 on 2026-10-16. The OIDC identity stays. The prod gate is amended by 0021 on 2026-10-17: a pull request merged to `release`, with the tag written afterwards as documentation. The artifact list was amended by 0012. The account ids moved from repository variables to repository secrets by 0035 on 2026-11-02. The repository went public on 2026-11-02 (Issue-178); "required reviewers" below were not added then, and whether they still should be, with 0021's gate in place, is Issue-228.
 - **Date:** 2026-10-14
 
 ## Decision
