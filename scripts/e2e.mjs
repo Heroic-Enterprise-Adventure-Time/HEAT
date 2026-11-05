@@ -158,21 +158,22 @@ const versionPollMs = 2_000;
 const versionWaitMs = 5 * 60_000;
 const waitStarted = performance.now();
 const waited = () => Math.round((performance.now() - waitStarted) / 1000);
-const otherVersions = new Set();
+const otherAnswers = new Set();
+const others = () => [...otherAnswers].join(", ") || "none";
 for (let inARow = 0; inARow < versionAnswersInARow; ) {
   if (performance.now() - waitStarted > versionWaitMs) {
-    throw new Error(`/graphql did not answer config.json's version ${config.version} ${versionAnswersInARow} times in a row within ${waited()} s; other answers: ${[...otherVersions].join(", ") || "none"}`);
+    throw new Error(`/graphql did not answer config.json's version ${config.version} ${versionAnswersInARow} times in a row within ${waited()} s; other answers: ${others()}`);
   }
-  const answer = (await graphql(token, `{ version }`)).data?.version;
-  if (answer === config.version) {
+  const reply = await graphql(token, `{ version }`);
+  if (reply.data?.version === config.version) {
     inARow += 1;
   } else {
     inARow = 0;
-    otherVersions.add(answer);
+    otherAnswers.add(reply.data?.version ?? JSON.stringify(reply.errors) ?? "no version");
   }
   if (inARow < versionAnswersInARow) await sleep(versionPollMs);
 }
-console.log(`ok: /graphql answered this deploy's version ${versionAnswersInARow} times in a row after ${waited()} s; other answers on the way: ${[...otherVersions].join(", ") || "none"}`);
+console.log(`ok: /graphql answered this deploy's version ${versionAnswersInARow} times in a row after ${waited()} s; other answers on the way: ${others()}`);
 
 // First sign-in makes the profile, and a repeat changes nothing; the
 // client calls joinGame after every sign-in in the same way.
