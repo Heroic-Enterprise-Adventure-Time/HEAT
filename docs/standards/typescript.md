@@ -65,6 +65,11 @@ Majors not taken, each with the reason and what releases it. A lint rule not yet
 - **Node 26.** Node 24 is the LTS line and 26 is Current. Released when 26 enters LTS, as rule 1 says.
 - **TypeScript 7.** The latest tag; 6.0.3 is pinned. Angular 22 accepts `>=6.0 <6.1` (rule 13), so 7 waits for an Angular release that accepts it, then a trial on a branch showing that Pothos, Vitest and the Angular tooling compile and test under it.
 
+Security fixes that no dependency update reaches, each with what releases it (Issue-215). Checked 2026-11-05.
+
+- **`@graphql-tools/utils`, overridden under `@graphql-eslint/eslint-plugin`.** The plugin's latest release, 4.4.2, requires `^10.0.0`, and every 10.x from 10.10.1 is vulnerable (Dependabot alerts 1 and 8; fixed in 12.0.2). The root's `overrides` gives the plugin the 12.1.0 the rest of the tree already resolves. The plugin's lint rules pass on it and still fail a broken schema. Released when the plugin accepts 12.0.2 or later: the override leaves `package.json` and this list in the same pull request.
+- **`minimatch` below 11.0.1, alert dismissed.** ESLint's packages, typescript-eslint and `graphql-config` require `^10`, and `glob` 10, under Testcontainers, requires `^9` (Dependabot alert 24). An override would cross majors against those ranges. The advisory needs an attacker to control the glob pattern, and every copy is a development dependency, whose patterns are this repository's and its tools'. Released when those packages accept 11.0.1 or later; a dismissed alert does not say when, so the checkup reads this entry.
+
 ## Why
 
 Latest with LTS preferred is the owner's standing policy for every tool and library, stated 2026-10-14: a project that exists to show current practice should run on current versions, and the cost of staying current in small steps is far below the cost of a large jump later. Exact pins and the lock file make the laptop and CI identical, which decision 0009 depends on. The install-script approval is npm's own control since 11.19; recording approvals in the repository turns a per-machine prompt into a reviewed decision. The manifest exists because the bundler and Terraform would otherwise each hold a copy of the same routes and drift. Committing the printed schema is how a code-first project keeps schema-first's one real advantage, a reviewable contract.
