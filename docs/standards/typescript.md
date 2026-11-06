@@ -57,6 +57,11 @@ Standards for every TypeScript package in this repository: the engine, the hub, 
 
 20. **A type that corrects a library's says the value's true shape, and any cast the library's signature needs stands at the call.** A type bent so that a value passes reads as true everywhere it is used; the cast at the call says once where the library's signature is wrong. From the review of PR-214, on `RawPage.LastEvaluatedKey`.
 
+### Security fixes no update reaches
+
+21. **An `overrides` entry is the last resort for a security fix no dependency update reaches.** It is scoped under the package that holds the vulnerable range, pinned exactly (rule 2), and listed under "Held back" with what releases it and an open issue that tracks the release; it leaves `package.json` and that list in the same pull request. From the review of PR-236.
+22. **A Dependabot alert is dismissed only with a "Held back" entry that gives the reason and what releases it, and an open issue that tracks the release.** Rule 1's ignore in `.github/dependabot.yml` is for a major of a direct dependency, and does not apply. From the review of PR-236.
+
 ## Held back
 
 Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.
@@ -64,6 +69,11 @@ Majors not taken, each with the reason and what releases it. A lint rule not yet
 - **graphql 17.** Apollo Server 5 declares graphql `^16.11.0` as its peer dependency; Pothos accepts 16 or 17. Released when Apollo Server accepts 17.
 - **Node 26.** Node 24 is the LTS line and 26 is Current. Released when 26 enters LTS, as rule 1 says.
 - **TypeScript 7.** The latest tag; 6.0.3 is pinned. Angular 22 accepts `>=6.0 <6.1` (rule 13), so 7 waits for an Angular release that accepts it, then a trial on a branch showing that Pothos, Vitest and the Angular tooling compile and test under it.
+
+Security fixes that no dependency update reaches, each with what releases it (rules 21 and 22). Issue-238 tracks both. Checked 2026-11-06.
+
+- **`@graphql-tools/utils`, overridden under `@graphql-eslint/eslint-plugin`.** The plugin's latest release, 4.4.2, requires `^10.0.0`, and every 10.x is vulnerable (Dependabot alerts 1 and 8; fixed in 12.0.2). The root's `overrides` gives the plugin the 12.1.0 the rest of the tree already resolves. The plugin's lint rules pass on it and still fail a broken schema. The override reaches every edge in the plugin's subtree, so an update there that needs a later 12.x fails or nests on its own Dependabot pull request, and the pin moves with it. Released when the plugin accepts 12.0.2 or later: the override leaves `package.json` and this list in the same pull request.
+- **`minimatch` from 7.0.0 below 11.0.1, alert dismissed.** ESLint's packages, typescript-eslint and `graphql-config` require `^10`, and `glob` 10, under Testcontainers, requires `^9` (Dependabot alert 24). An override would cross majors against those ranges. The advisory needs an attacker to control the glob pattern, and every copy is a development dependency, whose patterns are this repository's and its tools'. Released when those packages accept 11.0.1 or later; a dismissed alert does not say when, so the checkup tests this condition (`docs/runbooks/checkup.md`, rule 5).
 
 ## Why
 
