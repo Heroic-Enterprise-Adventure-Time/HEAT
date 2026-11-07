@@ -248,6 +248,9 @@ jobs:
 
   apply:
     name: Apply prod
+    # Stated as well as implied by guard-merge: on a push the build job's
+    # artifacts come from the merge commit, never from a pull request's head.
+    if: github.event_name == 'push'
     needs: [guard-merge, build]
     runs-on: ubuntu-latest
     environment:
