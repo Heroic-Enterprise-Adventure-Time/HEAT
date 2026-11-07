@@ -41,7 +41,12 @@
 
 **Job outputs for the handover.** `deploy.yml`'s apply job is a matrix, whose outputs are whichever row wrote last, so one row's empty value could overwrite `dev`'s.
 
+**Downloading the artifacts to `runner.temp`,** which is what CodeQL's `actions/artifact-poisoning/critical` asks for and what would clear its two alerts on `release.yml`. Terraform reads the bundles from `dist/` through each root's `dist_dir`, so it means changing all three roots, or moving the files back to `dist/` after the download, which would satisfy the scanner and protect nothing. The query matches any `terraform` command after such a download and does not compare paths, and here the artifact cannot reach the `.tf` files: see "Facts checked". Recommended: dismiss the alerts as false positives, which is the owner's call on PR-240.
+
 ## Facts checked
+
+- CodeQL's query, read 2026-11-07 from `github/codeql`, `ArtifactPoisoningQuery.qll` and `poisonable_steps.yml`: it treats a download as untrusted when any job in the workflow checks out a pull request's head under `pull_request_target` and uploads an artifact, without looking at which event the downloading job runs on, and its sink is any later command in its list, `terraform` among them, unless the download went to `runner.temp`. Its source says it skips the path check for such commands. An explicit `if: github.event_name == 'push'` on `release.yml`'s apply job did not clear the alerts, run on commit 98a293d.
+- `actions/download-artifact` at `v8`, read 2026-11-07 from its bundled `dist/index.js`: `unzip-stream` rewrites every `..` segment of an entry's path to `.` before `Extract` joins it to the target directory, and `Extract` writes each entry with `fs.createWriteStream`, so an entry stays under `dist/` or `client/`. Read from the source, not tried with a crafted archive; `v8` is a tag and can move.
 
 - **A step cannot give up the role, observed 2026-11-06,** run 42316078466 on `heat-sb231`, by a temporary step in the apply job with the three AWS keys blanked: `ACTIONS_ID_TOKEN_REQUEST_TOKEN` was present, the step minted a token with `curl`, and `sts assume-role-with-web-identity` assumed `heat-sandbox-apply` with it. The step printed yes or no and no value, and was removed before review.
 - GitHub, "OpenID Connect reference", read 2026-11-06: `id-token: write` is set on a job or a workflow, and a token is requested with `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN`. A job's subject names its environment, so a job with none cannot present the subject the apply roles trust.
