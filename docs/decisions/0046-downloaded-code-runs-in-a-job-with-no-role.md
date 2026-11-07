@@ -46,6 +46,8 @@
 - The tj-actions/changed-files compromise, CVE-2025-30066, as described by Sysdig and Upwind, read 2026-11-06: the injected script read secrets from the memory of the runner's `Runner.Worker` process, so what a job holds is not limited to what is in a step's environment.
 - GitHub, "Workflow syntax", read 2026-11-06: a new pending job or run in a concurrency group cancels the one already pending. A merge replaced in `deploy.yml`'s queue is contained in the merge that replaced it.
 - `scripts/stack-handover.sh`, run on a laptop 2026-11-06 with fake values: the round trip returned the password, and a wrong key was refused.
+- The whole push path, observed 2026-11-07, run 42316705580 attempt 2 on `heat-sb231`: the plan showed no changes, the job with no role passed the stack test and all three browser tests, and the cold start ran after them under the role. The artifact holds the password only in its sealed form, and the run's log matched none of the patterns searched for secrets. The same run without the repository secret was refused at the seal step, naming the secret.
+- The sweep, observed 2026-11-07, run 42410029940 from the branch with the dry run on: `sweep-bundle` built with no role and `sweep` listed under the role and found no orphan, so its dry-run, download and destroy steps did not run.
 
 ## Where it is described
 
