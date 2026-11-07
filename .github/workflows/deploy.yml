@@ -9,12 +9,19 @@
 # branch main (decision 0020). Two rows today: sandbox-base (Issue-37) and
 # dev (Issue-40). prod is not a row here: it ships through the release
 # branch (decision 0021), with its own triggers and its own jobs, in
-# release.yml (Issue-41). A row with code (dev) bundles the
-# functions before planning, because the root hashes the bundle, and after
-# the apply publishes the client build with config.json, creates the test
-# users, runs the smoke test through the environment's hostname, reads the
-# cold start and runs the browser test (decision 0045), as sandbox.yml does for
-# a per-issue stack; sandbox-base has no code and skips those steps.
+# release.yml (Issue-41). A row with code (dev) downloads the
+# bundles before planning, because the root hashes the bundle, and after
+# the apply publishes the client build with config.json and creates the test
+# users; then dev's stack-test job runs the smoke test through the
+# environment's hostname and the browser test (decision 0045), and its
+# cold-start job reads the cold start, as sandbox.yml does for a per-issue
+# stack; sandbox-base has no code and skips those steps.
+#
+# A job that runs downloaded code holds no role and no environment's secrets,
+# because a step cannot give up what its job holds
+# (docs/process/best-practices.md, rule 13; decision 0046): npm and what it
+# installs run in the build and stack-test jobs, and the plan, apply and
+# cold-start jobs run only Terraform, this repository's scripts and the AWS CLI.
 #
 # Why pull_request_target and not pull_request: the pull request's plan must
 # run under the root's environment to see its real values, and the
@@ -54,6 +61,13 @@ env:
   TF_INPUT: "false"
   AWS_REGION: us-east-1
 
+# One merge's run at a time, whole: the next merge's apply resets the test
+# user's password and moves the version, so it cannot land between this run's
+# apply and its stack test. Pull requests' plans never wait for each other.
+concurrency:
+  group: deploy-run-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: false
+
 # Every run step runs as `bash --noprofile --norc -eo pipefail {0}`. With no
 # shell named, GitHub runs `bash -e {0}`, where a pipe's status is its last
 # command's: a stack test that failed into tee left the run green (Issue-137).
@@ -62,6 +76,38 @@ defaults:
     shell: bash
 
 jobs:
+  # The functions for the plan, which hashes them, and on a merge the client
+  # for the publish step after the apply. No role, no environment and no
+  # secrets. On a pull request this is its head's code, as the plan's is.
+  build:
+    name: Bundle and build
+    if: >-
+      github.event_name == 'push'
+      || (github.event.pull_request.head.repo.full_name == github.repository
+          && github.actor != 'dependabot[bot]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out what this run plans
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install exactly what package-lock.json records
+        run: npm ci
+
+      - name: Bundle, and on a merge build the client
+        uses: ./.github/actions/bundle
+        with:
+          client: ${{ github.event_name == 'push' }}
+
   plan:
     name: Plan ${{ matrix.root }}
     # Only pull requests from this repository, and not Dependabot's.
@@ -69,6 +115,7 @@ jobs:
       github.event_name == 'pull_request_target'
       && github.event.pull_request.head.repo.full_name == github.repository
       && github.actor != 'dependabot[bot]'
+    needs: build
     runs-on: ubuntu-latest
     environment: ${{ matrix.environment }}
     permissions:
@@ -141,16 +188,15 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
 
       # The root zips dist/<name>/ and plans the function from its hash
       # (decision 0017), so the bundle exists before the plan.
-      - name: Install and bundle the functions
+      - name: Download the bundles
         if: matrix.code
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: dist/
 
       - name: Assume the plan role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
@@ -180,6 +226,7 @@ jobs:
   apply:
     name: Apply ${{ matrix.root }}
     if: github.event_name == 'push'
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: ${{ matrix.environment }}
@@ -262,19 +309,20 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
 
-      # The functions for the plan, which hashes them; the client for the
-      # publish step after the apply; the engine for the smoke test, which
-      # compares the hub's answer with it.
-      - name: Install, bundle the functions, build the client and the engine
+      - name: Download the bundles
         if: matrix.code
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
-          npm run build --workspace @heat/client
-          npm run build --workspace @heat/engine
+        uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: dist/
+
+      - name: Download the client
+        if: matrix.code
+        uses: actions/download-artifact@v8
+        with:
+          name: client
+          path: client/
 
       - name: Assume the apply role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
@@ -327,7 +375,7 @@ jobs:
         run: |
           set -eu
           out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
-          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
+          sh scripts/publish-client.sh "$(out client_bucket)" client "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
 
       - name: Write the environment's URL to the job summary
         id: summary
@@ -357,38 +405,85 @@ jobs:
           out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
           sh scripts/e2e-user.sh ensure "$(out user_pool_name)" "e2e@$(out zone_name)"
 
-      - name: Call the environment as that user
-        id: e2e
+      # What the smoke test needs from AWS, for a job that holds no role
+      # (decision 0046). An artifact and not job outputs, because a matrix's
+      # outputs are whichever row wrote last.
+      - name: Seal what the smoke test needs
         if: matrix.code
+        env:
+          E2E_HANDOVER_KEY: ${{ secrets.HEAT_E2E_HANDOVER_KEY }}
         run: |
           set -eu
-          zone_name="$(terraform -chdir="terraform/environment/$ROOT" output -raw zone_name)"
-          echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
-          echo "username=e2e@$zone_name" >> "$GITHUB_OUTPUT"
-          node scripts/e2e.mjs --stack "$STACK" --username "e2e@$zone_name" | tee -a "$RUNNER_TEMP/e2e.log"
+          out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
+          sh scripts/stack-handover.sh seal "$RUNNER_TEMP/stack-handover/handover.env" "$(out site_url)" "$(out ci_client_id)" "e2e@$(out zone_name)"
 
-      # Its own step, so the log reaches the run's page when the test fails,
-      # which ends the step above at the failing line.
-      - name: Put the stack test's log on the run's page
-        if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
-        run: |
-          {
-            echo
-            echo '### Stack test, through the API'
-            echo
-            echo '```text'
-            cat "$RUNNER_TEMP/e2e.log"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the sealed handover for the smoke test
+        if: matrix.code
+        uses: actions/upload-artifact@v7
+        with:
+          name: stack-handover
+          path: ${{ runner.temp }}/stack-handover/handover.env
+          if-no-files-found: error
+          retention-days: 1
+
+  # dev's smoke test and browser test (decision 0045), one copy with
+  # sandbox.yml's. No environment and no id-token permission: this job runs
+  # downloaded code (decision 0046). Not skipped when only sandbox-base's row
+  # failed; without dev's handover the download fails it. Skipped when the
+  # apply never ran, because the build failed, so that failure shows once.
+  stack-test:
+    name: Test dev
+    if: ${{ github.event_name == 'push' && !cancelled() && needs.apply.result != 'skipped' }}
+    needs: apply
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      since: ${{ steps.test.outputs.since }}
+      site_url: ${{ steps.test.outputs.site_url }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Test the environment, its API and its page
+        id: test
+        uses: ./.github/actions/stack-test
+        with:
+          stack: heat-dev
+          handover-key: ${{ secrets.HEAT_E2E_HANDOVER_KEY }}
+
+  # Back under the role, for the function's log, with nothing downloaded. Runs
+  # when the smoke test got as far as calling the environment, whatever came
+  # after.
+  cold-start:
+    name: Report dev's cold start
+    if: ${{ github.event_name == 'push' && !cancelled() && needs.stack-test.outputs.since != '' }}
+    needs: stack-test
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: ${{ needs.stack-test.outputs.site_url }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # A repository secret, so that GitHub masks the id in every log line
+      # (docs/README.md, rule 9).
+      ACCOUNT_ID: ${{ secrets.HEAT_DEV_ACCOUNT_ID }}
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
 
       - name: Report the cold start
-        if: matrix.code
-        run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
-
-      # The browser test (decision 0045), one copy with sandbox.yml's.
-      - name: Use the page in a browser as that user
-        if: matrix.code
-        uses: ./.github/actions/browser-test
+        uses: ./.github/actions/cold-start
         with:
-          stack: ${{ env.STACK }}
-          username: ${{ steps.e2e.outputs.username }}
+          role-arn: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-dev-apply
+          session-name: deploy-cold-start-dev
+          log-group: /aws/lambda/heat-dev-hub
+          since: ${{ needs.stack-test.outputs.since }}

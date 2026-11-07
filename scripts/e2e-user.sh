@@ -1,9 +1,9 @@
 #!/usr/bin/env sh
 # The stack's own test user in the account's shared pool, minted by the job
-# that applied the stack and deleted with the stack. No stored secret: the
-# password is random, set permanently for this run, masked in the log, and
-# handed to scripts/e2e.mjs and scripts/browser-test.mjs through GITHUB_ENV as
-# E2E_PASSWORD. The apply
+# that applied the stack and deleted with the stack. No stored password: it is
+# random, set permanently for this run, masked in the log, and written to
+# GITHUB_ENV as E2E_PASSWORD for scripts/stack-handover.sh, which seals it for
+# the stack test's job (decision 0046). The apply
 # role may do this because the boundary allows cognito-idp, which is how the
 # base's apply job creates the human test users too (decision 0020).
 #

@@ -32,8 +32,12 @@ import { setTimeout as sleep } from "node:timers/promises";
  * heat-dev), and every call goes through the stack's hostname,
  * as the browser's will: the page at /, config.json, and /graphql behind
  * CloudFront, which proves that the Authorization header crosses it. The
- * parameters are read with whatever AWS credentials are in the
- * environment: the apply role in the workflow, the plan role on a laptop.
+ * authenticated run imports the engine, downloaded code, so the workflow runs
+ * it in a job that holds no role and hands it E2E_SITE_URL and
+ * E2E_CI_CLIENT_ID by environment (docs/process/best-practices.md, rule 13;
+ * decision 0046). Without them it reads the parameters with whatever AWS
+ * credentials are in the environment: the plan role on a laptop, the apply
+ * role for prod's anonymous run, which imports nothing downloaded.
  * The password comes from the environment, never from an argument, so it
  * is in no process list and no log. In the workflow the user is minted for
  * the stack by scripts/e2e-user.sh; on a laptop it is player1 and the
@@ -66,9 +70,9 @@ function parameter(name) {
   }).trim();
 }
 
-const siteUrl = parameter("site_url");
+const siteUrl = process.env.E2E_SITE_URL ?? parameter("site_url");
 // prod writes no app_client_id parameter, because it has no ci client.
-const clientId = anonymousOnly ? undefined : parameter("app_client_id");
+const clientId = anonymousOnly ? undefined : (process.env.E2E_CI_CLIENT_ID ?? parameter("app_client_id"));
 const graphqlUrl = `${siteUrl}/graphql`;
 // The deploy before the current one, at its own route (decision 0030).
 const previousUrl = `${siteUrl}/previous/graphql`;

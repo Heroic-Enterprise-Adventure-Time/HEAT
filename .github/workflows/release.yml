@@ -36,6 +36,13 @@
 # The release ruleset lets only a pull request change release, so a push
 # here is always a merge. The hotfix lifecycle, how a hotfix reaches main,
 # is settled when the first one is needed (decision 0021).
+#
+# A job that runs downloaded code holds no role and no environment's secrets,
+# because a step cannot give up what its job holds
+# (docs/process/best-practices.md, rule 13; decision 0046): npm and what it
+# installs run in the build job, after the guard, and the plan and apply jobs
+# run only Terraform, this repository's scripts and the AWS CLI. The anonymous
+# smoke test stays under the role, because it imports nothing downloaded.
 name: Release
 
 on:
@@ -92,9 +99,40 @@ jobs:
           git fetch --no-tags origin release "$HEAD_SHA"
           sh scripts/check-release-source.sh pull-request "$HEAD_REF" "$HEAD_SHA"
 
+  # ---------------------------------------------------------------- build --
+  # The functions for the plan, which hashes them, and on the merge the client
+  # for the publish step after the apply. After whichever guard this event
+  # ran, the other being skipped. No role, no environment and no secrets.
+  build:
+    name: Bundle and build
+    needs: [guard, guard-merge]
+    if: ${{ !cancelled() && (needs.guard.result == 'success' || needs.guard-merge.result == 'success') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out what this run plans
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install exactly what package-lock.json records
+        run: npm ci
+
+      - name: Bundle, and on the merge build the client
+        uses: ./.github/actions/bundle
+        with:
+          client: ${{ github.event_name == 'push' }}
+
   plan:
     name: Plan prod
-    needs: guard
+    needs: [guard, build]
     runs-on: ubuntu-latest
     environment: prod
     permissions:
@@ -138,15 +176,14 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
 
       # The root zips dist/<name>/ and plans the function from its hash
       # (decision 0017), so the bundle exists before the plan.
-      - name: Install and bundle the functions
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+      - name: Download the bundles
+        uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: dist/
 
       - name: Assume the plan role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
@@ -192,7 +229,10 @@ jobs:
 
   apply:
     name: Apply prod
-    needs: guard-merge
+    # Stated as well as implied by guard-merge: on a push the build job's
+    # artifacts come from the merge commit, never from a pull request's head.
+    if: github.event_name == 'push'
+    needs: [guard-merge, build]
     runs-on: ubuntu-latest
     environment:
       name: prod
@@ -235,17 +275,18 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
 
-      # The functions for the plan, which hashes them, and the client for
-      # the publish step after the apply. No engine: the anonymous smoke test
-      # compares nothing with it.
-      - name: Install, bundle the functions and build the client
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
-          npm run build --workspace @heat/client
+      - name: Download the bundles
+        uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: dist/
+
+      - name: Download the client
+        uses: actions/download-artifact@v8
+        with:
+          name: client
+          path: client/
 
       - name: Assume the apply role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
@@ -282,7 +323,7 @@ jobs:
         run: |
           set -eu
           out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
-          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
+          sh scripts/publish-client.sh "$(out client_bucket)" client "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
 
       - name: Write the environment's URL to the job summary
         id: summary

@@ -1,6 +1,6 @@
 # 0045: A Playwright smoke test of the page on every stack, its trace encrypted to a committed certificate
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0046 on 2026-11-06: the browser's job holds no role, and `.github/actions/stack-test` calls `.github/actions/browser-test`. "The workflow holds no secret" below no longer holds for the workflow as a whole: the repository secret `HEAT_E2E_HANDOVER_KEY` seals the test user's password. The trace's encryption still needs no secret.
 - **Date:** 2026-11-04
 - **Settles:** Issue-202, from the library review of 2026-11-03 (row 22): the pipeline tested a stack through its API and the page by hand, so nothing showed that a real browser could get from the hostname to a drawn camp.
 
