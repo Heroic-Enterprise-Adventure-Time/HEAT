@@ -12,8 +12,8 @@
 #   push      checks, bundle and client build, cap, plan with the
 #             allow-list, apply, the client published to the stack's
 #             bucket with config.json, the stack test through the stack's
-#             hostname, the browser test of the page (decision 0045); the
-#             URL in the job summary, on the deployment and,
+#             hostname, the browser test of the page (decision 0045), the
+#             cold start; the URL in the job summary, on the deployment and,
 #             when the branch has an open pull request, in one comment on
 #             it. The checks run here so that a stack always holds a commit
 #             that typechecks and passes the tests (0017); they also run in
@@ -46,6 +46,13 @@
 # runs the branch's copy. A change to the delete or sweep jobs therefore
 # takes effect once it is on main, and a branch whose workflow is not yet
 # on main leaves an orphan when deleted, which the sweep collects.
+#
+# A job that runs downloaded code holds no role, because a step cannot give up
+# what its job holds (docs/process/best-practices.md, rule 13; decision 0046):
+# npm and what it installs run in the checks, stack-test, name-deleted and
+# sweep-bundle jobs, which have no id-token permission and no environment, and
+# the jobs that assume the apply role run only Terraform, this repository's
+# scripts and the AWS CLI.
 name: Sandbox stacks
 
 on:
@@ -80,6 +87,14 @@ env:
 
 permissions:
   contents: read
+
+# One push's run at a time per branch, whole: the next push's apply resets the
+# test user's password and moves the version, so it cannot land between this
+# run's apply and its stack test. Other events never wait for each other here;
+# the destroy and the sweep have their job-level groups.
+concurrency:
+  group: sandbox-run-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: false
 
 # Every run step runs as `bash --noprofile --norc -eo pipefail {0}`. With no
 # shell named, GitHub runs `bash -e {0}`, where a pipe's status is its last
@@ -193,7 +208,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
@@ -218,6 +232,23 @@ jobs:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
           role-session-name: sandbox-apply-${{ env.ISSUE }}
           aws-region: ${{ env.AWS_REGION }}
+
+      # TEMPORARY, Issue-231, removed before review: what decision 0046 rests on.
+      # Prints yes or no and no value.
+      - name: "Probe: can a step with its keys blanked still reach the apply role?"
+        env:
+          AWS_ACCESS_KEY_ID: ""
+          AWS_SECRET_ACCESS_KEY: ""
+          AWS_SESSION_TOKEN: ""
+        run: |
+          [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] && echo "request token in a run step: yes" || echo "request token in a run step: no"
+          token="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).value))')"
+          echo "::add-mask::$token"
+          if env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN aws sts assume-role-with-web-identity --role-arn "arn:aws:iam::$ACCOUNT_ID:role/heat-sandbox-apply" --role-session-name probe-231 --web-identity-token "$token" --query 'length(Credentials.AccessKeyId)' --output text >/dev/null 2>&1; then
+            echo "assumed the apply role with the keys blanked: yes"
+          else
+            echo "assumed the apply role with the keys blanked: no"
+          fi
 
       - name: Refuse to exceed the cap on concurrent stacks
         run: node scripts/sandbox.mjs cap "$SANDBOX_STACK_CAP" --issue "$ISSUE"
@@ -278,47 +309,90 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: sh scripts/post-stack-url.sh "$ISSUE" "${{ steps.summary.outputs.site_url }}"
 
-      # The stack test (decision 0018: the stack is the system). The engine
-      # is built because the test compares the hub's answer with it.
-      - name: Install and build the engine for the stack test
-        run: |
-          set -eu
-          npm ci
-          npm run build --workspace @heat/engine
-
       - name: Mint the stack's test user
         run: sh scripts/e2e-user.sh ensure heat-sb-base-users "e2e-$ISSUE@heat-sb.dcg-games.com"
 
-      - name: Call the stack as that user
-        id: e2e
+      # What the stack test needs from AWS, for a job that holds no role
+      # (decision 0046).
+      - name: Seal what the stack test needs
+        env:
+          E2E_HANDOVER_KEY: ${{ secrets.HEAT_E2E_HANDOVER_KEY }}
         run: |
           set -eu
-          echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
-          node scripts/e2e.mjs --issue "$ISSUE" --username "e2e-$ISSUE@heat-sb.dcg-games.com" | tee -a "$RUNNER_TEMP/e2e.log"
+          site_url="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw site_url)"
+          client_id="$(node scripts/sandbox.mjs output --issue "$ISSUE" -- -raw ci_client_id)"
+          sh scripts/stack-handover.sh seal "$RUNNER_TEMP/stack-handover/handover.env" "$site_url" "$client_id" "e2e-$ISSUE@heat-sb.dcg-games.com"
 
-      # Its own step, so the log reaches the run's page when the test fails,
-      # which ends the step above at the failing line.
-      - name: Put the stack test's log on the run's page
-        if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
-        run: |
-          {
-            echo
-            echo '### Stack test, through the API'
-            echo
-            echo '```text'
-            cat "$RUNNER_TEMP/e2e.log"
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Keep the sealed handover for the stack test
+        uses: actions/upload-artifact@v7
+        with:
+          name: stack-handover
+          path: ${{ runner.temp }}/stack-handover/handover.env
+          if-no-files-found: error
+          retention-days: 1
+
+  # The stack test (decision 0018: the stack is the system) and the browser
+  # test (decision 0045), one copy with deploy.yml's. No environment and no
+  # id-token permission: this job runs downloaded code (decision 0046).
+  stack-test:
+    name: Test the branch's stack
+    if: github.event_name == 'push'
+    needs: [checks, apply]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      since: ${{ steps.test.outputs.since }}
+      site_url: ${{ steps.test.outputs.site_url }}
+    steps:
+      - name: Check out the branch
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Test the stack, its API and its page
+        id: test
+        uses: ./.github/actions/stack-test
+        with:
+          stack: ${{ needs.checks.outputs.name }}
+          handover-key: ${{ secrets.HEAT_E2E_HANDOVER_KEY }}
+
+  # Back under the role, for the function's log, with nothing downloaded. Runs
+  # when the stack test got as far as calling the stack, whatever came after.
+  cold-start:
+    name: Report the stack's cold start
+    if: ${{ github.event_name == 'push' && !cancelled() && needs.stack-test.outputs.since != '' }}
+    needs: [checks, stack-test]
+    runs-on: ubuntu-latest
+    environment:
+      name: sandbox-${{ needs.checks.outputs.issue }}
+      url: ${{ needs.stack-test.outputs.site_url }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      # A repository secret, so that GitHub masks the id in every log line
+      # (docs/README.md, rule 9).
+      ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
+      ISSUE: ${{ needs.checks.outputs.issue }}
+      STACK: ${{ needs.checks.outputs.name }}
+    steps:
+      - name: Check out the branch
+        uses: actions/checkout@v7
+
+      - name: Assume the apply role through GitHub's OIDC provider
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
+          role-session-name: sandbox-cold-start-${{ env.ISSUE }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Report the cold start
-        run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ steps.e2e.outputs.since }}"
-
-      # The browser test (decision 0045), one copy with deploy.yml's.
-      - name: Use the page in a browser as that user
-        uses: ./.github/actions/browser-test
-        with:
-          stack: ${{ env.STACK }}
-          username: e2e-${{ env.ISSUE }}@heat-sb.dcg-games.com
+        run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ needs.stack-test.outputs.since }}"
 
   # -------------------------------------------------------- pull request --
   comment-url:
@@ -383,6 +457,7 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
+          cache: npm
 
       - name: Name the stack from the deleted branch
         id: stack
@@ -392,6 +467,22 @@ jobs:
           set -eu
           echo "issue=$(node scripts/sandbox.mjs issue --branch "$DELETED_REF")" >> "$GITHUB_OUTPUT"
           echo "name=$(node scripts/sandbox.mjs name --branch "$DELETED_REF")" >> "$GITHUB_OUTPUT"
+
+      # Here, with no role, because the root evaluates the bundle's hash even
+      # to destroy.
+      - name: Install and bundle the functions
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
+
+      - name: Upload the bundles for the destroy job
+        uses: actions/upload-artifact@v7
+        with:
+          name: bundles
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
 
   destroy:
     name: Destroy the deleted branch's stack
@@ -431,18 +522,17 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
 
-      - name: Bundle, because the root evaluates the bundle's hash even to destroy
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+      - name: Download the bundles
+        uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: dist/
 
       - name: Assume the apply role through GitHub's OIDC provider
         uses: aws-actions/configure-aws-credentials@v6
@@ -461,9 +551,39 @@ jobs:
           echo "Destroyed \`$STACK\`, removed its state and its test user." >> "$GITHUB_STEP_SUMMARY"
 
   # --------------------------------------------------------------- sweep --
+  # Before the sweep knows whether there is an orphan to destroy, because
+  # finding one takes the role and bundling must not hold it.
+  sweep-bundle:
+    name: Bundle for the sweep
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v7
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install and bundle the functions
+        run: |
+          set -eu
+          npm ci
+          npm run bundle
+
+      - name: Upload the bundles for the sweep
+        uses: actions/upload-artifact@v7
+        with:
+          name: bundles
+          path: dist/
+          if-no-files-found: error
+          retention-days: 1
+
   sweep:
     name: Sweep orphaned stacks
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: sweep-bundle
     runs-on: ubuntu-latest
     # A fixed environment of its own, which the apply role's sandbox-*
     # pattern admits, because the stacks it finds are only known once it
@@ -499,7 +619,6 @@ jobs:
         uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-          cache: npm
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v4
@@ -525,12 +644,12 @@ jobs:
             echo "Orphaned sandbox stacks (issue numbers): $orphans" | tee -a "$GITHUB_STEP_SUMMARY"
           fi
 
-      - name: Bundle, because the root evaluates the bundle's hash even to destroy
+      - name: Download the bundles, because the root evaluates the bundle's hash even to destroy
         if: steps.orphans.outputs.orphans != '' && env.DRY_RUN != 'true'
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+        uses: actions/download-artifact@v8
+        with:
+          name: bundles
+          path: dist/
 
       - name: Destroy each orphan
         if: steps.orphans.outputs.orphans != '' && env.DRY_RUN != 'true'

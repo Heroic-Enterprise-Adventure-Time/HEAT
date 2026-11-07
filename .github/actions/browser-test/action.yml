@@ -1,7 +1,7 @@
-# The browser test (decision 0045): the page as a player meets it, one copy for
-# sandbox.yml and deploy.yml, because deploy.yml's only runs on main. Expects
-# the repository checked out and installed, the engine built, E2E_PASSWORD in
-# the environment and a role that may read the stack's parameters.
+# The browser test (decision 0045): the page as a player meets it. Called by
+# .github/actions/stack-test, in its job with no role. Expects the repository
+# checked out and installed, the engine built, and E2E_PASSWORD, E2E_SITE_URL
+# and E2E_CI_CLIENT_ID in the environment.
 name: Browser test
 description: Uses the stack's page in headless Chromium, and keeps a failed run's trace encrypted.
 
@@ -19,14 +19,9 @@ runs:
     # Installed on every run, not cached: Playwright's CI page, read
     # 2026-11-04, says "Caching browser binaries is not recommended", because a
     # restore takes about as long as a download and Linux's OS dependencies
-    # cannot be cached. It downloads and runs code, so it holds no role's
-    # credentials (docs/process/best-practices.md, rule 13).
+    # cannot be cached.
     - name: Install Chromium for the browser test
       shell: bash
-      env:
-        AWS_ACCESS_KEY_ID: ""
-        AWS_SECRET_ACCESS_KEY: ""
-        AWS_SESSION_TOKEN: ""
       run: npx playwright install --with-deps chromium
 
     - name: Use the page in a browser as that user
