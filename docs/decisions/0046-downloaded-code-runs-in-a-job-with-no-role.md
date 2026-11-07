@@ -7,7 +7,7 @@
 
 ## Decision
 
-**The job is the boundary, not the step.** A step cannot give up what its job holds. npm, what it installs and the browser run in jobs with no `id-token` permission, no environment and no secrets; the jobs that assume a role run only Terraform, this repository's scripts and the AWS CLI, and download what the other jobs built. `.github/actions/stack-test` refuses to run if it finds AWS keys or the token request variable, so a later change cannot quietly bring a role back.
+**The job is the boundary, not the step.** A step cannot give up what its job holds. npm, what it installs and the browser run in jobs with no `id-token` permission, no environment and no secrets, each declaring its own `permissions`; the jobs that assume a role run only Terraform, this repository's scripts and the AWS CLI, and download what the other jobs built. `.github/actions/stack-test` refuses to run if it finds AWS keys or the token request variable, so a later change cannot quietly bring a role back.
 
 | Workflow | Jobs with no role | Jobs under a role |
 | --- | --- | --- |
@@ -19,11 +19,15 @@
 
 **What stays under a role.** Terraform and its providers, whose hashes the lock files pin, and the GitHub actions those jobs are built from, which have to run there. `prod`'s anonymous smoke test stays in its apply job, because it imports nothing downloaded and has no password to hand over.
 
+**Deferred: the actions are pinned by tag, not by commit.** GitHub's hardening guidance pins a third-party action to a full commit SHA. Every `uses:` here names a tag, so an action whose tag is moved upstream runs under the apply role with the environment's secrets, which is how the tj-actions compromise reached its victims. It is deferred to Issue-241 because it touches every workflow and is a change of its own; until then, what an action's maintainers publish under a tag is trusted as much as the role.
+
 **A role's job treats an artifact as data.** It downloads only from its own run, into `dist/` or `client/`, which the checkout does not track, so nothing it unpacks can replace a script. Terraform zips and hashes the bundles and `scripts/publish-client.sh` copies the client to its bucket; nothing under a role executes either. This keeps a compromised package from the role, not from what ships: the bundle and the client are built from those packages, as they always were, so its code can still reach a Lambda function or the page, and that function runs under its own execution role.
 
 **The handover.** The apply job mints the test user's random password as before. `scripts/stack-handover.sh` encrypts it with `openssl enc` under the repository secret `HEAT_E2E_HANDOVER_KEY`, and writes it with the site URL, the `ci` client's id and the username to the run's `stack-handover` artifact, kept for a day. The test's job opens it and masks the password. The artifact is public and only the password in it is sealed: the other three values are already in the public log. A leaked key exposes only test users' passwords, each replaced by that user's next run; the key enters no AWS account and reaches no production secret.
 
-**A run holds its branch whole.** Workflow-level concurrency on `sandbox.yml`'s and `deploy.yml`'s push runs, because the next apply resets the password and moves the version, and could otherwise land between this run's apply and its test. A queued run waits longer as a result.
+**A run holds its branch whole.** Workflow-level concurrency on `sandbox.yml`'s and `deploy.yml`'s push runs, because the next apply resets the password and moves the version, and could otherwise land between this run's apply and its test. A queued run waits longer as a result. A branch's destroy joins the same group by name, so it waits for the whole of a running push, tests included, and not just for its apply.
+
+**One copy of what runs only after a merge.** The bundle and the client's build are `.github/actions/bundle` and the cold start is `.github/actions/cold-start`, beside `.github/actions/stack-test`, because `deploy.yml` and `release.yml` run only after a merge and a drifted copy would show first on `dev` or `prod`; `sandbox.yml` runs all three on every push.
 
 **The cold start is a job of its own, under the role, after the tests,** because reading the function's log takes a role and the test user's calls are what it measures. It records a second deployment on the environment, so it carries the site's URL.
 
@@ -52,10 +56,12 @@
 - GitHub, "OpenID Connect reference", read 2026-11-06: `id-token: write` is set on a job or a workflow, and a token is requested with `ACTIONS_ID_TOKEN_REQUEST_URL` and `ACTIONS_ID_TOKEN_REQUEST_TOKEN`. A job's subject names its environment, so a job with none cannot present the subject the apply roles trust.
 - The tj-actions/changed-files compromise, CVE-2025-30066, as described by Sysdig and Upwind, read 2026-11-06: the injected script read secrets from the memory of the runner's `Runner.Worker` process, so what a job holds is not limited to what is in a step's environment.
 - GitHub, "Workflow syntax", read 2026-11-06: a new pending job or run in a concurrency group cancels the one already pending. A merge replaced in `deploy.yml`'s queue is contained in the merge that replaced it.
+- GitHub, "Workflow syntax", `concurrency`, read 2026-11-07: "at most one running job or workflow in a concurrency group" in the repository, so a job's group and a workflow's share one namespace; with the default `queue: single`, a new pending entry cancels the one already pending. Read, not yet observed on a deletion.
+- `actions/setup-node` at `v7`, its `action.yml` read 2026-11-07: caching is automatic only when `package.json` names a `packageManager`, which HEAT's does not, so `cache: npm` is the only cache a job has.
 - `scripts/stack-handover.sh`, run on a laptop 2026-11-06 with fake values: the round trip returned the password, and a wrong key was refused.
 - The whole push path, observed 2026-11-07, run 42316705580 attempt 2 on `heat-sb231`: the plan showed no changes, the job with no role passed the stack test and all three browser tests, and the cold start ran after them under the role. The artifact holds the password only in its sealed form, and the run's log matched none of the patterns searched for secrets. The same run without the repository secret was refused at the seal step, naming the secret.
 - The sweep, observed 2026-11-07, run 42410029940 from the branch with the dry run on: `sweep-bundle` built with no role and `sweep` listed under the role and found no orphan, so its dry-run, download and destroy steps did not run.
 
 ## Where it is described
 
-`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `.github/workflows/`; `.github/actions/stack-test`; `scripts/stack-handover.sh`.
+`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `.github/workflows/`; `.github/actions/stack-test`, `.github/actions/bundle` and `.github/actions/cold-start`; `scripts/stack-handover.sh`.

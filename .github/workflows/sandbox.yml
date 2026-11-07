@@ -91,7 +91,7 @@ permissions:
 # One push's run at a time per branch, whole: the next push's apply resets the
 # test user's password and moves the version, so it cannot land between this
 # run's apply and its stack test. Other events never wait for each other here;
-# the destroy and the sweep have their job-level groups.
+# the sweep has its job-level group, and the destroy joins this one, by name.
 concurrency:
   group: sandbox-run-${{ github.event_name == 'push' && github.ref || github.run_id }}
   cancel-in-progress: false
@@ -109,6 +109,10 @@ jobs:
     name: Checks and bundle
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    # Declared, not inherited, so that widening the workflow's default cannot
+    # give this job a role (docs/process/best-practices.md, rule 13).
+    permissions:
+      contents: read
     outputs:
       issue: ${{ steps.stack.outputs.issue }}
       name: ${{ steps.stack.outputs.name }}
@@ -143,29 +147,10 @@ jobs:
           npm run schema:print
           git diff --exit-code -- packages/hub/schema.graphql
 
-      - name: Bundle every function for Lambda
-        run: npm run bundle
-
-      - name: Upload the bundles for the apply job
-        uses: actions/upload-artifact@v7
+      - name: Bundle and build for the apply job
+        uses: ./.github/actions/bundle
         with:
-          name: bundles
-          path: dist/
-          if-no-files-found: error
-          retention-days: 1
-
-      # What the stack's bucket serves (Issue-39); one build serves any
-      # stack, because config.json is written beside it at publish time.
-      - name: Build the client for production
-        run: npm run build --workspace @heat/client
-
-      - name: Upload the client for the apply job
-        uses: actions/upload-artifact@v7
-        with:
-          name: client
-          path: packages/client/dist/client/browser/
-          if-no-files-found: error
-          retention-days: 1
+          client: "true"
 
   apply:
     name: Apply the branch's stack
@@ -361,21 +346,17 @@ jobs:
       # A repository secret, so that GitHub masks the id in every log line
       # (docs/README.md, rule 9).
       ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
-      ISSUE: ${{ needs.checks.outputs.issue }}
-      STACK: ${{ needs.checks.outputs.name }}
     steps:
       - name: Check out the branch
         uses: actions/checkout@v7
 
-      - name: Assume the apply role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
-          role-session-name: sandbox-cold-start-${{ env.ISSUE }}
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Report the cold start
-        run: sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "${{ needs.stack-test.outputs.since }}"
+        uses: ./.github/actions/cold-start
+        with:
+          role-arn: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
+          session-name: sandbox-cold-start-${{ needs.checks.outputs.issue }}
+          log-group: /aws/lambda/${{ needs.checks.outputs.name }}-hub
+          since: ${{ needs.stack-test.outputs.since }}
 
   # -------------------------------------------------------- pull request --
   comment-url:
@@ -429,6 +410,9 @@ jobs:
           || startsWith(github.event.ref, 'docs/') || startsWith(github.event.ref, 'infra/')
           || startsWith(github.event.ref, 'chore/') || startsWith(github.event.ref, 'hotfix/'))
     runs-on: ubuntu-latest
+    # Declared, not inherited: this job runs npm (rule 13).
+    permissions:
+      contents: read
     outputs:
       issue: ${{ steps.stack.outputs.issue }}
       name: ${{ steps.stack.outputs.name }}
@@ -453,19 +437,11 @@ jobs:
 
       # Here, with no role, because the root evaluates the bundle's hash even
       # to destroy.
-      - name: Install and bundle the functions
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+      - name: Install exactly what package-lock.json records
+        run: npm ci
 
-      - name: Upload the bundles for the destroy job
-        uses: actions/upload-artifact@v7
-        with:
-          name: bundles
-          path: dist/
-          if-no-files-found: error
-          retention-days: 1
+      - name: Bundle for the destroy job
+        uses: ./.github/actions/bundle
 
   destroy:
     name: Destroy the deleted branch's stack
@@ -473,8 +449,12 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: sandbox-${{ needs.name-deleted.outputs.issue }}
+    # The branch's push runs' own group (the workflow's concurrency above), so
+    # the destroy waits for the whole of a running push, its stack test and
+    # cold start as well as its apply, and replaces one still queued. A job's
+    # group and a workflow's share one namespace in the repository.
     concurrency:
-      group: sandbox-refs/heads/${{ github.event.ref }}
+      group: sandbox-run-refs/heads/${{ github.event.ref }}
       cancel-in-progress: false
     permissions:
       contents: read
@@ -540,6 +520,9 @@ jobs:
     name: Bundle for the sweep
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # Declared, not inherited: this job runs npm (rule 13).
+    permissions:
+      contents: read
     steps:
       - name: Check out main
         uses: actions/checkout@v7
@@ -550,22 +533,17 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      - name: Install and bundle the functions
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+      - name: Install exactly what package-lock.json records
+        run: npm ci
 
-      - name: Upload the bundles for the sweep
-        uses: actions/upload-artifact@v7
-        with:
-          name: bundles
-          path: dist/
-          if-no-files-found: error
-          retention-days: 1
+      - name: Bundle for the sweep
+        uses: ./.github/actions/bundle
 
   sweep:
     name: Sweep orphaned stacks
+    # Lists even when the bundle failed, so a broken main still reports its
+    # orphans; destroying one then fails at the download, in the open.
+    if: ${{ !cancelled() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') }}
     needs: sweep-bundle
     runs-on: ubuntu-latest
     # A fixed environment of its own, which the apply role's sandbox-*

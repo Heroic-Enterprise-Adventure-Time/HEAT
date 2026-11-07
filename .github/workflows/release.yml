@@ -122,32 +122,13 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      - name: Install and bundle the functions
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+      - name: Install exactly what package-lock.json records
+        run: npm ci
 
-      - name: Upload the bundles
-        uses: actions/upload-artifact@v7
+      - name: Bundle, and on the merge build the client
+        uses: ./.github/actions/bundle
         with:
-          name: bundles
-          path: dist/
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Build the client for production
-        if: github.event_name == 'push'
-        run: npm run build --workspace @heat/client
-
-      - name: Upload the client for the apply job
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v7
-        with:
-          name: client
-          path: packages/client/dist/client/browser/
-          if-no-files-found: error
-          retention-days: 1
+          client: ${{ github.event_name == 'push' }}
 
   plan:
     name: Plan prod

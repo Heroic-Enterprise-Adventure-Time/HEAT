@@ -100,32 +100,13 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      - name: Install and bundle the functions
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+      - name: Install exactly what package-lock.json records
+        run: npm ci
 
-      - name: Upload the bundles
-        uses: actions/upload-artifact@v7
+      - name: Bundle, and on a merge build the client
+        uses: ./.github/actions/bundle
         with:
-          name: bundles
-          path: dist/
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Build the client for production
-        if: github.event_name == 'push'
-        run: npm run build --workspace @heat/client
-
-      - name: Upload the client for the apply job
-        if: github.event_name == 'push'
-        uses: actions/upload-artifact@v7
-        with:
-          name: client
-          path: packages/client/dist/client/browser/
-          if-no-files-found: error
-          retention-days: 1
+          client: ${{ github.event_name == 'push' }}
 
   plan:
     name: Plan ${{ matrix.root }}
@@ -448,10 +429,11 @@ jobs:
   # dev's smoke test and browser test (decision 0045), one copy with
   # sandbox.yml's. No environment and no id-token permission: this job runs
   # downloaded code (decision 0046). Not skipped when only sandbox-base's row
-  # failed; without dev's handover the download fails it.
+  # failed; without dev's handover the download fails it. Skipped when the
+  # apply never ran, because the build failed, so that failure shows once.
   stack-test:
     name: Test dev
-    if: ${{ github.event_name == 'push' && !cancelled() }}
+    if: ${{ github.event_name == 'push' && !cancelled() && needs.apply.result != 'skipped' }}
     needs: apply
     runs-on: ubuntu-latest
     permissions:
@@ -498,12 +480,10 @@ jobs:
       - name: Check out main
         uses: actions/checkout@v7
 
-      - name: Assume the apply role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
-        with:
-          role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-dev-apply
-          role-session-name: deploy-cold-start-dev
-          aws-region: ${{ env.AWS_REGION }}
-
       - name: Report the cold start
-        run: sh scripts/report-cold-start.sh /aws/lambda/heat-dev-hub "${{ needs.stack-test.outputs.since }}"
+        uses: ./.github/actions/cold-start
+        with:
+          role-arn: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-dev-apply
+          session-name: deploy-cold-start-dev
+          log-group: /aws/lambda/heat-dev-hub
+          since: ${{ needs.stack-test.outputs.since }}
