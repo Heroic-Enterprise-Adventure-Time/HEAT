@@ -41,7 +41,7 @@
 
 **Job outputs for the handover.** `deploy.yml`'s apply job is a matrix, whose outputs are whichever row wrote last, so one row's empty value could overwrite `dev`'s.
 
-**Downloading the artifacts to `runner.temp`,** which is what CodeQL's `actions/artifact-poisoning/critical` asks for and what would clear its two alerts on `release.yml`. Terraform reads the bundles from `dist/` through each root's `dist_dir`, so it means changing all three roots, or moving the files back to `dist/` after the download, which would satisfy the scanner and protect nothing. The query matches any `terraform` command after such a download and does not compare paths, and here the artifact cannot reach the `.tf` files: see "Facts checked". Recommended: dismiss the alerts as false positives, which is the owner's call on PR-240.
+**Downloading the artifacts to `runner.temp`,** which is what CodeQL's `actions/artifact-poisoning/critical` asks for and what would clear its two alerts on `release.yml`. Terraform reads the bundles from `dist/` through each root's `dist_dir`, so it means changing all three roots, or moving the files back to `dist/` after the download, which would satisfy the scanner and protect nothing. The query matches any `terraform` command after such a download and does not compare paths, and here the artifact cannot reach the `.tf` files: see "Facts checked". The owner dismissed both alerts as false positives on 2026-11-07, on PR-240.
 
 ## Facts checked
 
