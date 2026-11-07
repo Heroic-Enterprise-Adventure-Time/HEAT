@@ -233,23 +233,6 @@ jobs:
           role-session-name: sandbox-apply-${{ env.ISSUE }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # TEMPORARY, Issue-231, removed before review: what decision 0046 rests on.
-      # Prints yes or no and no value.
-      - name: "Probe: can a step with its keys blanked still reach the apply role?"
-        env:
-          AWS_ACCESS_KEY_ID: ""
-          AWS_SECRET_ACCESS_KEY: ""
-          AWS_SESSION_TOKEN: ""
-        run: |
-          [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ] && echo "request token in a run step: yes" || echo "request token in a run step: no"
-          token="$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>process.stdout.write(JSON.parse(s).value))')"
-          echo "::add-mask::$token"
-          if env -u AWS_ACCESS_KEY_ID -u AWS_SECRET_ACCESS_KEY -u AWS_SESSION_TOKEN aws sts assume-role-with-web-identity --role-arn "arn:aws:iam::$ACCOUNT_ID:role/heat-sandbox-apply" --role-session-name probe-231 --web-identity-token "$token" --query 'length(Credentials.AccessKeyId)' --output text >/dev/null 2>&1; then
-            echo "assumed the apply role with the keys blanked: yes"
-          else
-            echo "assumed the apply role with the keys blanked: no"
-          fi
-
       - name: Refuse to exceed the cap on concurrent stacks
         run: node scripts/sandbox.mjs cap "$SANDBOX_STACK_CAP" --issue "$ISSUE"
 
