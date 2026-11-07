@@ -69,12 +69,12 @@ sequenceDiagram
 ```mermaid
 flowchart TB
   subgraph branch["A working branch"]
-    push["Push"] --> sandbox["Sandbox stacks: checks, bundle, the cap, plan, the allow-list, apply the branch's stack, publish the client, the stack test at its hostname, the browser test"]
+    push["Push"] --> sandbox["Sandbox stacks: checks and bundle with no role, the cap, plan, the allow-list, apply the branch's stack, publish the client, then with no role the stack test at its hostname and the browser test, then the cold start"]
     pr["Pull request to main"] --> ci["Build and test: typecheck, lint, tests, schema currency, bundle, Terraform format, validate, tflint and trivy"]
     pr --> devplan["Deploy: the dev plan under the plan role, posted on the pull request"]
   end
   subgraph mainb["main"]
-    merge["Merge to main"] --> dev["Deploy: plan, the allow-list, apply dev under the apply role, publish the client, the smoke test, the browser test"]
+    merge["Merge to main"] --> dev["Deploy: build with no role, plan, the allow-list, apply dev under the apply role, publish the client, then with no role the smoke test and the browser test, then the cold start"]
     rpr["Pull request main to release"] --> guard["Release: the source guard, the prod plan posted on the pull request"]
   end
   subgraph releaseb["release"]
@@ -127,7 +127,7 @@ Each item carries a status. **Decided** items are settled by the project owner. 
 - **Decided.** The engine advances on a clock its caller drives. The browser feeds it wall-clock time; the hub feeds it the next event, so verifying a ten-minute adventure takes milliseconds. No timer inside the engine waits for real time. Checked 2026-10-21 against BattleScript Online's engine before the port: its stepping reads no clock, and its one wall-clock read, a timestamp on the outcome, is dropped in the port.
 - **Working assumption.** Private causes, such as which facility granted a bonus, are resolved by the hub at start into the snapshot's effective numbers and are never recorded in the timeline.
 - **Working assumption.** The engine is one TypeScript package in this repository, used by both the Angular client and the hub.
-- **Decided.** The hub's cold start, measured on 2026-10-17 on the first sandbox stack (`heat-sb38`, Issue-38), the first request after the deploy: 627 ms of initialization, then 234 ms for the request itself; warm requests about 50 ms; 127 MB used of 1024; arm64; a 4.1 MB unminified bundle holding the SDK, Apollo, Pothos and Powertools, with tracing active. Acceptable for a game request, so nothing is bought: no provisioned concurrency. The levers if it grows: minify the bundle, leave the source map out of the zip, trim imports. Reported on every deploy in the run summary by the stack test, so the number is watched rather than remeasured.
+- **Decided.** The hub's cold start, measured on 2026-10-17 on the first sandbox stack (`heat-sb38`, Issue-38), the first request after the deploy: 627 ms of initialization, then 234 ms for the request itself; warm requests about 50 ms; 127 MB used of 1024; arm64; a 4.1 MB unminified bundle holding the SDK, Apollo, Pothos and Powertools, with tracing active. Acceptable for a game request, so nothing is bought: no provisioned concurrency. The levers if it grows: minify the bundle, leave the source map out of the zip, trim imports. Reported on every deploy in the run summary, from the function's log after the stack test, so the number is watched rather than remeasured.
 - **Built (Issue-201, decisions 0041 and 0042).** The repository, `packages/hub/src/db/repository.ts`, is the only caller of DynamoDB and is made of ElectroDB: nine entities in `db/entities.ts`, whose key templates are the `TEMPLATES` of `db/keys.ts`, the one statement of the layout. The tables were made whole by a backfill in the pipeline, removed by Issue-213.
 
 ## The adventure loop

@@ -6,7 +6,9 @@
 # deleted, and swept weekly in case a deletion was missed. Each stack's jobs
 # run under the GitHub environment sandbox-<issue>, which GitHub creates on
 # first reference and the sandbox apply role trusts by the pattern
-# sandbox-* (decision 0019). The stacks take no secret (decision 0020).
+# sandbox-* (decision 0019). The stacks take no environment secret (decision
+# 0020); the one repository secret, HEAT_E2E_HANDOVER_KEY, seals the test
+# user's password for the stack test's job and never enters AWS (decision 0046).
 #
 # Four triggers:
 #   push      checks, bundle and client build, cap, plan with the
