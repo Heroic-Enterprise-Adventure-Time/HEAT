@@ -23,7 +23,7 @@ runs:
       run: npm run bundle
 
     - name: Upload the bundles
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: bundles
         path: dist/
@@ -39,7 +39,7 @@ runs:
 
     - name: Upload the client
       if: inputs.client == 'true'
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: client
         path: packages/client/dist/client/browser/

@@ -1,6 +1,6 @@
 # 0046: Downloaded code runs in a job that holds no role, and a test user's password crosses to it sealed
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0047 on 2026-11-08: the deferral below is settled, and every action runs at the commit `.github/workflows/actions.lock` records.
 - **Date:** 2026-11-06
 - **Settles:** Issue-231, from the review of PR-230: `docs/process/best-practices.md`, rule 13, said a step that runs downloaded code holds no apply role's credentials, and asked for install and test steps to run before the role is assumed or with the keys removed.
 - **Amends:** 0020, "There are no repository secrets" and "the per-issue environments hold none": one repository secret, `HEAT_E2E_HANDOVER_KEY`, now reaches the per-issue stacks' jobs. 0045, "No role's credentials in the browser": the browser's job holds no role at all, so the keys are no longer blanked step by step in the workflow; and its "the workflow holds no secret", for the same repository secret.
@@ -19,7 +19,7 @@
 
 **What stays under a role.** Terraform and its providers, whose hashes the lock files pin, and the GitHub actions those jobs are built from, which have to run there. `prod`'s anonymous smoke test stays in its apply job, because it imports nothing downloaded and has no password to hand over.
 
-**Deferred: the actions are pinned by tag, not by commit.** GitHub's hardening guidance pins a third-party action to a full commit SHA. Every `uses:` here names a tag, so an action whose tag is moved upstream runs under the apply role with the environment's secrets, which is how the tj-actions compromise reached its victims. It is deferred to Issue-241 because it touches every workflow and is a change of its own; until then, what an action's maintainers publish under a tag is trusted as much as the role.
+**Deferred: the actions are pinned by tag, not by commit.** GitHub's hardening guidance pins a third-party action to a full commit SHA. Every `uses:` here names a tag, so an action whose tag is moved upstream runs under the apply role with the environment's secrets, which is how the tj-actions compromise reached its victims. It is deferred to Issue-241 because it touches every workflow and is a change of its own; until then, what an action's maintainers publish under a tag is trusted as much as the role. Settled by 0047: a workflow lockfile records the commit of every action, and of the actions they use.
 
 **A role's job treats an artifact as data.** It downloads only from its own run, into `dist/` or `client/`, which the checkout does not track, so nothing it unpacks can replace a script. Terraform zips and hashes the bundles and `scripts/publish-client.sh` copies the client to its bucket; nothing under a role executes either. This keeps a compromised package from the role, not from what ships: the bundle and the client are built from those packages, as they always were, so its code can still reach a Lambda function or the page, and that function runs under its own execution role.
 

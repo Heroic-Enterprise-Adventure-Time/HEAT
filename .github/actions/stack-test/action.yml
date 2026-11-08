@@ -37,7 +37,7 @@ runs:
         fi
 
     - name: Download what the apply job sealed
-      uses: actions/download-artifact@v8
+      uses: actions/download-artifact@v8.0.2
       with:
         name: stack-handover
         path: ${{ runner.temp }}/stack-handover
@@ -84,7 +84,7 @@ runs:
 
     # The browser test (decision 0045).
     - name: Use the page in a browser as that user
-      uses: ./.github/actions/browser-test
+      uses: $/.github/actions/browser-test
       with:
         stack: ${{ inputs.stack }}
         username: ${{ env.E2E_USERNAME }}

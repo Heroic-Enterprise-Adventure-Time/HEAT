@@ -4,8 +4,8 @@
 # it lint clean, do its tests pass, does the client build for production, is
 # the committed GraphQL schema current and the client's generated code with
 # it, does every function bundle, is every Terraform root formatted, valid
-# and clean under tflint and trivy, and does every workflow lint clean under
-# actionlint. It runs with no AWS
+# and clean under tflint and trivy, does every workflow lint clean under
+# actionlint, and does the actions lockfile cover it. It runs with no AWS
 # credentials; the integration tests start their own containers (decision
 # 0009) and the Terraform roots are initialised without a backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
@@ -34,10 +34,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -81,13 +81,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       # The latest release, on purpose: format and validate are stable across
       # releases, each root states its own floor in required_version, and the
       # owner's machine is expected to track the latest too (standards rule 1).
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_wrapper: false
 
@@ -111,7 +111,7 @@ jobs:
       # token is for downloading the AWS ruleset from GitHub without hitting
       # the anonymous rate limit (docs/standards/terraform.md, rule 17).
       - name: Set up tflint
-        uses: terraform-linters/setup-tflint@v6
+        uses: terraform-linters/setup-tflint@v6.3.2
         with:
           tflint_version: v0.65.0
 
@@ -168,9 +168,14 @@ jobs:
   workflows:
     name: Lint the workflows
     runs-on: ubuntu-latest
+    # It runs downloaded tools, so it states what it holds rather than
+    # inheriting the workflow's default (docs/process/best-practices.md,
+    # rule 13).
+    permissions:
+      contents: read
     steps:
       - name: Check out the repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       # actionlint, pinned, from its release archive, with the archive's build
       # attestation verified before it runs: the check its install document
@@ -194,3 +199,18 @@ jobs:
       - name: Lint every workflow
         run: |
           "$RUNNER_TEMP/actionlint" -color
+
+      # Every action the workflows use runs at the commit
+      # .github/workflows/actions.lock records (decision 0047). The extension
+      # is pinned to the release the lockfile was written with; --verify
+      # writes nothing and fails on a workflow or a `uses:` with no entry, or
+      # on a locked commit that is no longer reachable upstream.
+      - name: Set up gh-actions-lock
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh extension install github/gh-actions-lock --pin v0.4.1
+
+      - name: Verify the actions lockfile
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh actions-lock --verify

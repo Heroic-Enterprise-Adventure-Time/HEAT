@@ -47,7 +47,7 @@ runs:
 
     - name: Keep the encrypted trace as a run artifact
       if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@v7.0.2
       with:
         name: browser-trace
         path: ${{ runner.temp }}/browser-trace.tgz.cms
