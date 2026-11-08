@@ -1,6 +1,6 @@
 # TypeScript and Node
 
-Standards for every TypeScript package in this repository: the engine, the hub, the Angular client, the Lambda handlers, and the tooling around them. The client follows these where Angular's own conventions do not say otherwise; "The client" below says where they do.
+Standards for every TypeScript package in this repository: the engine, the hub (a Lambda function, decision 0012), the Angular client, and the tooling around them. The client follows these where Angular's own conventions do not say otherwise; "The client" below says where they do.
 
 ## Rules
 

@@ -46,7 +46,7 @@ These are part of the structure and are not written yet. Each is written when th
 2. **Rules first, reasons after.** A document opens with short rules that can be checked. The reasons follow in their own section.
 3. **One topic per file,** under about 200 lines. Longer files are followed less reliably.
 4. **Write a document when there is a decision to record,** not before. Do not write down what an agent would do anyway, or what it can read from the code.
-5. **Keep documents true.** A change in behavior and the document that describes it go in the same pull request. A rename of something a document quotes, a code, a type, a field, is followed by a search of every document and diagram for the old name, the root `README.md`, the Mermaid diagrams and the standards included, not only the files the change touches. From the review of PR-192 (Issue-155), where `ENGINE_UPDATED` survived in two diagrams and a standard while the entries around them were rewritten.
+5. **Keep documents true.** A change in behavior and the document that describes it go in the same pull request. A rename of something a document quotes, a code, a type, a field, is followed by a search of every document and diagram for the old name, the root `README.md`, the Mermaid diagrams and the standards included, not only the files the change touches. From the review of PR-192 (Issue-155), where `ENGINE_UPDATED` survived in two diagrams and a standard while the entries around them were rewritten. A loader (`AGENTS.md`, a standard's preamble) names what exists and does not count it or list it where another document is the list; a count or a list copied there is the next stale phrase. From the review of PR-243 (Issue-242), which fixed three such phrases and nearly wrote a fourth.
 6. **Say what is real.** Nothing is described as built, tested or enforced unless it is.
 7. **Mark the status of design items.** Each item in a design or architecture document is labeled Decided, Working assumption or Open. The labels are defined at the top of each of those documents.
 8. **Design and process documents say what is true now.** When a decision changes, edit the document and add a decision record. The record keeps what was rejected and the history; in the document, how a rule got there is one sentence pointing at the record. At the pauses that rule 9 of `process/best-practices.md` names, a checkpoint merged or a step of the build order begun, the documents are swept for history that has crept in, and it is moved to a record or cut.
@@ -66,7 +66,7 @@ Content that a person or another tool might need lives under `docs/`, in plain M
 ## How agents load these documents
 
 - `AGENTS.md` is the entry point. It imports the documents that every session needs, using `@path` references.
-- Each area of the repository will have its own `AGENTS.md` that imports the standards for that area. Those load only when an agent works on a file in that area.
+- Each area of the repository has its own `AGENTS.md` that imports the standards for that area (the index above names each). Those load only when an agent works on a file in that area.
 - Beside every `AGENTS.md` there is a `CLAUDE.md` containing only `@AGENTS.md`.
 
 The last rule has no exceptions. Claude Code reads `AGENTS.md` by itself only when no `CLAUDE.md` exists at or above the working directory, so one `CLAUDE.md` without a partner in another directory silently switches that directory's `AGENTS.md` off. Pairing them everywhere avoids that, and it also covers sessions that look for `CLAUDE.md` by name.
