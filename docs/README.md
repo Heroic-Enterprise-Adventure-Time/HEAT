@@ -66,7 +66,7 @@ Content that a person or another tool might need lives under `docs/`, in plain M
 ## How agents load these documents
 
 - `AGENTS.md` is the entry point. It imports the documents that every session needs, using `@path` references.
-- Each area of the repository will have its own `AGENTS.md` that imports the standards for that area. Those load only when an agent works on a file in that area.
+- Each area of the repository has its own `AGENTS.md` that imports the standards for that area (`packages/`, `packages/client/`, `packages/hub/`, `terraform/`). Those load only when an agent works on a file in that area.
 - Beside every `AGENTS.md` there is a `CLAUDE.md` containing only `@AGENTS.md`.
 
 The last rule has no exceptions. Claude Code reads `AGENTS.md` by itself only when no `CLAUDE.md` exists at or above the working directory, so one `CLAUDE.md` without a partner in another directory silently switches that directory's `AGENTS.md` off. Pairing them everywhere avoids that, and it also covers sessions that look for `CLAUDE.md` by name.

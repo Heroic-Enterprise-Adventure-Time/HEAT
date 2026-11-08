@@ -1,6 +1,6 @@
 # packages
 
-The TypeScript packages: the engine, the hub, the Angular client, and later the Lambda handlers. Each is an npm workspace with its own `package.json`, built, typechecked and tested from the repository root.
+The TypeScript packages: the engine, the hub (the one Lambda function, decision 0012) and the Angular client. Each is an npm workspace with its own `package.json`, built, typechecked and tested from the repository root.
 
 Read and follow the standards for this area: @../docs/standards/typescript.md
 
