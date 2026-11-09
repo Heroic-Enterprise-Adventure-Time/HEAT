@@ -103,6 +103,14 @@ jobs:
   # The functions for the plan, which hashes them, and on the merge the client
   # for the publish step after the apply. After whichever guard this event
   # ran, the other being skipped. No role, no environment and no secrets.
+  #
+  # Because one of the two guards is always skipped, every job after build has
+  # a skipped job among its ancestors. A job with no status function in its if
+  # gets GitHub's implicit success(), which a skipped ancestor fails even when
+  # the job's own needs succeeded: the first release after the job split
+  # (run 42697656391, PR-250) skipped "Plan prod" with guard and build both
+  # green. So plan, apply and tag each say which of their needs must have
+  # succeeded, beside !cancelled() (Issue-239).
   build:
     name: Bundle and build
     needs: [guard, guard-merge]
@@ -133,6 +141,7 @@ jobs:
   plan:
     name: Plan prod
     needs: [guard, build]
+    if: ${{ !cancelled() && needs.guard.result == 'success' && needs.build.result == 'success' }}
     runs-on: ubuntu-latest
     environment: prod
     permissions:
@@ -231,7 +240,7 @@ jobs:
     name: Apply prod
     # Stated as well as implied by guard-merge: on a push the build job's
     # artifacts come from the merge commit, never from a pull request's head.
-    if: github.event_name == 'push'
+    if: ${{ !cancelled() && github.event_name == 'push' && needs.guard-merge.result == 'success' && needs.build.result == 'success' }}
     needs: [guard-merge, build]
     runs-on: ubuntu-latest
     environment:
@@ -365,6 +374,7 @@ jobs:
   tag:
     name: Tag the release
     needs: apply
+    if: ${{ !cancelled() && needs.apply.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       # The tag and the Release. Events raised by this token start no
