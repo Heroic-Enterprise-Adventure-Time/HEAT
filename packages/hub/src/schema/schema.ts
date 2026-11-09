@@ -570,7 +570,7 @@ builder.queryFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description: "The signed-in player, or null before joinGame has made their profile.",
-    resolve: async (_root, _args, ctx) => (ctx.playerId ? ctx.repo.getPlayer(ctx.playerId) : undefined),
+    resolve: (_root, _args, ctx) => ctx.repo.getPlayer(callerId(ctx)),
   }),
   version: t.string({
     nullable: true,
@@ -586,7 +586,7 @@ builder.queryFields((t) => ({
     resolve: async (_root, args, ctx) => {
       const adventure = await ctx.repo.getAdventure(args.id);
       if (!adventure) return null;
-      return adventure.status === "SETTLED" || adventure.playerId === ctx.playerId ? adventure : null;
+      return adventure.status === "SETTLED" || adventure.playerId === callerId(ctx) ? adventure : null;
     },
   }),
   heroesSeenAt: t.field({
