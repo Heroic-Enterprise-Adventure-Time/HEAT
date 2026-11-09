@@ -140,6 +140,10 @@ describe('Job board', () => {
     const { user } = await renderJobs(fakeGame([...party, hero('h6', 'Rook', 'DEAD')]), WOLVES);
     expect(screen.queryByRole('checkbox', { name: 'Rook' })).not.toBeInTheDocument();
     expect(screen.getAllByRole('checkbox')).toHaveLength(5);
+    // The checkboxes are one labeled group, the Party heading's, described by the rule they follow.
+    const group = screen.getByRole('group', { name: 'Party' });
+    expect(group).toHaveAccessibleDescription('Pick one to 4 heroes.');
+    expect(within(group).getAllByRole('checkbox')).toHaveLength(5);
     expect(depart()).toBeDisabled();
 
     for (const name of ['Wren', 'Moss', 'Lark', 'Fen']) await user.click(box(name));
