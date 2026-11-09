@@ -161,10 +161,16 @@ describe('Adventure', () => {
     expect(textsOf(abilities('Wren').getAllByRole('button'))).toEqual(['Strike', 'Chop', 'Mine', 'Move up']);
     expect(textsOf(abilities('Wat').getAllByRole('button'))).toEqual(['Guard', 'Strike']);
     expect(abilities('Wren').getByRole('button', { name: 'Chop' })).toBeDisabled();
+    // The reason is beside the disabled buttons, and each hero's group is described by it.
+    const wait = 'On the road: abilities are for a fight or a gather.';
+    expect(screen.getByText(wait)).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Wren next action' })).toHaveAccessibleDescription(wait);
 
     await run(4100);
     expect(stage('Stage 2 of 4: Gather timber from 3 trees, up to 60')).toBeInTheDocument();
     expect(abilities('Wren').getByRole('button', { name: 'Chop' })).toBeEnabled();
+    expect(screen.queryByText(wait)).not.toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Wren next action' })).not.toHaveAccessibleDescription();
   });
 
   it("queues a forced action until the hero's turn uses it, and logs it then", async () => {

@@ -124,6 +124,12 @@ export class Adventure {
     const field = this.play.field();
     return !!field && field.outcome === null && field.timeLimitMs !== null;
   });
+  /** Why the ability buttons are disabled, shown beside them (angular.md, rule 14); null while they can be used. */
+  protected readonly abilitiesWait = computed(() => {
+    const field = this.play.field();
+    if (!field || this.inBattle()) return null;
+    return field.outcome === null ? 'On the road: abilities are for a fight or a gather.' : 'The adventure is over.';
+  });
 
   constructor() {
     effect(() => {

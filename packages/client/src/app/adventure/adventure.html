@@ -80,6 +80,9 @@
 
       <h3 id="party-title">Party</h3>
       @if (play.field(); as field) {
+        @if (abilitiesWait(); as wait) {
+          <p class="note" id="abilities-wait">{{ wait }}</p>
+        }
         <ul class="party" aria-labelledby="party-title">
           @for (hero of field.party; track hero.unitId) {
             <li [class.down]="hero.health <= 0">
@@ -90,7 +93,12 @@
               </div>
               <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="`${hero.name} health`"></meter>
               @if (hero.health > 0) {
-                <div class="abilities" role="group" [attr.aria-label]="`${hero.name} next action`">
+                <div
+                  class="abilities"
+                  role="group"
+                  [attr.aria-label]="`${hero.name} next action`"
+                  [attr.aria-describedby]="abilitiesWait() ? 'abilities-wait' : null"
+                >
                   @for (ability of abilities(hero.type); track ability.id) {
                     <button
                       type="button"
