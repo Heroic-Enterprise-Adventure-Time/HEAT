@@ -19,7 +19,7 @@
 
 **What stays under a role.** Terraform and its providers, whose hashes the lock files pin, and the GitHub actions those jobs are built from, which have to run there. `prod`'s anonymous smoke test stays in its apply job, because it imports nothing downloaded and has no password to hand over.
 
-**Deferred: the actions are pinned by tag, not by commit.** GitHub's hardening guidance pins a third-party action to a full commit SHA. Every `uses:` here names a tag, so an action whose tag is moved upstream runs under the apply role with the environment's secrets, which is how the tj-actions compromise reached its victims. It is deferred to Issue-241 because it touches every workflow and is a change of its own; until then, what an action's maintainers publish under a tag is trusted as much as the role. Settled by 0047: a workflow lockfile records the commit of every action, and of the actions they use.
+**Deferred: the actions are pinned by tag, not by commit.** GitHub's hardening guidance pins a third-party action to a full commit SHA. Every `uses:` here names a tag, so an action whose tag is moved upstream runs under the apply role with the environment's secrets, which is how the tj-actions compromise reached its victims. It is deferred to Issue-241 because it touches every workflow and is a change of its own; until then, what an action's maintainers publish under a tag is trusted as much as the role.
 
 **A role's job treats an artifact as data.** It downloads only from its own run, into `dist/` or `client/`, which the checkout does not track, so nothing it unpacks can replace a script. Terraform zips and hashes the bundles and `scripts/publish-client.sh` copies the client to its bucket; nothing under a role executes either. This keeps a compromised package from the role, not from what ships: the bundle and the client are built from those packages, as they always were, so its code can still reach a Lambda function or the page, and that function runs under its own execution role.
 
@@ -65,4 +65,4 @@
 
 ## Where it is described
 
-`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `terraform/environment/prod/README.md`; `.github/workflows/`; `.github/actions/stack-test`, `.github/actions/bundle` and `.github/actions/cold-start`; `scripts/stack-handover.sh`.
+`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `terraform/environment/prod/README.md`; `.github/workflows/`; `.github/actions/stack-test`, `.github/actions/bundle` and `.github/actions/cold-start`; `scripts/stack-handover.sh`. The actions' commits, the deferral above: decision 0047 and `.github/workflows/actions.lock`.

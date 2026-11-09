@@ -32,6 +32,10 @@ jobs:
   build-and-test:
     name: Build and test
     runs-on: ubuntu-latest
+    # Declared, not inherited: this job runs npm (docs/process/best-practices.md,
+    # rule 13).
+    permissions:
+      contents: read
     steps:
       - name: Check out the repository
         uses: actions/checkout@v7.0.1
@@ -79,6 +83,10 @@ jobs:
   terraform:
     name: Terraform format, validate, lint and scan
     runs-on: ubuntu-latest
+    # Declared, not inherited: this job runs tflint, its ruleset and trivy
+    # (docs/process/best-practices.md, rule 13).
+    permissions:
+      contents: read
     steps:
       - name: Check out the repository
         uses: actions/checkout@v7.0.1
@@ -110,10 +118,17 @@ jobs:
       # tflint, pinned, with the rulesets terraform/.tflint.hcl names; the
       # token is for downloading the AWS ruleset from GitHub without hitting
       # the anonymous rate limit (docs/standards/terraform.md, rule 17).
+      # The archive's checksum pins the build, not only its tag (rule 14 of
+      # docs/process/best-practices.md); it is the release's checksums.txt
+      # line for linux_amd64, a file whose build attestation was verified
+      # with `gh attestation verify --repo terraform-linters/tflint` when the
+      # version was taken (2026-11-08). The AWS ruleset is checked by tflint
+      # itself, which verifies a plugin's attestation by default.
       - name: Set up tflint
         uses: terraform-linters/setup-tflint@v6.3.2
         with:
           tflint_version: v0.65.0
+          checksums: d4c545ed2e29d6338604b586f34f544f380f70f243aa72f7b484713835eaec61
 
       - name: Lint every root and module
         run: |
@@ -168,9 +183,8 @@ jobs:
   workflows:
     name: Lint the workflows
     runs-on: ubuntu-latest
-    # It runs downloaded tools, so it states what it holds rather than
-    # inheriting the workflow's default (docs/process/best-practices.md,
-    # rule 13).
+    # Declared, not inherited: this job runs actionlint and gh-actions-lock
+    # (docs/process/best-practices.md, rule 13).
     permissions:
       contents: read
     steps:
@@ -202,15 +216,27 @@ jobs:
 
       # Every action the workflows use runs at the commit
       # .github/workflows/actions.lock records (decision 0047). The extension
-      # is pinned to the release the lockfile was written with; --verify
-      # writes nothing and fails on a workflow or a `uses:` with no entry, or
-      # on a locked commit that is no longer reachable upstream.
+      # is the release the lockfile was written with, taken as actionlint is
+      # above, from the release's binary with its build attestation verified
+      # before it runs (docs/process/best-practices.md, rule 14): `gh
+      # extension install --pin` takes only a tag for a binary extension,
+      # and a tag can move. The binary runs on its own, outside gh, reading
+      # GH_TOKEN; --verify writes nothing and fails on a workflow or a
+      # `uses:` with no entry, or on a locked commit that is no longer
+      # reachable upstream.
       - name: Set up gh-actions-lock
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh extension install github/gh-actions-lock --pin v0.4.1
+          ACTIONS_LOCK_VERSION: 0.4.1
+        run: |
+          set -eu
+          binary="$RUNNER_TEMP/gh-actions-lock"
+          gh release download "v$ACTIONS_LOCK_VERSION" --repo github/gh-actions-lock --pattern linux-amd64 --output "$binary"
+          gh attestation verify "$binary" --repo github/gh-actions-lock
+          chmod +x "$binary"
 
       - name: Verify the actions lockfile
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh actions-lock --verify
+        run: |
+          "$RUNNER_TEMP/gh-actions-lock" --verify

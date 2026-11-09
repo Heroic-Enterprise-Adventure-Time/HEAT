@@ -34,9 +34,12 @@ updates:
         update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
-    # The workflows, and the composite actions they share. An update to a
-    # locked workflow regenerates its entry in .github/workflows/actions.lock
-    # in the same pull request (decision 0047).
+    # The workflows, and the composite actions they share. GitHub documents
+    # that an update to a locked workflow regenerates its entries in
+    # .github/workflows/actions.lock in the same pull request (decision
+    # 0047). Whether an update to a composite action under .github/actions
+    # does too is not documented; "Build and test" refuses the pull request
+    # if it does not, and the lockfile is regenerated on its branch.
     directories:
       - /
       - /.github/actions/*
