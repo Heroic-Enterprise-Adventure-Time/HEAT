@@ -61,7 +61,8 @@ describe("a stalled SDK call", () => {
     ]);
     for (const { error, ms } of [dynamo, bucket]) {
       expect(error).toMatchObject({ name: "TimeoutError", $metadata: { attempts: 3 } });
-      expect(ms).toBeGreaterThanOrEqual(3 * requestHandler.requestTimeout);
+      // The backoff can be 0 ms and a timer can fire a millisecond early against performance.now().
+      expect(ms).toBeGreaterThanOrEqual(3 * requestHandler.requestTimeout - 50);
       expect(ms).toBeLessThan(BOUND_MS);
     }
   });
