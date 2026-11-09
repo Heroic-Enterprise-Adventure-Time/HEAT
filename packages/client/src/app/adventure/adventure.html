@@ -97,7 +97,7 @@
                   class="abilities"
                   role="group"
                   [attr.aria-label]="`${hero.name} next action`"
-                  [attr.aria-describedby]="abilitiesWait() ? 'abilities-wait' : null"
+                  [attr.aria-describedby]="abilitiesWaitId()"
                 >
                   @for (ability of abilities(hero.type); track ability.id) {
                     <button
