@@ -28,6 +28,7 @@ import { callerId } from "../context.js";
 import { type AdventureRecord, type Camp, campLevels, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "../db/statuses.js";
 import { discardAdventure } from "../discard.js";
+import { readAdventure } from "../read.js";
 import { recruitHero } from "../recruit.js";
 import {
   AdventureDiscarded,
@@ -583,11 +584,7 @@ builder.queryFields((t) => ({
     authScopes: { authenticated: true },
     description: "An adventure by id: any settled one, for its replay; an open or discarded one only for its own player. Null otherwise.",
     args: { id: t.arg.id({ required: true }) },
-    resolve: async (_root, args, ctx) => {
-      const adventure = await ctx.repo.getAdventure(args.id);
-      if (!adventure) return null;
-      return adventure.status === "SETTLED" || adventure.playerId === callerId(ctx) ? adventure : null;
-    },
+    resolve: (_root, args, ctx) => readAdventure(ctx.repo, callerId(ctx), args.id),
   }),
   heroesSeenAt: t.field({
     type: [SeenHeroRef],
