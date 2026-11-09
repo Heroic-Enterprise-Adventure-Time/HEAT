@@ -1,6 +1,6 @@
 # 0046: Downloaded code runs in a job that holds no role, and a test user's password crosses to it sealed
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0047 on 2026-11-08: the deferral below is settled, and every action runs at the commit `.github/workflows/actions.lock` records.
 - **Date:** 2026-11-06
 - **Settles:** Issue-231, from the review of PR-230: `docs/process/best-practices.md`, rule 13, said a step that runs downloaded code holds no apply role's credentials, and asked for install and test steps to run before the role is assumed or with the keys removed.
 - **Amends:** 0020, "There are no repository secrets" and "the per-issue environments hold none": one repository secret, `HEAT_E2E_HANDOVER_KEY`, now reaches the per-issue stacks' jobs. 0045, "No role's credentials in the browser": the browser's job holds no role at all, so the keys are no longer blanked step by step in the workflow; and its "the workflow holds no secret", for the same repository secret.
@@ -65,4 +65,4 @@
 
 ## Where it is described
 
-`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `terraform/environment/prod/README.md`; `.github/workflows/`; `.github/actions/stack-test`, `.github/actions/bundle` and `.github/actions/cold-start`; `scripts/stack-handover.sh`.
+`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `terraform/environment/prod/README.md`; `.github/workflows/`; `.github/actions/stack-test`, `.github/actions/bundle` and `.github/actions/cold-start`; `scripts/stack-handover.sh`. The actions' commits, the deferral above: decision 0047 and `.github/workflows/actions.lock`.

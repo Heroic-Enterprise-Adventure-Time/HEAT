@@ -120,10 +120,10 @@ jobs:
       name: ${{ steps.stack.outputs.name }}
     steps:
       - name: Check out the branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -150,7 +150,7 @@ jobs:
           git diff --exit-code -- packages/hub/schema.graphql
 
       - name: Bundle and build for the apply job
-        uses: ./.github/actions/bundle
+        uses: $/.github/actions/bundle
         with:
           client: "true"
 
@@ -189,32 +189,32 @@ jobs:
           [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out the branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_wrapper: false
 
       - name: Download the bundles
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           name: bundles
           path: dist/
 
       - name: Download the client
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           name: client
           path: client/
 
       - name: Assume the apply role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
           role-session-name: sandbox-apply-${{ env.ISSUE }}
@@ -294,7 +294,7 @@ jobs:
           sh scripts/stack-handover.sh seal "$RUNNER_TEMP/stack-handover/handover.env" "$site_url" "$client_id" "e2e-$ISSUE@heat-sb.dcg-games.com"
 
       - name: Keep the sealed handover for the stack test
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: stack-handover
           path: ${{ runner.temp }}/stack-handover/handover.env
@@ -316,17 +316,17 @@ jobs:
       site_url: ${{ steps.test.outputs.site_url }}
     steps:
       - name: Check out the branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
 
       - name: Test the stack, its API and its page
         id: test
-        uses: ./.github/actions/stack-test
+        uses: $/.github/actions/stack-test
         with:
           stack: ${{ needs.checks.outputs.name }}
           handover-key: ${{ secrets.HEAT_E2E_HANDOVER_KEY }}
@@ -350,10 +350,10 @@ jobs:
       ACCOUNT_ID: ${{ secrets.HEAT_SANDBOX_ACCOUNT_ID }}
     steps:
       - name: Check out the branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Report the cold start
-        uses: ./.github/actions/cold-start
+        uses: $/.github/actions/cold-start
         with:
           role-arn: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
           session-name: sandbox-cold-start-${{ needs.checks.outputs.issue }}
@@ -381,10 +381,10 @@ jobs:
       pull-requests: write
     steps:
       - name: Check out the branch
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
 
@@ -420,10 +420,10 @@ jobs:
       name: ${{ steps.stack.outputs.name }}
     steps:
       - name: Check out main
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -443,7 +443,7 @@ jobs:
         run: npm ci
 
       - name: Bundle for the destroy job
-        uses: ./.github/actions/bundle
+        uses: $/.github/actions/bundle
 
   destroy:
     name: Destroy the deleted branch's stack
@@ -481,26 +481,26 @@ jobs:
       # The branch itself is gone; main's copy of the root destroys from the
       # state key.
       - name: Check out main
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_wrapper: false
 
       - name: Download the bundles
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           name: bundles
           path: dist/
 
       - name: Assume the apply role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
           role-session-name: sandbox-destroy-${{ env.ISSUE }}
@@ -527,10 +527,10 @@ jobs:
       contents: read
     steps:
       - name: Check out main
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
           cache: npm
@@ -539,7 +539,7 @@ jobs:
         run: npm ci
 
       - name: Bundle for the sweep
-        uses: ./.github/actions/bundle
+        uses: $/.github/actions/bundle
 
   sweep:
     name: Sweep orphaned stacks
@@ -576,20 +576,20 @@ jobs:
           [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_SANDBOX_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out main
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_wrapper: false
 
       - name: Assume the apply role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
           role-session-name: sandbox-sweep
@@ -609,7 +609,7 @@ jobs:
 
       - name: Download the bundles, because the root evaluates the bundle's hash even to destroy
         if: steps.orphans.outputs.orphans != '' && env.DRY_RUN != 'true'
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           name: bundles
           path: dist/
