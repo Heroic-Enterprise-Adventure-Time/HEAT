@@ -1,0 +1,55 @@
+# The browser test (decision 0045): the page as a player meets it. Called by
+# .github/actions/stack-test, in its job with no role. Expects the repository
+# checked out and installed, the engine built, and E2E_PASSWORD, E2E_SITE_URL
+# and E2E_CI_CLIENT_ID in the environment.
+name: Browser test
+description: Uses the stack's page in headless Chromium, and keeps a failed run's trace encrypted.
+
+inputs:
+  stack:
+    description: The stack under test, named as its parameters are, heat-sb<issue> or heat-dev
+    required: true
+  username:
+    description: The test user's email address
+    required: true
+
+runs:
+  using: composite
+  steps:
+    # Installed on every run, not cached: Playwright's CI page, read
+    # 2026-11-04, says "Caching browser binaries is not recommended", because a
+    # restore takes about as long as a download and Linux's OS dependencies
+    # cannot be cached.
+    - name: Install Chromium for the browser test
+      shell: bash
+      run: npx playwright install --with-deps chromium
+
+    - name: Use the page in a browser as that user
+      id: browser
+      shell: bash
+      env:
+        FORCE_COLOR: "0"
+        STACK_NAME: ${{ inputs.stack }}
+        USERNAME: ${{ inputs.username }}
+      run: node scripts/browser-test.mjs --stack "$STACK_NAME" --username "$USERNAME" | tee -a "$RUNNER_TEMP/browser.log"
+
+    - name: Put the browser test's log on the run's page
+      if: ${{ !cancelled() && (steps.browser.outcome == 'success' || steps.browser.outcome == 'failure') }}
+      shell: bash
+      run: sh scripts/report-browser-test.sh "$RUNNER_TEMP/browser.log" "${{ steps.browser.outcome }}" packages/client/test-results
+
+    # Encrypted before it leaves the runner: a trace holds the test user's
+    # password and tokens, and a public repository's artifacts are public.
+    - name: Encrypt the browser test's trace
+      if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
+      shell: bash
+      run: sh scripts/seal-browser-trace.sh packages/client/test-results "$RUNNER_TEMP/browser-trace.tgz.cms"
+
+    - name: Keep the encrypted trace as a run artifact
+      if: ${{ !cancelled() && steps.browser.outcome == 'failure' }}
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: browser-trace
+        path: ${{ runner.temp }}/browser-trace.tgz.cms
+        if-no-files-found: ignore
+        retention-days: 7

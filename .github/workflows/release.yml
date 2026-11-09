@@ -36,6 +36,13 @@
 # The release ruleset lets only a pull request change release, so a push
 # here is always a merge. The hotfix lifecycle, how a hotfix reaches main,
 # is settled when the first one is needed (decision 0021).
+#
+# A job that runs downloaded code holds no role and no environment's secrets,
+# because a step cannot give up what its job holds
+# (docs/process/best-practices.md, rule 13; decision 0046): npm and what it
+# installs run in the build job, after the guard, and the plan and apply jobs
+# run only Terraform, this repository's scripts and the AWS CLI. The anonymous
+# smoke test stays under the role, because it imports nothing downloaded.
 name: Release
 
 on:
@@ -59,31 +66,43 @@ defaults:
     shell: bash
 
 jobs:
-  # -------------------------------------------------------- pull request --
+  # ---------------------------------------------------------------- guard --
+  # One job for both events, its steps chosen by the event, so that no job
+  # after it has a skipped ancestor. A job with no status function in its if
+  # gets GitHub's implicit success(), which a skipped ancestor fails even when
+  # the job's own needs succeeded: with a guard per event, the first release
+  # after the job split (run 42697656391, PR-250) skipped "Plan prod" with
+  # both of its needs green (Issue-239). The release ruleset requires this
+  # job's name on the pull request.
   guard:
     name: Release source
-    # Only pull requests from this repository, and not Dependabot's.
+    # Every push, which is always a merge; only pull requests from this
+    # repository, and not Dependabot's.
     if: >-
-      github.event_name == 'pull_request_target'
-      && github.event.pull_request.head.repo.full_name == github.repository
-      && github.actor != 'dependabot[bot]'
+      github.event_name == 'push'
+      || (github.event_name == 'pull_request_target'
+          && github.event.pull_request.head.repo.full_name == github.repository
+          && github.actor != 'dependabot[bot]')
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # The push check asks GitHub which pull request the merge came from.
+      pull-requests: read
     steps:
-      # The default branch's copy, which is the ref a pull_request_target run
-      # carries and the one this workflow file itself comes from, so the
-      # script is the workflow's companion; the whole history, for the merge
-      # base. Not release's copy: on the first release (Issue-64) release
-      # predated the script, and on any later one its copy could lag main's
-      # workflow. The pull request's head is fetched by its sha, so nothing
-      # from it is executed.
-      - name: Check out main with its history
-        uses: actions/checkout@v7
+      # The run's own ref. On a pull request that is the default branch's
+      # copy, the one this workflow file itself comes from, so the script is
+      # the workflow's companion; the whole history, for the merge base. Not
+      # release's copy: on the first release (Issue-64) release predated the
+      # script, and on any later one its copy could lag main's workflow. The
+      # pull request's head is fetched by its sha, so nothing from it is
+      # executed. On a push it is the merge commit on release.
+      - name: Check out the run's ref with its history
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 
       - name: Check the pull request's source
+        if: github.event_name == 'pull_request_target'
         env:
           HEAD_REF: ${{ github.event.pull_request.head.ref }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
@@ -92,9 +111,48 @@ jobs:
           git fetch --no-tags origin release "$HEAD_SHA"
           sh scripts/check-release-source.sh pull-request "$HEAD_REF" "$HEAD_SHA"
 
+      # The pull request's own check has no hold over a push.
+      - name: Check which pull request the merge commit came from
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: sh scripts/check-release-source.sh push "$GITHUB_SHA"
+
+  # ---------------------------------------------------------------- build --
+  # The functions for the plan, which hashes them, and on the merge the client
+  # for the publish step after the apply. No role, no environment and no
+  # secrets.
+  build:
+    name: Bundle and build
+    needs: guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out what this run plans
+        uses: actions/checkout@v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up Node from .node-version
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Install exactly what package-lock.json records
+        run: npm ci
+
+      - name: Bundle, and on the merge build the client
+        uses: $/.github/actions/bundle
+        with:
+          client: ${{ github.event_name == 'push' }}
+
+  # -------------------------------------------------------- pull request --
   plan:
     name: Plan prod
-    needs: guard
+    if: github.event_name == 'pull_request_target'
+    needs: build
     runs-on: ubuntu-latest
     environment: prod
     permissions:
@@ -125,31 +183,30 @@ jobs:
           [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out the pull request's head
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_wrapper: false
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: npm
 
       # The root zips dist/<name>/ and plans the function from its hash
       # (decision 0017), so the bundle exists before the plan.
-      - name: Install and bundle the functions
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
+      - name: Download the bundles
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: bundles
+          path: dist/
 
       - name: Assume the plan role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-prod-plan
           role-session-name: release-plan-prod
@@ -174,25 +231,12 @@ jobs:
         run: sh scripts/post-terraform-plan.sh "$ROOT" "$RUNNER_TEMP/plan.tfplan" "${{ github.event.pull_request.head.sha }}" "plan role" "${{ github.event.pull_request.number }}"
 
   # ---------------------------------------------------------------- push --
-  guard-merge:
-    name: Release source of the merge
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Check out release
-        uses: actions/checkout@v7
-
-      - name: Check which pull request the merge commit came from
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: sh scripts/check-release-source.sh push "$GITHUB_SHA"
-
   apply:
     name: Apply prod
-    needs: guard-merge
+    # On a push the build job's artifacts come from the merge commit, never
+    # from a pull request's head.
+    if: github.event_name == 'push'
+    needs: build
     runs-on: ubuntu-latest
     environment:
       name: prod
@@ -224,31 +268,32 @@ jobs:
           [ -n "$ACCOUNT_ID" ] || { echo "The repository secret HEAT_PROD_ACCOUNT_ID is not set." >&2; exit 1; }
 
       - name: Check out release
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4
+        uses: hashicorp/setup-terraform@v4.0.1
         with:
           terraform_wrapper: false
 
       - name: Set up Node from .node-version
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: .node-version
-          cache: npm
 
-      # The functions for the plan, which hashes them, and the client for
-      # the publish step after the apply. No engine: the anonymous smoke test
-      # compares nothing with it.
-      - name: Install, bundle the functions and build the client
-        run: |
-          set -eu
-          npm ci
-          npm run bundle
-          npm run build --workspace @heat/client
+      - name: Download the bundles
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: bundles
+          path: dist/
+
+      - name: Download the client
+        uses: actions/download-artifact@v8.0.2
+        with:
+          name: client
+          path: client/
 
       - name: Assume the apply role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-prod-apply
           role-session-name: release-apply-prod
@@ -282,7 +327,7 @@ jobs:
         run: |
           set -eu
           out() { terraform -chdir="terraform/environment/$ROOT" output -raw "$1"; }
-          sh scripts/publish-client.sh "$(out client_bucket)" packages/client/dist/client/browser "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
+          sh scripts/publish-client.sh "$(out client_bucket)" client "/graphql" "$(out user_pool_id)" "$(out browser_client_id)" "$(out login_host)" "$(out password_sign_in)" "$(out app_version)"
 
       - name: Write the environment's URL to the job summary
         id: summary
@@ -332,7 +377,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Check out release with its tags
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
 

@@ -149,6 +149,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   await app.init({ width: 320, height: 180, background: '#4f7f2a', antialias: false, resolution: 1, roundPixels: true });
   app.canvas.style.imageRendering = 'pixelated';
   app.canvas.style.display = 'block';
+  app.canvas.setAttribute('role', 'img');
+  app.canvas.setAttribute('aria-label', 'The battle');
   host.appendChild(app.canvas);
 
   const tileset = (await (await fetch('/art/ground/meadow-01/tileset.json')).json()) as TilesetJson;

@@ -3,15 +3,15 @@
   <h2 id="panel-title">{{ job.name }}</h2>
   <p>{{ job.description }}</p>
 
-  <h3>Stages</h3>
-  <ol class="stages">
+  <h3 id="stages-title">Stages</h3>
+  <ol class="stages" aria-labelledby="stages-title">
     @for (stage of job.stages; track $index) {
       <li>{{ words(stage) }}</li>
     }
   </ol>
 
-  <h3>Reward</h3>
-  <ul class="credits">
+  <h3 id="reward-title">Reward</h3>
+  <ul class="credits" aria-labelledby="reward-title">
     @for (credit of reward(); track credit.material) {
       <li>
         {{ credit.words }}. {{ game.camp()?.name }} holds {{ credit.balance }}, with room for {{ credit.room }} more.
@@ -21,7 +21,7 @@
   </ul>
   <p class="retreat">{{ retreat() }}</p>
 
-  <h3>Party</h3>
+  <h3 id="party-title">Party</h3>
   @if (!game.player()) {
     <p>Loading…</p>
   } @else if (game.adventure(); as adventure) {
@@ -33,7 +33,7 @@
     </p>
   } @else {
     <p>Pick one to {{ maxParty }} heroes.</p>
-    <ul class="party">
+    <ul class="party" aria-labelledby="party-title">
       @for (hero of game.livingHere(); track hero.id) {
         <li>
           <label>

@@ -1,0 +1,47 @@
+# The functions' bundles and, when asked, the client's production build,
+# uploaded for a job under a role to download. One copy for sandbox.yml,
+# deploy.yml and release.yml, because the last two run only after a merge and
+# a drifted copy would show first on dev or prod; sandbox.yml's checks job
+# runs it on every push. It runs downloaded code, so it runs in a job with no
+# role and no id-token permission (docs/process/best-practices.md, rule 13;
+# decision 0046). Expects the repository checked out, Node set up and npm ci
+# run.
+name: Bundle
+description: Bundles the functions and, when asked, builds the client, and uploads both as artifacts.
+
+inputs:
+  client:
+    description: "'true' to build and upload the client as well as the bundles"
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - name: Bundle every function for Lambda
+      shell: bash
+      run: npm run bundle
+
+    - name: Upload the bundles
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: bundles
+        path: dist/
+        if-no-files-found: error
+        retention-days: 1
+
+    # What the stack's bucket serves (Issue-39); one build serves any stack,
+    # because config.json is written beside it at publish time.
+    - name: Build the client for production
+      if: inputs.client == 'true'
+      shell: bash
+      run: npm run build --workspace @heat/client
+
+    - name: Upload the client
+      if: inputs.client == 'true'
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: client
+        path: packages/client/dist/client/browser/
+        if-no-files-found: error
+        retention-days: 1

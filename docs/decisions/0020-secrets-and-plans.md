@@ -1,6 +1,6 @@
 # 0020: Secrets live in GitHub environments, enter AWS through a base root, and pull request plans run under the target environment
 
-- **Status:** Decided
+- **Status:** Decided. Amended by 0035 on 2026-11-02: the account ids are repository secrets, so "There are no repository secrets" below now holds for every other secret, none of which is a repository's. The repository went public on 2026-11-02 (Issue-178), so outside pull requests can now be opened: the plan job refuses heads from other repositories, as "The residual risk" below requires (`.github/workflows/deploy.yml`). Amended by 0046 on 2026-11-06: one repository secret, `HEAT_E2E_HANDOVER_KEY`, reaches the per-issue stacks' jobs, carrying a test user's password between two jobs of a run.
 - **Date:** 2026-10-17
 - **Amends:** 0008, "the state holds no secrets by design": the base roots' state holds the Cognito secrets. 0017, the plan job's identity: a pull request's plan of a permanent root runs under that root's GitHub environment, and the plan roles trust that subject beside `pull_request`. 0019, the sandbox plan role's carve-out for user-pool records: test users are not Terraform's, so the carve-out closes.
 

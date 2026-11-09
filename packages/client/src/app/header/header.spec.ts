@@ -1,9 +1,12 @@
 import { signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { render, screen } from '@testing-library/angular/zoneless';
+import userEvent from '@testing-library/user-event';
 
 import { Game, type PlayerView } from '../game';
 import { Session, type SessionUser } from '../session';
+import { fakeSession, PLAYER } from '../testing/fake-session';
+import { textsOf } from '../testing/texts-of';
 import { Header } from './header';
 
 const player: PlayerView = {
@@ -25,51 +28,35 @@ const player: PlayerView = {
   },
 };
 
-async function render(user: SessionUser | null, loaded: PlayerView | null) {
-  const session = {
-    user: signal(user),
-    signInLabel: 'Sign in with Google',
-    signedIn: 0,
-    signedOut: 0,
-    signIn: () => {
-      session.signedIn++;
-      return Promise.resolve();
-    },
-    signOut: () => {
-      session.signedOut++;
-      return Promise.resolve();
-    },
-  };
+async function renderHeader(signedIn: SessionUser | null, loaded: PlayerView | null) {
+  const session = fakeSession(signedIn);
   const game = { player: signal(loaded), location: signal('millbrook') };
-  await TestBed.configureTestingModule({
-    imports: [Header],
+  const user = userEvent.setup();
+  await render(Header, {
     providers: [
       provideRouter([]),
       { provide: Session, useValue: session },
       { provide: Game, useValue: game },
     ],
-  }).compileComponents();
-  const fixture = TestBed.createComponent(Header);
-  await fixture.whenStable();
-  return { session, page: fixture.nativeElement as HTMLElement };
+  });
+  return { session, user };
 }
 
 describe('Header', () => {
   it('shows the title and Google sign-in to a visitor', async () => {
-    const { session, page } = await render(null, null);
-    expect(page.querySelector('.title')?.textContent).toBe('HEAT');
-    expect(page.querySelector('select')).toBeNull();
-    page.querySelector('button')?.click();
+    const { session, user } = await renderHeader(null, null);
+    expect(screen.getByText('HEAT')).toBeInTheDocument();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sign in with Google' }));
     expect(session.signedIn).toBe(1);
   });
 
   it('shows a signed-in player their camps, a link to the open adventure and sign-out', async () => {
-    const { session, page } = await render({ email: 'player@example.com', name: null, accessToken: 't' }, player);
-    expect([...page.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['Millbrook']);
-    expect(page.querySelector('.adventure')?.textContent).toBe('Adventure in progress');
-    expect(page.querySelector('.adventure')?.getAttribute('href')).toBe('/adventure');
-    expect(page.querySelector('.who')?.textContent).toBe('player@example.com');
-    page.querySelector('button')?.click();
+    const { session, user } = await renderHeader(PLAYER, player);
+    expect(textsOf(screen.getAllByRole('option'))).toEqual(['Millbrook']);
+    expect(screen.getByRole('link', { name: 'Adventure in progress' })).toHaveAttribute('href', '/adventure');
+    expect(screen.getByText('player@example.com')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(session.signedOut).toBe(1);
   });
 });

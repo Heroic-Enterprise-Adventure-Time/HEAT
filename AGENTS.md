@@ -2,7 +2,7 @@
 
 HEAT (Heroic Enterprise Adventure Time) is a browser game about running an adventuring business, built as a technical showcase. The game is deliberately simple. The interest is in the data services behind it and the pipeline that delivers them.
 
-The design is under `docs/design/` and `docs/architecture/`. Application code is under `packages/`, one npm workspace per package, with its standards in `docs/standards/typescript.md`; what exists today is what `docs/architecture/overview.md` marks built. Generated art is under `art/`, each set with its provenance. Infrastructure is under `terraform/`, one stack per directory, each with a README that says what it manages and whether it is applied. Nothing runs the system on a laptop: a branch's sandbox stack is the system, and the laptop runs the fast loop (`docs/process/development.md`).
+The design is under `docs/design/` and `docs/architecture/`. Application code is under `packages/`, one npm workspace per package, with its standards under `docs/standards/` (`typescript.md` for every package, `angular.md` for the client, `graphql.md` for the hub), each loaded by its area's `AGENTS.md`; what exists today is what `docs/architecture/overview.md` marks built. Generated art is under `art/`, each set with its provenance. Infrastructure is under `terraform/`, one stack per directory, each with a README that says what it manages and whether it is applied, with its standards in `docs/standards/terraform.md`, loaded by that area's `AGENTS.md`. Nothing runs the system on a laptop: a branch's sandbox stack is the system, and the laptop runs the fast loop (`docs/process/development.md`).
 
 ## How to work here
 

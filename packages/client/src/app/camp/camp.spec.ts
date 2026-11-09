@@ -1,7 +1,5 @@
 import { computed, signal } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
-import { provideRouter, Router } from '@angular/router';
-import { RouterTestingHarness } from '@angular/router/testing';
+import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
 import { type FacilityKind, must } from '@heat/engine';
 
@@ -9,9 +7,12 @@ import { routes } from '../app.routes';
 import { type CampView, Game, type HeroView, type RecruitOffer, type SeenHeroView, upgradeOffer } from '../game';
 import { Refusal } from '../hub';
 import { Session } from '../session';
-import { TEST_LAYOUT_SIZES } from '../testing/layout-sizes';
+import { fakeSession, PLAYER } from '../testing/fake-session';
+import { testLayoutSizes } from '../testing/layout-sizes';
+import { itemHolding, listItems, menu, panel, panelBox } from '../testing/page';
+import { renderAt } from '../testing/render-at';
+import { textsOf } from '../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from './camp';
-import { LAYOUT_SIZES } from './layout-sizes';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
 
 const wren: HeroView = {
@@ -128,289 +129,274 @@ function fakeScene() {
   return scene;
 }
 
-async function render(game: ReturnType<typeof fakeGame>, url = '/camp/millbrook') {
+async function renderCamp(game: ReturnType<typeof fakeGame>, url = '/camp/millbrook') {
   const scene = fakeScene();
-  TestBed.configureTestingModule({
-    providers: [
-      provideRouter(routes),
-      { provide: Game, useValue: game },
-      { provide: Session, useValue: { user: signal({ email: 'player@example.com', name: null, accessToken: 't' }) } },
-      { provide: CAMP_SCENE_FACTORY, useValue: scene.factory },
-      { provide: LAYOUT_SIZES, useValue: () => TEST_LAYOUT_SIZES },
-    ],
-  });
-  const harness = await RouterTestingHarness.create(url);
-  await vi.waitFor(() => { expect(scene.callbacks).not.toBeNull(); });
-  const router = TestBed.inject(Router);
-  const settle = async () => {
-    harness.detectChanges();
-    await harness.fixture.whenStable();
-  };
-  return { harness, router, scene, settle, page: harness.routeNativeElement as HTMLElement };
+  const { router, user } = await renderAt(url, routes, [
+    { provide: Game, useValue: game },
+    { provide: Session, useValue: fakeSession(PLAYER) },
+    { provide: CAMP_SCENE_FACTORY, useValue: scene.factory },
+    testLayoutSizes,
+  ]);
+  await waitFor(() => { expect(scene.callbacks).not.toBeNull(); });
+  return { router, scene, user };
 }
 
-const current = (page: HTMLElement) => page.querySelector('nav.menu a[aria-current="page"]')?.textContent.trim();
+const marked = (name: string) => menu().getByRole('link', { name, current: 'page' });
+const backTo = (name: string) => panel().getByRole('link', { name: `← ${name}` });
+/** The entry of the hall's recruit list that offers a unit type. */
+const recruit = (unitType: string) => within(itemHolding('Recruit', 'button', `Recruit a ${unitType}`));
+const recruitButton = (unitType: string) => recruit(unitType).getByRole('button');
+const section = (name: string) => screen.getByRole('region', { name });
 
 describe('Camp', () => {
   it('shows the heroes hall at the camp itself, recruits the free villager and sends it walking in from the hall', async () => {
     const game = fakeGame([]);
-    const { router, scene, settle, page } = await render(game);
+    const { router, scene, user } = await renderCamp(game);
     expect(router.url).toBe('/camp/millbrook/heroes-hall');
-    expect(page.querySelector('aside h2')?.textContent).toBe('Heroes hall');
-    expect(page.textContent).toContain('No living heroes.');
-    expect(page.querySelector('.recruits li')?.textContent).toContain('free');
+    expect(panel().getByRole('heading', { name: 'Heroes hall', level: 2 })).toBeInTheDocument();
+    expect(panel().getByText('No living heroes.')).toBeInTheDocument();
+    expect(recruit('villager').getByText('free')).toBeInTheDocument();
 
-    must([...page.querySelectorAll('button')].find((b) => b.textContent.includes('Recruit a villager')), 'the recruit button').click();
-    await vi.waitFor(() => { expect(game.recruited).toEqual(['villager']); });
-    await settle();
-    expect(scene.shown.at(-1)).toEqual({ heroes: [{ id: 'h1', spriteSet: 'villager-01' }], arriving: 'h1' });
-    expect(page.querySelector('.roster')?.textContent).toContain('Wren');
-    expect(page.querySelector('.recruits li')?.textContent).toContain('20 timber, you have 60');
+    await user.click(recruitButton('villager'));
+    expect(await panel().findByRole('link', { name: 'Wren' })).toBeInTheDocument();
+    expect(game.recruited).toEqual(['villager']);
+    await waitFor(() => { expect(scene.shown.at(-1)).toEqual({ heroes: [{ id: 'h1', spriteSet: 'villager-01' }], arriving: 'h1' }); });
+    expect(recruit('villager').getByText('20 timber, you have 60')).toBeInTheDocument();
   });
 
   it("shows each recruit's price beside the camp's balance, and why one cannot be had", async () => {
-    const { page } = await render(fakeGame([wren]));
-    const [villager, fighter] = [...page.querySelectorAll('.recruits li')];
-    expect(villager?.textContent).toContain('Recruit a villager');
-    expect(villager?.textContent).toContain('20 timber, you have 60');
-    expect(villager?.querySelector('button')?.disabled).toBe(false);
-    expect(fighter?.textContent).toContain('40 ore, you have 0');
-    expect(fighter?.querySelector('.note')?.textContent).toBe('Not enough ore.');
-    expect(fighter?.querySelector('button')?.disabled).toBe(true);
+    await renderCamp(fakeGame([wren]));
+    expect(recruit('villager').getByText('20 timber, you have 60')).toBeInTheDocument();
+    expect(recruitButton('villager')).toBeEnabled();
+    expect(recruit('fighter').getByText('40 ore, you have 0')).toBeInTheDocument();
+    expect(recruit('fighter').getByText('Not enough ore.')).toBeInTheDocument();
+    expect(recruitButton('fighter')).toBeDisabled();
   });
 
   it("recruits a paid villager, and shows the hub's refusal in place on the recruit it refused", async () => {
     const game = fakeGame([wren]);
-    const { settle, page } = await render(game);
-    const button = () => page.querySelector('.recruits li button') as HTMLButtonElement;
-    button().click();
-    await vi.waitFor(() => { expect(game.recruited).toEqual(['villager']); });
-    await settle();
-    expect(page.querySelector('.roster.living')?.textContent).toContain('Linnet');
+    const { user } = await renderCamp(game);
+    await user.click(recruitButton('villager'));
+    expect(await within(panel().getByRole('list', { name: 'Living' })).findByRole('link', { name: 'Linnet' })).toBeInTheDocument();
+    expect(game.recruited).toEqual(['villager']);
 
     game.refuse = new Refusal('HallFull', 'the heroes hall is full');
-    button().click();
-    await vi.waitFor(() => { expect(game.recruited).toHaveLength(2); });
-    await settle();
-    const [villager, fighter] = [...page.querySelectorAll('.recruits li')];
-    expect(villager?.querySelector('.refusal')?.textContent).toBe('The hall is full.');
-    expect(fighter?.querySelector('.refusal')).toBeNull();
+    await waitFor(() => { expect(recruitButton('villager')).toBeEnabled(); });
+    await user.click(recruitButton('villager'));
+    expect(await recruit('villager').findByText('The hall is full.')).toHaveRole('alert');
+    expect(game.recruited).toHaveLength(2);
+    expect(recruit('fighter').queryByRole('alert')).not.toBeInTheDocument();
   });
 
   it('groups the roster into the living and the dead', async () => {
     const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
-    const { page } = await render(fakeGame([wren, dead]));
-    expect([...page.querySelectorAll('aside h3')].map((h) => h.textContent)).toEqual(['Living', 'Dead', 'Recruit', 'Upgrade to level 2']);
-    expect(page.querySelector('.roster.living')?.textContent).toContain('Wren');
-    expect(page.querySelector('.roster.living')?.textContent).not.toContain('Hob');
-    expect(page.querySelector('.roster.dead')?.textContent).toContain('Hob');
+    await renderCamp(fakeGame([wren, dead]));
+    expect(textsOf(panel().getAllByRole('heading', { level: 3 }))).toEqual(['Living', 'Dead', 'Recruit', 'Upgrade to level 2']);
+    const living = within(panel().getByRole('list', { name: 'Living' }));
+    expect(living.getByRole('link', { name: 'Wren' })).toBeInTheDocument();
+    expect(living.queryByRole('link', { name: 'Hob' })).not.toBeInTheDocument();
+    expect(within(panel().getByRole('list', { name: 'Dead' })).getByRole('link', { name: 'Hob' })).toBeInTheDocument();
   });
 
   it('opens a facility clicked in the scene at its path', async () => {
-    const { router, scene, settle, page } = await render(fakeGame([]));
+    const { router, scene } = await renderCamp(fakeGame([]));
     must(scene.callbacks, 'the scene callbacks').onFacility('job-board');
-    await vi.waitFor(() => { expect(router.url).toBe('/camp/millbrook/job-board'); });
-    await settle();
-    expect(page.querySelector('aside h2')?.textContent).toBe('Job board');
-    expect(current(page)).toBe('Job board');
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook/job-board'); });
+    expect(await panel().findByRole('heading', { name: 'Job board', level: 2 })).toBeInTheDocument();
+    expect(marked('Job board')).toBeInTheDocument();
   });
 
   it('shows a hero card under the hall, keeping the hall marked in the menu', async () => {
-    const { router, scene, settle, page } = await render(fakeGame([wren]));
+    const { router, scene } = await renderCamp(fakeGame([wren]));
     must(scene.callbacks, 'the scene callbacks').onHero('h1');
-    await vi.waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall/heroes/h1'); });
-    await settle();
-    expect(page.querySelector('aside h2')?.textContent).toBe('Wren');
-    expect(page.querySelector('dl')?.textContent).toContain('villager');
-    expect(current(page)).toBe('Heroes hall');
-    expect(page.querySelector('aside .back')?.getAttribute('href')).toBe('/camp/millbrook/heroes-hall');
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall/heroes/h1'); });
+    expect(await panel().findByRole('heading', { name: 'Wren', level: 2 })).toBeInTheDocument();
+    expect(panel().getByText('villager')).toBeInTheDocument();
+    expect(marked('Heroes hall')).toBeInTheDocument();
+    expect(backTo('Heroes hall')).toHaveAttribute('href', '/camp/millbrook/heroes-hall');
   });
 
   it('links each roster entry to its card', async () => {
-    const { page } = await render(fakeGame([wren]));
-    expect(page.querySelector('.roster a')?.getAttribute('href')).toBe('/camp/millbrook/heroes-hall/heroes/h1');
+    await renderCamp(fakeGame([wren]));
+    expect(panel().getByRole('link', { name: 'Wren' })).toHaveAttribute('href', '/camp/millbrook/heroes-hall/heroes/h1');
   });
 
   it('walks only the living heroes about the camp', async () => {
     const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
-    const { scene } = await render(fakeGame([wren, dead]));
-    expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h1']);
+    const { scene } = await renderCamp(fakeGame([wren, dead]));
+    await waitFor(() => { expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h1']); });
   });
 
   it('keeps a hero away on the open adventure out of the camp', async () => {
     const game = fakeGame([wren, { ...wren, id: 'h2', name: 'Hob' }]);
     game.adventure.set({ snapshot: { heroes: [{ heroId: 'h1' }] } });
-    const { scene } = await render(game);
-    expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h2']);
+    const { scene } = await renderCamp(game);
+    await waitFor(() => { expect(scene.shown.at(-1)?.heroes.map((h) => h.id)).toEqual(['h2']); });
   });
 
   it("lists the camp's stock against the warehouse's cap", async () => {
-    const { page } = await render(fakeGame([]), '/camp/millbrook/warehouse');
-    expect([...page.querySelectorAll('.stock li')].map((li) => li.textContent.trim())).toEqual(['60 of 100 timber', '3 of 100 cloth']);
+    await renderCamp(fakeGame([]), '/camp/millbrook/warehouse');
+    expect(textsOf(listItems('Stock'))).toEqual(['60 of 100 timber', '3 of 100 cloth']);
   });
 
   it("walks other players' heroes seen here beside the player's own", async () => {
-    const { scene } = await render(fakeGame([wren], [moss]));
-    expect(scene.shown.at(-1)?.heroes).toEqual([
-      { id: 'h1', spriteSet: 'villager-01' },
-      { id: 's1', spriteSet: 'villager-07' },
-    ]);
+    const { scene } = await renderCamp(fakeGame([wren], [moss]));
+    await waitFor(() => {
+      expect(scene.shown.at(-1)?.heroes).toEqual([
+        { id: 'h1', spriteSet: 'villager-01' },
+        { id: 's1', spriteSet: 'villager-07' },
+      ]);
+    });
   });
 
   it("opens another player's hero on a read-only card that never says whose it is", async () => {
-    const { router, scene, settle, page } = await render(fakeGame([wren], [moss]));
+    const { router, scene } = await renderCamp(fakeGame([wren], [moss]));
     must(scene.callbacks, 'the scene callbacks').onHero('s1');
-    await vi.waitFor(() => { expect(router.url).toBe('/camp/millbrook/seen/s1'); });
-    await settle();
-    const card = must(page.querySelector('aside'), 'the card');
-    expect(card.querySelector('h2')?.textContent).toBe('Moss');
-    expect(card.querySelector('dl')?.textContent).toContain('villager');
-    expect(card.querySelector('dl')?.textContent).toContain('2');
-    expect(card.textContent).not.toContain('@');
-    expect(card.querySelector('button')).toBeNull();
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook/seen/s1'); });
+    expect(await panel().findByRole('heading', { name: 'Moss', level: 2 })).toBeInTheDocument();
+    expect(panel().getByText('villager')).toBeInTheDocument();
+    expect(panel().getByText('2')).toBeInTheDocument();
+    expect(panelBox()).not.toHaveTextContent('@');
+    expect(panel().queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('retires a hero from its card behind a confirmation, and walks it back into the hall', async () => {
     const game = fakeGame([wren]);
-    const { scene, settle, page } = await render(game, '/camp/millbrook/heroes-hall/heroes/h1');
-    const button = (text: string) => must([...page.querySelectorAll<HTMLButtonElement>('aside button')].find((b) => b.textContent.trim() === text), `the ${text} button`);
+    const { scene, user } = await renderCamp(game, '/camp/millbrook/heroes-hall/heroes/h1');
+    const confirmation = { name: /Retiring is permanent\./ };
 
-    button('Retire').click();
-    await settle();
-    expect(page.querySelector('.confirm')?.textContent).toContain('Retiring is permanent.');
-    button('Keep').click();
-    await settle();
-    expect(page.querySelector('.confirm')).toBeNull();
+    await user.click(panel().getByRole('button', { name: 'Retire' }));
+    expect(await panel().findByRole('group', confirmation)).toBeInTheDocument();
+    await user.click(panel().getByRole('button', { name: 'Keep' }));
+    await waitFor(() => { expect(panel().queryByRole('group', confirmation)).not.toBeInTheDocument(); });
     expect(game.retired).toEqual([]);
 
-    button('Retire').click();
-    await settle();
-    button('Retire Wren').click();
-    await vi.waitFor(() => { expect(game.retired).toEqual(['h1']); });
-    await settle();
-    expect(page.querySelector('dl')?.textContent).toContain('retired on Oct 21, 2026');
-    expect(page.querySelectorAll('aside button')).toHaveLength(0);
-    expect(scene.shown.at(-1)).toEqual({ heroes: [], arriving: undefined, leaving: 'h1' });
+    await user.click(panel().getByRole('button', { name: 'Retire' }));
+    await user.click(await panel().findByRole('button', { name: 'Retire Wren' }));
+    expect(await panel().findByText('retired on Oct 21, 2026')).toBeInTheDocument();
+    expect(game.retired).toEqual(['h1']);
+    expect(panel().queryByRole('button')).not.toBeInTheDocument();
+    await waitFor(() => { expect(scene.shown.at(-1)).toEqual({ heroes: [], arriving: undefined, leaving: 'h1' }); });
   });
 
   it('shows the retired apart from the active heroes, collapsed', async () => {
     const retired = { ...wren, id: 'h3', name: 'Ash', status: 'RETIRED' as const, retiredAt: '2026-10-21T12:00:00.000Z' };
-    const { page } = await render(fakeGame([wren, retired]));
-    const [active, apart] = [...page.querySelectorAll('.roster')];
-    expect(active?.textContent).toContain('Wren');
-    expect(active?.textContent).not.toContain('Ash');
-    const details = page.querySelector('details.retired') as HTMLDetailsElement;
-    expect(details.open).toBe(false);
-    expect(details.querySelector('summary')?.textContent).toBe('Retired (1)');
-    expect(apart?.querySelector('a')?.getAttribute('href')).toBe('/camp/millbrook/heroes-hall/heroes/h3');
+    await renderCamp(fakeGame([wren, retired]));
+    const living = within(panel().getByRole('list', { name: 'Living' }));
+    expect(living.getByRole('link', { name: 'Wren' })).toBeInTheDocument();
+    expect(living.queryByRole('link', { name: 'Ash' })).not.toBeInTheDocument();
+    const details = panel().getByRole('group');
+    expect(details).not.toHaveAttribute('open');
+    expect(within(details).getByText('Retired (1)')).toBeInTheDocument();
+    expect(within(details).getByRole('link', { name: 'Ash' })).toHaveAttribute('href', '/camp/millbrook/heroes-hall/heroes/h3');
   });
 
   it('lists every facility of the camp in the menu, built or not, each linking to its path', async () => {
-    const { page } = await render(fakeGame([]));
-    const entries = [...page.querySelectorAll<HTMLAnchorElement>('nav.menu a')];
-    expect(entries.map((a) => a.textContent.trim())).toEqual(['Heroes hall', 'Job board', 'Warehouse', 'Lumber camp', 'Mine', 'Caravan hub']);
-    const mine = must(entries[4], 'the mine entry');
-    const hall = must(entries[0], 'the hall entry');
-    expect(mine.getAttribute('href')).toBe('/camp/millbrook/mine');
-    expect(mine.classList).toContain('unbuilt');
-    expect(hall.classList).not.toContain('unbuilt');
-    expect(hall.querySelector('img')?.getAttribute('src')).toBe('art/icons/heroes-hall.png');
+    await renderCamp(fakeGame([]));
+    expect(textsOf(menu().getAllByRole('link'))).toEqual(['Heroes hall', 'Job board', 'Warehouse', 'Lumber camp', 'Mine', 'Caravan hub']);
+    const mine = menu().getByRole('link', { name: 'Mine' });
+    const hall = menu().getByRole('link', { name: 'Heroes hall' });
+    expect(mine).toHaveAttribute('href', '/camp/millbrook/mine');
+    expect(mine).toHaveClass('unbuilt');
+    expect(hall).not.toHaveClass('unbuilt');
+    expect(within(hall).getByRole('presentation')).toHaveAttribute('src', 'art/icons/heroes-hall.png');
   });
 
   it('hands the scene each facility level: 0 for the ones not built', async () => {
-    const { scene } = await render(fakeGame([]));
+    const { scene } = await renderCamp(fakeGame([]));
     expect(scene.levels).toEqual({ 'heroes-hall': 1, 'job-board': 1, warehouse: 1, 'lumber-camp': 0, mine: 0, 'caravan-hub': 0 });
   });
 
   it('says what an unbuilt facility does and that it is not built', async () => {
-    const { page } = await render(fakeGame([]), '/camp/millbrook/mine');
-    expect(page.querySelector('aside h2')?.textContent).toBe('Mine');
-    expect(page.querySelector('aside')?.textContent).toContain('Not built yet.');
-    expect(page.querySelector('aside')?.textContent).toContain('mining runs');
-    expect(current(page)).toBe('Mine');
+    await renderCamp(fakeGame([]), '/camp/millbrook/mine');
+    expect(panel().getByRole('heading', { name: 'Mine', level: 2 })).toBeInTheDocument();
+    expect(panel().getByText('Not built yet.')).toBeInTheDocument();
+    expect(panelBox()).toHaveTextContent('mining runs');
+    expect(marked('Mine')).toBeInTheDocument();
   });
 
   it("builds the mine with its cost beside the camp's balance, and draws it built", async () => {
     const game = fakeGame([]);
-    const { page, scene, settle } = await render(game, '/camp/millbrook/mine');
-    const build = () => page.querySelector('.build') as HTMLElement;
-    expect(build().querySelector('h3')?.textContent).toBe('Build');
-    expect(build().querySelector('.price')?.textContent).toBe('60 timber, you have 60; 3 cloth, you have 3');
-    (build().querySelector('button') as HTMLButtonElement).click();
-    await vi.waitFor(() => { expect(game.built).toEqual([['mine', 1]]); });
-    await settle();
-    expect(page.querySelector('aside')?.textContent).toContain('Level 1.');
-    expect(page.querySelector('aside')?.textContent).toContain('At its highest level here.');
-    await vi.waitFor(() => { expect(scene.levels?.['mine']).toBe(1); });
+    const { scene, user } = await renderCamp(game, '/camp/millbrook/mine');
+    const build = section('Build');
+    expect(within(build).getByRole('heading', { name: 'Build' })).toBeInTheDocument();
+    expect(within(build).getByText('60 timber, you have 60; 3 cloth, you have 3')).toBeInTheDocument();
+    await user.click(within(build).getByRole('button', { name: 'Build' }));
+    expect(await panel().findByText('Level 1.')).toBeInTheDocument();
+    expect(game.built).toEqual([['mine', 1]]);
+    expect(panel().getByText('At its highest level here.')).toBeInTheDocument();
+    await waitFor(() => { expect(scene.levels?.['mine']).toBe(1); });
   });
 
   it("lists the mine's jobs once it is built, each leading to its detail under the mine (Issue-133)", async () => {
     const game = fakeGame([]);
-    const { page, settle } = await render(game, '/camp/millbrook/mine');
-    expect(page.querySelector('aside .jobs')).toBeNull();
-    (page.querySelector('.build button') as HTMLButtonElement).click();
-    await vi.waitFor(() => { expect(game.built).toEqual([['mine', 1]]); });
-    await settle();
-    const jobs = [...page.querySelectorAll('aside .jobs li')].map((li) => [...li.children].map((c) => c.textContent.trim()));
-    expect(jobs).toEqual([['Ore from the hill', 'up to 40 ore']]);
-    expect(page.querySelector('aside .jobs a')?.getAttribute('href')).toBe('/camp/millbrook/mine/jobs/ore-from-the-hill');
+    const { user } = await renderCamp(game, '/camp/millbrook/mine');
+    expect(panel().queryByRole('list', { name: 'Jobs' })).not.toBeInTheDocument();
+    await user.click(panel().getByRole('button', { name: 'Build' }));
+    const job = await panel().findByRole('link', { name: 'Ore from the hill' });
+    expect(job).toHaveAttribute('href', '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    expect(listItems('Jobs')).toHaveLength(1);
+    expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('up to 40 ore')).toBeInTheDocument();
+    expect(game.built).toEqual([['mine', 1]]);
   });
 
-  it("shows a mine's job under the mine once built, keeping the mine marked, and no such job before", async () => {
+  it("shows a mine's job under the mine once built, keeping the mine marked", async () => {
     const game = fakeGame([wren]);
     const built = game.camp();
     game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'mine' ? { kind: 'mine', level: 1 } : f)) });
-    const { page } = await render(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
-    expect(page.querySelector('aside h2')?.textContent).toBe('Ore from the hill');
-    expect([...page.querySelectorAll('.stages li')].map((li) => li.textContent.trim())).toContain('Gather ore from 2 ore veins, up to 40');
-    expect(page.querySelector('aside .back')?.textContent.trim()).toBe('← Mine');
-    expect(page.querySelector('aside .back')?.getAttribute('href')).toBe('/camp/millbrook/mine');
-    expect(current(page)).toBe('Mine');
+    await renderCamp(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    expect(panel().getByRole('heading', { name: 'Ore from the hill', level: 2 })).toBeInTheDocument();
+    expect(textsOf(listItems('Stages'))).toContain('Gather ore from 2 ore veins, up to 40');
+    expect(backTo('Mine')).toHaveAttribute('href', '/camp/millbrook/mine');
+    expect(marked('Mine')).toBeInTheDocument();
+  });
 
-    TestBed.resetTestingModule();
-    const unbuilt = await render(fakeGame([wren]), '/camp/millbrook/mine/jobs/ore-from-the-hill');
-    expect(unbuilt.page.querySelector('aside')?.textContent).toContain('The mine has no such job.');
+  it('has no such job under a mine not built', async () => {
+    await renderCamp(fakeGame([wren]), '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    expect(panel().getByText('The mine has no such job.')).toBeInTheDocument();
   });
 
   it('keeps a job off any poster but its own', async () => {
-    const { page } = await render(fakeGame([wren]), '/camp/millbrook/job-board/jobs/ore-from-the-hill');
-    expect(page.querySelector('aside')?.textContent).toContain('The job board has no such job.');
+    await renderCamp(fakeGame([wren]), '/camp/millbrook/job-board/jobs/ore-from-the-hill');
+    expect(panel().getByText('The job board has no such job.')).toBeInTheDocument();
   });
 
   it("shows the hub's refusal of a build in place", async () => {
     const game = fakeGame([]);
     game.refuseBuild = new Refusal('InsufficientResources', 'level 1 costs 60 timber');
-    const { page, settle } = await render(game, '/camp/millbrook/mine');
-    (page.querySelector('.build button') as HTMLButtonElement).click();
-    await vi.waitFor(() => { expect(game.built).toHaveLength(1); });
-    await settle();
-    expect(page.querySelector('.build .refusal')?.textContent).toBe('The camp cannot pay for this now.');
+    const { user } = await renderCamp(game, '/camp/millbrook/mine');
+    await user.click(panel().getByRole('button', { name: 'Build' }));
+    expect(await within(section('Build')).findByText('The camp cannot pay for this now.')).toHaveRole('alert');
+    expect(game.built).toHaveLength(1);
   });
 
   it('disables a build the camp cannot have, and says why', async () => {
-    const { page } = await render(fakeGame([]), '/camp/millbrook/caravan-hub');
-    expect((page.querySelector('.build button') as HTMLButtonElement).disabled).toBe(true);
-    expect(page.querySelector('.build .note')?.textContent).toBe('Needs a level 2 warehouse first.');
+    await renderCamp(fakeGame([]), '/camp/millbrook/caravan-hub');
+    expect(panel().getByRole('button', { name: 'Build' })).toBeDisabled();
+    expect(panel().getByText('Needs a level 2 warehouse first.')).toBeInTheDocument();
   });
 
-  it("offers the warehouse's and the hall's next level, with what it holds", async () => {
-    const { page } = await render(fakeGame([]), '/camp/millbrook/warehouse');
-    expect(page.querySelector('.build h3')?.textContent).toBe('Upgrade to level 2');
-    expect(page.querySelector('.build')?.textContent).toContain('Holds 200 of each resource.');
-    expect(page.querySelector('.build .note')?.textContent).toBe('Not enough timber or ore.');
-    TestBed.resetTestingModule();
-    const hall = await render(fakeGame([]));
-    expect(hall.page.querySelector('.build')?.textContent).toContain('Holds 6 heroes.');
-    expect(hall.page.querySelector('.build .note')?.textContent).toBe('Not enough timber or cloth.');
+  it("offers the warehouse's next level, with what it holds", async () => {
+    await renderCamp(fakeGame([]), '/camp/millbrook/warehouse');
+    const upgrade = section('Upgrade to level 2');
+    expect(within(upgrade).getByText('Holds 200 of each resource.')).toBeInTheDocument();
+    expect(within(upgrade).getByText('Not enough timber or ore.')).toBeInTheDocument();
+  });
+
+  it("offers the hall's next level, with what it holds", async () => {
+    await renderCamp(fakeGame([]));
+    const upgrade = section('Upgrade to level 2');
+    expect(within(upgrade).getByText('Holds 6 heroes.')).toBeInTheDocument();
+    expect(within(upgrade).getByText('Not enough timber or cloth.')).toBeInTheDocument();
   });
 
   it('sends a facility the camp does not have back to the hall', async () => {
-    const { router } = await render(fakeGame([]), '/camp/millbrook/forge');
-    await vi.waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
+    const { router } = await renderCamp(fakeGame([]), '/camp/millbrook/forge');
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
   });
 
   it('sends a camp with no layout to the starting camp', async () => {
-    const { router } = await render(fakeGame([]), '/camp/atlantis');
-    await vi.waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
+    const { router } = await renderCamp(fakeGame([]), '/camp/atlantis');
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
   });
 });

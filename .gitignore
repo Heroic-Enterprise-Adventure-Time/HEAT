@@ -33,3 +33,6 @@ dist/
 
 # The client's copy of art/, made by packages/client/scripts/copy-art.mjs
 packages/client/generated/
+
+# The browser test's results; a trace holds a password and tokens
+packages/client/test-results/

@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { setTimeout as sleep } from "node:timers/promises";
 
 /**
  * The stack test: signs in to the base pool as a test user through the ci
@@ -31,8 +32,12 @@ import { execFileSync } from "node:child_process";
  * heat-dev), and every call goes through the stack's hostname,
  * as the browser's will: the page at /, config.json, and /graphql behind
  * CloudFront, which proves that the Authorization header crosses it. The
- * parameters are read with whatever AWS credentials are in the
- * environment: the apply role in the workflow, the plan role on a laptop.
+ * authenticated run imports the engine, downloaded code, so the workflow runs
+ * it in a job that holds no role and hands it E2E_SITE_URL and
+ * E2E_CI_CLIENT_ID by environment (docs/process/best-practices.md, rule 13;
+ * decision 0046). Without them it reads the parameters with whatever AWS
+ * credentials are in the environment: the plan role on a laptop, the apply
+ * role for prod's anonymous run, which imports nothing downloaded.
  * The password comes from the environment, never from an argument, so it
  * is in no process list and no log. In the workflow the user is minted for
  * the stack by scripts/e2e-user.sh; on a laptop it is player1 and the
@@ -65,9 +70,9 @@ function parameter(name) {
   }).trim();
 }
 
-const siteUrl = parameter("site_url");
+const siteUrl = process.env.E2E_SITE_URL ?? parameter("site_url");
 // prod writes no app_client_id parameter, because it has no ci client.
-const clientId = anonymousOnly ? undefined : parameter("app_client_id");
+const clientId = anonymousOnly ? undefined : (process.env.E2E_CI_CLIENT_ID ?? parameter("app_client_id"));
 const graphqlUrl = `${siteUrl}/graphql`;
 // The deploy before the current one, at its own route (decision 0030).
 const previousUrl = `${siteUrl}/previous/graphql`;
@@ -145,6 +150,34 @@ const { replay, levelForXp } = await import("@heat/engine");
 
 const token = await signIn();
 console.log(`signed in as ${username} through client ${clientId}`);
+
+// An apply can finish with the previous version still answering /graphql, 53
+// and 78 seconds after the alias moved in the two runs measured, and both
+// versions in turn within one test (Issue-232). So the test waits until the
+// live route has answered this deploy's version several times in a row, then
+// says how long that took, which measures the lag on every run. A deploy
+// whose version never arrives fails here, naming both.
+const versionAnswersInARow = 10;
+const versionPollMs = 2_000;
+const versionWaitMs = 5 * 60_000;
+const waitStarted = performance.now();
+const waited = () => Math.round((performance.now() - waitStarted) / 1000);
+const otherAnswers = new Set();
+const others = () => [...otherAnswers].join(", ") || "none";
+for (let inARow = 0; inARow < versionAnswersInARow; ) {
+  if (performance.now() - waitStarted > versionWaitMs) {
+    throw new Error(`/graphql did not answer config.json's version ${config.version} ${versionAnswersInARow} times in a row within ${waited()} s; other answers: ${others()}`);
+  }
+  const reply = await graphql(token, `{ version }`);
+  if (reply.data?.version === config.version) {
+    inARow += 1;
+  } else {
+    inARow = 0;
+    otherAnswers.add(reply.data?.version ?? JSON.stringify(reply.errors) ?? "no version");
+  }
+  if (inARow < versionAnswersInARow) await sleep(versionPollMs);
+}
+console.log(`ok: /graphql answered this deploy's version ${versionAnswersInARow} times in a row after ${waited()} s; other answers on the way: ${others()}`);
 
 // First sign-in makes the profile, and a repeat changes nothing; the
 // client calls joinGame after every sign-in in the same way.

@@ -1,0 +1,11 @@
+# actionlint reads this from the repository root, in "Build and test" and on a
+# laptop alike.
+paths:
+  .github/workflows/**/*.{yml,yaml}:
+    ignore:
+      # actionlint 1.7.12 does not know GitHub's same-repository `$/` syntax,
+      # which the actions lockfile needs for the composite actions (decision
+      # 0047); rhysd/actionlint issue 711. Scoped to that one message, so a
+      # malformed remote `uses:` still fails. It leaves this file when a
+      # release that knows `$/` is pinned.
+      - 'specifying action "\$/.+" in invalid format because ref is missing'

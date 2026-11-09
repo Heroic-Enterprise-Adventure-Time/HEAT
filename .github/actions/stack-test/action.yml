@@ -1,0 +1,90 @@
+# The stack test and the browser test, one copy for sandbox.yml and deploy.yml,
+# because deploy.yml's only runs on main. They run downloaded code, so they run
+# in a job with no role and no id-token permission
+# (docs/process/best-practices.md, rule 13; decision 0046). What they need from
+# AWS the apply job read and sealed into the stack-handover artifact. Expects
+# the repository checked out and Node set up.
+name: Stack test
+description: Calls the stack through its hostname and uses its page in a browser, holding no role.
+
+inputs:
+  stack:
+    description: The stack under test, heat-sb<issue> or heat-dev
+    required: true
+  handover-key:
+    description: The repository secret HEAT_E2E_HANDOVER_KEY, which opens the sealed password
+    required: true
+
+outputs:
+  since:
+    description: When the stack test began, in epoch milliseconds, for the cold start
+    value: ${{ steps.e2e.outputs.since }}
+  site_url:
+    description: The stack's URL, for the deployment the cold start's job records
+    value: ${{ steps.e2e.outputs.site_url }}
+
+runs:
+  using: composite
+  steps:
+    # Rule 13 as a check, so that a later change cannot quietly bring a role back.
+    - name: Refuse to run with a role within reach
+      shell: bash
+      run: |
+        set -eu
+        if [ -n "${AWS_ACCESS_KEY_ID:-}" ] || [ -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+          echo "This job runs downloaded code and may hold no role: no AWS keys and no id-token permission." >&2
+          exit 1
+        fi
+
+    - name: Download what the apply job sealed
+      uses: actions/download-artifact@v8.0.2
+      with:
+        name: stack-handover
+        path: ${{ runner.temp }}/stack-handover
+
+    # The engine is built because the test compares the hub's answer with it.
+    - name: Install and build the engine for the stack test
+      shell: bash
+      run: |
+        set -eu
+        npm ci
+        npm run build --workspace @heat/engine
+
+    - name: Open what the apply job sealed
+      shell: bash
+      env:
+        E2E_HANDOVER_KEY: ${{ inputs.handover-key }}
+      run: sh scripts/stack-handover.sh open "$RUNNER_TEMP/stack-handover/handover.env"
+
+    - name: Call the stack as the test user
+      id: e2e
+      shell: bash
+      env:
+        STACK_NAME: ${{ inputs.stack }}
+      run: |
+        set -eu
+        echo "since=$(date +%s000)" >> "$GITHUB_OUTPUT"
+        echo "site_url=$E2E_SITE_URL" >> "$GITHUB_OUTPUT"
+        node scripts/e2e.mjs --stack "$STACK_NAME" --username "$E2E_USERNAME" | tee -a "$RUNNER_TEMP/e2e.log"
+
+    # Its own step, so the log reaches the run's page when the test fails,
+    # which ends the step above at the failing line.
+    - name: Put the stack test's log on the run's page
+      if: ${{ !cancelled() && (steps.e2e.outcome == 'success' || steps.e2e.outcome == 'failure') }}
+      shell: bash
+      run: |
+        {
+          echo
+          echo '### Stack test, through the API'
+          echo
+          echo '```text'
+          cat "$RUNNER_TEMP/e2e.log"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    # The browser test (decision 0045).
+    - name: Use the page in a browser as that user
+      uses: $/.github/actions/browser-test
+      with:
+        stack: ${{ inputs.stack }}
+        username: ${{ env.E2E_USERNAME }}

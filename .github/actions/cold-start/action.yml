@@ -1,0 +1,37 @@
+# The cold start, read from the function's log under the role after the stack
+# test. One copy for sandbox.yml and deploy.yml, because deploy.yml's runs only
+# on main. It runs nothing downloaded; the job names the environment and
+# grants id-token (decision 0046). Expects the repository checked out.
+name: Cold start
+description: Assumes a role and reports the function's cold start since the stack test began.
+
+inputs:
+  role-arn:
+    description: The role that reads the function's log
+    required: true
+  session-name:
+    description: The role session's name
+    required: true
+  log-group:
+    description: The function's log group, /aws/lambda/<stack>-hub
+    required: true
+  since:
+    description: When the stack test began, in epoch milliseconds
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Assume the role through GitHub's OIDC provider
+      uses: aws-actions/configure-aws-credentials@v6.3.0
+      with:
+        role-to-assume: ${{ inputs.role-arn }}
+        role-session-name: ${{ inputs.session-name }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Report the cold start
+      shell: bash
+      env:
+        LOG_GROUP: ${{ inputs.log-group }}
+        SINCE: ${{ inputs.since }}
+      run: sh scripts/report-cold-start.sh "$LOG_GROUP" "$SINCE"

@@ -66,7 +66,7 @@ jobs:
           echo "arn=arn:aws:iam::${account}:role/heat-${name}-apply" >> "$GITHUB_OUTPUT"
 
       - name: Assume the role through GitHub's OIDC provider
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v6.3.0
         with:
           role-to-assume: ${{ steps.role.outputs.arn }}
           role-session-name: verify-apply-roles

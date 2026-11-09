@@ -1,25 +1,20 @@
-import { ApplicationInitStatus, signal } from '@angular/core';
+import { ApplicationInitStatus, importProvidersFrom, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { type ActivatedRouteSnapshot, provideRouter, type RouterStateSnapshot, UrlTree } from '@angular/router';
-import { RouterTestingHarness } from '@angular/router/testing';
+import { screen } from '@testing-library/angular/zoneless';
 import { ApolloTestingModule } from 'apollo-angular/testing';
 
-import { App } from './app';
 import { appConfig } from './app.config';
 import { routes, signedIn } from './app.routes';
 import { Config } from './config';
 import { Session, type SessionUser } from './session';
+import { renderAt } from './testing/render-at';
 
 describe('App', () => {
   it('routes the empty path to the home page', async () => {
-    // The header reads the game, which needs a client of the hub; signed out, it sends nothing.
-    await TestBed.configureTestingModule({
-      imports: [App, ApolloTestingModule],
-      providers: [provideRouter(routes)],
-    }).compileComponents();
-    const harness = await RouterTestingHarness.create('/');
-    const page = harness.routeNativeElement as HTMLElement;
-    expect(page.querySelector('h1')?.textContent).toBe('HEAT');
+    // The game needs a client of the hub; signed out, it sends nothing.
+    await renderAt('/', routes, [importProvidersFrom(ApolloTestingModule)]);
+    expect(screen.getByRole('heading', { name: 'HEAT', level: 1 })).toBeInTheDocument();
   });
 
   // The application's own providers, initializers included: the test runner

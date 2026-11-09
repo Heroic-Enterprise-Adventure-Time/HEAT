@@ -12,18 +12,18 @@
       } @else if (settled.result; as result) {
         <p class="outcome">{{ outcomes[result.outcome] }}.</p>
 
-        <h3>Stages</h3>
-        <ol class="stages">
+        <h3 id="stages-title">Stages</h3>
+        <ol class="stages" aria-labelledby="stages-title">
           @for (stage of result.stages; track stage.stage) {
             <li>{{ stage.kind }}: {{ endings[stage.ended] ?? stage.ended }}</li>
           }
         </ol>
 
-        <h3>Rewards</h3>
+        <h3 id="rewards-title">Rewards</h3>
         @if (result.rewards.length === 0) {
           <p>Nothing came home.</p>
         } @else {
-          <ul class="rewards">
+          <ul class="rewards" aria-labelledby="rewards-title">
             @for (reward of result.rewards; track reward.material) {
               <li>{{ reward.amount }} {{ reward.material }}</li>
             }
@@ -35,8 +35,8 @@
           }
         }
 
-        <h3>Heroes</h3>
-        <ul class="heroes">
+        <h3 id="heroes-title">Heroes</h3>
+        <ul class="heroes" aria-labelledby="heroes-title">
           @for (hero of result.heroes; track hero.heroId) {
             <li>
               <strong>{{ heroName(hero.heroId) }}</strong>&ngsp;
@@ -78,9 +78,9 @@
 
       <ng-container *ngTemplateOutlet="playback" />
 
-      <h3>Party</h3>
+      <h3 id="party-title">Party</h3>
       @if (play.field(); as field) {
-        <ul class="party">
+        <ul class="party" aria-labelledby="party-title">
           @for (hero of field.party; track hero.unitId) {
             <li [class.down]="hero.health <= 0">
               <div class="who">
