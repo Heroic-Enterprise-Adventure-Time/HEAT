@@ -435,7 +435,8 @@ export class Game {
    */
   async startAdventure(location: string, jobId: string, heroIds: readonly string[]): Promise<AdventureView> {
     try {
-      const input = { location, jobId, heroIds };
+      // One request id per start, which becomes the adventure's id: a repeat of this request answers the adventure it started.
+      const input = { requestId: crypto.randomUUID(), location, jobId, heroIds };
       const data = await this.mutate(StartAdventureDocument, { input });
       return adventureFromWire(answered(must(data.startAdventure, 'startAdventure'), 'StartAdventureSuccess').adventure);
     } finally {

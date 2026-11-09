@@ -21,9 +21,11 @@
  * well inside 10 s. The hub's whole invocation took 446 ms at most in `dev`
  * and 426 ms in `prod` over the 14 days to 2026-11-09 (p99 272 ms and
  * 384 ms, cold starts included), so 2 s is several times the slowest call
- * seen. A call that times out may still have committed: a transaction's
- * conditions hold the rules for the retry, the hub's or the player's
- * (rules 7 and 18).
+ * seen. A call that times out may still have committed, and the SDK's retry
+ * of it then fails its own transaction's conditions; every verb that writes
+ * reads again after a failed condition and answers the work done, by the
+ * request's id or the state it finds (graphql.md, rules 7 and 9), so the
+ * player gets the answer, not a refusal.
  */
 export const requestHandler = {
   /** A connection that is not made in this time fails (the SDK's `in-region` mode uses 1.1 s). */

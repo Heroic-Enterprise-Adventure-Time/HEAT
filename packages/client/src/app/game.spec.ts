@@ -130,10 +130,10 @@ function fakeHub(start: PlayerView) {
     }
     if (op === 'StartAdventure') {
       if (player.openAdventure) return { startAdventure: { __typename: 'AdventureOpen', message: 'an adventure is already open', adventureId: player.openAdventure.id } };
-      const { location, jobId, heroIds } = variables['input'] as { location: string; jobId: string; heroIds: string[] };
+      const { requestId, location, jobId, heroIds } = variables['input'] as { requestId: string; location: string; jobId: string; heroIds: string[] };
       const heroes = player.heroes.filter((h) => heroIds.includes(h.id));
       const adventure: AdventureView = {
-        id: 'a1',
+        id: requestId,
         startedAt: '2026-10-22T07:00:00.000Z',
         location,
         seed: 's1',
@@ -314,9 +314,11 @@ describe('Game', () => {
     expect(game.livingHere().map((h) => h.id)).toEqual([villager.id]);
 
     const adventure = must(await run(game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id])), 'the adventure');
-    expect(hub.calls.find((c) => c.op === 'StartAdventure')?.variables).toEqual({
-      input: { location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: [villager.id] },
-    });
+    const sent = hub.calls.find((c) => c.op === 'StartAdventure')?.variables['input'] as { requestId: string };
+    expect(sent).toEqual({ requestId: expect.any(String) as string, location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: [villager.id] });
+    // The client names the request, and the hub makes it the adventure's id.
+    expect(sent.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(adventure.id).toBe(sent.requestId);
     expect(adventure.snapshot.heroes.map((h) => h.name)).toEqual(['Wren']);
     expect(game.adventure()?.job.name).toBe('Wolves on the mill road');
   });

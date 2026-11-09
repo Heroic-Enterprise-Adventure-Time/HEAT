@@ -97,7 +97,7 @@ export type StageKind =
   | 'GATHER'
   | 'TRAVEL';
 
-/** Which job to start, where, and with whom. */
+/** Which job to start, where, and with whom, and the request's id. */
 export type StartAdventureInput = {
   /** The party: one to four of the player's living heroes at that camp. */
   readonly heroIds: ReadonlyArray<string | number>;
@@ -105,6 +105,8 @@ export type StartAdventureInput = {
   readonly jobId: string | number;
   /** The camp's location, which posts the job. */
   readonly location: string | number;
+  /** A UUID the client makes, which becomes the adventure's id; a repeat answers the adventure already started. */
+  readonly requestId: string;
 };
 
 /** Which adventure to submit, with its override log. */

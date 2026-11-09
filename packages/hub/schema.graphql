@@ -395,7 +395,7 @@ type Mutation {
   retireHero(input: RetireHeroInput!): RetireHeroResult
 
   """
-  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with AdventureOpen while one is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.
+  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.
   """
   startAdventure(input: StartAdventureInput!): StartAdventureResult
 
@@ -626,7 +626,7 @@ type StageResult {
   startedAtMs: Int!
 }
 
-"""Which job to start, where, and with whom."""
+"""Which job to start, where, and with whom, and the request's id."""
 input StartAdventureInput {
   """The party: one to four of the player's living heroes at that camp."""
   heroIds: [ID!]!
@@ -638,6 +638,11 @@ input StartAdventureInput {
 
   """The camp's location, which posts the job."""
   location: ID!
+
+  """
+  A UUID the client makes, which becomes the adventure's id; a repeat answers the adventure already started.
+  """
+  requestId: UUID!
 }
 
 """

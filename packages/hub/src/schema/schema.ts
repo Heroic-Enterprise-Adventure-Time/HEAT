@@ -521,8 +521,15 @@ const RetireHeroInput = builder.inputType("RetireHeroInput", {
 const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
 
 const StartAdventureInput = builder.inputType("StartAdventureInput", {
-  description: "Which job to start, where, and with whom.",
+  description: "Which job to start, where, and with whom, and the request's id.",
   fields: (t) => ({
+    requestId: t.field({
+      type: "UUID",
+      required: true,
+      description: "A UUID the client makes, which becomes the adventure's id; a repeat answers the adventure already started.",
+      // One spelling per request, as RecruitHeroInput's: the value is the record's key.
+      validate: z.uuid("a request id is a UUID").check(z.toLowerCase()),
+    }),
     location: t.id({ required: true, description: "The camp's location, which posts the job." }),
     jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built." }),
     heroIds: t.idList({
@@ -645,10 +652,10 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. Refused with AdventureOpen while one is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.",
+      "Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.",
     errors: answers("StartAdventure", { field: "adventure", what: "the adventure opened" }, [AdventureOpen, Requires, HeroDead, HeroRetired, HeroNotHere, HeroAdventuring, Conflict]),
     args: { input: t.arg({ type: StartAdventureInput, required: true }) },
-    resolve: (_root, { input }, ctx) => startAdventure(ctx.repo, callerId(ctx), ctx.version, input.location, input.jobId, input.heroIds),
+    resolve: (_root, { input }, ctx) => startAdventure(ctx.repo, callerId(ctx), ctx.version, input.requestId, input.location, input.jobId, input.heroIds),
   }),
   submitAdventure: t.field({
     type: AdventureRef,

@@ -102,8 +102,8 @@ async function invalid(query: string, variables: Record<string, unknown>, player
 }
 
 const JOIN = `mutation { joinGame { ... on JoinGameSuccess { player { id name } } } }` as Query<{ joinGame: Result<"player", { id: string; name: string | null }> }>;
-const START = `mutation($heroIds: [ID!]!) {
-  startAdventure(input: { location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds }) {
+const START = `mutation($requestId: UUID!, $heroIds: [ID!]!) {
+  startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "wolves-on-the-mill-road", heroIds: $heroIds }) {
     __typename
     ... on StartAdventureSuccess { adventure { id seed } }
     ... on AdventureOpen { adventureId }
@@ -166,7 +166,7 @@ describe("authorization at the field level", () => {
 describe("first sign-in", () => {
   it("makes the profile once, with joinGame, and starting an adventure no longer does", async () => {
     const p = `p-${randomUUID()}`;
-    await gql(START, { heroIds: [randomUUID()] }, p);
+    await gql(START, { requestId: randomUUID(), heroIds: [randomUUID()] }, p);
     expect(await repo.getPlayer(p)).toBeUndefined();
 
     const joined = await gql(JOIN, {}, p);
@@ -266,7 +266,7 @@ describe("the adventure loop through the graph", () => {
     const villager = randomUUID();
     await gql(RECRUIT, { id: villager }, p);
 
-    const start = await gql(START, { heroIds: [villager] }, p);
+    const start = await gql(START, { requestId: randomUUID(), heroIds: [villager] }, p);
     expect(start.errors).toBeUndefined();
     const { id: adventureId, seed } = must(start.data?.startAdventure.adventure, "the start's adventure");
 
@@ -285,7 +285,7 @@ describe("the adventure loop through the graph", () => {
       },
     });
 
-    const again = await gql(START, { heroIds: [villager] }, p);
+    const again = await gql(START, { requestId: randomUUID(), heroIds: [villager] }, p);
     expect(again.errors).toBeUndefined();
     expect(again.data?.startAdventure).toEqual({ __typename: "AdventureOpen", adventureId });
 
@@ -366,7 +366,7 @@ describe("the adventure loop through the graph", () => {
         [Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()), `a party is 1 to ${MAX_PARTY} heroes`],
         [[id, id.toUpperCase()], "a hero is in the party twice"],
       ] as const) {
-        const reply = await gql(START, { heroIds }, p);
+        const reply = await gql(START, { requestId: randomUUID(), heroIds }, p);
         expect(code(reply)).toBe("BAD_USER_INPUT");
         expect(message(reply)).toContain(words);
       }
@@ -378,10 +378,10 @@ describe("the adventure loop through the graph", () => {
       await gql(JOIN, {}, p);
       const villager = randomUUID();
       await gql(RECRUIT, { id: villager }, p);
-      await gql(START, { heroIds: [villager] }, p);
+      await gql(START, { requestId: randomUUID(), heroIds: [villager] }, p);
       const open = must(await repo.openAdventure(p), "the open adventure");
 
-      const reply = await gql(START, { heroIds: Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()) }, p);
+      const reply = await gql(START, { requestId: randomUUID(), heroIds: Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()) }, p);
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect((await repo.openAdventure(p))?.adventureId).toBe(open.adventureId);
     });
@@ -409,8 +409,8 @@ describe("the adventure loop through the graph", () => {
     });
 
     it("checks input before a scope, and a well-formed request still needs the scope", async () => {
-      expect(code(await gql(START, { heroIds: [] }))).toBe("BAD_USER_INPUT");
-      expect(code(await gql(START, { heroIds: [randomUUID()] }))).toBe("UNAUTHENTICATED");
+      expect(code(await gql(START, { requestId: randomUUID(), heroIds: [] }))).toBe("BAD_USER_INPUT");
+      expect(code(await gql(START, { requestId: randomUUID(), heroIds: [randomUUID()] }))).toBe("UNAUTHENTICATED");
     });
   });
 });
@@ -433,7 +433,7 @@ describe("the deploy's version", () => {
     expect(other.data?.me.id).toBe(p);
     expect(other.extensions?.["outdated"]).toBe(true);
     // A party of none is malformed input, in errors; the flag rides on that response too.
-    const refused = await gql(START, { heroIds: [] }, p, { "heat-version": "0".repeat(40) });
+    const refused = await gql(START, { requestId: randomUUID(), heroIds: [] }, p, { "heat-version": "0".repeat(40) });
     expect(refused.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
     expect(refused.extensions?.["outdated"]).toBe(true);
   });
