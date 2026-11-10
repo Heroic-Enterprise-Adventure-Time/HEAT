@@ -40,11 +40,8 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v7.0.1
 
-      - name: Set up Node from .node-version
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          cache: npm
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
 
       - name: Install exactly what package-lock.json records
         run: npm ci
@@ -91,13 +88,12 @@ jobs:
       - name: Check out the repository
         uses: actions/checkout@v7.0.1
 
-      # The latest release, on purpose: format and validate are stable across
-      # releases, each root states its own floor in required_version, and the
-      # owner's machine is expected to track the latest too (standards rule 1).
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
-        with:
-          terraform_wrapper: false
+      # The one exact release the plan and apply jobs run, from the same
+      # action, so the floor checks the binary that applies; each root states
+      # its own floor in required_version, and the owner's machine tracks the
+      # pin (docs/standards/terraform.md, rule 13).
+      - name: Set up Terraform, pinned and checked
+        uses: $/.github/actions/terraform
 
       - name: Check formatting
         run: terraform fmt -check -recursive -diff
