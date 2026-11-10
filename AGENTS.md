@@ -30,6 +30,8 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | Why the project exists and what it concentrates on | `docs/design/purpose.md` |
 | The game: what the player does | `docs/design/game.md` |
 | The system: services, data and flows | `docs/architecture/overview.md` |
+| How an adventure is started, played, verified and replayed | `docs/architecture/adventure-loop.md` |
+| The tables' keys and the transactions that write them | `docs/architecture/camps.md` |
 | Why a choice was made, and what was rejected | `docs/decisions/` |
 | The Terraform state bucket, who applies, and the one-time bootstrap | `terraform/backend/README.md` |
 | Running and seeing a change: the sandbox stacks and the fast loop | `docs/process/development.md` |
