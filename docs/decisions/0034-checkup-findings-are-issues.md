@@ -1,6 +1,6 @@
 # 0034: The checkup's findings are issues, and a closed `excused` issue is the suppression record
 
-- **Status:** Decided
+- **Status:** Decided. Amended on 2026-11-10 by Issue-273: a finding is still an issue, now a sub-issue of a batch issue, one batch per pull request that fixes its findings; the cap counts batches, at most six per run; a note is never filed on its own; and a candidate rule is put to the owner only when it guards security, money or the game's data, is enforced by a machine, or loosens a rule that already produces false findings, an accepted one going into the batch that touches its document.
 - **Date:** 2026-10-26
 - **Settles:** Issue-147: where a whole-tree finding goes, how one that is not to be fixed is remembered, and how much one run may file. Decision 0033 settles that the checkup exists, runs at a pause from a session on the subscription, and starts where lint and the review skill stop; it does not settle the surface.
 
