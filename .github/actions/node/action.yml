@@ -32,7 +32,14 @@ runs:
         NODE_SHA256: 48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75
       run: |
         set -eu
+        if [ "$RUNNER_OS-$RUNNER_ARCH" != Linux-X64 ]; then
+          echo "::error::The pinned archive and checksum are linux-x64; this runner is $RUNNER_OS-$RUNNER_ARCH."
+          exit 1
+        fi
+        # .node-version as fnm reads it: 24, v24 or 24.22 all name major 24.
         major="$(tr -d '[:space:]' < .node-version)"
+        major="${major#v}"
+        major="${major%%.*}"
         if [ "${NODE_VERSION%%.*}" != "$major" ]; then
           echo "::error::The pinned Node $NODE_VERSION is not the major $major that .node-version holds."
           exit 1
