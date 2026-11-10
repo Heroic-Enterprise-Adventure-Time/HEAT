@@ -29,14 +29,19 @@ summary() {
 
 tag="$(git tag --points-at "$sha" --list 'v[0-9][0-9][0-9][0-9].[0-9][0-9].[0-9][0-9]*' | sort -V | tail -n 1)"
 if [ -n "$tag" ]; then
-  # A failed view is read as no Release: if one is there after all, the
-  # create below refuses it and the job fails, to be re-run.
-  if gh release view "$tag" --json tagName >/dev/null 2>&1; then
+  # Only GitHub's 404 means the Release is missing. Any other failure, a
+  # 5xx like the one Issue-219 met, a rate limit or a token problem, stops
+  # the job so a re-run can read it again; reading it as missing would send
+  # the create into the Release that is there.
+  if found="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" --jq .tag_name 2>&1)"; then
     echo "$sha is already released as $tag, with its GitHub Release; nothing to write"
     summary
     exit 0
   fi
-  echo "$sha is already tagged $tag; writing its missing GitHub Release"
+  case "$found" in
+    *"(HTTP 404)"*) echo "$sha is already tagged $tag; writing its missing GitHub Release" ;;
+    *) echo "could not read the GitHub Release for $tag: $found" >&2; exit 1 ;;
+  esac
 else
   day="v$(date -u +%Y.%m.%d)"
   tag="$day"
