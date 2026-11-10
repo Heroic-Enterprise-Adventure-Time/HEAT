@@ -11,6 +11,7 @@ import {
   type BattleSetup,
   CombatEngine,
   type CombatProfile,
+  type GatherRatings,
   type MonsterProfile,
   type Opponent,
   type PartyMember,
@@ -18,10 +19,10 @@ import {
   type UnitType,
 } from "../../src/index.js";
 
-export function hero(unitId: string, unitType: UnitType, health?: number): PartyMember {
+export function hero(unitId: string, unitType: UnitType, health?: number, gather?: GatherRatings): PartyMember {
   const profile = UNIT_PROFILES[unitType];
   if (!profile) throw new Error(`No profile for ${unitType}`);
-  return { unitId, unitType, health: health ?? profile.stats.maxHealth, stats: profile.stats };
+  return { unitId, unitType, health: health ?? profile.stats.maxHealth, stats: gather ? { ...profile.stats, gather } : profile.stats };
 }
 
 export function opponent(unitId: string, type: Opponent["type"]): Opponent {

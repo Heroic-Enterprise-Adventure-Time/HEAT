@@ -75,8 +75,18 @@ export type AdventureEvent =
   | AdventureEndEvent
   | BattleEvent;
 
-/** Bumped when the events' shape changes (architecture overview, "The adventure loop"). */
-export const ADVENTURE_TIMELINE_SCHEMA_VERSION = 1;
+/**
+ * Bumped when the events' shape or meaning changes; a stored timeline of
+ * another version is not played, "replay unavailable", and none is migrated
+ * (docs/architecture/adventure-loop.md). 2: the battle's version 2, and the
+ * party's stats carry gather ratings (decision 0051).
+ */
+export const ADVENTURE_TIMELINE_SCHEMA_VERSION = 2;
+
+/** Whether a stored timeline's events are this engine's, so that a client built with it can play them. */
+export function isPlayableTimeline(timeline: { readonly schemaVersion?: unknown }): boolean {
+  return timeline.schemaVersion === ADVENTURE_TIMELINE_SCHEMA_VERSION;
+}
 
 export interface AdventureTimeline {
   readonly schemaVersion: number;

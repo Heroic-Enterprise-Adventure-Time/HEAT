@@ -65,7 +65,7 @@ function addTo(amounts: Partial<Record<Material, number>>, rewards: readonly Rew
 
 /** The battle a fight or gather stage runs: its opponents, ids unique on the whole timeline. */
 function opponentsOf(stage: Stage, index: number): Opponent[] {
-  const groups = stage.kind === "fight" ? stage.monsters : stage.kind === "gather" ? stage.nodes : [];
+  const groups = stage.kind === "fight" || stage.kind === "gather" ? stage.opponents : [];
   return groups.flatMap(({ type, count }) => range(count).map((n) => ({ unitId: `s${String(index)}-${type}-${String(n + 1)}`, type })));
 }
 
@@ -288,7 +288,6 @@ export class AdventureEngine {
           party,
           opponents: opponentsOf(stage, index),
           timeLimitMs: stage.timeLimitMs,
-          ...(stage.kind === "gather" ? { carryLimit: stage.carry } : {}),
         },
         this.content.battle,
       );
