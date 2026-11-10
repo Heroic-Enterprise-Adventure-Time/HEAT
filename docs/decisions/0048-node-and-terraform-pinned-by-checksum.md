@@ -29,7 +29,7 @@
 
 ## What it leaves open
 
-- Nothing tracks the two pins: Dependabot followed setup-node and setup-terraform, and does not read an `env:` block. A pin falling behind is a defect under typescript.md rule 1 and terraform.md rule 13; how it is noticed is a follow-up issue on the checkup.
+- Nothing tracks the two pins: Dependabot followed setup-node and setup-terraform, and does not read an `env:` block. A pin falling behind is a defect under typescript.md rule 1 and terraform.md rule 13; since Issue-275 the checkup notices it, comparing both pins with the latest releases at every pause (`docs/runbooks/checkup.md`, rule 12).
 - The owner's machine runs Terraform and Node of its own; it tracks the pins by hand.
 
 ## Facts checked

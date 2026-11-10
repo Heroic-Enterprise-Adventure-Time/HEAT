@@ -9,4 +9,5 @@ Follow `docs/runbooks/checkup.md`, step by step, on `main`: it holds the rules, 
 
 - `$ARGUMENTS` is empty for the whole tree, or one area name from the runbook's table (rule 1). This session must have no issue in flight; if it does, stop and say so.
 - A pass of the runbook's rule 4 is a subagent, the Agent tool with the `general-purpose` type, given the pass's brief; the passes run in one message so they run beside each other. The subagent's report is a claim: read the cited lines yourself before filing (rule 8).
+- The pin check of the runbook's rule 12 reads the two release indexes with `curl` in the Bash tool, piped to `node -e` to pick the version, not with WebFetch, which returns a summary rather than the JSON.
 - The issue bodies are written with the Write tool to the scratchpad and passed with `--body-file`, because a body on the command line loses its backslashes.
