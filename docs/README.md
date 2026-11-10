@@ -18,7 +18,9 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
-| [architecture/overview.md](architecture/overview.md) | The system: three diagrams, then services, data, flows, build order | When the agent reads it |
+| [architecture/overview.md](architecture/overview.md) | The system: three diagrams, then services, data, environments, build order | When the agent reads it |
+| [architecture/adventure-loop.md](architecture/adventure-loop.md) | The adventure loop: the seed and the snapshot, the override log, one version per deploy, what start, submit and discard write, the client's play, resume and replay, what verification proves | When the agent reads it |
+| [architecture/camps.md](architecture/camps.md) | Camps, heroes and resources: the player table's keys, the recruit, retire, build and settle transactions, and the location table's keys for the heroes seen at a location, recent adventures and replays by job | When the agent reads it |
 | [decisions/](decisions/README.md) | One record per significant decision, including what was rejected | When the agent reads it |
 | [../terraform/backend/README.md](../terraform/backend/README.md) | The state bucket, who applies it, and the one-time bootstrap | When the agent reads it |
 | [../terraform/bootstrap/README.md](../terraform/bootstrap/README.md) | The pipeline's plan and apply roles, their boundary and the budget action in each workload account, who applies, what waits on what | When the agent reads it |

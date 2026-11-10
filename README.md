@@ -135,7 +135,9 @@ The platform and the core loop, steps 1 and 2 of the build order in [docs/archit
 | --- | --- |
 | Every project document, and how documents are written | [docs/README.md](docs/README.md) |
 | What the player does | [docs/design/game.md](docs/design/game.md) |
-| The system: services, data, flows, build order | [docs/architecture/overview.md](docs/architecture/overview.md) |
+| The system: services, data, environments, build order | [docs/architecture/overview.md](docs/architecture/overview.md) |
+| The adventure loop: start, play, verify, replay | [docs/architecture/adventure-loop.md](docs/architecture/adventure-loop.md) |
+| The tables' keys and the transactions that write them | [docs/architecture/camps.md](docs/architecture/camps.md) |
 | Why a choice was made, and what was rejected | [docs/decisions/](docs/decisions/README.md) |
 | How a change is run and seen before review | [docs/process/development.md](docs/process/development.md) |
 | Each stack: what it manages and whether it is applied | the README in each directory under [terraform/](terraform/) |
