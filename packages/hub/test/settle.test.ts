@@ -69,7 +69,7 @@ async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): P
 }
 
 async function start(p: string, heroes: Hero[], issuedBy = version) {
-  return startAdventure(repo, p, issuedBy, at, wolves.id, heroes.map((h) => h.id));
+  return startAdventure(repo, p, issuedBy, randomUUID(), at, wolves.id, heroes.map((h) => h.id));
 }
 
 

@@ -10,7 +10,7 @@ import { stageWords } from '../camp/panels/job-words';
 import { type AdventureResultView, Game } from '../game';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
-import { secondsLeft } from './field';
+import { secondsLeft, waitingWords } from './field';
 import { Play, SPEEDS } from './play';
 
 /** Calls `onFrame` with the wall-clock milliseconds since the last frame until stopped; a test provides one it drives by hand. */
@@ -124,6 +124,13 @@ export class Adventure {
     const field = this.play.field();
     return !!field && field.outcome === null && field.timeLimitMs !== null;
   });
+  /** Why the ability buttons are disabled, shown beside them (angular.md, rule 14); null while they can be used. */
+  protected readonly abilitiesWait = computed(() => {
+    const field = this.play.field();
+    return field ? waitingWords(field) : null;
+  });
+  /** The note's id while it shows, which describes each hero's ability buttons. */
+  protected readonly abilitiesWaitId = computed(() => (this.abilitiesWait() ? 'abilities-wait' : null));
 
   constructor() {
     effect(() => {

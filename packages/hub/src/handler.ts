@@ -3,7 +3,6 @@ import { handlers, startServerAndCreateLambdaHandler } from "@as-integrations/aw
 import { injectLambdaContext } from "@aws-lambda-powertools/logger/middleware";
 import { logMetrics } from "@aws-lambda-powertools/metrics/middleware";
 import { captureLambdaHandler } from "@aws-lambda-powertools/tracer/middleware";
-import { S3Client } from "@aws-sdk/client-s3";
 import middy from "@middy/core";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2, Context as LambdaContext } from "aws-lambda";
 
@@ -11,7 +10,7 @@ import { type Context, createContextFactory } from "./context.js";
 import { configFromEnv, createDocumentClient } from "./db/client.js";
 import { logger, metrics, requestLogging, tracer } from "./observability.js";
 import { schema } from "./schema/schema.js";
-import { replayBucketFromEnv, S3Timelines } from "./timelines.js";
+import { createS3Client, replayBucketFromEnv, S3Timelines } from "./timelines.js";
 import { outdatedFlag, previousVersionFromEnv, versionFromEnv } from "./version.js";
 
 /**
@@ -28,7 +27,10 @@ const config = configFromEnv();
 const version = versionFromEnv();
 const previousVersion = previousVersionFromEnv();
 const db = createDocumentClient(config, (client) => tracer.captureAWSv3Client(client));
-const timelines = new S3Timelines(tracer.captureAWSv3Client(new S3Client({ region: config.region ?? "us-east-1" })), replayBucketFromEnv());
+const timelines = new S3Timelines(
+  createS3Client({ region: config.region ?? "us-east-1" }, (client) => tracer.captureAWSv3Client(client)),
+  replayBucketFromEnv(),
+);
 
 export const server = new ApolloServer<Context>({ schema, plugins: [requestLogging(), outdatedFlag()] });
 

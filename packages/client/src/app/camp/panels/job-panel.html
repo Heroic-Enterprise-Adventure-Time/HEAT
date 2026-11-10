@@ -32,23 +32,25 @@
       <a class="link" [routerLink]="['/camp', game.location(), 'heroes-hall']">heroes hall</a>.
     </p>
   } @else {
-    <p>Pick one to {{ maxParty }} heroes.</p>
-    <ul class="party" aria-labelledby="party-title">
-      @for (hero of game.livingHere(); track hero.id) {
-        <li>
-          <label>
-            <input
-              type="checkbox"
-              [checked]="picked().has(hero.id)"
-              [disabled]="!picked().has(hero.id) && picked().size >= maxParty"
-              (change)="toggle(hero.id)"
-            />
-            {{ hero.name }}
-          </label>
-          <span>{{ hero.unitType }}, level {{ hero.level }}</span>
-        </li>
-      }
-    </ul>
+    <div role="group" aria-labelledby="party-title" aria-describedby="party-size">
+      <p id="party-size">Pick one to {{ maxParty }} heroes.</p>
+      <ul class="party">
+        @for (hero of game.livingHere(); track hero.id) {
+          <li>
+            <label>
+              <input
+                type="checkbox"
+                [checked]="picked().has(hero.id)"
+                [disabled]="!picked().has(hero.id) && picked().size >= maxParty"
+                (change)="toggle(hero.id)"
+              />
+              {{ hero.name }}
+            </label>
+            <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+          </li>
+        }
+      </ul>
+    </div>
     <button type="button" [disabled]="picked().size === 0 || pending()" (click)="depart(job.id)">Depart</button>
   }
   @if (refusal(); as refusal) {

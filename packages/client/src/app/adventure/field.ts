@@ -149,3 +149,24 @@ export function secondsLeft(field: Field, simTime: number): number | null {
   const left = field.stageStart + field.timeLimitMs - simTime;
   return left <= 10_000 && left > 0 ? Math.ceil(left / 1000) : null;
 }
+
+/**
+ * Why a hero's ability buttons wait, in the player's words, or null while
+ * they can be used: in a fight or a gather, before the end (angular.md, rule
+ * 14). Out of one, the stage's kind says where the party is: on the road,
+ * nearly home, or in a fight or a gather that has not begun or has just
+ * ended, a window between a stage's events (Issue-168, from the review of
+ * PR-254).
+ */
+export function waitingWords(field: Field): string | null {
+  if (field.outcome !== null) return 'The adventure is over.';
+  if (field.timeLimitMs !== null) return null;
+  switch (field.stageKind) {
+    case 'travel':
+      return 'On the road: abilities are for a fight or a gather.';
+    case 'arrive':
+      return 'Nearly home: abilities are for a fight or a gather.';
+    default:
+      return 'Abilities are for a fight or a gather while it is under way.';
+  }
+}

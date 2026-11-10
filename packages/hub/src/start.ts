@@ -15,21 +15,23 @@ import { retryingConflicts } from "./conflict.js";
 import {
   AdventureAlreadyOpen,
   type AdventureRecord,
+  AlreadyApplied,
   campLevels,
   FacilityMissing,
   type Hero,
   HeroChanged,
   type Repository,
 } from "./db/repository.js";
-import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, type Refusal, Requires } from "./refusals.js";
+import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Refusal, Requires } from "./refusals.js";
 
 /**
  * Starting an adventure from a location's job board, or from a facility the
  * camp has built (overview, "The adventure loop"; decision 0030; Issue-133).
- * The client names the location, the job and the party; the hub checks
- * them, issues the seed and the frozen
- * snapshot of the party, stamped with the deploy's version, and opens the
- * player's one adventure.
+ * The client names the location, the job, the party and the request's id,
+ * which becomes the adventure's id; the hub checks them, issues the seed and
+ * the frozen snapshot of the party, stamped with the deploy's version, and
+ * opens the player's one adventure. A repeat answers the adventure the
+ * request started, as it is (graphql.md, rule 7).
  *
  * The rules are checked twice, as recruiting's are: here, against what was
  * read, to give the player a reason; and in the transaction's conditions,
@@ -84,22 +86,63 @@ function snapshotHero(hero: Hero): SnapshotHero {
   };
 }
 
+/**
+ * The adventure this request started, if any: its request id is the
+ * adventure's id (graphql.md, rule 7), and it is answered as it is now,
+ * open, settled or discarded. The id with another location, job or party,
+ * or another player's adventure, is the client's defect: BAD_USER_INPUT,
+ * never the first request's adventure.
+ */
+async function startedBy(
+  repo: Repository,
+  playerId: string,
+  requestId: string,
+  locationId: string,
+  jobId: string,
+  heroIds: readonly string[],
+): Promise<AdventureRecord | undefined> {
+  const adventure = await repo.getAdventure(requestId);
+  if (!adventure) return undefined;
+  const party = adventure.snapshot.heroes.map((h) => h.heroId);
+  // The party's ids are distinct (StartAdventureInput), so the same ids in any order are the same party.
+  const sameParty = party.length === heroIds.length && heroIds.every((id) => party.includes(id));
+  const same = adventure.playerId === playerId && adventure.location === locationId && adventure.jobId === jobId && sameParty;
+  if (!same) badInput(`request ${requestId} started another adventure`);
+  return adventure;
+}
+
 export function startAdventure(
   repo: Repository,
   playerId: string,
   version: string,
+  requestId: string,
   locationId: string,
   jobId: string,
   heroIds: readonly string[],
   now = new Date(),
 ): Promise<AdventureRecord> {
-  return retryingConflicts("start", "the party changed while starting; no adventure was started", () => startOnce(repo, playerId, version, locationId, jobId, heroIds, now));
+  return retryingConflicts("start", "the party changed while starting; no adventure was started", async () => {
+    try {
+      return await startOnce(repo, playerId, version, requestId, locationId, jobId, heroIds, now);
+    } catch (e) {
+      // A refusal is final only once the work is read as not done after it
+      // (graphql.md, rule 9). A repeat of a start that committed, the
+      // player's or the SDK's retry of a transaction whose answer timed out,
+      // finds its own adventure open, or its party on it or back, and is
+      // answered with that adventure.
+      if (!(e instanceof Refusal)) throw e;
+      const started = await startedBy(repo, playerId, requestId, locationId, jobId, heroIds);
+      if (started) return started;
+      throw e;
+    }
+  });
 }
 
 async function startOnce(
   repo: Repository,
   playerId: string,
   version: string,
+  requestId: string,
   locationId: string,
   jobId: string,
   heroIds: readonly string[],
@@ -151,7 +194,7 @@ async function startOnce(
   const snapshot: AdventureSnapshot = { version, jobId: job.id, heroes: heroes.map(snapshotHero) };
   try {
     return await repo.startAdventure(playerId, {
-      adventureId: randomUUID(),
+      adventureId: requestId,
       seed: randomUUID(),
       location: at.id,
       jobId: job.id,
@@ -160,7 +203,8 @@ async function startOnce(
       startedAt: now.toISOString(),
     }, needs);
   } catch (e) {
-    if (!(e instanceof AdventureAlreadyOpen || e instanceof HeroChanged || e instanceof FacilityMissing)) throw e;
+    // AlreadyApplied: the record exists with no open item, a repeat after the adventure ended.
+    if (!(e instanceof AdventureAlreadyOpen || e instanceof AlreadyApplied || e instanceof HeroChanged || e instanceof FacilityMissing)) throw e;
     // Another request got there first: answer with what it changed.
     const winner = await repo.openAdventure(playerId);
     if (winner) refuseOpen(winner.adventureId);
