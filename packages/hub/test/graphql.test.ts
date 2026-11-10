@@ -1,13 +1,15 @@
 import { randomUUID } from "node:crypto";
 
+import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { MAX_PARTY, must } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient } from "../src/db/client.js";
+import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
+import { storedItem } from "./data.js";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
@@ -27,13 +29,17 @@ type Handler = (event: APIGatewayProxyEventV2WithJWTAuthorizer, context: LambdaC
 
 let handler: Handler;
 let repo: Repository;
+let db: DynamoDBDocumentClient;
+let tables: Tables;
 
 beforeAll(async () => {
   // The handler reads its configuration at import time, after global setup
   // has set the environment, so it is imported here rather than at the top.
   handler = (await import("../src/handler.js")).handler as unknown as Handler;
   const config = configFromEnv();
-  repo = new Repository(createDocumentClient(config), config.tables);
+  db = createDocumentClient(config);
+  tables = config.tables;
+  repo = new Repository(db, tables);
 });
 
 function event(
@@ -260,6 +266,28 @@ describe("the camp through the graph", () => {
 });
 
 describe("the adventure loop through the graph", () => {
+  it("answers a snapshot issued before the gather ratings with none, so an adventure open across that deploy is still read (Issue-283)", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(JOIN, {}, p);
+    const villager = randomUUID();
+    await gql(RECRUIT, { id: villager }, p);
+    const start = await gql(START, { requestId: randomUUID(), heroIds: [villager] }, p);
+    const { id: adventureId } = must(start.data?.startAdventure.adventure, "the start's adventure");
+
+    // The record as the deploy before wrote it: one `gathering` stat and no ratings.
+    const key = { PK: `ADVENTURE#${adventureId}`, SK: "RECORD" };
+    const record = must(await storedItem(db, tables.location, key), "the adventure's record") as { snapshot: { heroes: { stats: Record<string, unknown> }[] } };
+    const heroes = record.snapshot.heroes.map((h) => ({ ...h, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }));
+    await db.send(new PutCommand({ TableName: tables.location, Item: { ...record, snapshot: { ...record.snapshot, heroes } } }));
+
+    const me = await gql(
+      `{ me { openAdventure { id snapshot { heroes { stats { maxHealth speed damage gather { material rating } } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
+      {}, p,
+    );
+    expect(me.errors).toBeUndefined();
+    expect(me.data?.me.openAdventure).toEqual({ id: adventureId, snapshot: { heroes: [{ stats: { maxHealth: 30, speed: 8, damage: 4, gather: [] } }] } });
+  });
+
   it("starts a job with the villager, shows it on me, refuses a second start, and settles with the engine's rewards once", async () => {
     const p = `p-${randomUUID()}`;
     await gql(JOIN, {}, p);
