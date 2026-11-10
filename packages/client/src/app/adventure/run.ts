@@ -182,26 +182,29 @@ export interface SavedRun {
 }
 
 /**
- * A saved run as the browser kept it: each entry one of the engine's
- * `AdventureLogEntry` union, and the time reached. The storage is the
- * player's to edit, so what comes back is checked before the engine sees
- * it; `loadRun` answering the schema's output as a `SavedRun` is the
- * compile-time check that the two agree.
+ * One entry of a saved log: one of the engine's `AdventureLogEntry` union.
+ * Strict, so a key the schema does not know makes the run unreadable, and it
+ * starts again from the seed, rather than resuming with a field dropped and a
+ * log that differs from the one played.
  */
-const SavedRunSchema = z.object({
-  log: z.array(
-    z.discriminatedUnion('kind', [
-      z.object({
-        kind: z.literal('unit'),
-        acceptedAtSimTime: z.number(),
-        unitId: z.string(),
-        override: z.object({ kind: z.literal('force-action'), abilityId: z.string() }),
-      }),
-      z.object({ kind: z.literal('party'), acceptedAtSimTime: z.number(), order: z.enum(['press-on', 'retreat']) }),
-    ]),
-  ),
-  simTime: z.number(),
-});
+const LogEntrySchema = z.discriminatedUnion('kind', [
+  z.strictObject({
+    kind: z.literal('unit'),
+    acceptedAtSimTime: z.number(),
+    unitId: z.string(),
+    override: z.strictObject({ kind: z.literal('force-action'), abilityId: z.string() }),
+  }),
+  z.strictObject({ kind: z.literal('party'), acceptedAtSimTime: z.number(), order: z.enum(['press-on', 'retreat']) }),
+]);
+
+/** Whether two types are each assignable to the other. */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+// The schema and the engine's union agree both ways: a member, a field or an order the engine gains and the schema lacks fails to compile here.
+const _entriesAgree: Same<z.output<typeof LogEntrySchema>, AdventureLogEntry> = true;
+
+/** A saved run as the browser kept it: the log and the time reached. The storage is the player's to edit, so what comes back is checked before the engine sees it. */
+const SavedRunSchema = z.strictObject({ log: z.array(LogEntrySchema), simTime: z.number() });
 
 /** The saved log of an adventure, or null when there is none or it cannot be read: the run then starts again with the same seed. */
 export function loadRun(adventureId: string): SavedRun | null {
