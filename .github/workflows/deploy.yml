@@ -94,11 +94,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Set up Node from .node-version
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          cache: npm
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
 
       - name: Install exactly what package-lock.json records
         run: npm ci
@@ -179,15 +176,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
-        with:
-          terraform_wrapper: false
+      - name: Set up Terraform, pinned and checked
+        uses: $/.github/actions/terraform
 
-      - name: Set up Node from .node-version
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
 
       # The root zips dist/<name>/ and plans the function from its hash
       # (decision 0017), so the bundle exists before the plan.
@@ -300,15 +293,11 @@ jobs:
       - name: Check out main
         uses: actions/checkout@v7.0.1
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
-        with:
-          terraform_wrapper: false
+      - name: Set up Terraform, pinned and checked
+        uses: $/.github/actions/terraform
 
-      - name: Set up Node from .node-version
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
 
       - name: Download the bundles
         if: matrix.code
@@ -445,11 +434,8 @@ jobs:
       - name: Check out main
         uses: actions/checkout@v7.0.1
 
-      - name: Set up Node from .node-version
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version-file: .node-version
-          cache: npm
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
 
       - name: Test the environment, its API and its page
         id: test

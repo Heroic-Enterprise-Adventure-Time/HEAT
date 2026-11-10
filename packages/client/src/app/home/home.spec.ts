@@ -48,6 +48,13 @@ describe('Home', () => {
   it('says so when the stack configuration did not load', async () => {
     await renderHome(fakeSession(null), 'GET /config.json answered 404');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
-    expect(screen.getByText('The page could not load its stack configuration: GET /config.json answered 404.')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/^The page could not load its stack configuration: GET \/config\.json answered 404\.$/);
+  });
+
+  it('says why the session failed, as an alert', async () => {
+    const session = fakeSession(null);
+    session.error.set('The sign-in could not be completed.');
+    await renderHome(session);
+    expect(screen.getByRole('alert')).toHaveTextContent(/^The sign-in could not be completed\.$/);
   });
 });

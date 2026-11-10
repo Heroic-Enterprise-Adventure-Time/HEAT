@@ -277,8 +277,9 @@ const home = (await graphql(token, heroQuery)).data?.me;
 const party = home?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");
 check(party?.unitType === "VILLAGER", `the camp has a living villager to send: ${party?.id}`);
 const startFields = `__typename ... on Error { message } ... on AdventureOpen { adventureId } ... on Requires { missing { kind level } }`;
-const startMutation = `mutation($heroIds: [ID!]!) { startAdventure(input: { location: "millbrook", jobId: "${job}", heroIds: $heroIds }) { ${startFields} ... on StartAdventureSuccess { adventure { id seed } } } }`;
-const start = await graphql(token, startMutation, { heroIds: [party.id] });
+const startMutation = `mutation($requestId: UUID!, $heroIds: [ID!]!) { startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "${job}", heroIds: $heroIds }) { ${startFields} ... on StartAdventureSuccess { adventure { id seed } } } }`;
+const startId = crypto.randomUUID();
+const start = await graphql(token, startMutation, { requestId: startId, heroIds: [party.id] });
 check(!start.errors && success(start, "startAdventure", "adventure")?.id, `startAdventure set out on the timber job: ${JSON.stringify(start.data)} (${start.ms} ms)`);
 const { id, seed } = success(start, "startAdventure", "adventure");
 
@@ -288,7 +289,10 @@ check(!open.errors && adventure?.id === id && adventure.seed === seed && adventu
 check(adventure.snapshot?.jobId === adventure.job.id && adventure.snapshot.heroes.length === 1 && adventure.snapshot.heroes[0].heroId === party.id && adventure.snapshot.heroes[0].unitType === "VILLAGER", `the snapshot holds the villager and the job: ${JSON.stringify(adventure.snapshot?.heroes)}`);
 check(adventure.version === config.version && adventure.snapshot.version === config.version, `the adventure is stamped with config.json's version, so the hub and the client carry one (${adventure.version})`);
 
-const again = await graphql(token, startMutation, { heroIds: [party.id] });
+check(id === startId, `the adventure's id is the start's request id (${id})`);
+const repeat = await graphql(token, startMutation, { requestId: startId, heroIds: [party.id] });
+check(!repeat.errors && success(repeat, "startAdventure", "adventure")?.id === id, `a repeat of the start answers the adventure it started (${repeat.ms} ms)`);
+const again = await graphql(token, startMutation, { requestId: crypto.randomUUID(), heroIds: [party.id] });
 check(!again.errors && again.data?.startAdventure?.__typename === "AdventureOpen" && again.data.startAdventure.adventureId === id, `a second start is refused with AdventureOpen, naming the open one (${again.ms} ms)`);
 const busy = await graphql(token, `mutation($id: ID!) { retireHero(input: { heroId: $id }) { __typename ... on HeroAdventuring { heroId } } }`, { id: party.id });
 check(!busy.errors && busy.data?.retireHero?.__typename === "HeroAdventuring" && busy.data.retireHero.heroId === party.id, `the villager cannot retire while it is adventuring (${busy.ms} ms)`);
@@ -382,15 +386,15 @@ if (mineLevel(campBefore) === 0 && (timberBefore < 60 || clothBefore < 3)) {
 // which pays for a fighter, retired at once so the hall never fills.
 const oreJob = "ore-from-the-hill";
 const snapshotFields = `snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gathering } } }`;
-const oreStartMutation = `mutation($heroIds: [ID!]!) { startAdventure(input: { location: "millbrook", jobId: "${oreJob}", heroIds: $heroIds }) { ${startFields} ... on StartAdventureSuccess { adventure { id seed ${snapshotFields} } } } }`;
+const oreStartMutation = `mutation($requestId: UUID!, $heroIds: [ID!]!) { startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "${oreJob}", heroIds: $heroIds }) { ${startFields} ... on StartAdventureSuccess { adventure { id seed ${snapshotFields} } } } }`;
 const atMine = campIn((await graphql(token, facilitiesQuery)).data?.me);
 const miner = (await graphql(token, heroQuery)).data?.me?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");
 if (mineLevel(atMine) === 0) {
-  const refused = await graphql(token, oreStartMutation, { heroIds: [miner.id] });
+  const refused = await graphql(token, oreStartMutation, { requestId: crypto.randomUUID(), heroIds: [miner.id] });
   const why = refused.data?.startAdventure;
   check(!refused.errors && why?.__typename === "Requires" && why.missing?.[0]?.kind === "MINE", `the mine's job is refused while the camp has no mine: ${JSON.stringify(why)} (${refused.ms} ms)`);
 } else {
-  const set = await graphql(token, oreStartMutation, { heroIds: [miner.id] });
+  const set = await graphql(token, oreStartMutation, { requestId: crypto.randomUUID(), heroIds: [miner.id] });
   const ore = success(set, "startAdventure", "adventure");
   check(!set.errors && ore?.id, `startAdventure set out on the mine's job from the built mine: ${JSON.stringify(set.data)} (${set.ms} ms)`);
   const expectedOre = replay(engineSnapshot(ore.snapshot), ore.seed, []).result;

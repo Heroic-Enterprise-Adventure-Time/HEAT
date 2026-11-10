@@ -3,12 +3,12 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
-import { Game } from '../../game';
-import { Refusal } from '../../hub';
+import { Game, type RetireRefusal } from '../../game';
+import { refusalWords } from '../../hub';
 import { CampState } from '../camp-state';
 
 /** The hub's refusals of a retirement, by type, in the player's words; any other is shown as the hub put it. */
-const REFUSALS: Readonly<Record<string, string>> = {
+const REFUSALS: Readonly<Record<RetireRefusal, string>> = {
   HeroAdventuring: 'This hero is away on an adventure, and retires once it is settled.',
   Conflict: 'The camp changed while retiring, and nobody retired. Try again.',
 };
@@ -49,8 +49,7 @@ export class HeroCard {
       this.confirming.set(null);
       this.camp.leaving.set(hero.id);
     } catch (e) {
-      const kind = e instanceof Refusal ? e.kind : null;
-      this.refused.set((kind && REFUSALS[kind]) ?? (e instanceof Error ? e.message : String(e)));
+      this.refused.set(refusalWords(e, REFUSALS));
     } finally {
       this.pending.set(false);
     }

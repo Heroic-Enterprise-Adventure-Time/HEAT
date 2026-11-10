@@ -69,7 +69,7 @@ describe("startAdventure", () => {
     const villager = await recruitHero(repo, p, "villager", randomUUID());
     const now = new Date("2026-10-22T09:00:00Z");
 
-    const started = await startAdventure(repo, p, version, at, wolves, [villager.id], now);
+    const started = await startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id], now);
 
     expect(started).toMatchObject({ playerId: p, location: at, jobId: wolves, version, startedAt: now.toISOString(), status: "OPEN" });
     expect(started.seed).toMatch(/^[0-9a-f-]{36}$/);
@@ -90,7 +90,7 @@ describe("startAdventure", () => {
     const p = player();
     const heroes = await putHeroes(p, ["ALIVE", "ALIVE", "ALIVE", "ALIVE"]);
     const ids = heroes.map((h) => h.id).reverse();
-    const started = await startAdventure(repo, p, version, at, "timber-from-the-near-woods", ids);
+    const started = await startAdventure(repo, p, version, randomUUID(), at, "timber-from-the-near-woods", ids);
     expect(started.snapshot.heroes.map((h) => h.heroId)).toEqual(ids);
   });
 
@@ -99,19 +99,78 @@ describe("startAdventure", () => {
     const heroes = await putHeroes(p, ["ALIVE", "ALIVE"]);
     const a = must(heroes[0], "hero a");
     const b = must(heroes[1], "hero b");
-    const first = await startAdventure(repo, p, version, at, wolves, [a.id]);
-    const refused = await refusal(startAdventure(repo, p, version, at, wolves, [b.id]));
+    const first = await startAdventure(repo, p, version, randomUUID(), at, wolves, [a.id]);
+    const refused = await refusal(startAdventure(repo, p, version, randomUUID(), at, wolves, [b.id]));
     expect(refused).toBeInstanceOf(AdventureOpen);
     expect(refused).toMatchObject({ adventureId: first.adventureId });
     expect((await repo.getHero(p, b.id))?.adventureId).toBeNull();
   });
 
+  it("answers a repeat with the adventure it started, open, settled or discarded, and refuses its id for another start", async () => {
+    const p = player();
+    const villager = await recruitHero(repo, p, "villager", randomUUID());
+    const requestId = randomUUID();
+    const first = await startAdventure(repo, p, version, requestId, at, wolves, [villager.id]);
+    expect(first.adventureId).toBe(requestId);
+    expect(await startAdventure(repo, p, version, requestId, at, wolves, [villager.id])).toEqual(first);
+    expect(await refusal(startAdventure(repo, p, version, requestId, at, "timber-from-the-near-woods", [villager.id]))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, player(), version, requestId, at, wolves, [villager.id]))).toMatchObject(BAD_USER_INPUT);
+
+    // Settled: the lone villager dies to the wolves (settle.test.ts), so the repeat's party is refused, and then found started.
+    await submitAdventure(repo, new MemoryTimelines(), p, version, requestId, []);
+    expect(await startAdventure(repo, p, version, requestId, at, wolves, [villager.id])).toMatchObject({ adventureId: requestId, status: "SETTLED" });
+
+    // Discarded: the party is back and alive, so the repeat reaches the transaction, whose record already exists.
+    const q = player();
+    const hero = must((await putHeroes(q, ["ALIVE"]))[0], "the hero");
+    const again = randomUUID();
+    await repo.discard(q, await startAdventure(repo, q, version, again, at, wolves, [hero.id]));
+    expect(await startAdventure(repo, q, version, again, at, wolves, [hero.id])).toMatchObject({ adventureId: again, status: "DISCARDED" });
+    expect(await repo.openAdventure(q)).toBeUndefined();
+    expect((await repo.getHero(q, hero.id))?.adventureId).toBeNull();
+  });
+
+  it("answers the adventure when the SDK sends a start again after it committed", async () => {
+    const p = player();
+    const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+    const requestId = randomUUID();
+    // The transaction commits and its answer is lost, so the SDK sends it again, which its own writes refuse.
+    const resent = new Proxy(repo, {
+      get: (target, key, receiver): unknown =>
+        key === "startAdventure"
+          ? async (...args: Parameters<Repository["startAdventure"]>): Promise<AdventureRecord> => {
+              await target.startAdventure(...args);
+              return target.startAdventure(...args);
+            }
+          : Reflect.get(target, key, receiver),
+    });
+    const started = await startAdventure(resent, p, version, requestId, at, wolves, [hero.id]);
+    expect(started).toMatchObject({ adventureId: requestId, status: "OPEN" });
+    expect(await repo.openAdventure(p)).toMatchObject({ adventureId: requestId });
+  });
+
+  it("answers a repeat with the first's adventure wherever the first commits", async () => {
+    const answered = await everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      const requestId = randomUUID();
+      let first: AdventureRecord | undefined;
+      const late = winnerBefore(repo, k, async () => (first = await startAdventure(repo, p, version, requestId, at, wolves, [hero.id])));
+      const repeat = await startAdventure(late.repo, p, version, requestId, at, wolves, [hero.id]);
+      if (!late.ran()) return false;
+      expect(repeat).toEqual(first);
+      return true;
+    });
+    // Before each of openAdventure, getHero and startAdventure.
+    expect(answered).toBe(3);
+  });
+
   it("refuses a job that is not on the location's board, and a location that does not exist", async () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    expect(await refusal(startAdventure(repo, p, version, at, "dragons-in-the-well", [hero.id]))).toMatchObject(BAD_USER_INPUT);
-    expect(await refusal(startAdventure(repo, p, version, at, "toString", [hero.id]))).toMatchObject(BAD_USER_INPUT);
-    expect(await refusal(startAdventure(repo, p, version, "atlantis", wolves, [hero.id]))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, p, version, randomUUID(), at, "dragons-in-the-well", [hero.id]))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, p, version, randomUUID(), at, "toString", [hero.id]))).toMatchObject(BAD_USER_INPUT);
+    expect(await refusal(startAdventure(repo, p, version, randomUUID(), "atlantis", wolves, [hero.id]))).toMatchObject(BAD_USER_INPUT);
   });
 
   it("refuses another player's hero, a hero elsewhere, a dead hero and a retired one", async () => {
@@ -122,7 +181,7 @@ describe("startAdventure", () => {
     const alive = must(heroes[0], "the living hero");
     const dead = must(heroes[1], "the dead hero");
     const retired = must(heroes[2], "the retired hero");
-    const refused = (ids: string[]) => refusal(startAdventure(repo, p, version, at, wolves, ids));
+    const refused = (ids: string[]) => refusal(startAdventure(repo, p, version, randomUUID(), at, wolves, ids));
     // Another player's hero is not said to exist, so it is the client's defect, not a refusal.
     expect(await refused([alive.id, theirs.id])).toMatchObject(BAD_USER_INPUT);
     expect(await refused([randomUUID()])).toMatchObject(BAD_USER_INPUT);
@@ -143,7 +202,7 @@ describe("startAdventure", () => {
       const third = must(heroes[2], "the third hero").id;
       // Two starts with the same hero, one with another: every pair conflicts somewhere.
       const parties = [[first], [first], [second, third]];
-      const results = await Promise.allSettled(parties.map((ids) => startAdventure(repo, p, version, at, wolves, ids)));
+      const results = await Promise.allSettled(parties.map((ids) => startAdventure(repo, p, version, randomUUID(), at, wolves, ids)));
       const won = results.flatMap((r) => (r.status === "fulfilled" ? [r.value] : []));
       expect(won).toHaveLength(1);
       const winner = must(won[0], "the winning start");
@@ -165,8 +224,8 @@ describe("startAdventure", () => {
       const p = player();
       const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
       let winner: AdventureRecord | undefined;
-      const late = place(k, async () => (winner = await startAdventure(repo, p, version, at, wolves, [hero.id])));
-      const lost = await refusal(startAdventure(late.repo, p, version, at, wolves, [hero.id]));
+      const late = place(k, async () => (winner = await startAdventure(repo, p, version, randomUUID(), at, wolves, [hero.id])));
+      const lost = await refusal(startAdventure(late.repo, p, version, randomUUID(), at, wolves, [hero.id]));
       if (!late.ran()) return false;
       expect(lost).toBeInstanceOf(AdventureOpen);
       expect(lost).toMatchObject({ adventureId: winner?.adventureId });
@@ -198,7 +257,7 @@ describe("a facility's job (Issue-133)", () => {
   it("refuses the mine's job while the camp has not built the mine, and writes nothing", async () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    const refused = await refusal(startAdventure(repo, p, version, at, ore, [hero.id]));
+    const refused = await refusal(startAdventure(repo, p, version, randomUUID(), at, ore, [hero.id]));
     expect(refused).toBeInstanceOf(Requires);
     expect(refused).toMatchObject({ missing: [{ kind: "mine", level: 1 }] });
     expect(await repo.openAdventure(p)).toBeUndefined();
@@ -209,7 +268,7 @@ describe("a facility's job (Issue-133)", () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
     await buildMine(p);
-    const started = await startAdventure(repo, p, version, at, ore, [hero.id]);
+    const started = await startAdventure(repo, p, version, randomUUID(), at, ore, [hero.id]);
     expect(started).toMatchObject({ location: at, jobId: ore, status: "OPEN" });
     expect((await repo.openAdventure(p))?.adventureId).toBe(started.adventureId);
     expect((await repo.getHero(p, hero.id))?.adventureId).toBe(started.adventureId);
@@ -229,7 +288,7 @@ describe("a facility's job (Issue-133)", () => {
             }
           : Reflect.get(target, key, receiver),
     });
-    const refused = await refusal(startAdventure(stale, p, version, at, ore, [hero.id]));
+    const refused = await refusal(startAdventure(stale, p, version, randomUUID(), at, ore, [hero.id]));
     expect(refused).toBeInstanceOf(Requires);
     expect(refused).toMatchObject({ missing: [{ kind: "mine", level: 1 }] });
     expect(await repo.openAdventure(p)).toBeUndefined();
@@ -239,7 +298,7 @@ describe("a facility's job (Issue-133)", () => {
   it("needs nothing built for a job on the job board", async () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    expect((await startAdventure(repo, p, version, at, wolves, [hero.id])).jobId).toBe(wolves);
+    expect((await startAdventure(repo, p, version, randomUUID(), at, wolves, [hero.id])).jobId).toBe(wolves);
   });
 });
 
@@ -247,7 +306,7 @@ describe("no retiring a hero while it is adventuring", () => {
   it("refuses the retire until the adventure is settled, or until the hero is dead", async () => {
     const p = player();
     const villager = await recruitHero(repo, p, "villager", randomUUID());
-    const started = await startAdventure(repo, p, version, at, wolves, [villager.id]);
+    const started = await startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id]);
     expect(await refusal(retireHero(repo, p, villager.id))).toBeInstanceOf(HeroAdventuring);
     expect((await repo.getHero(p, villager.id))?.status).toBe("ALIVE");
 
@@ -262,7 +321,7 @@ describe("no retiring a hero while it is adventuring", () => {
     const p = player();
     const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
     const stale = must(await repo.getHero(p, hero.id), "the hero");
-    await startAdventure(repo, p, version, at, wolves, [hero.id]);
+    await startAdventure(repo, p, version, randomUUID(), at, wolves, [hero.id]);
     await expect(repo.retire(p, stale)).rejects.toThrow();
     expect((await repo.getHero(p, hero.id))?.status).toBe("ALIVE");
   });
@@ -272,7 +331,7 @@ describe("no retiring a hero while it is adventuring", () => {
       const p = player();
       const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
       const [start, retire] = await Promise.allSettled([
-        startAdventure(repo, p, version, at, wolves, [hero.id]),
+        startAdventure(repo, p, version, randomUUID(), at, wolves, [hero.id]),
         retireHero(repo, p, hero.id),
       ]);
       const after = must(await repo.getHero(p, hero.id), "the hero");

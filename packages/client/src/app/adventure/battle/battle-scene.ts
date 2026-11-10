@@ -16,7 +16,8 @@ import {
   WEAPON_SPRITES,
 } from '@heat/engine';
 
-import { layGround, type Terrain, type TilesetJson } from '../../camp/scene/ground';
+import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/ground';
+import { fetchJson } from '../../static-json';
 import type { Field, FieldUnit } from '../field';
 import { effectFrameAt, heldFrame } from './action-sprites';
 import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type WeaponArt } from './battle-art';
@@ -153,7 +154,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   app.canvas.setAttribute('aria-label', 'The battle');
   host.appendChild(app.canvas);
 
-  const tileset = (await (await fetch('/art/ground/meadow-01/tileset.json')).json()) as TilesetJson;
+  const tileset = await fetchJson('/art/ground/meadow-01/tileset.json', TilesetJsonSchema);
   const sheet = await Assets.load<Texture>('/art/ground/meadow-01/tileset.png');
 
   // The world in the stage's coordinates: the road, then everyone back to front by the row they stand on.

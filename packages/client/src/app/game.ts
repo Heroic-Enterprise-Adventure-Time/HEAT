@@ -30,6 +30,7 @@ import {
 import {
   type AdventureFieldsFragment,
   BuildFacilityDocument,
+  type BuildFacilityMutation,
   type CampFieldsFragment,
   DiscardAdventureDocument,
   HeroesSeenAtDocument,
@@ -39,10 +40,13 @@ import {
   type MeQuery,
   type OverrideInput,
   RecruitHeroDocument,
+  type RecruitHeroMutation,
   type ResultFieldsFragment,
   RetireHeroDocument,
+  type RetireHeroMutation,
   type SeenHeroFieldsFragment,
   StartAdventureDocument,
+  type StartAdventureMutation,
   SubmitAdventureDocument,
   TimelineDocument,
   type AdventureOutcome as WireAdventureOutcome,
@@ -52,7 +56,7 @@ import {
   type StageKind as WireStageKind,
   type UnitType as WireUnitType,
 } from './graphql/generated/graphql';
-import { apiError, PREVIOUS, Refusal, type Route } from './hub';
+import { apiError, PREVIOUS, Refusal, type RefusalOf, type Route } from './hub';
 import { Session } from './session';
 
 /**
@@ -93,6 +97,12 @@ export type AdventureResultView = Engine<ResultFieldsFragment>;
 type MePlayer = NonNullable<MeQuery['me']>;
 /** The signed-in player: `camps` and `heroes` are nulled only for another caller (graphql.md, rule 11), never for the player's own read. */
 export type PlayerView = Engine<Omit<MePlayer, 'camps' | 'heroes'> & { readonly camps: readonly CampFieldsFragment[]; readonly heroes: readonly HeroFieldsFragment[] }>;
+
+/** The refusals each mutation can answer, by type, which the tables of the player's words are keyed by (angular.md, rule 6). */
+export type RecruitRefusal = RefusalOf<RecruitHeroMutation['recruitHero']>;
+export type BuildRefusal = RefusalOf<BuildFacilityMutation['buildFacility']>;
+export type RetireRefusal = RefusalOf<RetireHeroMutation['retireHero']>;
+export type StartRefusal = RefusalOf<StartAdventureMutation['startAdventure']>;
 
 /**
  * An adventure just ended, kept until the player leaves its result: the
@@ -435,7 +445,8 @@ export class Game {
    */
   async startAdventure(location: string, jobId: string, heroIds: readonly string[]): Promise<AdventureView> {
     try {
-      const input = { location, jobId, heroIds };
+      // One request id per start, which becomes the adventure's id: a repeat of this request answers the adventure it started.
+      const input = { requestId: crypto.randomUUID(), location, jobId, heroIds };
       const data = await this.mutate(StartAdventureDocument, { input });
       return adventureFromWire(answered(must(data.startAdventure, 'startAdventure'), 'StartAdventureSuccess').adventure);
     } finally {
@@ -448,23 +459,30 @@ export class Game {
    * `settled`, then reads the player again. An adventure another deploy
    * issued is refused with EngineUpdated, and goes to the deploy before,
    * `/previous/graphql`; refused there too, no deploy can verify it, so
-   * it is discarded and the result is null (decision 0030). Any other
+   * it is discarded and the result is null (decision 0030). Refused with
+   * AdventureDiscarded, it was discarded already, and it settles the same
+   * way, so the page says so instead of leaving for the camp. Any other
    * refusal or failure is thrown, and the log stays saved for another try.
+   * The player is read again either way, since a refusal means the view
+   * was stale.
    */
   async submitAdventure(adventure: AdventureView, log: readonly AdventureLogEntry[]): Promise<void> {
-    const input = { adventureId: adventure.id, overrides: log.map(overrideInput) };
-    const submit = async (route: Route) => must((await this.mutate(SubmitAdventureDocument, { input }, route)).submitAdventure, 'submitAdventure');
-    let result: AdventureResultView | null = null;
-    let answer = await submit('current');
-    if (answer.__typename === 'EngineUpdated') answer = await submit(PREVIOUS);
-    if (answer.__typename === 'EngineUpdated') {
-      const data = await this.mutate(DiscardAdventureDocument, { input: { adventureId: adventure.id } });
-      answered(must(data.discardAdventure, 'discardAdventure'), 'DiscardAdventureSuccess');
-    } else {
-      result = resultFromWire(must(answered(answer, 'SubmitAdventureSuccess').adventure.result, 'the settled result'));
+    try {
+      const input = { adventureId: adventure.id, overrides: log.map(overrideInput) };
+      const submit = async (route: Route) => must((await this.mutate(SubmitAdventureDocument, { input }, route)).submitAdventure, 'submitAdventure');
+      let result: AdventureResultView | null = null;
+      let answer = await submit('current');
+      if (answer.__typename === 'EngineUpdated') answer = await submit(PREVIOUS);
+      if (answer.__typename === 'EngineUpdated') {
+        const data = await this.mutate(DiscardAdventureDocument, { input: { adventureId: adventure.id } });
+        answered(must(data.discardAdventure, 'discardAdventure'), 'DiscardAdventureSuccess');
+      } else if (answer.__typename !== 'AdventureDiscarded') {
+        result = resultFromWire(must(answered(answer, 'SubmitAdventureSuccess').adventure.result, 'the settled result'));
+      }
+      this.settled.set({ adventure, result });
+    } finally {
+      await this.reload();
     }
-    this.settled.set({ adventure, result });
-    await this.reload();
   }
 
   /** The timeline the hub stored at settlement, for the replay: display only, played with no engine (decision 0030). */

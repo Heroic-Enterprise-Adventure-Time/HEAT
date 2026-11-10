@@ -3,6 +3,7 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import * as z from "zod/mini";
 
 import { parseEnv, requiredVariable } from "../env.js";
+import { requestHandler } from "../sdk.js";
 
 /**
  * Rule 1 of decision 0009: every AWS call goes through an SDK client whose
@@ -45,6 +46,7 @@ export function createDocumentClient(
   instrument: (client: DynamoDBClient) => DynamoDBClient = (client) => client,
 ): DynamoDBDocumentClient {
   const base = new DynamoDBClient({
+    requestHandler,
     ...(config.region ? { region: config.region } : {}),
     ...(config.endpoint ? { endpoint: config.endpoint } : {}),
   });

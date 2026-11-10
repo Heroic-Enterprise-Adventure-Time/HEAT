@@ -1,7 +1,8 @@
-import { GetObjectCommand, PutObjectCommand, type S3Client, S3ServiceException } from "@aws-sdk/client-s3";
+import { GetObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from "@aws-sdk/client-s3";
 import * as z from "zod/mini";
 
 import { parseEnv, requiredVariable } from "./env.js";
+import { requestHandler } from "./sdk.js";
 
 /**
  * The replay bucket (overview, "Services and data"; decision 0030): one
@@ -32,6 +33,24 @@ const ReplayEnv = z.object({ HEAT_REPLAY_BUCKET: requiredVariable });
 
 export function replayBucketFromEnv(env: NodeJS.ProcessEnv = process.env): string {
   return parseEnv(ReplayEnv, env).HEAT_REPLAY_BUCKET;
+}
+
+/**
+ * The replay bucket's client, with the hub's timeouts (`sdk.ts`). In AWS the
+ * endpoint is unset; a test sets one. `instrument` is the tracer's capture,
+ * as for the DynamoDB client.
+ */
+export function createS3Client(
+  config: { region: string; endpoint?: string | undefined },
+  instrument: (client: S3Client) => S3Client = (client) => client,
+): S3Client {
+  return instrument(
+    new S3Client({
+      requestHandler,
+      region: config.region,
+      ...(config.endpoint ? { endpoint: config.endpoint, forcePathStyle: true } : {}),
+    }),
+  );
 }
 
 const key = (adventureId: string) => `${adventureId}.json`;

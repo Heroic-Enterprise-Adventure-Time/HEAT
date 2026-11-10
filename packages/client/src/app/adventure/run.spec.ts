@@ -26,6 +26,8 @@ function playLive(run: AdventureRun, until = Infinity): void {
 
 describe('AdventureRun', () => {
   beforeEach(() => { localStorage.clear(); });
+  // And after, so a failed expectation leaves nothing saved for the specs that follow.
+  afterEach(() => { localStorage.clear(); });
 
   it("keeps the log the engine keeps, so the hub's replay of it gives the same timeline and result", () => {
     const run = new AdventureRun(SNAPSHOT, 'seed-1');
@@ -70,6 +72,18 @@ describe('AdventureRun', () => {
     expect(loadRun('a1')).toBeNull();
     localStorage.setItem(`${SAVED_RUN_PREFIX}a2`, '{not json');
     expect(loadRun('a2')).toBeNull();
+  });
+
+  it('reads a saved log with an entry the engine does not know as none, so the engine never sees it', () => {
+    const saved = (log: unknown[]) => { localStorage.setItem(`${SAVED_RUN_PREFIX}a3`, JSON.stringify({ log, simTime: 4100 })); };
+    saved([{ kind: 'party', acceptedAtSimTime: 4000, order: 'charge' }]);
+    expect(loadRun('a3')).toBeNull();
+    saved([{ kind: 'unit', acceptedAtSimTime: 4000, unitId: 'h1' }]);
+    expect(loadRun('a3')).toBeNull();
+    saved([{ kind: 'party', acceptedAtSimTime: 4000, order: 'retreat', target: 'h1' }]);
+    expect(loadRun('a3')).toBeNull();
+    saved([{ kind: 'unit', acceptedAtSimTime: 4000, unitId: 'h1', override: { kind: 'force-action', abilityId: 'chop' } }]);
+    expect(loadRun('a3')?.log).toHaveLength(1);
   });
 
   it('stops at an entry, with the clock at its time, and goes on from there', () => {
