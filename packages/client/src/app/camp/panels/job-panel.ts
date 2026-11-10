@@ -6,8 +6,8 @@ import { upperFirst } from 'es-toolkit';
 
 import { FACILITIES, type FacilityKind, MAX_PARTY, type Stage } from '@heat/engine';
 
-import { Game } from '../../game';
-import { Refusal } from '../../hub';
+import { Game, type StartRefusal } from '../../game';
+import { Refusal, refusalWords } from '../../hub';
 import { CampState } from '../camp-state';
 import { credits, creditWords, jobAt, retreatWords, stageWords } from './job-words';
 
@@ -17,7 +17,7 @@ import { credits, creditWords, jobAt, retreatWords, stageWords } from './job-wor
  * wrong size or a hero that is not the player's are the client's own
  * defects, refused as BAD_USER_INPUT, and this panel never sends them.
  */
-const REFUSALS: Readonly<Record<string, string>> = {
+const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
   AdventureOpen: 'An adventure is already under way. Only one can be open at a time.',
   HeroNotHere: 'A hero in the party is not at this camp.',
   HeroDead: 'A hero in the party is dead.',
@@ -109,11 +109,10 @@ export class JobPanel {
       await this.game.startAdventure(this.game.location(), jobId, [...this.picked()]);
       await this.router.navigate(['/adventure']);
     } catch (e) {
-      const kind = e instanceof Refusal ? e.kind : null;
       const facility = this.job()?.facility;
-      // The facility that posts the job is not built: the hub's rule, as Issue-133 gave it.
-      const words = kind === 'Requires' && facility ? `Build the ${FACILITIES[facility].name.toLowerCase()} first.` : kind && REFUSALS[kind];
-      this.refusal.set(words ?? (e instanceof Error ? e.message : String(e)));
+      // The facility that posts the job is not built: the hub's rule, as Issue-133 gave it, with the facility's name.
+      const requires = e instanceof Refusal && e.kind === 'Requires' ? facility : undefined;
+      this.refusal.set(requires ? `Build the ${FACILITIES[requires].name.toLowerCase()} first.` : refusalWords(e, REFUSALS));
     } finally {
       this.pending.set(false);
     }

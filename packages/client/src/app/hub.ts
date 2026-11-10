@@ -36,6 +36,20 @@ export class Refusal extends Error {
   }
 }
 
+/** The refusal types a mutation's result union names: every member but its success. */
+export type RefusalOf<Result extends { readonly __typename: string } | null> = Exclude<NonNullable<Result>, { readonly __typename: `${string}Success` }>['__typename'];
+
+/**
+ * A refusal in the player's words, from a component's table keyed by the
+ * refusal types it shows; a type the table lacks, from a newer deploy, or a
+ * failure that is no refusal, as the hub or the failure put it (angular.md,
+ * rule 6).
+ */
+export function refusalWords<Kind extends string>(e: unknown, table: Readonly<Record<Kind, string>>): string {
+  if (e instanceof Refusal && Object.hasOwn(table, e.kind)) return table[e.kind as Kind];
+  return e instanceof Error ? e.message : String(e);
+}
+
 /**
  * What Apollo threw, as an `ApiError`: the first entry of the response's
  * `errors` array with its code, since every operation the client makes is

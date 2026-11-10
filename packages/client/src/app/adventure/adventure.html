@@ -14,8 +14,8 @@
 
         <h3 id="stages-title">Stages</h3>
         <ol class="stages" aria-labelledby="stages-title">
-          @for (stage of result.stages; track stage.stage) {
-            <li>{{ stage.kind }}: {{ endings[stage.ended] ?? stage.ended }}</li>
+          @for (stage of stages(); track stage.stage) {
+            <li>{{ stage.words }}</li>
           }
         </ol>
 
@@ -129,13 +129,8 @@
           </button>
         </div>
 
-        @if (field.cargo.length > 0) {
-          <p class="cargo">
-            Carrying
-            @for (load of field.cargo; track load.material) {
-              {{ load.amount }} {{ load.material }}{{ $last ? '' : ', ' }}
-            }
-          </p>
+        @if (cargo(); as cargo) {
+          <p class="cargo">Carrying {{ cargo }}</p>
         }
       }
 
@@ -154,7 +149,7 @@
 <ng-template #playback>
   <div class="playback" role="group" aria-label="Playback">
     <button type="button" [attr.aria-pressed]="play.paused()" (click)="play.togglePause()">
-      {{ play.paused() ? 'Resume' : 'Pause' }}
+      {{ pauseLabel() }}
     </button>
     @for (speed of speeds; track speed) {
       <button type="button" [attr.aria-pressed]="play.speed() === speed" (click)="play.setSpeed(speed)">{{ speed }}×</button>

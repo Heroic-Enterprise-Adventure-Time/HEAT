@@ -188,6 +188,13 @@ describe('Camp', () => {
     expect(recruit('fighter').queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('says why the player could not be read, as an alert', async () => {
+    const game = fakeGame([]);
+    game.error.set('The hub could not be reached.');
+    await renderCamp(game);
+    expect(screen.getByRole('alert')).toHaveTextContent(/^The hub could not be reached\.$/);
+  });
+
   it('groups the roster into the living and the dead', async () => {
     const dead = { ...wren, id: 'h2', name: 'Hob', status: 'DEAD' as const };
     await renderCamp(fakeGame([wren, dead]));
