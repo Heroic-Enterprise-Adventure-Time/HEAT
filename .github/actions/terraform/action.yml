@@ -1,0 +1,39 @@
+# Terraform at one exact release whose archive is checked against a pinned
+# checksum before it runs (docs/process/best-practices.md, rule 14).
+# hashicorp/setup-terraform is not used: at the commit the lockfile pinned
+# (v4.0.1) it downloads the archive with the tool cache's downloadTool and
+# checks no checksum or signature, and with no terraform_version it takes
+# whatever release is latest.
+#
+# The checksum is the linux_amd64 line of the release's SHA256SUMS, whose
+# signature was verified when the version was taken against HashiCorp's key
+# C874 011F 0AB4 0511 0D02 1055 3436 5D94 72D7 468F, the fingerprint
+# hashicorp.com/security publishes, which is the check that page describes:
+# 1.17.1, 2026-11-09, signed by its subkey 374EC75B485913604A831CC7C820C6D5CD27AB87.
+# A new version is taken the same way, both values together, in a pull
+# request of its own (docs/standards/terraform.md, rule 13).
+#
+# One copy for every job that runs Terraform, the gate in ci.yml and the
+# plan, apply, destroy and sweep jobs, so the floor checks the binary that
+# applies. Called as $/, so a pull_request_target plan runs the base
+# branch's copy, never the pull request's (decision 0047).
+name: Terraform
+description: Installs one exact Terraform release, checked against its pinned checksum.
+
+runs:
+  using: composite
+  steps:
+    - name: Install Terraform, checked against its pinned checksum
+      shell: bash
+      env:
+        TERRAFORM_VERSION: 1.17.1
+        TERRAFORM_SHA256: 4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061
+      run: |
+        set -eu
+        archive="terraform_${TERRAFORM_VERSION}_linux_amd64.zip"
+        curl --fail --silent --show-error --location --retry 3 --output "$RUNNER_TEMP/$archive" "https://releases.hashicorp.com/terraform/$TERRAFORM_VERSION/$archive"
+        echo "$TERRAFORM_SHA256  $RUNNER_TEMP/$archive" | sha256sum --check --strict
+        mkdir -p "$RUNNER_TEMP/terraform"
+        unzip -q -o "$RUNNER_TEMP/$archive" terraform -d "$RUNNER_TEMP/terraform"
+        echo "$RUNNER_TEMP/terraform" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/terraform/terraform" version

@@ -12,7 +12,7 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run build --workspace @heat/engine && npm run test --workspaces --if-present",
     "typecheck": "npm run build --workspace @heat/engine && npm run typecheck --workspaces --if-present",
-    "lint": "npm run build --workspace @heat/engine && eslint .",
+    "lint": "npm run build --workspace @heat/engine && eslint . --max-warnings 0",
     "bundle": "npm run build --workspace @heat/engine && node scripts/bundle.mjs",
     "schema:print": "npm run schema:print --workspace @heat/hub",
     "codegen": "graphql-codegen --config codegen.mjs"
