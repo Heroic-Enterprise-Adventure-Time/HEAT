@@ -4,13 +4,13 @@
     <p>Heroic Enterprise Adventure Time: a browser game about running an adventuring business.</p>
 
     @if (config.error(); as error) {
-      <p class="error">The page could not load its stack configuration: {{ error }}.</p>
+      <p class="error" role="alert">The page could not load its stack configuration: {{ error }}.</p>
     } @else {
       <button type="button" (click)="session.signIn()">{{ session.signInLabel }}</button>
     }
 
     @if (session.error(); as error) {
-      <p class="error">{{ error }}</p>
+      <p class="error" role="alert">{{ error }}</p>
     }
   </main>
 }

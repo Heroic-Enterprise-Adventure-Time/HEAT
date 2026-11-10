@@ -6,19 +6,24 @@
  * effect shows a while after it began, and where.
  */
 import { range } from 'es-toolkit';
+import * as z from 'zod/mini';
 
-/** PixelLab's game pack manifest, as much of it as the battle reads: the whole effect, without the sprite. */
-export interface EffectManifest {
-  readonly frame_ms: number;
-  readonly clips: readonly {
-    readonly name: string;
-    readonly start_frame: number;
-    readonly frames: number;
-    readonly frame: { readonly w: number; readonly h: number };
-    readonly sheets: readonly { readonly file: string; readonly first_frame: number; readonly frames: number; readonly columns: number }[];
-    readonly offset: { readonly x: number; readonly y: number };
-  }[];
-}
+/** PixelLab's game pack manifest, as much of it as the battle reads: the whole effect, without the sprite; checked where it is fetched (angular.md, rule 4). */
+export const EffectManifestSchema = z.object({
+  frame_ms: z.number(),
+  clips: z.array(
+    z.object({
+      name: z.string(),
+      start_frame: z.number(),
+      frames: z.number(),
+      frame: z.object({ w: z.number(), h: z.number() }),
+      sheets: z.array(z.object({ file: z.string(), first_frame: z.number(), frames: z.number(), columns: z.number() })),
+      offset: z.object({ x: z.number(), y: z.number() }),
+    }),
+  ),
+});
+
+export type EffectManifest = z.output<typeof EffectManifestSchema>;
 
 export interface Rect {
   readonly x: number;

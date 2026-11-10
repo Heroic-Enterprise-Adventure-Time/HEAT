@@ -6,7 +6,7 @@ import { ApolloClient, InMemoryCache } from '@apollo/client';
 
 import { Config, type StackConfig } from './config';
 import { MeDocument } from './graphql/generated/graphql';
-import { ApiError, apiError, Hub, PREVIOUS, VERSION_HEADER } from './hub';
+import { ApiError, apiError, Hub, PREVIOUS, Refusal, refusalWords, VERSION_HEADER } from './hub';
 import { Session } from './session';
 
 const config: StackConfig = {
@@ -91,5 +91,19 @@ describe('Hub', () => {
       (e: unknown) => apiError(e),
     );
     expect(failed).toEqual(new ApiError('the hub answered 502', null));
+  });
+});
+
+describe('refusalWords', () => {
+  const words: Readonly<Record<'HallFull' | 'Conflict', string>> = { HallFull: 'The hall is full.', Conflict: 'Try again.' };
+
+  it("answers a refusal the table knows in the player's words", () => {
+    expect(refusalWords(new Refusal('HallFull', 'the hall holds 4'), words)).toBe('The hall is full.');
+  });
+
+  it('answers a refusal the table lacks, or a failure that is no refusal, as it was put', () => {
+    expect(refusalWords(new Refusal('SomethingNew', 'something new'), words)).toBe('something new');
+    expect(refusalWords(new Refusal('toString', 'not a key of the table'), words)).toBe('not a key of the table');
+    expect(refusalWords(new ApiError('the hub answered 502', null), words)).toBe('the hub answered 502');
   });
 });

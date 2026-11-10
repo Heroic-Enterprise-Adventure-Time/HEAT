@@ -453,9 +453,23 @@ describe('Game, submitting an adventure', () => {
     expect(game.settled()).toEqual({ adventure: open, result: null });
   });
 
-  it('throws any other refusal and keeps nothing, so the run can be sent again', async () => {
-    const { game, run } = setupSubmit({ current: 'Conflict' });
+  it('settles an adventure the hub says was discarded already with no result, and reads the player again', async () => {
+    const { hub, game, run } = setupSubmit({ current: 'AdventureDiscarded' });
+    await run(game.submitAdventure(open, log));
+    expect(hub.calls.map((c) => [c.op, c.route])).toEqual([
+      ['SubmitAdventure', 'current'],
+      ['Me', 'current'],
+    ]);
+    expect(game.settled()).toEqual({ adventure: open, result: null });
+  });
+
+  it('throws any other refusal and keeps nothing, so the run can be sent again, and reads the player again', async () => {
+    const { hub, game, run } = setupSubmit({ current: 'Conflict' });
     await expect(run(game.submitAdventure(open, log))).rejects.toMatchObject({ kind: 'Conflict' });
+    expect(hub.calls.map((c) => [c.op, c.route])).toEqual([
+      ['SubmitAdventure', 'current'],
+      ['Me', 'current'],
+    ]);
     expect(game.settled()).toBeNull();
   });
 

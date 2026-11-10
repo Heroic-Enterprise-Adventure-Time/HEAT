@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, InjectionToken, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { ABILITIES, type AbilityId, type JobId, JOBS, location, must, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
+import { ABILITIES, type AbilityId, type JobId, JOBS, location, must, type PartyOrder, type StageEnding, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
@@ -41,8 +41,8 @@ export const BATTLE_SCENE_FACTORY = new InjectionToken<BattleSceneFactory>('heat
   factory: () => async (host, callbacks) => (await import('./battle/battle-scene')).createBattleScene(host, callbacks),
 });
 
-/** How a stage ended, in the player's words. */
-const ENDINGS: Readonly<Record<string, string>> = {
+/** How a stage ended, in the player's words: one for each of the engine's endings, so a new ending is a compile error here (angular.md, rule 6). */
+const ENDINGS: Readonly<Record<StageEnding, string>> = {
   done: 'done',
   win: 'won',
   loss: 'lost',
@@ -55,6 +55,11 @@ const OUTCOMES: Readonly<Record<AdventureResultView['outcome'], string>> = {
   retreat: 'The party turned back',
   defeat: 'The party fell',
 };
+
+/** A stage's ending in the player's words; one this client's engine lacks, sent by a newer deploy, as the hub put it (angular.md, rule 6). */
+function endingWords(ended: string): string {
+  return Object.hasOwn(ENDINGS, ended) ? ENDINGS[ended as StageEnding] : ended;
+}
 
 /**
  * The open adventure, `/adventure` (Issue-15): the battle in the stage, and
@@ -85,8 +90,11 @@ export class Adventure {
   private readonly createScene = inject(BATTLE_SCENE_FACTORY);
   private readonly readSizes = inject(LAYOUT_SIZES);
   protected readonly speeds = SPEEDS;
-  protected readonly endings = ENDINGS;
   protected readonly outcomes = OUTCOMES;
+  /** Each stage of the settled result in words, "fight: won". */
+  protected readonly stages = computed(() => this.game.settled()?.result?.stages.map((s) => ({ stage: s.stage, words: `${s.kind}: ${endingWords(s.ended)}` })) ?? []);
+  /** What the pause toggle does next. */
+  protected readonly pauseLabel = computed(() => (this.play.paused() ? 'Resume' : 'Pause'));
 
   /** The window and the regions' sizes, measured together, since a font-size change moves both. */
   private readonly viewport = signal(this.measured());
@@ -118,6 +126,11 @@ export class Adventure {
   protected readonly countdown = computed(() => {
     const field = this.play.field();
     return field ? secondsLeft(field, this.play.simTime()) : null;
+  });
+  /** What the party carries in words, "5 timber, 3 ore", or null when it carries nothing. */
+  protected readonly cargo = computed(() => {
+    const cargo = this.play.field()?.cargo ?? [];
+    return cargo.length > 0 ? cargo.map((load) => `${load.amount} ${load.material}`).join(', ') : null;
   });
   /** Whether a hero can be told what to do: in a fight or a gather, before the end. */
   protected readonly inBattle = computed(() => {

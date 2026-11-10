@@ -4,8 +4,9 @@ import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyl
 import { facilityArtLevel, type FacilityKind, must } from '@heat/engine';
 
 import { lowestOpaqueRow } from '../../pixel-art';
+import { fetchJson } from '../../static-json';
 import { sceneView, type SceneView } from '../page-layout';
-import { layGround, type TilesetJson } from './ground';
+import { layGround, TilesetJsonSchema } from './ground';
 import { type CampLayout, cornersAround, MAP_HEIGHT, MAP_WIDTH, TILE } from './layout';
 import { type Facing, gone, leave, newWalker, randomSpot, step, WALK_SPEED, type Walker } from './wander';
 
@@ -124,7 +125,7 @@ export async function createCampScene(
   app.canvas.setAttribute('aria-label', SCENE_LABEL);
   host.appendChild(app.canvas);
 
-  const tileset = (await (await fetch(`/art/ground/${layout.ground}/tileset.json`)).json()) as TilesetJson;
+  const tileset = await fetchJson(`/art/ground/${layout.ground}/tileset.json`, TilesetJsonSchema);
   const sheet = await Assets.load<Texture>(`/art/ground/${layout.ground}/tileset.png`);
 
   // The world: the ground, then the facilities and heroes back to front by the

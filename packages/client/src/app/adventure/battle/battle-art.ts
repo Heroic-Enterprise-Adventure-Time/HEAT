@@ -1,10 +1,12 @@
 import { range } from 'es-toolkit';
 import { Assets, Rectangle, Texture } from 'pixi.js';
+import * as z from 'zod/mini';
 
 import { must } from '@heat/engine';
 
 import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
-import { effectLayout, type EffectLayout, type EffectManifest } from './action-sprites';
+import { fetchJson } from '../../static-json';
+import { effectLayout, type EffectLayout, EffectManifestSchema } from './action-sprites';
 
 /**
  * A battle unit's pictures, read from its sprite set's files and its
@@ -38,9 +40,15 @@ export interface UnitArt {
   readonly fadeAbove: number | null;
 }
 
-interface Provenance {
-  animations?: Record<string, { framesPerDirection?: number; frames?: number; holdFrame?: number; fadeAboveEnd?: boolean }>;
-}
+/** A sprite set's provenance, as much of it as the battle reads: how many frames each animation has, and how it plays; checked where it is fetched (angular.md, rule 4). */
+export const ProvenanceSchema = z.object({
+  animations: z.optional(
+    z.record(
+      z.string(),
+      z.object({ framesPerDirection: z.optional(z.number()), frames: z.optional(z.number()), holdFrame: z.optional(z.number()), fadeAboveEnd: z.optional(z.boolean()) }),
+    ),
+  ),
+});
 
 async function frames(paths: readonly string[], footOf?: Texture): Promise<Frames> {
   const textures = await Promise.all(paths.map((p) => Assets.load<Texture>(p)));
@@ -48,7 +56,7 @@ async function frames(paths: readonly string[], footOf?: Texture): Promise<Frame
 }
 
 async function figureArt(base: string): Promise<UnitArt> {
-  const provenance = (await (await fetch(`${base}/provenance.json`)).json()) as Provenance;
+  const provenance = await fetchJson(`${base}/provenance.json`, ProvenanceSchema);
   const count = (anim: string) => provenance.animations?.[anim]?.framesPerDirection ?? 1;
   const east = (anim: string) => range(count(anim)).map((i) => `${base}/${anim}-east-${i}.png`);
   const [stance, walk, act, hit, down] = await Promise.all([frames(east('stance')), frames(east('walk')), frames(east('act')), frames(east('hit')), frames(east('down'))]);
@@ -56,7 +64,7 @@ async function figureArt(base: string): Promise<UnitArt> {
 }
 
 async function propArt(base: string): Promise<UnitArt> {
-  const provenance = (await (await fetch(`${base}/provenance.json`)).json()) as Provenance;
+  const provenance = await fetchJson(`${base}/provenance.json`, ProvenanceSchema);
   const standing = await Assets.load<Texture>(`${base}/standing.png`);
   const still = { textures: [standing], foot: lowestOpaqueRow(standing) };
   const count = (anim: string) => provenance.animations?.[anim]?.frames ?? 1;
@@ -81,9 +89,10 @@ export interface EffectArt {
   readonly frames: readonly Texture[];
 }
 
-interface WeaponProvenance {
-  animations: { swing: { frames: number; holdFrame: number; grips: [number, number][] } };
-}
+/** A weapon's provenance, as much of it as the battle reads: the swing's frames, the one held, and each frame's grip. */
+export const WeaponProvenanceSchema = z.object({
+  animations: z.object({ swing: z.object({ frames: z.number(), holdFrame: z.number(), grips: z.array(z.tuple([z.number(), z.number()])) }) }),
+});
 
 const weapons = new Map<string, Promise<WeaponArt>>();
 const effects = new Map<string, Promise<EffectArt>>();
@@ -94,7 +103,7 @@ export function loadWeaponArt(set: string): Promise<WeaponArt> {
   if (!art) {
     const base = `/art/weapons/${set}`;
     art = (async () => {
-      const provenance = (await (await fetch(`${base}/provenance.json`)).json()) as WeaponProvenance;
+      const provenance = await fetchJson(`${base}/provenance.json`, WeaponProvenanceSchema);
       const { frames, holdFrame, grips } = provenance.animations.swing;
       const swing = await Promise.all(range(frames).map((i) => Assets.load<Texture>(`${base}/swing-${i}.png`)));
       return { swing, holdFrame, grips: grips.map(([x, y]) => ({ x, y })) };
@@ -110,7 +119,7 @@ export function loadEffectArt(set: string): Promise<EffectArt> {
   if (!art) {
     const base = `/art/effects/${set}`;
     art = (async () => {
-      const layout = effectLayout((await (await fetch(`${base}/manifest.json`)).json()) as EffectManifest);
+      const layout = effectLayout(await fetchJson(`${base}/manifest.json`, EffectManifestSchema));
       const sheet = await Assets.load<Texture>(`${base}/${layout.sheet}`);
       const frames = layout.frames.map((r) => new Texture({ source: sheet.source, frame: new Rectangle(r.x, r.y, r.width, r.height) }));
       return { layout, frames };

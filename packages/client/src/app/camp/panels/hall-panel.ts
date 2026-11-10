@@ -1,13 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
-import { Game, type RecruitOffer } from '../../game';
-import { Refusal } from '../../hub';
+import { Game, type RecruitOffer, type RecruitRefusal } from '../../game';
+import { refusalWords } from '../../hub';
 import { CampState } from '../camp-state';
-import { FacilityBuild } from './facility-build';
+import { costWords, FacilityBuild } from './facility-build';
 
 /** The hub's refusals of a recruit, by type, in the player's words; any other is shown as the hub put it. */
-const REFUSALS: Readonly<Record<string, string>> = {
+const REFUSALS: Readonly<Record<RecruitRefusal, string>> = {
   HallLevel: 'The hall is not at the level this needs.',
   HallFull: 'The hall is full.',
   InsufficientResources: 'The camp cannot pay for this now.',
@@ -16,8 +16,7 @@ const REFUSALS: Readonly<Record<string, string>> = {
 
 /** A recruit's price in words, each resource beside the camp's balance (game.md, "The page"). */
 export function priceWords(offer: RecruitOffer): string {
-  if (offer.cost.length === 0) return 'free';
-  return offer.cost.map((c) => `${c.amount} ${c.material}, you have ${c.balance}`).join('; ');
+  return offer.cost.length === 0 ? 'free' : costWords(offer.cost);
 }
 
 /**
@@ -51,8 +50,7 @@ export class HallPanel {
       const hero = await this.game.recruit(offer.unitType);
       this.camp.arriving.set(hero.id);
     } catch (e) {
-      const kind = e instanceof Refusal ? e.kind : null;
-      this.refused.set({ unitType: offer.unitType, words: (kind && REFUSALS[kind]) ?? (e instanceof Error ? e.message : String(e)) });
+      this.refused.set({ unitType: offer.unitType, words: refusalWords(e, REFUSALS) });
     } finally {
       this.pending.set(null);
     }

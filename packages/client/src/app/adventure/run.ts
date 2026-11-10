@@ -1,4 +1,5 @@
 import { sortBy } from 'es-toolkit';
+import * as z from 'zod/mini';
 
 import {
   AdventureEngine,
@@ -180,13 +181,35 @@ export interface SavedRun {
   readonly simTime: number;
 }
 
+/**
+ * A saved run as the browser kept it: each entry one of the engine's
+ * `AdventureLogEntry` union, and the time reached. The storage is the
+ * player's to edit, so what comes back is checked before the engine sees
+ * it; `loadRun` answering the schema's output as a `SavedRun` is the
+ * compile-time check that the two agree.
+ */
+const SavedRunSchema = z.object({
+  log: z.array(
+    z.discriminatedUnion('kind', [
+      z.object({
+        kind: z.literal('unit'),
+        acceptedAtSimTime: z.number(),
+        unitId: z.string(),
+        override: z.object({ kind: z.literal('force-action'), abilityId: z.string() }),
+      }),
+      z.object({ kind: z.literal('party'), acceptedAtSimTime: z.number(), order: z.enum(['press-on', 'retreat']) }),
+    ]),
+  ),
+  simTime: z.number(),
+});
+
 /** The saved log of an adventure, or null when there is none or it cannot be read: the run then starts again with the same seed. */
 export function loadRun(adventureId: string): SavedRun | null {
   try {
     const text = localStorage.getItem(SAVED_RUN_PREFIX + adventureId);
     if (!text) return null;
-    const value = JSON.parse(text) as SavedRun;
-    return Array.isArray(value.log) && typeof value.simTime === 'number' ? value : null;
+    const parsed = SavedRunSchema.safeParse(JSON.parse(text));
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }
