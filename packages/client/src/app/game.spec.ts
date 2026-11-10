@@ -22,7 +22,7 @@ const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCach
  */
 const wireHero = (hero: HeroView) => ({ __typename: 'Hero', ...hero, unitType: constantCase(hero.unitType) });
 const wireSeen = (hero: SeenHeroView) => ({ __typename: 'SeenHero', ...hero, unitType: constantCase(hero.unitType) });
-const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number }[]) =>
+const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number; rating?: number }[]) =>
   amounts.map((a) => ({ __typename: typename, ...a, material: constantCase(a.material) }));
 const wireAdventure = (a: AdventureView) => ({
   __typename: 'Adventure',
@@ -31,7 +31,7 @@ const wireAdventure = (a: AdventureView) => ({
   snapshot: {
     __typename: 'Snapshot',
     ...a.snapshot,
-    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats } })),
+    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, gather: wireAmounts('GatherRating', h.stats.gather) } })),
   },
 });
 const wirePlayer = (p: PlayerView) => ({
@@ -142,7 +142,7 @@ function fakeHub(start: PlayerView) {
         snapshot: {
           version: 'v1',
           jobId,
-          heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } })),
+          heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: 'timber', rating: 2 }, { material: 'ore', rating: 2 }] } })),
         },
       };
       player = { ...player, openAdventure: adventure };

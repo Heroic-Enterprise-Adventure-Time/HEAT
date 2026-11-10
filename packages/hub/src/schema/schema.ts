@@ -6,6 +6,7 @@ import {
   ADVENTURE_OUTCOMES,
   type AdventureSnapshot,
   FACILITY_KINDS,
+  type GatherRating,
   hallCapacity,
   type Job,
   JOBS,
@@ -191,13 +192,28 @@ const JobRef = builder.objectRef<Job>("Job").implement({
   }),
 });
 
+const GatherRatingRef = builder.objectRef<GatherRating>("GatherRating").implement({
+  description: "How well a unit harvests the resource nodes of one material, the engine's `GatherRating`.",
+  fields: (t) => ({
+    material: t.expose("material", { type: MaterialRef }),
+    rating: t.exposeInt("rating", { description: "Set against a node's difficulty: a hit's yield is its share of the node's maximum, and a rating above the difficulty yields no more." }),
+  }),
+});
+
 const UnitStatsRef = builder.objectRef<UnitStats>("UnitStats").implement({
   description: "A unit's numbers in battle.",
   fields: (t) => ({
     maxHealth: t.exposeInt("maxHealth"),
     speed: t.exposeInt("speed", { description: "Turns per ten seconds." }),
     damage: t.exposeInt("damage"),
-    gathering: t.exposeInt("gathering", { description: "Work done to a resource node by a gather ability." }),
+    gather: t.field({
+      type: [GatherRatingRef],
+      description: "The unit's gather rating for each material it harvests; a material with no entry is 0, and a hit on a node of it yields nothing.",
+      // A snapshot issued before the ratings (Issue-283) has none, and is
+      // still read while its adventure is open across that deploy: the
+      // previous deploy verifies it, and this one only has to answer it.
+      resolve: (stats) => (stats as Partial<UnitStats>).gather ?? [],
+    }),
   }),
 });
 

@@ -87,7 +87,7 @@ function adventureOf(heroIds: readonly string[]): AdventureView {
       jobId: 'wolves-on-the-mill-road',
       heroes: party
         .filter((h) => heroIds.includes(h.id))
-        .map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } })),
+        .map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: 'timber', rating: 2 }, { material: 'ore', rating: 2 }] } })),
     },
   };
 }
@@ -115,8 +115,8 @@ describe('Job board', () => {
     await renderJobs(fakeGame([]), '/camp/millbrook/job-board');
     expect(panel().getByRole('heading', { name: 'Job board', level: 2 })).toBeInTheDocument();
     expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Pick up sticks', 'Timber from the near woods', 'Wolves on the mill road']);
-    expect(job('Pick up sticks').getByText('up to 40 timber')).toBeInTheDocument();
-    expect(job('Timber from the near woods').getByText('3 cloth and up to 60 timber')).toBeInTheDocument();
+    expect(job('Pick up sticks').getByText('up to 45 timber')).toBeInTheDocument();
+    expect(job('Timber from the near woods').getByText('3 cloth and up to 90 timber')).toBeInTheDocument();
     expect(job('Wolves on the mill road').getByText('10 cloth')).toBeInTheDocument();
     expect(panel().getByRole('link', { name: 'Pick up sticks' })).toHaveAttribute('href', '/camp/millbrook/job-board/jobs/pick-up-sticks');
     expect(menu().getByRole('link', { name: 'Job board', current: 'page' })).toBeInTheDocument();
@@ -125,10 +125,10 @@ describe('Job board', () => {
   it("shows a job's stages in order, its credits beside the camp's balance and room, and its retreat penalty", async () => {
     await renderJobs(fakeGame([must(party[0], 'the first of the party')]), '/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
     expect(panel().getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
-    expect(textsOf(listItems('Stages'))).toEqual(['Travel', 'Gather timber from 3 trees, up to 60', 'Fight a wolf', 'Arrive']);
+    expect(textsOf(listItems('Stages'))).toEqual(['Travel', 'Gather timber from 2 trees', 'Fight a wolf', 'Arrive']);
     expect(textsOf(listItems('Reward'))).toEqual([
       '3 cloth. Millbrook holds 0, with room for 100 more.',
-      'Up to 60 timber. Millbrook holds 90, with room for 10 more.',
+      'Up to 90 timber. Millbrook holds 90, with room for 10 more.',
       '15 XP to each hero who comes back.',
     ]);
     expect(panel().getByText('A retreat forfeits the pay, keeps the timber gathered, and earns half the XP.')).toBeInTheDocument();

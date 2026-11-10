@@ -211,6 +211,18 @@ type FacilityLevel {
   level: Int!
 }
 
+"""
+How well a unit harvests the resource nodes of one material, the engine's `GatherRating`.
+"""
+type GatherRating {
+  material: Material!
+
+  """
+  Set against a node's difficulty: a hit's yield is its share of the node's maximum, and a rating above the difficulty yields no more.
+  """
+  rating: Int!
+}
+
 """The heroes hall holds no more active heroes at its level."""
 type HallFull implements Error {
   """In the player's words; the client may show it as it is."""
@@ -684,8 +696,10 @@ scalar UUID
 type UnitStats {
   damage: Int!
 
-  """Work done to a resource node by a gather ability."""
-  gathering: Int!
+  """
+  The unit's gather rating for each material it harvests; a material with no entry is 0, and a hit on a node of it yields nothing.
+  """
+  gather: [GatherRating!]!
   maxHealth: Int!
 
   """Turns per ten seconds."""

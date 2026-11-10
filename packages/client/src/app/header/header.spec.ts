@@ -23,7 +23,7 @@ const player: PlayerView = {
     snapshot: {
       version: 'v1',
       jobId: 'wolves-on-the-mill-road',
-      heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
+      heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: 'timber', rating: 2 }, { material: 'ore', rating: 2 }] } }],
     },
   },
 };
