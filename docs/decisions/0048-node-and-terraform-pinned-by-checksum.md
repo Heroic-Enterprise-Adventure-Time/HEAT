@@ -1,6 +1,6 @@
 # 0048: Node and Terraform run at one exact release, checked against a pinned checksum, in every job
 
-- **Status:** Decided
+- **Status:** Decided; the pins' tracking by Issue-275, the checkup's rule 12
 - **Date:** 2026-11-09
 - **Settles:** Issue-258 and the instance of `docs/process/best-practices.md` rule 14 that Issue-267 names, from the checkup of 2a146cf: `hashicorp/setup-terraform` with no version took the latest Terraform, and `actions/setup-node` took Node 24 by its major, each downloading with no check, in the jobs that plan and apply `prod`.
 - **Reverses:** `docs/standards/terraform.md` rule 13 and ci.yml's comment, which ran the latest Terraform in the pipeline on purpose.
@@ -29,7 +29,7 @@
 
 ## What it leaves open
 
-- Nothing tracks the two pins: Dependabot followed setup-node and setup-terraform, and does not read an `env:` block. A pin falling behind is a defect under typescript.md rule 1 and terraform.md rule 13; since Issue-275 the checkup notices it, comparing both pins with the latest releases at every pause (`docs/runbooks/checkup.md`, rule 12).
+- Nothing tracks the two pins: Dependabot followed setup-node and setup-terraform, and does not read an `env:` block. A pin falling behind is a defect under typescript.md rule 1 and terraform.md rule 13; how it is noticed is a follow-up issue on the checkup.
 - The owner's machine runs Terraform and Node of its own; it tracks the pins by hand.
 
 ## Facts checked
@@ -43,4 +43,4 @@
 
 ## Where it is described
 
-`.github/actions/node/action.yml`; `.github/actions/terraform/action.yml`; `docs/process/best-practices.md`, rule 14; `docs/standards/typescript.md`, rule 1; `docs/standards/terraform.md`, rule 13.
+`.github/actions/node/action.yml`; `.github/actions/terraform/action.yml`; `docs/process/best-practices.md`, rule 14; `docs/standards/typescript.md`, rule 1; `docs/standards/terraform.md`, rule 13; `docs/runbooks/checkup.md`, rule 12, which checks the pins against the latest releases.
