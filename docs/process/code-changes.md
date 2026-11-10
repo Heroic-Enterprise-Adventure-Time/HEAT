@@ -18,7 +18,7 @@ How a change gets from an idea to `main`. "Code" here means anything in the repo
 
 ### Pull requests
 
-7. A pull request has one purpose and is small enough to review line by line.
+7. A pull request has one purpose and is small enough to review line by line. What its work or its review finds on the way is done in it, by rule 30.
 8. An agent opens the pull request without asking first.
 9. The description says what changed, why, how it was verified, and what was not verified. It also lists any rule or convention the agent introduced that was not agreed beforehand. The review skill's findings are threads on the pull request, not part of the description (rule 23).
 10. A change in behavior and the document that describes that behavior go in the same pull request.
@@ -59,6 +59,10 @@ How one checkpoint moves through the rules above, from the start of a session to
 
 29. **Every job that gates a merge is a required check of both rulesets, by its job's name.** A required check is a check run's name, not a workflow's, so a gate the rulesets do not name can be red and the pull request still merge, as the Terraform and workflow checks could until Issue-267. A new gate job and its entries in `.github/rulesets/` go in the same pull request, and the owner applies them before its merge. Not gates: the plan jobs, which are what the owner reads, and which the apply plans and checks again; and the sandbox stack's jobs, because a Dependabot pull request has no stack and the cap can refuse one, so a required stack check would never report and would hold the pull request for good, while rule 23 already has the writer exercise the stack before opening it. Added 2026-11-09 (Issue-257).
 
+### Found on the way
+
+30. **What a checkpoint's work or its review finds is done in that checkpoint, not filed for later.** A fix, a document that has outgrown its rule, or a change of direction the owner decides while the pull request is open goes into that pull request as commits of its own: done now, written down where the behavior or the decision is described, and the context brought up to date in the same push, the issue's body, the build order, the pull request's description and the private working context, so that nothing still describes the old direction. An issue is filed only for work that cannot ride: it needs a design conversation of its own, it would touch files that another issue in flight is changing (rule 27), or the owner judges that it would make the pull request too large to read. Added 2026-11-10 (Issue-282).
+
 ## Why
 
 **Checkpoints before code.** Agreeing the end of a piece of work before starting it keeps a pull request small and lets review compare the change against something already agreed. The issue is where the agreed end lives: next to the pull request that delivers it, closed by the merge, found cold by a new session.
@@ -78,6 +82,8 @@ How one checkpoint moves through the rules above, from the start of a session to
 **Production through a release branch.** The tag applied `prod` in the run that planned it, and the repository, private on the Team plan at the time, could have no required reviewers, so nobody could read the `prod` plan before the apply. A pull request from `main` to `release` is a review surface that already exists; the tag then records the release instead of causing it (decision 0021). The repository has been public since 2026-11-02 (Issue-178), which makes required reviewers available; they are not added while the repository has one person, who would only be approving their own merge (decision 0011's status line).
 
 **One issue per session.** A long session accumulates context the next issue does not need. A fresh session finds everything from the issue, the private working context and the documents `AGENTS.md` names.
+
+**Done where it is found.** Every issue filed for later is a session to start, a context to read cold and a pull request to review, and by 2026-11-10 the open list was growing faster than the work moved (the owner). The review of PR-293 found the overview past the length its rule allows, and the first answer offered was an issue; the owner's call was to split it there, and to write that down. One purpose still bounds what a pull request sets out to do; it does not send what the work turns up to the backlog.
 
 The earlier shapes of this cycle, the owner applying every stack and the branch staying checked out under the IDE, are recorded in decisions 0011, 0017 and 0018.
 
