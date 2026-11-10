@@ -11,11 +11,11 @@ How the tree on `main` is reviewed against the standards at a pause, a checkpoin
 
    | Area | Paths | Documents |
    | --- | --- | --- |
-   | Packages | `packages/engine/**`, `packages/AGENTS.md`, `scripts/**`, `manifest.json`, `package.json`, `tsconfig*.json`, `eslint.config.mjs`, `.node-version` | `docs/standards/typescript.md` |
+   | Packages | `packages/engine/**`, `packages/AGENTS.md`, `scripts/**` but its `.sh` files, `manifest.json`, `package.json`, `tsconfig*.json`, `eslint.config.mjs`, `.node-version` | `docs/standards/typescript.md` |
    | Client | `packages/client/**` | `docs/standards/angular.md` and `docs/standards/typescript.md` |
    | Hub | `packages/hub/**` | `docs/standards/graphql.md` and `docs/standards/typescript.md` |
    | Terraform | `terraform/**` | `docs/standards/terraform.md` |
-   | Pipeline | `.github/**`, `.claude/settings.json`, `terraform/allowed-resource-types.txt` | `docs/process/code-changes.md` and `docs/process/best-practices.md`, which hold the guardrails |
+   | Pipeline | `.github/**`, `scripts/**/*.sh`, `.claude/settings.json`, `terraform/allowed-resource-types.txt` | `docs/process/code-changes.md` and `docs/process/best-practices.md`, which hold the guardrails |
    | Documents | `docs/**`, `AGENTS.md`, `CLAUDE.md`, every `AGENTS.md` and `CLAUDE.md` under an area, `.claude/skills/**` | `docs/README.md`; `docs/decisions/README.md` for `docs/decisions/**` |
    | Art | `art/**` | `docs/process/assets.md` |
 
