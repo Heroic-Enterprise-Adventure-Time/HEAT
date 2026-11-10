@@ -10,16 +10,15 @@ import * as z from 'zod/mini';
 
 import { must } from '@heat/engine';
 
-export type Terrain = 'lower' | 'upper';
+/** The two terrains a tileset blends: the one declaration, which the type and the schema both read (typescript.md, rule 18). */
+export const TERRAINS = ['lower', 'upper'] as const;
+export type Terrain = (typeof TERRAINS)[number];
 
-export interface Box {
-  readonly x: number;
-  readonly y: number;
-  readonly width: number;
-  readonly height: number;
-}
+/** A rectangle of the sheet in its pixels: a tile's `bounding_box`. */
+const BoxSchema = z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() });
+export type Box = Readonly<z.output<typeof BoxSchema>>;
 
-const terrain = z.enum(['lower', 'upper']);
+const terrain = z.enum(TERRAINS);
 const size = z.object({ width: z.number(), height: z.number() });
 
 /** PixelLab's `tileset.json`, as much of it as the ground reads; checked where it is fetched (angular.md, rule 4). */
@@ -29,7 +28,7 @@ export const TilesetJsonSchema = z.object({
     tiles: z.array(
       z.object({
         corners: z.object({ NE: terrain, NW: terrain, SE: terrain, SW: terrain }),
-        bounding_box: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }),
+        bounding_box: BoxSchema,
       }),
     ),
   }),

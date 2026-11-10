@@ -4,7 +4,8 @@ import { RouterLink } from '@angular/router';
 import { Game, type RecruitOffer, type RecruitRefusal } from '../../game';
 import { refusalWords } from '../../hub';
 import { CampState } from '../camp-state';
-import { costWords, FacilityBuild } from './facility-build';
+import { priceWords } from './cost-words';
+import { FacilityBuild } from './facility-build';
 
 /** The hub's refusals of a recruit, by type, in the player's words; any other is shown as the hub put it. */
 const REFUSALS: Readonly<Record<RecruitRefusal, string>> = {
@@ -13,11 +14,6 @@ const REFUSALS: Readonly<Record<RecruitRefusal, string>> = {
   InsufficientResources: 'The camp cannot pay for this now.',
   Conflict: 'The camp changed while recruiting, and nobody was recruited. Try again.',
 };
-
-/** A recruit's price in words, each resource beside the camp's balance (game.md, "The page"). */
-export function priceWords(offer: RecruitOffer): string {
-  return offer.cost.length === 0 ? 'free' : costWords(offer.cost);
-}
 
 /**
  * The heroes hall's panel, `/camp/<location>/heroes-hall` (game.md, "The

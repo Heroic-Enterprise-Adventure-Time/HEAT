@@ -10,7 +10,15 @@ import * as z from 'zod/mini';
 export async function fetchJson<Schema extends z.ZodMiniType>(url: string, schema: Schema, fetchFn: typeof fetch = fetch): Promise<z.output<Schema>> {
   const response = await fetchFn(url);
   if (!response.ok) throw new Error(`GET ${url} answered ${String(response.status)}`);
-  const parsed = schema.safeParse(await response.json());
+  const text = await response.text();
+  let value: unknown;
+  try {
+    value = JSON.parse(text);
+  } catch {
+    // Not JSON at all, such as the page itself served in place of a missing file.
+    throw new Error(`${url} is not JSON`);
+  }
+  const parsed = schema.safeParse(value);
   if (!parsed.success) throw new Error(`${url} is not what the page reads: ${z.prettifyError(parsed.error)}`);
   return parsed.data;
 }

@@ -41,7 +41,7 @@ export interface UnitArt {
 }
 
 /** A sprite set's provenance, as much of it as the battle reads: how many frames each animation has, and how it plays; checked where it is fetched (angular.md, rule 4). */
-export const ProvenanceSchema = z.object({
+const ProvenanceSchema = z.object({
   animations: z.optional(
     z.record(
       z.string(),
@@ -90,53 +90,53 @@ export interface EffectArt {
 }
 
 /** A weapon's provenance, as much of it as the battle reads: the swing's frames, the one held, and each frame's grip. */
-export const WeaponProvenanceSchema = z.object({
+const WeaponProvenanceSchema = z.object({
   animations: z.object({ swing: z.object({ frames: z.number(), holdFrame: z.number(), grips: z.array(z.tuple([z.number(), z.number()])) }) }),
 });
+
+/**
+ * The art under `key`, loaded once and shared by every battle after. A load
+ * that fails, a fetch or a file its schema refuses, is dropped from the
+ * cache, so the next battle tries again rather than failing until a reload.
+ */
+function loadOnce<T>(cache: Map<string, Promise<T>>, key: string, load: () => Promise<T>): Promise<T> {
+  let art = cache.get(key);
+  if (!art) {
+    art = load();
+    cache.set(key, art);
+    art.catch(() => { cache.delete(key); });
+  }
+  return art;
+}
 
 const weapons = new Map<string, Promise<WeaponArt>>();
 const effects = new Map<string, Promise<EffectArt>>();
 
 /** A weapon's art, loaded once: `<set>` under `/art/weapons`. */
 export function loadWeaponArt(set: string): Promise<WeaponArt> {
-  let art = weapons.get(set);
-  if (!art) {
-    const base = `/art/weapons/${set}`;
-    art = (async () => {
-      const provenance = await fetchJson(`${base}/provenance.json`, WeaponProvenanceSchema);
-      const { frames, holdFrame, grips } = provenance.animations.swing;
-      const swing = await Promise.all(range(frames).map((i) => Assets.load<Texture>(`${base}/swing-${i}.png`)));
-      return { swing, holdFrame, grips: grips.map(([x, y]) => ({ x, y })) };
-    })();
-    weapons.set(set, art);
-  }
-  return art;
+  const base = `/art/weapons/${set}`;
+  return loadOnce(weapons, set, async () => {
+    const provenance = await fetchJson(`${base}/provenance.json`, WeaponProvenanceSchema);
+    const { frames, holdFrame, grips } = provenance.animations.swing;
+    const swing = await Promise.all(range(frames).map((i) => Assets.load<Texture>(`${base}/swing-${i}.png`)));
+    return { swing, holdFrame, grips: grips.map(([x, y]) => ({ x, y })) };
+  });
 }
 
 /** An effect's art, loaded once: `<set>` under `/art/effects`. */
 export function loadEffectArt(set: string): Promise<EffectArt> {
-  let art = effects.get(set);
-  if (!art) {
-    const base = `/art/effects/${set}`;
-    art = (async () => {
-      const layout = effectLayout(await fetchJson(`${base}/manifest.json`, EffectManifestSchema));
-      const sheet = await Assets.load<Texture>(`${base}/${layout.sheet}`);
-      const frames = layout.frames.map((r) => new Texture({ source: sheet.source, frame: new Rectangle(r.x, r.y, r.width, r.height) }));
-      return { layout, frames };
-    })();
-    effects.set(set, art);
-  }
-  return art;
+  const base = `/art/effects/${set}`;
+  return loadOnce(effects, set, async () => {
+    const layout = effectLayout(await fetchJson(`${base}/manifest.json`, EffectManifestSchema));
+    const sheet = await Assets.load<Texture>(`${base}/${layout.sheet}`);
+    const frames = layout.frames.map((r) => new Texture({ source: sheet.source, frame: new Rectangle(r.x, r.y, r.width, r.height) }));
+    return { layout, frames };
+  });
 }
 
 const loaded = new Map<string, Promise<UnitArt>>();
 
 /** A set's art, loaded once: `heroes/<set>`, `monsters/<set>` or `props/<set>` under `/art`. */
 export function loadUnitArt(path: string): Promise<UnitArt> {
-  let art = loaded.get(path);
-  if (!art) {
-    art = path.startsWith('props/') ? propArt(`/art/${path}`) : figureArt(`/art/${path}`);
-    loaded.set(path, art);
-  }
-  return art;
+  return loadOnce(loaded, path, () => (path.startsWith('props/') ? propArt(`/art/${path}`) : figureArt(`/art/${path}`)));
 }

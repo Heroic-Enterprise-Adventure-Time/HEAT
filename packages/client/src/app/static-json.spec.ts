@@ -21,6 +21,11 @@ describe('fetchJson', () => {
     );
   });
 
+  it('refuses a body that is not JSON, naming the file', async () => {
+    const page: typeof fetch = () => Promise.resolve(new Response('<!doctype html><html></html>', { status: 200 }));
+    await expect(fetchJson('/art/ground/none/tileset.json', TilesetJsonSchema, page)).rejects.toThrow('/art/ground/none/tileset.json is not JSON');
+  });
+
   it('refuses a file the server did not find', async () => {
     await expect(fetchJson('/art/ground/none/tileset.json', TilesetJsonSchema, answering({}, 404))).rejects.toThrow('GET /art/ground/none/tileset.json answered 404');
   });

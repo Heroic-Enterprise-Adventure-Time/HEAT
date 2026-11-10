@@ -4,6 +4,7 @@ import type { FacilityKind } from '@heat/engine';
 
 import { type BuildRefusal, Game, type UpgradeOffer } from '../../game';
 import { refusalWords } from '../../hub';
+import { costWords } from './cost-words';
 
 /** The hub's refusals of a build, by type, in the player's words; any other is shown as the hub put it. */
 const REFUSALS: Readonly<Record<BuildRefusal, string>> = {
@@ -12,11 +13,6 @@ const REFUSALS: Readonly<Record<BuildRefusal, string>> = {
   InsufficientResources: 'The camp cannot pay for this now.',
   Conflict: 'The camp changed while building, and nothing was built. Try again.',
 };
-
-/** A cost in words, each resource beside the camp's balance (game.md, "The page"): a facility's level here, a recruit's price in the hall. */
-export function costWords(cost: UpgradeOffer['cost']): string {
-  return cost.map((c) => `${c.amount} ${c.material}, you have ${c.balance}`).join('; ');
-}
 
 /**
  * Building a facility or its next level, inside the facility's panel and the
