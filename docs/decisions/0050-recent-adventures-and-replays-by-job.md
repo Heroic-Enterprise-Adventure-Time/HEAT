@@ -33,9 +33,9 @@ The settle transaction sets the two attributes when it marks the record settled.
 
 **The index is eventually consistent.** A replay may be missing from its job's list for a moment after its adventure settles. The list is read when a panel opens, not as the answer to a submit, and a test that settles and then reads waits for it.
 
-**"My history" leaves the index.** A record carries one value for `GSI1PK`, so one index cannot be keyed by job and by player at once; 0023's sentence would have needed a second pair of keys or a second item. A player's history is private, is asked for by the player alone, and is not in step 3. It is designed when it is built, in the player's own collection of the player table, where the ledger already holds one entry per adventure.
+**"My history" leaves the index.** A record carries one value for `GSI1PK`, so one index cannot be keyed by job and by player at once; 0023's sentence would have needed a second pair of keys or a second item. A player's history is private, is asked for by the player alone, and is not in step 3. It is designed when it is built, in the player's own collection of the player table, as an item of its own per adventure. The ledger cannot stand in for it: settlement writes one ledger entry per material credited, so an adventure that paid nothing, a retreat that forfeits its pay or a party all down, has no entry at all.
 
-**No backfill.** Adventures settled before the deploy that adds these are in neither list: their records carry no `GSI1PK`, which also keeps them out of the index's own backfill, and their feed items would have expired within the week. The lists start from the deploy. A replay stored under an older timeline schema is "replay unavailable" (overview, "The adventure loop"), which is one more reason an old record is not worth listing.
+**No backfill.** Adventures settled before the deploy that adds these are in neither list: their records carry no `GSI1PK`, which also keeps them out of the index's own backfill, and their feed items would have expired within the week. The lists start from the deploy. A replay stored under an older timeline schema is "replay unavailable" (`docs/architecture/adventure-loop.md`), which is one more reason an old record is not worth listing.
 
 **Room left for step 5, and nothing designed.** Shared facilities that players contribute to stay in step 5 (the owner, 2026-11-10). Two prefixes in the location's collection are kept for them, `FACILITY#<kind>` for a shared facility's state and `CONTRIB#` for what players give, so that nothing in step 3 or 4 takes them. Their shape, and how upkeep fits "no real-time gating" (game.md, "The adventure loop"), are step 5's to decide.
 
@@ -71,4 +71,4 @@ Not checked here, and for Issue-289 to check when it builds the index: how Elect
 
 ## Where it is described
 
-`docs/architecture/overview.md`, "Services and data", "Camps, heroes and resources" and "Build order". `docs/design/game.md`, "Locations and camps". Built by Issue-288 (the feed item), Issue-289 (the index) and Issue-290 (the client).
+`docs/architecture/camps.md`. `docs/architecture/overview.md`, "Services and data" and "Build order". `docs/design/game.md`, "Locations and camps". Built by Issue-288 (the feed item), Issue-289 (the index) and Issue-290 (the client).
