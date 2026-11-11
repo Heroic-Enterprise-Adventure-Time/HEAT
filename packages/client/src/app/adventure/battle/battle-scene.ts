@@ -19,7 +19,7 @@ import {
 import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/ground';
 import { fetchJson } from '../../static-json';
 import type { Field, FieldUnit } from '../field';
-import { effectFrameAt, flightAt, flightPoint, heldFrame, releaseMs } from './action-sprites';
+import { effectFrameAt, heldFrame, projectileAt } from './action-sprites';
 import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
 
@@ -100,6 +100,8 @@ interface UnitView {
   readonly top: Sprite;
   /** The weapon in hand while the unit acts; none for a unit that uses none, such as the wolf. */
   weapon: WeaponArt | null;
+  /** A weapon is named for the unit, loaded or not yet. */
+  readonly armed: boolean;
   readonly weaponSprite: Sprite;
   readonly bar: Graphics;
   barShown: string;
@@ -132,7 +134,7 @@ interface EffectView {
  * (assets.md, rules 33 and 35). On the adventure's clock, as the act is.
  */
 interface ProjectileView {
-  art: EffectArt | null;
+  readonly art: NonNullable<EffectArt['projectile']>;
   readonly actor: UnitView;
   readonly target: UnitView;
   readonly act: { readonly from: number; readonly resolve: number };
@@ -252,6 +254,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     const bar = new Graphics();
     body.addChild(picture, top, weaponSprite);
     things.addChild(body, bar);
+    // The weapon by unit type for now; a hero's equipped weapon replaces this lookup (game.md, "Heroes").
+    const weapon = unit.kind === 'resource' ? undefined : WEAPON_SPRITES[unit.type as UnitType | MonsterType];
     const unitView: UnitView = {
       unit,
       opponent: unit.side === 'opponents',
@@ -260,6 +264,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       picture,
       top,
       weapon: null,
+      armed: weapon !== undefined,
       weaponSprite,
       bar,
       barShown: '',
@@ -277,8 +282,6 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         if (!destroyed) unitView.art = art;
       });
     }
-    // The weapon by unit type for now; a hero's equipped weapon replaces this lookup (game.md, "Heroes").
-    const weapon = unit.kind === 'resource' ? undefined : WEAPON_SPRITES[unit.type as UnitType | MonsterType];
     if (weapon) {
       void loadWeaponArt(weapon).then((art) => {
         if (!destroyed) unitView.weapon = art;
@@ -310,55 +313,47 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     projectiles.delete(unitId);
   };
 
-  /** Readies an ability's projectile for the action just declared; an effect with none leaves nothing to draw. */
+  /** Readies an ability's projectile for the action just declared; an effect with none, a swing or a bite, makes nothing. */
   const addProjectile = (set: string, actor: UnitView, target: UnitView, act: { readonly from: number; readonly resolve: number }) => {
-    removeProjectile(actor.unit.unitId);
-    const sprite = new Sprite();
-    sprite.visible = false;
-    sprite.anchor.set(0, 0.5);
-    things.addChild(sprite);
-    const projectile: ProjectileView = { art: null, actor, target, act, sprite };
-    projectiles.set(actor.unit.unitId, projectile);
+    const { unitId } = actor.unit;
+    removeProjectile(unitId);
     void loadEffectArt(set).then((art) => {
-      if (!destroyed) projectile.art = art;
+      // Loaded after the action it was for: nothing to show.
+      if (destroyed || !art.projectile || actor.act !== act || units.get(unitId) !== actor) return;
+      removeProjectile(unitId);
+      const sprite = new Sprite();
+      sprite.visible = false;
+      sprite.anchor.set(0, 0.5);
+      things.addChild(sprite);
+      projectiles.set(unitId, { art: art.projectile, actor, target, act, sprite });
     });
   };
 
   /**
-   * Shows each projectile where it is at `simTime`: before its release on
-   * the bow's nock, its tail on the string (the owner's note on Issue-284);
-   * from the release, the moment the weapon or, for a unit with none, the
-   * act reaches its hold frame, along its flight; landed, gone.
+   * Shows each projectile where `projectileAt` puts it at `simTime`: on the
+   * bow's string, then along its flight; landed, gone. One whose target fell
+   * while it flew is dropped, and so is one whose actor fell or was left
+   * behind with the stage.
    */
   const drawProjectiles = (simTime: number) => {
     for (const [unitId, projectile] of [...projectiles]) {
-      const { actor, target, act, sprite } = projectile;
-      const flying = projectile.art?.projectile;
-      // An actor that fell in its warmup, or was left behind with the stage, never lets go.
-      if (actor.act !== act || actor.downAt !== null || actor.behind || !units.has(target.unit.unitId) || (projectile.art && !flying)) {
+      const { art, actor, target, act, sprite } = projectile;
+      const gone = (unit: UnitView) => unit.downAt !== null || unit.behind || units.get(unit.unit.unitId) !== unit;
+      if (actor.act !== act || gone(actor) || gone(target)) {
         removeProjectile(unitId);
         continue;
       }
       sprite.visible = false;
-      if (!flying) continue;
+      // The release is read from the actor's art and its weapon's: until both are loaded there is no telling when it is.
+      if (!actor.art || (actor.armed && !actor.weapon)) continue;
       const { weapon } = actor;
       const facing = actor.opponent ? -1 : 1;
-      const release = weapon ? releaseMs(weapon.holdFrame, ACT_MS, weapon.frameMs) : releaseMs(actor.art?.actHold ?? 0, ACT_MS);
-      const index = weapon ? heldFrame(simTime, act, weapon.holdFrame, weapon.swing.length, ACT_MS, weapon.frameMs) : null;
-      const nock = index === null ? undefined : weapon?.nocks?.[index];
-      const grip = index === null ? undefined : weapon?.grips[index];
-      // Where it is let go from: the nock of the bow in hand, or the hand itself.
-      const hand = { x: actor.x + facing * (HAND.x + (nock && grip ? nock.x - grip.x : 0)), y: actor.y + HAND.y + (nock && grip ? nock.y - grip.y + 0.5 : 0) };
-      const progress = flightAt(simTime, act, release);
-      let at: { x: number; y: number };
-      if (progress !== null) at = flightPoint(hand, { x: target.x, y: target.y - flying.layout.height }, progress, flying.layout.arc);
-      else if (simTime < act.from + release && nock) at = hand;
-      else continue;
-      const frame = progress === null ? 0 : Math.floor((simTime - act.from - release) / flying.layout.frameMs) % flying.frames.length;
-      sprite.texture = must(flying.frames[frame], `frame ${frame} of the projectile`);
+      const from = { feet: actor, facing, hand: HAND, actHold: actor.art.actHold, weapon: weapon && { ...weapon, frames: weapon.swing.length } } as const;
+      const at = projectileAt(simTime, act, ACT_MS, from, target, art.layout);
+      if (!at) continue;
+      sprite.texture = must(art.frames[at.frame], `frame ${at.frame} of the projectile`);
       sprite.scale.set(facing, 1);
-      // On the string its tail is on the nock; in flight its middle is on the path.
-      sprite.position.set(Math.round(at.x - (progress === null ? 0 : (facing * sprite.texture.width) / 2)), Math.round(at.y));
+      sprite.position.set(at.x, at.y);
       sprite.zIndex = Math.max(actor.y, target.y) + 0.45;
       sprite.visible = true;
     }

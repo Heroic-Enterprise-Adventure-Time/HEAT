@@ -6,7 +6,7 @@ import { must } from '@heat/engine';
 
 import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
 import { fetchJson } from '../../static-json';
-import { effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileLayout, projectileLayout } from './action-sprites';
+import { effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileLayout, projectileLayout, type Rect } from './action-sprites';
 
 /**
  * A battle unit's pictures, read from its sprite set's files and its
@@ -144,7 +144,7 @@ export function loadEffectArt(set: string): Promise<EffectArt> {
   const base = `/art/effects/${set}`;
   return loadOnce(effects, set, async () => {
     const manifest = await fetchJson(`${base}/manifest.json`, EffectManifestSchema);
-    const cut = async (clip: { readonly sheet: string; readonly frames: readonly { x: number; y: number; width: number; height: number }[] }) => {
+    const cut = async (clip: { readonly sheet: string; readonly frames: readonly Rect[] }) => {
       const sheet = await Assets.load<Texture>(`${base}/${clip.sheet}`);
       return clip.frames.map((r) => new Texture({ source: sheet.source, frame: new Rectangle(r.x, r.y, r.width, r.height) }));
     };

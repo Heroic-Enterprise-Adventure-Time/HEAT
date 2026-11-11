@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { effectFrameAt, effectLayout, type EffectManifest, flightAt, flightPoint, heldFrame, projectileLayout, releaseMs } from './action-sprites';
+import { must } from '@heat/engine';
+
+import { effectFrameAt, effectLayout, type EffectManifest, flightAt, flightPoint, heldFrame, projectileAt, projectileLayout, releaseMs, type Thrower } from './action-sprites';
 
 const manifest: EffectManifest = {
   frame_ms: 71,
@@ -120,11 +122,12 @@ describe('an effect with a projectile', () => {
     expect(effectFrameAt(layout, 0)).toBe(0);
   });
 
-  it('cuts its projectile, lands its middle where the pack drew it above the feet, and keeps the arc of the pack\'s own path', () => {
+  it('cuts its projectile, lands its middle where the pack\'s own path ends, and keeps the arc of that path', () => {
     const projectile = projectileLayout(thrown);
     expect(projectile?.sheet).toBe('part-projectile.png');
     expect(projectile?.frames).toHaveLength(6);
-    expect(projectile?.height).toBe(23);
+    // The clip's corner at the path's start, the last move, and half a frame: over the feet, 24 above.
+    expect(projectile?.landing).toEqual({ x: -45 + 40 + 5, y: -28 - 1 + 5 });
     expect(projectile?.arc).toBe(5 / 40);
   });
 
@@ -177,5 +180,54 @@ describe('a projectile in flight', () => {
     expect(flightPoint({ x: 200, y: 50 }, { x: 100, y: 50 }, 0.5, 0.125)).toEqual({ x: 150, y: 37.5 });
     expect(flightPoint({ x: 100, y: 50 }, { x: 200, y: 50 }, 0, 0.125)).toEqual({ x: 100, y: 50 });
     expect(flightPoint({ x: 100, y: 50 }, { x: 200, y: 50 }, 1, 0.125)).toEqual({ x: 200, y: 50 });
+  });
+});
+
+describe('where a projectile is drawn', () => {
+  const layout = must(projectileLayout(thrown), 'the projectile clip');
+  const act = { from: 1000, resolve: 1700 };
+  const hand = { x: 10, y: -20 };
+  const target = { x: 300, y: 120 };
+
+  it('leaves a bare hand at the act\'s hold frame and lands, its middle on the path, where the pack drew it on the target', () => {
+    const goblin: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 3, weapon: null };
+    // Nothing in the hand before the release, at 270 ms.
+    expect(projectileAt(1269, act, 90, goblin, target, layout)).toBeNull();
+    // Let go from the hand: the sprite's tail half its width behind its middle.
+    expect(projectileAt(1270, act, 90, goblin, target, layout)).toEqual({ x: 110 - 5, y: 100, frame: 0 });
+    // Just before it lands: its middle at the landing point, over the feet and 24 above.
+    const last = must(projectileAt(1699, act, 90, goblin, target, layout), 'the last point of the flight');
+    expect(last.x).toBeCloseTo(300 - 5, 0);
+    expect(last.y).toBeCloseTo(96, 0);
+    expect(projectileAt(1700, act, 90, goblin, target, layout)).toBeNull();
+  });
+
+  it('plays its own frames through the flight', () => {
+    const goblin: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 0, weapon: null };
+    expect(projectileAt(1000 + 83 * 2, act, 90, goblin, target, layout)?.frame).toBe(2);
+    expect(projectileAt(1000 + 83 * 6, act, 90, goblin, target, layout)?.frame).toBe(0);
+  });
+
+  it('is mirrored for the other side: let go to the left, its tail to the right', () => {
+    const goblin: Thrower = { feet: { x: 300, y: 120 }, facing: -1, hand, actHold: 3, weapon: null };
+    const hero = { x: 100, y: 120 };
+    expect(projectileAt(1270, act, 90, goblin, hero, layout)).toEqual({ x: 290 + 5, y: 100, frame: 0 });
+    expect(must(projectileAt(1699, act, 90, goblin, hero, layout), 'the last point of the flight').x).toBeCloseTo(100 + 5, 0);
+  });
+
+  it('sits on a bow\'s string, its tail on the frame\'s nock, until the bow\'s hold frame, then flies', () => {
+    const grips = [{ x: 20, y: 20 }, { x: 20, y: 20 }, { x: 20, y: 20 }];
+    const nocks = [{ x: 18, y: 20 }, { x: 14, y: 21 }, { x: 18, y: 20 }];
+    const ranger: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 0, weapon: { holdFrame: 2, frames: 3, frameMs: [], grips, nocks } };
+    // The second frame, the string drawn 6 back and 1 down from the grip; the half pixel rounds down the screen.
+    expect(projectileAt(1100, act, 90, ranger, target, layout)).toEqual({ x: 110 - 6, y: Math.round(100 + 1 + 0.5), frame: 0 });
+    // The hold frame begins at 180 ms: off the string and into its flight.
+    expect(projectileAt(1180, act, 90, ranger, target, layout)).toEqual({ x: 110 - 2 - 5, y: Math.round(100.5), frame: 0 });
+  });
+
+  it('shows nothing before the release for a weapon with no nock', () => {
+    const slinger: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 0, weapon: { holdFrame: 2, frames: 3, frameMs: [], grips: [{ x: 0, y: 0 }], nocks: null } };
+    expect(projectileAt(1100, act, 90, slinger, target, layout)).toBeNull();
+    expect(projectileAt(1180, act, 90, slinger, target, layout)).not.toBeNull();
   });
 });

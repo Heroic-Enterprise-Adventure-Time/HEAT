@@ -21,7 +21,9 @@
 - The bow's frames before its hold have their own lengths, recorded in its provenance as `frameMs`: the draw at the act's 90 ms a frame and the release, frames 4 and 5, at 45 ms, on the owner's note of 2026-11-10. Its hold begins at 450 ms and the arrow flies for 250 ms.
 - While the bow is drawn the arrow's sprite is shown on the string, its tail on the frame's nock (the owner's note of the same day).
 - The goblin's throw reaches its hold frame, the arm at the release, at 270 ms, and the rock flies for 330 ms.
-- A projectile's path is a straight line from where it is let go to where the effects tool drew it on its target, lifted in the middle by the arc of the tool's own path, kept as a share of the distance: none for the arrow, an eighth for the rock.
+- A projectile's path is a straight line from where it is let go to where the effects tool's own path ends on its target, lifted in the middle by the arc of that path, kept as a share of the distance: none for the arrow, an eighth for the rock.
+- It flies at whoever the action was declared at. The engine decides who takes the hit as the action resolves, which is as the projectile lands, so where a guard steps in, the projectile ends on the ally it covered and the impact plays on the guard. Aiming at the guard would take a guess in the scene or a new event in the timeline; neither is worth it for one frame of difference (the review of PR-297, the owner's call).
+- A projectile whose target falls while it flies is dropped.
 
 **The engine's events do not change.** The scene draws the flight from `action-declared`, which already carries when the action resolves, and the impact from `action-resolved`. Both timeline schema versions stay at 2, and a stored replay draws its projectiles from the same events a live run does.
 

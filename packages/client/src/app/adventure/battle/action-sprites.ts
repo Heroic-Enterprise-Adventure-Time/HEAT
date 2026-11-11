@@ -15,7 +15,8 @@ export const EffectManifestSchema = z.object({
   clips: z.array(
     z.object({
       name: z.string(),
-      role: z.optional(z.string()),
+      // The roles the battle reads; one it does not know is refused here, not played as the whole effect.
+      role: z.optional(z.enum(['projectile', 'impact'])),
       start_frame: z.number(),
       frames: z.number(),
       frame: z.object({ w: z.number(), h: z.number() }),
@@ -78,8 +79,8 @@ export interface ProjectileLayout {
   readonly sheet: string;
   readonly frames: readonly Rect[];
   readonly frameMs: number;
-  /** How far above the target's feet the middle of the projectile lands. */
-  readonly height: number;
+  /** Where the middle of the projectile lands from the target's feet, for an actor on the left: the end of the workbench's own path. */
+  readonly landing: { readonly x: number; readonly y: number };
   /** How high its path rises at the middle, as a share of the distance flown: none for an arrow, a little for a rock. */
   readonly arc: number;
 }
@@ -92,7 +93,9 @@ export function projectileLayout(manifest: EffectManifest): ProjectileLayout | n
   const moves = clip.moves ?? [];
   const span = Math.max(0, ...moves.map((m) => Math.abs(m.x)));
   const rise = Math.max(0, ...moves.map((m) => -m.y));
-  return { ...cut(clip), frameMs: manifest.frame_ms, height: -(clip.offset.y + clip.frame.h / 2), arc: span > 0 ? rise / span : 0 };
+  const end = moves.at(-1) ?? { x: 0, y: 0 };
+  const landing = { x: clip.offset.x + end.x + clip.frame.w / 2, y: clip.offset.y + end.y + clip.frame.h / 2 };
+  return { ...cut(clip), frameMs: manifest.frame_ms, landing, arc: span > 0 ? rise / span : 0 };
 }
 
 /** The frame of an effect `ms` after its action resolved, -1 before its first, or null once it is over. */
@@ -153,4 +156,69 @@ export function flightAt(simTime: number, act: { readonly from: number; readonly
 export function flightPoint(from: { readonly x: number; readonly y: number }, to: { readonly x: number; readonly y: number }, progress: number, arc: number): { x: number; y: number } {
   const lift = 4 * arc * Math.abs(to.x - from.x) * progress * (1 - progress);
   return { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress - lift };
+}
+
+interface Point {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** Whoever lets a projectile go: where it stands, which way it faces, and what its hand and its weapon do through the act. */
+export interface Thrower {
+  readonly feet: Point;
+  /** 1 for the party, facing east; -1 for the other side, drawn mirrored. */
+  readonly facing: 1 | -1;
+  /** The leading hand from the feet, facing east. */
+  readonly hand: Point;
+  /** The act's hold frame, for a unit that throws with its hand. */
+  readonly actHold: number;
+  /** The weapon in hand, or null for none: a bow carries its nocks, where the arrow sits while it is drawn. */
+  readonly weapon: {
+    readonly holdFrame: number;
+    readonly frames: number;
+    readonly frameMs: readonly number[];
+    readonly grips: readonly Point[];
+    readonly nocks: readonly Point[] | null;
+  } | null;
+}
+
+/**
+ * Where a projectile's sprite goes at `simTime`, and which of its frames
+ * shows (rules 33 and 35): before its release, on the nock of a bow, its
+ * tail on the string; from the release, the moment the weapon or, for a
+ * unit with none, the act reaches its hold frame, along its flight to where
+ * the workbench landed it on the target, its middle on the path; null
+ * before the release for a unit with no bow, and once it has landed. The
+ * point is the sprite's tail at its mid height, whole pixels, for a sprite
+ * mirrored when `facing` is -1.
+ */
+export function projectileAt(
+  simTime: number,
+  act: { readonly from: number; readonly resolve: number },
+  frameMs: number,
+  from: Thrower,
+  target: Point,
+  layout: ProjectileLayout,
+): { x: number; y: number; frame: number } | null {
+  const { weapon, facing } = from;
+  const release = weapon ? releaseMs(weapon.holdFrame, frameMs, weapon.frameMs) : releaseMs(from.actHold, frameMs);
+  const index = weapon ? heldFrame(simTime, act, weapon.holdFrame, weapon.frames, frameMs, weapon.frameMs) : null;
+  const nock = index === null ? undefined : weapon?.nocks?.[index];
+  const grip = index === null ? undefined : weapon?.grips[index];
+  const onString = nock !== undefined && grip !== undefined;
+  // Where it is let go from: the nock of the bow in hand, or the hand itself.
+  const hand = {
+    x: from.feet.x + facing * (from.hand.x + (onString ? nock.x - grip.x : 0)),
+    y: from.feet.y + from.hand.y + (onString ? nock.y - grip.y + 0.5 : 0),
+  };
+  const progress = flightAt(simTime, act, release);
+  if (progress === null) {
+    if (simTime >= act.from + release || !onString) return null;
+    return { x: Math.round(hand.x), y: Math.round(hand.y), frame: 0 };
+  }
+  const to = { x: target.x + facing * layout.landing.x, y: target.y + layout.landing.y };
+  const at = flightPoint(hand, to, progress, layout.arc);
+  const frame = Math.floor((simTime - act.from - release) / layout.frameMs) % layout.frames.length;
+  const width = layout.frames[frame]?.width ?? 0;
+  return { x: Math.round(at.x - (facing * width) / 2), y: Math.round(at.y), frame };
 }
