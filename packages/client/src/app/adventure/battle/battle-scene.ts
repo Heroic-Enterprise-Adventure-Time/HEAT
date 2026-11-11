@@ -335,7 +335,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const { actor, target, act, sprite } = projectile;
       const flying = projectile.art?.projectile;
       // An actor that fell in its warmup, or was left behind with the stage, never lets go.
-      if (actor.act !== act || actor.downAt !== null || !units.has(target.unit.unitId) || (projectile.art && !flying)) {
+      if (actor.act !== act || actor.downAt !== null || actor.behind || !units.has(target.unit.unitId) || (projectile.art && !flying)) {
         removeProjectile(unitId);
         continue;
       }
