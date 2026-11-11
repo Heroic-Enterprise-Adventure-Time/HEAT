@@ -10,7 +10,7 @@ import {
   levelForXp,
   replay,
 } from "../../src/index.js";
-import { contentWithJob, hero, ofKind, snapshot, TIMBER, WOLVES } from "./helpers.js";
+import { contentWithJob, hero, ofKind, rewardOf, snapshot, TIMBER, WOLVES } from "./helpers.js";
 
 const retreatAt = (acceptedAtSimTime: number): AdventureLogEntry => ({ kind: "party", acceptedAtSimTime, order: "retreat" });
 const pressOnAt = (acceptedAtSimTime: number): AdventureLogEntry => ({ kind: "party", acceptedAtSimTime, order: "press-on" });
@@ -194,7 +194,7 @@ describe("A stage's time limit", () => {
     const { timeline, result } = replay(snapshot(job.id, villagers), "a", [], contentWithJob(job));
     expect(result.outcome).toBe("retreat");
     expect(result.stages.at(-1)).toMatchObject({ kind: "gather", ended: "timeout", endedAtMs: 4000 + 3000 });
-    const timber_ = result.rewards.find((r) => r.material === "timber")?.amount ?? 0;
+    const timber_ = rewardOf(result, "timber");
     expect(timber_).toBeGreaterThan(0);
     expect(timber_).toBeLessThan(60);
     expect(result.rewards.some((r) => r.material === "cloth")).toBe(false);

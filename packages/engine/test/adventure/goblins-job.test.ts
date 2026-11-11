@@ -1,8 +1,7 @@
-import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { JOBS, jobsPostedBy, location, replay, RESOURCE_NODES, STARTING_LOCATION, type UnitType, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { GOBLINS, hero, ORE, SEEDS, seeds, snapshot } from "./helpers.js";
+import { type AdventureResult, JOBS, jobsPostedBy, location, replay, RESOURCE_NODES, type SnapshotHero, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
+import { GOBLINS, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The first mixed stage (Issue-286, decision 0052): three ore veins hold the
 // front line and two goblin rock throwers stand behind them. Its numbers are
@@ -14,14 +13,11 @@ if (stage?.kind !== "gather") throw new Error("The goblins job gathers second");
 /** What villagers alone bring home from the three veins: a rating of 2 against 3, two thirds of each vein's 30. */
 const VILLAGERS_ORE = 60;
 
-const party = (...types: UnitType[]) => types.map((type, i) => hero(`${type}-${i + 1}`, type));
-const villagers = (count: number) => party(...range(count).map(() => "villager" as const));
-
-function played(heroes: ReturnType<typeof party>) {
+function played(heroes: readonly SnapshotHero[]) {
   return seeds.map((seed) => ({ seed, result: replay(snapshot(GOBLINS, heroes), seed, []).result }));
 }
 
-const oreOf = (result: ReturnType<typeof replay>["result"]) => result.rewards.find((r) => r.material === "ore")?.amount ?? 0;
+const oreOf = (result: AdventureResult) => rewardOf(result, "ore");
 
 describe("Goblins in the old workings", () => {
   it("is the mine's second job: three veins with two goblins behind them, and nothing after", () => {

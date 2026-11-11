@@ -6,8 +6,10 @@ import {
   ADVENTURE_CONTENT,
   type AdventureContent,
   type AdventureEvent,
+  type AdventureResult,
   type AdventureSnapshot,
   type Job,
+  type Material,
   type SnapshotHero,
   UNIT_PROFILES,
   type UnitStats,
@@ -18,6 +20,21 @@ export function hero(heroId: string, unitType: UnitType, stats: Partial<UnitStat
   const profile = UNIT_PROFILES[unitType];
   if (!profile) throw new Error(`No profile for ${unitType}`);
   return { heroId, unitType, name: heroId, spriteSet: `${unitType}-01`, level: 1, stats: { ...profile.stats, ...stats } };
+}
+
+/** A party by its unit types, each hero named for its type and its place: `villager-2`. */
+export function party(...types: UnitType[]): SnapshotHero[] {
+  return types.map((type, i) => hero(`${type}-${i + 1}`, type));
+}
+
+/** A party of villagers alone. */
+export function villagers(count: number): SnapshotHero[] {
+  return range(count).map((i) => hero(`villager-${i + 1}`, "villager"));
+}
+
+/** How much of a material a result brings home; none is 0. */
+export function rewardOf(result: AdventureResult, material: Material): number {
+  return result.rewards.find((r) => r.material === material)?.amount ?? 0;
 }
 
 export function snapshot(jobId: string, heroes: readonly SnapshotHero[]): AdventureSnapshot {

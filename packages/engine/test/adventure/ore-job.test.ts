@@ -1,8 +1,7 @@
-import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { FACILITIES, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION } from "../../src/index.js";
-import { hero, ORE, SEEDS, seeds, snapshot } from "./helpers.js";
+import { ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The mine's first job (Issue-133, decision 0031, as retuned by decision
 // 0051): posted by the mine, not the job board, and one run of it by
@@ -31,9 +30,9 @@ describe("Ore from the hill", () => {
 
   for (const count of [1, 2]) {
     it(`is completed by ${count} villager(s) on every one of ${SEEDS} seeds, with 40 ore and no death`, () => {
-      const party = range(count).map((i) => hero(`villager-${i + 1}`, "villager"));
+      const heroes = villagers(count);
       for (const seed of seeds) {
-        const { result } = replay(snapshot(ORE, party), seed, []);
+        const { result } = replay(snapshot(ORE, heroes), seed, []);
         expect(result.outcome, seed).toBe("complete");
         expect(result.dead, seed).toEqual([]);
         expect(result.rewards, seed).toEqual([{ material: "ore", amount: VILLAGERS_ORE }]);
@@ -43,12 +42,12 @@ describe("Ore from the hill", () => {
   }
 
   it(`is completed by a fighter with a villager on every one of ${SEEDS} seeds with no death, for less ore: the fighter's hits waste the veins`, () => {
-    const party = [hero("fighter-1", "fighter"), hero("villager-1", "villager")];
+    const heroes = party("fighter", "villager");
     for (const seed of seeds) {
-      const { result } = replay(snapshot(ORE, party), seed, []);
+      const { result } = replay(snapshot(ORE, heroes), seed, []);
       expect(result.outcome, seed).toBe("complete");
       expect(result.dead, seed).toEqual([]);
-      const amount = result.rewards.find((r) => r.material === "ore")?.amount ?? 0;
+      const amount = rewardOf(result, "ore");
       expect(amount, seed).toBeGreaterThan(0);
       expect(amount, seed).toBeLessThan(VILLAGERS_ORE);
     }
