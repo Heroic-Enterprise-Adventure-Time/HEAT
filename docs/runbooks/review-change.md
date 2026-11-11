@@ -14,6 +14,7 @@ How a pull request is reviewed against the standards before the owner reads it: 
    | `packages/**`, and any `.ts`, `.mjs` or `.js` file, `package.json`, `tsconfig*.json`, `eslint.config.mjs` or `manifest.json` elsewhere | `docs/standards/typescript.md` |
    | `.github/**`, `.claude/settings.json`, `terraform/allowed-resource-types.txt` | `docs/process/code-changes.md` and `docs/process/best-practices.md`, which hold the guardrails |
    | `scripts/**/*.sh` | `docs/process/code-changes.md` and `docs/process/best-practices.md`, as for `.github/**`, because the workflows run them with their roles and tokens (Issue-255) |
+   | `art/**` | `docs/process/assets.md`, whose numbered rules say what a set holds, its provenance, its checks and its waivers (Issue-284) |
    | `packages/client/**` | `docs/standards/angular.md` as well |
    | `packages/hub/**` | `docs/standards/graphql.md` as well |
    | `terraform/**` | `docs/standards/terraform.md` |
