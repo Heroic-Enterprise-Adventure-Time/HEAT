@@ -1,15 +1,12 @@
-import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { AdventureEngine, type AdventureResult, JOBS, jobsPostedBy, location, replay, RESOURCE_NODES, STARTING_LOCATION } from "../../src/index.js";
-import { hero, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
+import { hero, SEEDS, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 // The first progression (decision 0031, as retuned by decision 0051): a new
 // player's free villager cannot fail "Pick up sticks", and one run pays for
 // the next villager.
 
-const SEEDS = 500;
-const seeds = range(SEEDS).map((i) => `seed-${i}`);
 const lone = [hero("villager-1", "villager")];
 const sticks = JOBS[STICKS];
 const gather = sticks.stages[1];

@@ -2,13 +2,11 @@ import { range } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { FACILITIES, JOBS, replay, RESOURCE_NODES, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { hero, snapshot, TIMBER } from "./helpers.js";
+import { hero, SEEDS, seeds, snapshot, TIMBER } from "./helpers.js";
 
 // The villagers' timber run (decision 0031, as retuned by decision 0051):
 // one run of it pays for the mine.
 
-const SEEDS = 500;
-const seeds = range(SEEDS).map((i) => `seed-${i}`);
 const timber = JOBS[TIMBER];
 const gather = timber.stages[1];
 if (gather?.kind !== "gather") throw new Error("The timber job gathers second");

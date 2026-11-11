@@ -79,6 +79,17 @@ describe("A job run to the end", () => {
     expect(result.rewards).toEqual([{ material: "timber", amount: 30 }, ...job.pay]);
   });
 
+  it("gives every unit its own id when a stage names a type twice", () => {
+    const job: Job = {
+      ...JOBS[TIMBER],
+      id: "woods-either-side",
+      stages: [{ kind: "gather", opponents: [{ type: "tree", count: 1 }, { type: "wolf", count: 1 }, { type: "tree", count: 2 }], timeLimitMs: 90_000 }, { kind: "arrive" }],
+    };
+    const { timeline } = replay(snapshot(job.id, villagers), "a", [], contentWithJob(job));
+    const opponents = ofKind(timeline.events, "battle-start")[0]?.participants.filter((p) => p.side === "opponents");
+    expect(opponents?.map((p) => p.unitId)).toEqual(["s0-tree-1", "s0-wolf-1", "s0-tree-2", "s0-tree-3"]);
+  });
+
   it("carries health from one stage to the next", () => {
     const job: Job = {
       ...JOBS[WOLVES],
