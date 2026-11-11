@@ -344,6 +344,21 @@ const repeated = await graphql(token, submitMutation, { id, log: [] });
 const unchanged = (await graphql(token, heroQuery)).data?.me;
 check(!repeated.errors && JSON.stringify(success(repeated, "submitAdventure", "adventure")?.result) === JSON.stringify(result) && JSON.stringify(unchanged) === JSON.stringify(after), `a repeated submit answers the settled result and pays nothing (${repeated.ms} ms)`);
 
+// The location's recent adventures (Issue-288, decision 0050): the settle
+// transaction put this one in Millbrook's feed, so it is the newest there,
+// by its public fields: the job, the outcome, the stages, what was credited
+// and the party, with no id of a hero or a player.
+const recentQuery = `{ recentAdventuresAt(location: "millbrook") { id job { id } outcome stages { stage kind ended } credited { material amount } party { name unitType spriteSet level died } settledAt } }`;
+const recent = await graphql(token, recentQuery);
+const newest = recent.data?.recentAdventuresAt?.[0];
+const sent = adventure.snapshot.heroes[0];
+check(!recent.errors && newest?.id === id && newest.job.id === job && newest.outcome === result.outcome, `the settled adventure is first in Millbrook's recent adventures, of ${recent.data?.recentAdventuresAt?.length}: ${newest?.id} ${newest?.outcome} at ${newest?.settledAt} (${recent.ms} ms)`);
+check(newest.stages.length === expected.stages.length && newest.stages.every((s, i) => s.ended.toLowerCase() === expected.stages[i].ended), `it says how each stage ended: ${newest.stages.map((s) => s.ended).join(", ")}`);
+check(sorted(newest.credited) === sorted(result.credited), `it says what was credited: ${sorted(newest.credited)}`);
+check(JSON.stringify(newest.party) === JSON.stringify([{ name: sent.name, unitType: "VILLAGER", spriteSet: sent.spriteSet, level: villager.level, died: false }]), `its party is the villager by its public fields, at the level it came home at: ${JSON.stringify(newest.party)}`);
+check(!JSON.stringify(newest).includes(party.id) && !JSON.stringify(newest).includes(current.data.me.id), `nothing in it names the hero's id or the player's`);
+check(recent.data.recentAdventuresAt.length <= 20, `the list holds at most 20`);
+
 // Paid recruitment (Issue-82): the timber run pays for a second villager,
 // 20 timber debited while the first lives. It is retired at once, on every
 // stack, so dev's test user never fills its hall.
