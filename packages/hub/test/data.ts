@@ -3,11 +3,12 @@ import { randomUUID } from "node:crypto";
 import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { vi } from "vitest";
 
-import { must } from "@heat/engine";
+import { type AdventureOutcome, must } from "@heat/engine";
 
 import { ITEM_VERSION } from "../src/db/keys.js";
+import type { AdventureRecord, SettledResult } from "../src/db/repository.js";
 import { RECENT_TTL_SECONDS, type RecentAdventure } from "../src/recent.js";
-import { locationKeys, playerKeys } from "./keys.js";
+import { locationKeys, playerKeys, replayKeys } from "./keys.js";
 
 /**
  * What the data-layer tests share for their data (typescript.md, rule 19): a
@@ -43,6 +44,35 @@ export function recentAdventure(location: string, at: Date, overrides: Partial<R
 export async function putRecentAdventure(db: DynamoDBDocumentClient, table: string, item: RecentAdventure): Promise<RecentAdventure> {
   await db.send(new PutCommand({ TableName: table, Item: whole("recent", { ...locationKeys.done(item.location, item.settledAt, item.adventureId), ...item }) }));
   return item;
+}
+
+/** A result of the given outcome with nothing else in it. */
+export const emptyResult = (outcome: AdventureOutcome): SettledResult => ({ outcome, endedAtMs: 1000, reachedStage: 0, stages: [], rewards: [], credited: [], lost: [], heroes: [] });
+
+/** A settled record of the job as settlement leaves it, settled at the given time: nobody's party home with nothing, unless overridden. */
+export function settledAdventure(jobId: string, at: Date, overrides: Partial<AdventureRecord> = {}): AdventureRecord {
+  const version = "0123456789abcdef0123456789abcdef01234567";
+  return {
+    adventureId: randomUUID(),
+    playerId: player(),
+    seed: randomUUID(),
+    location: "millbrook",
+    jobId,
+    snapshot: { version, jobId, heroes: [] },
+    version,
+    startedAt: new Date(at.getTime() - 60_000).toISOString(),
+    status: "SETTLED",
+    result: emptyResult("complete"),
+    settledAt: at.toISOString(),
+    ...overrides,
+  };
+}
+
+/** Puts a settled record past the repository, under its key and the index's keys the layout gives it. */
+export async function putSettledAdventure(db: DynamoDBDocumentClient, table: string, record: AdventureRecord): Promise<AdventureRecord> {
+  const settledAt = must(record.settledAt, "the time the record settled");
+  await db.send(new PutCommand({ TableName: table, Item: whole("adventure", { ...locationKeys.adventure(record.adventureId), ...replayKeys(record.jobId, settledAt), replayOf: record.jobId, ...record }) }));
+  return record;
 }
 
 /** Items a table's Queries read during `run`, and how many Queries there were; the caller restores the spy. */

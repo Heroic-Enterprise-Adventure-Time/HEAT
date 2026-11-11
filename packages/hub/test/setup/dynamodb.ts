@@ -32,7 +32,7 @@ export async function setup(): Promise<void> {
   // against the in-memory store, and the bucket by the stack test.
   process.env["HEAT_REPLAY_BUCKET"] = "heat-test-replays";
 
-  await ensureTables(endpoint, "heat-test-player", "heat-test-location");
+  await ensureTables(endpoint, ["heat-test-player", "heat-test-location"], ["heat-test-location"]);
 }
 
 export async function teardown(): Promise<void> {

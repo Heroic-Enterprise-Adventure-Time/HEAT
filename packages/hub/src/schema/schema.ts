@@ -51,6 +51,7 @@ import {
   Requires,
   type Shortfall,
 } from "../refusals.js";
+import { replaysOf } from "../replays.js";
 import { retireHero } from "../retire.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
 import { startAdventure } from "../start.js";
@@ -62,7 +63,7 @@ import { builder } from "./builder.js";
  * adventure behind the `self` scope; other players' heroes seen at a location, by
  * their public fields only; a settled adventure, with its result and its
  * timeline; the adventures recently completed at a location, by their public
- * fields only; the deploy's version; joining, recruiting, retiring, building, and an
+ * fields only; a job's replays, its settled adventures; the deploy's version; joining, recruiting, retiring, building, and an
  * adventure started from the job board or a facility, submitted for verification and
  * settlement, or discarded when no deploy can verify it.
  *
@@ -294,6 +295,7 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     id: t.exposeID("adventureId"),
     seed: t.exposeString("seed"),
     startedAt: t.expose("startedAt", { type: "DateTime" }),
+    settledAt: t.expose("settledAt", { type: "DateTime", nullable: true, description: "When the adventure settled. Null until it has." }),
     location: t.exposeID("location", { description: "The location's id in the static content." }),
     // A job this version does not know means the adventure is another version's.
     job: t.field({ type: JobRef, resolve: (adventure) => knownJob(adventure.jobId) }),
@@ -304,7 +306,7 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     timeline: t.field({
       type: "JSON",
       nullable: true,
-      description: "The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled.",
+      description: "The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled. Read from the store once per adventure, so it is asked of the one adventure being played, not of each in a list.",
       resolve: async (adventure, _args, ctx) => {
         if (adventure.status !== "SETTLED") return null;
         const body = await ctx.timelines.get(adventure.adventureId);
@@ -606,6 +608,7 @@ const DiscardAdventureInput = builder.inputType("DiscardAdventureInput", {
 
 /** A location of the static content, where a field does nothing else with the id (graphql.md, rule 14). */
 const knownLocation = z.string().check(z.refine((id) => location(id) !== undefined, { error: ({ input }) => `no location ${String(input)}` }));
+const postedJob = z.string().check(z.refine((id) => jobOf(id) !== undefined, { error: ({ input }) => `no job ${String(input)}` }));
 
 builder.queryFields((t) => ({
   player: t.field({
@@ -650,6 +653,14 @@ builder.queryFields((t) => ({
     description: "The adventures most recently settled at the location, newest first, at most 20 and none older than a week; the caller's own are among them like anyone's, and nothing says whose an adventure was.",
     args: { location: t.arg.id({ required: true, validate: knownLocation }) },
     resolve: (_root, args, ctx) => recentAdventuresAt(ctx.repo, args.location),
+  }),
+  replaysOf: t.field({
+    type: [AdventureRef],
+    nullable: true,
+    authScopes: { authenticated: true },
+    description: "The job's replays: its adventures most recently settled, newest first, at most 20, whatever their outcome and whoever's they were, which nothing says. One settled a moment ago may not be listed yet. A job this version does not post is refused.",
+    args: { job: t.arg.id({ required: true, validate: postedJob }) },
+    resolve: (_root, args, ctx) => replaysOf(ctx.repo, args.job),
   }),
 }));
 

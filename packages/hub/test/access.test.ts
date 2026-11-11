@@ -28,8 +28,8 @@ const ACCESS = {
     Player: ["id"],
   },
   "any signed-in player": {
-    Query: ["adventure", "heroesSeenAt", "me", "recentAdventuresAt"],
-    Adventure: ["id", "job", "location", "result", "seed", "snapshot", "startedAt", "status", "timeline", "version"],
+    Query: ["adventure", "heroesSeenAt", "me", "recentAdventuresAt", "replaysOf"],
+    Adventure: ["id", "job", "location", "result", "seed", "settledAt", "snapshot", "startedAt", "status", "timeline", "version"],
     AdventureResult: ["credited", "endedAtMs", "heroes", "lost", "outcome", "reachedStage", "rewards", "stages"],
     HeroOutcome: ["dead", "health", "heroId", "level", "xp", "xpGained"],
     Job: ["description", "facility", "id", "location", "name"],

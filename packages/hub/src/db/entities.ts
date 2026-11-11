@@ -6,7 +6,7 @@ import { ADVENTURE_OUTCOMES, type AdventureSnapshot, FACILITY_KINDS, MATERIALS, 
 import type { RecentAdventure, RecentHero } from "../recent.js";
 import type { Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
-import { ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
+import { GSI1, ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
 import type { AdventureRecord, Hero, OpenAdventure, Player, SettledResult } from "./repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
 
@@ -156,6 +156,18 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
    * The snapshot and the result are stored whole, typed from the engine's and
    * the settlement's own types: a `map` would state them a second time, and
    * drops a nested field it does not declare, on a write and on a read.
+   *
+   * `replays` is the record in GSI1 (decision 0050), keyed from two
+   * attributes that only settlement sets, so that an open or discarded record
+   * carries neither key. ElectroDB writes each key of an index as soon as a
+   * write holds that key's composites: keyed on `jobId`, a record being
+   * started would carry GSI1PK from its first write. And the library's own
+   * device for a sparse index, a `condition` callback, refuses that first
+   * write, because a write that names one of such an index's composites must
+   * name them all, and a record being started has no end. Hence `replayOf`,
+   * the job once more, set with `settledAt` and hidden, so no read answers
+   * it. ElectroDB 3.9.3, both tried on 2026-11-11; test/replays.test.ts
+   * holds the keys on the items as stored.
    */
   const adventure = new Entity(
     {
@@ -173,11 +185,17 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         result: { type: CustomAttributeType<SettledResult>("any") },
         settledAt: { type: "string" },
         discardedAt: { type: "string" },
+        replayOf: { type: "string", hidden: true },
       },
       indexes: {
         primary: {
           pk: { field: KEY.pk, composite: ["adventureId"], template: TEMPLATES.adventurePk, casing: "none" },
           sk: { field: KEY.sk, composite: [], template: TEMPLATES.adventure, casing: "none" },
+        },
+        replays: {
+          index: GSI1.name,
+          pk: { field: GSI1.pk, composite: ["replayOf"], template: TEMPLATES.replaysPk, casing: "none" },
+          sk: { field: GSI1.sk, composite: ["settledAt"], template: TEMPLATES.replays, casing: "none" },
         },
       },
     },

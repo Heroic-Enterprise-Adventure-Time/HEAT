@@ -33,6 +33,13 @@ resource "aws_dynamodb_table" "player" {
 # Partitioned by location, and by adventure for the record settle looks up
 # by id. Public: what every player may see. Its TTL attribute, expiresAt in
 # epoch seconds, is set on the heroes seen at a location (decision 0029).
+#
+# GSI1 is the table's one index, with generic keys as the table's own are
+# (decision 0050): the adventure record carries GSI1PK = JOB#<jobId> and
+# GSI1SK = <settledAt> from settlement on, and nothing else carries either,
+# so the index holds the settled records and is what replaysOf reads. It
+# projects every attribute, because ElectroDB reads an index item as the
+# whole entity. On-demand like the table, so it costs nothing at rest.
 resource "aws_dynamodb_table" "location" {
   name         = "${var.name_prefix}-location"
   billing_mode = "PAY_PER_REQUEST"
@@ -47,6 +54,31 @@ resource "aws_dynamodb_table" "location" {
   attribute {
     name = "SK"
     type = "S"
+  }
+
+  attribute {
+    name = "GSI1PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "GSI1SK"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "GSI1"
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "GSI1PK"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "GSI1SK"
+      key_type       = "RANGE"
+    }
   }
 
   ttl {

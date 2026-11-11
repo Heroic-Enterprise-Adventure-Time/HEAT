@@ -532,7 +532,8 @@ export class Repository {
   /**
    * Settle, in one transaction (decision 0014; overview, "Camps, heroes and
    * resources"): the open item deleted only if it is this adventure; the
-   * record marked settled with its result only if it is still open; the
+   * record marked settled with its result only if it is still open, and from
+   * then on in its job's replays, by the index's keys (decision 0050); the
    * camp's warehouse level checked against the one the cap was computed
    * from, and its living count decremented by the dead only if it covers
    * them; each survivor's XP and level set and its mark removed, and its
@@ -568,7 +569,8 @@ export class Repository {
           AdventureClosed,
           items.adventure
             .update({ adventureId })
-            .set({ status: "SETTLED", result: s.result, settledAt: now.toISOString() })
+            // `replayOf` and `settledAt` are what the index's keys are made from (entities.ts).
+            .set({ status: "SETTLED", result: s.result, settledAt: now.toISOString(), replayOf: s.jobId })
             .where((a, op) => op.eq(a.status, "OPEN"))
             .commit(),
         ),
@@ -934,6 +936,18 @@ export class Repository {
       .where((a, op) => op.gt(a.expiresAt, seconds))
       .go({ ...STRONG, order: "desc", limit });
     return data;
+  }
+
+  /**
+   * The settled adventures of a job, newest first: one Query of GSI1 on
+   * `JOB#<jobId>` in descending key order, which is the order they settled
+   * in, reading at most `limit` (decision 0050). Eventually consistent, as
+   * every read of a global secondary index is, so an adventure may be
+   * missing for a moment after it settles.
+   */
+  async replays(jobId: string, limit: number): Promise<AdventureRecord[]> {
+    const { data } = await this.service.entities.adventure.query.replays({ replayOf: jobId }).go({ order: "desc", limit });
+    return data.map(toAdventure);
   }
 
   /** The player's `AT#` items, raw, every page: a raw read answers one page whatever `pages` says. */
