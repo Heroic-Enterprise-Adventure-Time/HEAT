@@ -1,8 +1,7 @@
 {
   "set": "rock-01",
   "kind": "action effect",
-  "abilities": [],
-  "madeFor": "The goblin rock thrower's throw of Issue-286: the rock flies from the goblin's hand to its target and the grit plays where it lands. The engine has no such ability yet, so `abilities` is empty; Issue-286 names it here when it adds it.",
+  "abilities": ["throw-rock"],
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

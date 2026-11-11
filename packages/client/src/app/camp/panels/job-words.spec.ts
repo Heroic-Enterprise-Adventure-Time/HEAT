@@ -10,7 +10,7 @@ const ore = JOBS['ore-from-the-hill'];
 describe('job words', () => {
   it("lists a poster's jobs and finds one only where it is posted", () => {
     expect(jobsAt('millbrook', 'job-board').map((j) => j.id)).toEqual(['pick-up-sticks', 'timber-from-the-near-woods', 'wolves-on-the-mill-road']);
-    expect(jobsAt('millbrook', 'mine').map((j) => j.id)).toEqual(['ore-from-the-hill']);
+    expect(jobsAt('millbrook', 'mine').map((j) => j.id)).toEqual(['ore-from-the-hill', 'goblins-in-the-old-workings']);
     expect(jobAt('millbrook', 'job-board', 'timber-from-the-near-woods')).toBe(timber);
     expect(jobAt('millbrook', 'job-board', 'ore-from-the-hill')).toBeUndefined();
     expect(jobAt('millbrook', 'mine', 'ore-from-the-hill')).toBe(ore);
@@ -22,6 +22,8 @@ describe('job words', () => {
     expect(wolves.stages.map(stageWords)).toEqual(['Travel', 'Fight 2 wolves', 'Arrive']);
     expect(timber.stages.map(stageWords)).toEqual(['Travel', 'Gather timber from 2 trees', 'Fight a wolf', 'Arrive']);
     expect(ore.stages.map(stageWords)).toEqual(['Travel', 'Gather ore from 2 ore veins', 'Fight a wolf', 'Arrive']);
+    // The first mixed stage (Issue-286): its nodes and its monsters in one line.
+    expect(JOBS['goblins-in-the-old-workings'].stages.map(stageWords)).toEqual(['Travel', 'Gather ore from 3 ore veins, and fight 2 goblin rock throwers', 'Arrive']);
   });
 
   it('says a stage of nodes and monsters together as both, whichever kind it is', () => {

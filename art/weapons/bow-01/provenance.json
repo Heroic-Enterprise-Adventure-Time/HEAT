@@ -1,8 +1,7 @@
 {
   "set": "bow-01",
   "kind": "weapon sprite set",
-  "wielders": [],
-  "madeFor": "The ranger's bow of Issue-286. No engine code draws a bow yet, so `wielders` is empty; Issue-286 names the ranger here when it gives the ranger its shot.",
+  "wielders": ["ranger"],
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",
@@ -66,6 +65,8 @@
       },
       "holdFrame": 6,
       "holdFrameNote": "The bow at rest just after the release, so that the arrow leaves as the hold begins (agreed with the owner 2026-11-10). The string is furthest back on frame 3.",
+      "frameMs": [90, 90, 90, 90, 45, 45],
+      "frameMsNote": "How long each frame before the hold lasts when it is played, in milliseconds on the action's clock: the draw at the act's 90, and the release, frames 4 and 5, at half that, on the owner's note under playing. The hold frame begins at 450, which is when the arrow leaves.",
       "grips": [
         [23, 14],
         [22, 14],

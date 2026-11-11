@@ -201,6 +201,10 @@ export const LOCATIONS: readonly Location[] = [
       // pays for a villager, one run of the mine's first job for a fighter.
       { unitType: "villager", hallLevel: 1, cost: [{ material: "timber", amount: 20 }] },
       { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 40 }] },
+      // The next step (Issue-286): the wolves job's cloth pays for the hall's
+      // second level and then for a ranger, the first unit type a hall's
+      // level gates.
+      { unitType: "ranger", hallLevel: 2, cost: [{ material: "timber", amount: 40 }, { material: "cloth", amount: 10 }] },
     ],
   },
 ];
@@ -307,7 +311,7 @@ export function heroNames(presentation: Presentation, taken: ReadonlySet<string>
 // ── The battle ─────────────────────────────────────────────────────
 
 /** The monsters, by the type a fight stage names. Their sprite sets are mapped beside them (Issue-111). */
-export const MONSTER_TYPES = ["wolf", "bandit"] as const;
+export const MONSTER_TYPES = ["wolf", "bandit", "goblin-rock-thrower"] as const;
 export type MonsterType = (typeof MONSTER_TYPES)[number];
 
 /** The resource nodes a gather stage names. */
@@ -319,7 +323,7 @@ export function isResourceType(type: string): type is ResourceType {
   return (RESOURCE_TYPES as readonly string[]).includes(type);
 }
 
-export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "move-up";
+export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "shoot" | "throw-rock" | "move-up";
 
 const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
 
@@ -334,7 +338,9 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
  * one tree before starting the next (Issue-15). Chop and mine are a strike
  * at a node with their own look: the same damage and the same warmup, so
  * that forcing a strike at a tree gains nothing over chopping it (decision
- * 0051).
+ * 0051). A ranged attack reaches every line from every line, which is what
+ * makes it the answer to a monster standing behind resource nodes; its
+ * warmup is its wind-up and its projectile's flight together (decision 0052).
  */
 export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
   strike: {
@@ -385,6 +391,22 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     warmupMs: 300,
     effect: { kind: "gather", material: "ore" },
   },
+  shoot: {
+    abilityId: "shoot",
+    name: "Shoot",
+    tags: ["ranged-attack", "physical", "piercing"],
+    targeting: { side: "enemy", reach: ANY_LINE, selection: "closest" },
+    warmupMs: 700,
+    effect: { kind: "damage" },
+  },
+  "throw-rock": {
+    abilityId: "throw-rock",
+    name: "Throw a rock",
+    tags: ["ranged-attack", "physical"],
+    targeting: { side: "enemy", reach: ANY_LINE, selection: "closest" },
+    warmupMs: 600,
+    effect: { kind: "damage" },
+  },
   "move-up": {
     abilityId: "move-up",
     name: "Move up",
@@ -401,7 +423,10 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
  * A villager's gather ratings are low in both timber and ore, below a
  * node's difficulty, so it brings home a share of each; a specialized
  * gatherer later meets the difficulty in one of them, and a combat unit has
- * no rating, so its hits waste a node (decision 0051).
+ * no rating, so its hits waste a node (decision 0051). A ranger stands at
+ * the back and shoots whatever is closest, monsters before nodes like any
+ * unit; with nothing else left it shoots a node and wastes its share of it
+ * (the owner's call on Issue-286).
  */
 export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
   villager: {
@@ -413,6 +438,11 @@ export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> =
     homeLine: "front",
     stats: { maxHealth: 50, speed: 10, damage: 6, gather: [] },
     actions: ["guard", "strike"],
+  },
+  ranger: {
+    homeLine: "far",
+    stats: { maxHealth: 26, speed: 10, damage: 6, gather: [] },
+    actions: ["shoot"],
   },
 };
 
@@ -428,6 +458,14 @@ export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
     homeLine: "near",
     stats: { maxHealth: 30, speed: 9, damage: 5, gather: [] },
     actions: ["strike-weakest", "move-up"],
+  },
+  // Fragile and hard-hitting, on a line melee cannot reach while anything
+  // stands in front of it (decision 0052).
+  "goblin-rock-thrower": {
+    name: "Goblin rock thrower",
+    homeLine: "far",
+    stats: { maxHealth: 12, speed: 8, damage: 5, gather: [] },
+    actions: ["throw-rock"],
   },
 };
 
@@ -451,7 +489,7 @@ export const BATTLE_CONTENT: BattleContent = {
 
 // ── Jobs and advancement ───────────────────────────────────────────
 
-export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road" | "ore-from-the-hill";
+export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road" | "ore-from-the-hill" | "goblins-in-the-old-workings";
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
@@ -526,6 +564,25 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     ],
     pay: [],
     xp: 15,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
+  // The first mixed stage (Issue-286, decision 0052): the veins hold the
+  // front line and the goblins throw from behind them, out of melee's reach
+  // until the veins fall. Villagers alone need four and usually lose one; a
+  // ranger with two villagers clears it with no death.
+  "goblins-in-the-old-workings": {
+    id: "goblins-in-the-old-workings",
+    name: "Goblins in the old workings",
+    description: "Three good veins lie deeper in, and goblins have moved in behind them. They throw rocks at anyone who digs.",
+    location: "millbrook",
+    facility: "mine",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: 3 }, { type: "goblin-rock-thrower", count: 2 }], timeLimitMs: 120_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    xp: 25,
     retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
   },
 };

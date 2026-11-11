@@ -1,8 +1,7 @@
 {
   "set": "arrow-01",
   "kind": "action effect",
-  "abilities": [],
-  "madeFor": "The ranger's shot of Issue-286: the arrow flies from the ranger's bow to its target and the sparks play where it lands. The engine has no such ability yet, so `abilities` is empty; Issue-286 names it here when it adds it.",
+  "abilities": ["shoot"],
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

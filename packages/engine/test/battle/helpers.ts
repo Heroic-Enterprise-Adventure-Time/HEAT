@@ -13,6 +13,7 @@ import {
   type CombatProfile,
   type GatherRatings,
   type MonsterProfile,
+  type MonsterType,
   type Opponent,
   type PartyMember,
   UNIT_PROFILES,
@@ -36,7 +37,7 @@ export function setup(party: readonly PartyMember[], opponents: readonly Opponen
 /** The game's content with some hero and monster profiles replaced. */
 export function contentWith(changes: {
   heroes?: Partial<Record<UnitType, Partial<CombatProfile>>>;
-  monsters?: Partial<Record<"wolf" | "bandit", Partial<MonsterProfile>>>;
+  monsters?: Partial<Record<MonsterType, Partial<MonsterProfile>>>;
 }): BattleContent {
   const heroes = { ...BATTLE_CONTENT.heroes };
   for (const [type, change] of Object.entries(changes.heroes ?? {}) as [UnitType, Partial<CombatProfile>][]) {
@@ -44,7 +45,7 @@ export function contentWith(changes: {
     if (base) heroes[type] = { ...base, ...change };
   }
   const monsters = { ...BATTLE_CONTENT.monsters };
-  for (const [type, change] of Object.entries(changes.monsters ?? {}) as ["wolf" | "bandit", Partial<MonsterProfile>][]) {
+  for (const [type, change] of Object.entries(changes.monsters ?? {}) as [MonsterType, Partial<MonsterProfile>][]) {
     monsters[type] = { ...monsters[type], ...change };
   }
   return { ...BATTLE_CONTENT, heroes, monsters };

@@ -13,7 +13,7 @@
 import type { Material } from "../index.js";
 import type { Line } from "./unit.js";
 
-export type AbilityTag = "melee-attack" | "physical" | "slashing" | "piercing" | "gather" | "support" | "movement";
+export type AbilityTag = "melee-attack" | "ranged-attack" | "physical" | "slashing" | "piercing" | "gather" | "support" | "movement";
 
 /** From the actor's line, the lines of the target side the ability reaches. */
 export interface LineReach {

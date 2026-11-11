@@ -10,6 +10,7 @@ import type { MonsterType, ResourceType } from "./content.js";
 export const MONSTER_SPRITE_SETS: Readonly<Record<MonsterType, readonly string[]>> = {
   wolf: ["wolf-02"],
   bandit: ["bandit-01"],
+  "goblin-rock-thrower": ["goblin-02"],
 };
 
 export const PROP_SPRITE_SETS: Readonly<Partial<Record<ResourceType, readonly string[]>>> = {

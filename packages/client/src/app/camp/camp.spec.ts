@@ -342,8 +342,9 @@ describe('Camp', () => {
     await user.click(panel().getByRole('button', { name: 'Build' }));
     const job = await panel().findByRole('link', { name: 'Ore from the hill' });
     expect(job).toHaveAttribute('href', '/camp/millbrook/mine/jobs/ore-from-the-hill');
-    expect(listItems('Jobs')).toHaveLength(1);
+    expect(listItems('Jobs')).toHaveLength(2);
     expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('up to 60 ore')).toBeInTheDocument();
+    expect(within(itemHolding('Jobs', 'link', 'Goblins in the old workings')).getByText('up to 90 ore')).toBeInTheDocument();
     expect(game.built).toEqual([['mine', 1]]);
   });
 
