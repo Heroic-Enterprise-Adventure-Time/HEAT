@@ -1,6 +1,9 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { vi } from "vitest";
+
+import { must } from "@heat/engine";
 
 import { ITEM_VERSION } from "../src/db/keys.js";
 import { playerKeys } from "./keys.js";
@@ -17,6 +20,20 @@ export const whole = <Item extends object>(entity: string, item: Item) => ({ ...
 
 export async function storedItem(db: DynamoDBDocumentClient, table: string, key: { PK: string; SK: string }) {
   return (await db.send(new GetCommand({ TableName: table, Key: key, ConsistentRead: true }))).Item;
+}
+
+/** Items a table's Queries read during `run`, and how many Queries there were; the caller restores the spy. */
+export async function reads<T>(db: DynamoDBDocumentClient, table: string, run: () => Promise<T>): Promise<{ result: T; queries: number; read: number }> {
+  const send = vi.spyOn(db, "send");
+  const result = await run();
+  let queries = 0;
+  let read = 0;
+  for (const [i, [command]] of send.mock.calls.entries()) {
+    if (!(command instanceof QueryCommand) || command.input.TableName !== table) continue;
+    queries++;
+    read += ((await must(send.mock.results[i], `the result of call ${i}`).value) as { ScannedCount?: number }).ScannedCount ?? 0;
+  }
+  return { result, queries, read };
 }
 
 /** Camps from before ElectroDB, each too big for three to fit a DynamoDB page, so that a read of them crosses a page. */

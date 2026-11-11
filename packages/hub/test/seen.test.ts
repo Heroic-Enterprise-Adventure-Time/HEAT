@@ -1,16 +1,14 @@
 import { randomInt, randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-
-import { must } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { type Hero, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { heroesSeenAt, type Random, SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, sightingOf } from "../src/seen.js";
-import { player, whole } from "./data.js";
+import { player, reads, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -54,20 +52,6 @@ async function putOwnHero(p: string, h: Hero): Promise<void> {
   await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, h.id), ...h }) }));
 }
 
-/** Items the location table's Queries read during `run`, and how many Queries there were. */
-async function reads<T>(run: () => Promise<T>): Promise<{ result: T; queries: number; read: number }> {
-  const send = vi.spyOn(db, "send");
-  const result = await run();
-  let queries = 0;
-  let read = 0;
-  for (const [i, [command]] of send.mock.calls.entries()) {
-    if (!(command instanceof QueryCommand) || command.input.TableName !== tables.location) continue;
-    queries++;
-    read += ((await must(send.mock.results[i], `the result of call ${i}`).value) as { ScannedCount?: number }).ScannedCount ?? 0;
-  }
-  return { result, queries, read };
-}
-
 /** A source of randomness whose window starts at the given hex digit, then random. */
 function startingAt(digit: number): Random {
   let first = true;
@@ -85,7 +69,7 @@ describe("the sample of heroes seen at a location", () => {
     const at = place();
     for (let i = 0; i < 40; i++) await putSighting(hero(at));
     for (const digit of [0, 7, 15]) {
-      const { result, queries, read } = await reads(() => heroesSeenAt(repo, player(), at, startingAt(digit)));
+      const { result, queries, read } = await reads(db, tables.location, () => heroesSeenAt(repo, player(), at, startingAt(digit)));
       expect(result).toHaveLength(SAMPLE_SIZE);
       expect(new Set(result.map((s) => s.heroId)).size).toBe(SAMPLE_SIZE);
       expect(queries).toBeGreaterThan(0);

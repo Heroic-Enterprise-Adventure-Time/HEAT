@@ -159,6 +159,7 @@ export function settlement(
   return {
     adventureId: record.adventureId,
     location: record.location,
+    jobId: record.jobId,
     warehouseLevel,
     holdings,
     survivors,
