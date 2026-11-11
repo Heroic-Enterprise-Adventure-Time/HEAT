@@ -1,8 +1,7 @@
 {
   "set": "goblin-02",
   "kind": "monster sprite set",
-  "monsters": [],
-  "madeFor": "The goblin rock thrower of Issue-286, a monster on a rear line that throws rocks. The engine has no such monster yet, so `monsters` is empty; Issue-286 names it here when it adds it.",
+  "monsters": ["goblin-rock-thrower"],
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

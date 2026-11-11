@@ -56,9 +56,9 @@ describe("static content", () => {
     }
   });
 
-  it("starts a new player at Millbrook, which recruits the villager and the fighter", () => {
+  it("starts a new player at Millbrook, which recruits the villager, the fighter and the ranger", () => {
     expect(location(STARTING_LOCATION)?.name).toBe("Millbrook");
-    expect(location(STARTING_LOCATION)?.recruits.map((r) => r.unitType)).toEqual(["villager", "fighter"]);
+    expect(location(STARTING_LOCATION)?.recruits.map((r) => r.unitType)).toEqual(["villager", "fighter", "ranger"]);
     expect(location(STARTING_LOCATION)?.sharedFacilities).toEqual(["job-board"]);
   });
 

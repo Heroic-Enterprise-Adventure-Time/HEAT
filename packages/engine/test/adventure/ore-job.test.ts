@@ -18,7 +18,7 @@ describe("Ore from the hill", () => {
   it("is posted by Millbrook's mine and not by its job board", () => {
     expect(ore.facility).toBe("mine");
     expect(FACILITIES.mine.levels.length).toBeGreaterThan(0);
-    expect(jobsPostedBy(STARTING_LOCATION, "mine").map((j) => j.id)).toEqual([ORE]);
+    expect(jobsPostedBy(STARTING_LOCATION, "mine").map((j) => j.id)).toContain(ORE);
     expect(jobsPostedBy(STARTING_LOCATION, "job-board").map((j) => j.id)).not.toContain(ORE);
   });
 

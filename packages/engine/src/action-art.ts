@@ -12,12 +12,15 @@ import type { AbilityId, MonsterType, UnitType } from "./content.js";
  * uses (one weapon kind per unit type, game.md, "Heroes"); when heroes carry
  * crafted weapons, the hero's own replaces this lookup. A unit with no entry,
  * such as the wolf, acts with nothing in hand. An ability with no entry, such
- * as moving up, draws no effect.
+ * as moving up, draws no effect. An effect with a projectile, the arrow and
+ * the rock, flies it from the actor to the target before its impact plays
+ * (assets.md, rule 35).
  */
 export const WEAPON_SPRITES: Readonly<Partial<Record<UnitType | MonsterType, string>>> = {
   villager: "hand-axe-01",
   fighter: "sword-01",
   bandit: "dagger-01",
+  ranger: "bow-01",
 };
 
 export const ABILITY_EFFECTS: Readonly<Partial<Record<AbilityId, string>>> = {
@@ -27,4 +30,6 @@ export const ABILITY_EFFECTS: Readonly<Partial<Record<AbilityId, string>>> = {
   guard: "guard-01",
   chop: "chop-01",
   mine: "mine-01",
+  shoot: "arrow-01",
+  "throw-rock": "rock-01",
 };

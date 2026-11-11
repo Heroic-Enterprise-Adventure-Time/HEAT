@@ -1,8 +1,7 @@
 {
   "set": "bow-01",
   "kind": "weapon sprite set",
-  "wielders": [],
-  "madeFor": "The ranger's bow of Issue-286. No engine code draws a bow yet, so `wielders` is empty; Issue-286 names the ranger here when it gives the ranger its shot.",
+  "wielders": ["ranger"],
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

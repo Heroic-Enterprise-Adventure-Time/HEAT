@@ -18,6 +18,8 @@ describe("The battle's content", () => {
     expect(UNIT_PROFILES.fighter).toMatchObject({ homeLine: "front", actions: ["guard", "strike"] });
     expect(MONSTERS.wolf).toMatchObject({ homeLine: "front", actions: ["bite", "move-up"] });
     expect(MONSTERS.bandit).toMatchObject({ homeLine: "near", actions: ["strike-weakest", "move-up"] });
+    expect(UNIT_PROFILES.ranger).toMatchObject({ homeLine: "far", actions: ["shoot"] });
+    expect(MONSTERS["goblin-rock-thrower"]).toMatchObject({ homeLine: "far", actions: ["throw-rock"] });
   });
 
   it("uses positive whole numbers for stats, warmups and amounts", () => {
@@ -42,7 +44,7 @@ describe("The battle's content", () => {
       expect(rating).toBeGreaterThan(0);
       expect(rating).toBeLessThan(node.difficulty);
     }
-    for (const profile of [must(UNIT_PROFILES.fighter, "the fighter"), ...Object.values(MONSTERS)]) expect(profile.stats.gather).toEqual([]);
+    for (const profile of [must(UNIT_PROFILES.fighter, "the fighter"), must(UNIT_PROFILES.ranger, "the ranger"), ...Object.values(MONSTERS)]) expect(profile.stats.gather).toEqual([]);
   });
 
   it("lists every monster and resource type", () => {
