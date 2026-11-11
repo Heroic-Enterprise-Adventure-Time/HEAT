@@ -141,6 +141,14 @@
       "why": "Made beside the throw at the owner's word, to compare; it reads as a punch. It stays on the character in PixelLab under the name act."
     }
   ],
+  "waivedChecks": [
+    {
+      "failure": "act east: height drifts 7 px",
+      "check": "act east: height drifts",
+      "date": "2026-11-10",
+      "note": "Waived by the owner under rule 29: a throw winds up and reaches, so the figure's height changes by design."
+    }
+  ],
   "rejected": [
     {
       "name": "Goblin 01",
