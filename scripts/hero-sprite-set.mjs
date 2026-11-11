@@ -22,7 +22,10 @@
 // may give "characterParameters" that differ from rule 8 (a quadruped's body_type and template). Each of its
 // animations may name its own "template" and "mode", or "mode": "v3" with its "actionDescription", and its
 // "frames" and, for act, its "holdFrame", where they differ from rule 11's (rule 28). Either kind may list the
-// candidates not kept, as "rejected": [{ "name": "...", "characterId": "...", "description": "..." }].
+// candidates not kept, as "rejected": [{ "name": "...", "characterId": "...", "description": "..." }], and the
+// animations made and not used, as "notKept": [{ "name": "...", "template": "...", "groupId": "...", "generations": n,
+// "why": "..." }]. A set made before the engine has its monster or class leaves that list empty and says what it
+// is for in "madeFor", with its PixelLab "tags" given in full.
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -350,8 +353,9 @@ if (record) {
     set,
     kind: monster ? "monster sprite set" : "hero sprite set",
     ...(monster ? { monsters: record.monsters } : { classes: record.classes, presentation: record.presentation }),
+    ...(record.madeFor ? { madeFor: record.madeFor } : {}),
     service: SERVICE,
-    pixellab: { characterId: values.character, name: record.name, tags: ["heat", monster ? "monster" : "hero", ...(monster ? record.monsters : record.classes)] },
+    pixellab: { characterId: values.character, name: record.name, tags: record.tags ?? ["heat", monster ? "monster" : "hero", ...(monster ? record.monsters : record.classes)] },
     character: {
       tool: "create_character",
       via: "MCP",
@@ -371,6 +375,7 @@ if (record) {
     },
     animations,
     animationGenerations: Object.values(animations).reduce((n, a) => n + a.generations, 0),
+    ...(record.notKept ? { animationsNotKept: record.notKept } : {}),
     ...(report.waived.length ? { waivedChecks: report.waived } : {}),
     ...(record.rejected ? { rejected: record.rejected } : {}),
     verified: values["mirror-west"]

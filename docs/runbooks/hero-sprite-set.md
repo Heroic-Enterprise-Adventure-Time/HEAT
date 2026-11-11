@@ -51,6 +51,7 @@ The same steps, with four differences (`docs/process/assets.md`, rules 28 and 29
 - Every candidate is shown in a battle line-up as well, facing west (the east rotation mirrored) opposite a kept hero.
 - A four-legged monster's walk and stance are `mode: template`, and its act, hit and down `mode: v3`, so its record names each animation's `template` or `mode` and `actionDescription`, its `frames`, and the act's `holdFrame`, chosen by eye.
 - The record says `"kind": "monster"` and lists `monsters`, the candidates not kept as `rejected`, and for a quadruped the `characterParameters` that differ from rule 8.
+- A monster made before the engine has it (rule 5) has an empty `monsters`, a `madeFor` and its PixelLab `tags` in full; an animation made and not used, such as the jab beside a throw (rule 28), is listed under `notKept`, and the act's `source`, `template`, `frames` and `holdFrame` name the one kept.
 
 A prop, such as a tree, is an object, not a character: rules 30 and 31, and `node scripts/prop-sprite-set.mjs --object <id> --out art/props/<set> --record <record.json>`, whose header gives the record's shape.
 

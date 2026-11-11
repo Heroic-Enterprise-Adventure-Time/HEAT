@@ -16,6 +16,9 @@
 //   { "name": "HEAT slash 01", "abilities": ["strike"], "effectId": "...", "imageId": "...",
 //     "file": "heat-slash-01-game.zip", "createdAt": "...", "madeAround": "...",
 //     "parts": [{ "name": "slash_trail", "size": 0.7, "colour": [...], ... }], "edits": ["..."] }
+// A projectile's pack (rule 35) also holds clips with a role, the projectile and its impact; their sheets are
+// written beside whole.png. "madeFor" says what a set is for while its "abilities" are still empty, before the
+// engine has the ability.
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -76,6 +79,21 @@ for (const file of ["whole.png", "manifest.json"]) {
   if (sha(readFileSync(join(values.out, file))) !== sha(bytes)) failures.push(`${file} differs from the pack's`);
 }
 const manifest = JSON.parse(zip.get("manifest.json")?.toString("utf8") ?? "{}");
+// A projectile's pieces (rule 35): the clips the manifest gives a role, the projectile in place and its impact,
+// each a sheet of its own for the game to move and to play on resolve.
+const roleFiles = {};
+for (const clip of manifest.clips?.filter((c) => c.role) ?? []) {
+  for (const { file } of clip.sheets) {
+    const bytes = zip.get(file);
+    if (!bytes) {
+      failures.push(`the pack has no ${file}`);
+      continue;
+    }
+    writeFileSync(join(values.out, file), bytes);
+    if (sha(readFileSync(join(values.out, file))) !== sha(bytes)) failures.push(`${file} differs from the pack's`);
+    roleFiles[file] = `the game pack's ${clip.role} clip, ${clip.frames} frames`;
+  }
+}
 const whole = manifest.clips?.find((c) => c.name === "whole");
 if (!whole) failures.push("the manifest has no whole clip");
 if (manifest.loop) failures.push("the effect loops; an action's effect plays once");
@@ -94,6 +112,7 @@ const provenance = {
   set,
   kind: "action effect",
   abilities: record.abilities,
+  ...(record.madeFor ? { madeFor: record.madeFor } : {}),
   service: SERVICE,
   pixellab: { effectId: record.effectId, name: record.name, imageId: record.imageId },
   effect: {
@@ -109,10 +128,11 @@ const provenance = {
   files: {
     "whole.png": "the game pack's whole clip: the effect without the sprite, a sheet of frames",
     "manifest.json": "the game pack's manifest: the frame size, the sheet's layout, the fps and the offset from the target's feet",
+    ...roleFiles,
   },
   frames: whole?.frames,
   fps: manifest.fps,
-  verified: `whole.png and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded ${new Date().toISOString().slice(0, 10)}.`,
+  verified: `${["whole.png", ...Object.keys(roleFiles)].join(", ")} and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded ${new Date().toISOString().slice(0, 10)}.`,
 };
 const json = JSON.stringify(provenance, null, 2).replace(/\[\s+([^[\]{}]*?)\s+\]/g, (_, items) => `[${items.split(/,\s+/).join(", ")}]`);
 writeFileSync(join(values.out, "provenance.json"), json + "\n");
