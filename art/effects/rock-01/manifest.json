@@ -1,0 +1,173 @@
+{
+ "app": "PixelLab VFX Creator",
+ "name": "HEAT rock 01",
+ "fps": 12,
+ "frame_ms": 83,
+ "frames": 12,
+ "loop": false,
+ "canvas": {
+  "w": 77,
+  "h": 49
+ },
+ "anchor": {
+  "kind": "feet",
+  "x": 48,
+  "y": 37
+ },
+ "clips": [
+  {
+   "name": "whole",
+   "title": "the whole effect, no sprite",
+   "depth": "both",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 11,
+   "frame": {
+    "w": 69,
+    "h": 34
+   },
+   "sheets": [
+    {
+     "file": "whole.png",
+     "first_frame": 0,
+     "frames": 11,
+     "columns": 4,
+     "rows": 3
+    }
+   ],
+   "offset": {
+    "x": -45,
+    "y": -33
+   }
+  },
+  {
+   "name": "whole-with-sprite",
+   "title": "the whole effect with the sprite in it",
+   "depth": "both",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 12,
+   "frame": {
+    "w": 69,
+    "h": 35
+   },
+   "sheets": [
+    {
+     "file": "whole-with-sprite.png",
+     "first_frame": 0,
+     "frames": 12,
+     "columns": 4,
+     "rows": 3
+    }
+   ],
+   "offset": {
+    "x": -45,
+    "y": -34
+   }
+  },
+  {
+   "name": "front",
+   "title": "everything in front of the sprite",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 11,
+   "frame": {
+    "w": 69,
+    "h": 34
+   },
+   "sheets": [
+    {
+     "file": "front.png",
+     "first_frame": 0,
+     "frames": 11,
+     "columns": 4,
+     "rows": 3
+    }
+   ],
+   "offset": {
+    "x": -45,
+    "y": -33
+   }
+  },
+  {
+   "name": "part-projectile",
+   "title": "the projectile part, in place",
+   "role": "projectile",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 6,
+   "frame": {
+    "w": 10,
+    "h": 10
+   },
+   "sheets": [
+    {
+     "file": "part-projectile.png",
+     "first_frame": 0,
+     "frames": 6,
+     "columns": 3,
+     "rows": 2
+    }
+   ],
+   "offset": {
+    "x": -45,
+    "y": -28
+   },
+   "moves": [
+    {
+     "x": 0,
+     "y": 0
+    },
+    {
+     "x": 6.91,
+     "y": -2.9
+    },
+    {
+     "x": 13.82,
+     "y": -4.6
+    },
+    {
+     "x": 20.73,
+     "y": -4.89
+    },
+    {
+     "x": 27.64,
+     "y": -3.92
+    },
+    {
+     "x": 34.55,
+     "y": -1.59
+    }
+   ]
+  },
+  {
+   "name": "part-debris_burst",
+   "title": "the debris burst part",
+   "role": "impact",
+   "part": "debris_burst",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 6,
+   "frames": 5,
+   "frame": {
+    "w": 42,
+    "h": 32
+   },
+   "sheets": [
+    {
+     "file": "part-debris_burst.png",
+     "first_frame": 0,
+     "frames": 5,
+     "columns": 3,
+     "rows": 2
+    }
+   ],
+   "offset": {
+    "x": -18,
+    "y": -31
+   }
+  }
+ ]
+}
