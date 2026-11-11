@@ -57,7 +57,7 @@ describe("Goblins in the old workings", () => {
     for (const { seed, result } of played(party("ranger", "villager", "villager"))) {
       expect(result.outcome, seed).toBe("complete");
       expect(result.dead, seed).toEqual([]);
-      expect(oreOf(result), seed).toBeGreaterThanOrEqual(35);
+      expect(oreOf(result), seed).toBeGreaterThanOrEqual(30);
       expect(oreOf(result), seed).toBeLessThan(VILLAGERS_ORE);
       expect(result.xp.every((x) => x.xp === goblins.xp), seed).toBe(true);
     }

@@ -6,7 +6,7 @@ import { must } from '@heat/engine';
 
 import { highestOpaqueRow, lowestOpaqueRow } from '../../pixel-art';
 import { fetchJson } from '../../static-json';
-import { effectLayout, type EffectLayout, EffectManifestSchema } from './action-sprites';
+import { effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileLayout, projectileLayout } from './action-sprites';
 
 /**
  * A battle unit's pictures, read from its sprite set's files and its
@@ -81,17 +81,32 @@ export interface WeaponArt {
   readonly holdFrame: number;
   /** Each frame's grip, the pixel in the wielder's hand, from the provenance: PixelLab draws the swing turning about the canvas, not the hand. */
   readonly grips: readonly { readonly x: number; readonly y: number }[];
+  /** How long each frame before the hold lasts, where the provenance says; a frame it does not name lasts as long as the act's. */
+  readonly frameMs: readonly number[];
+  /** A bow's nock on each frame, the middle of its string, where an arrow's tail sits while it is drawn; none for a weapon that shoots nothing. */
+  readonly nocks: readonly { readonly x: number; readonly y: number }[] | null;
 }
 
-/** An ability's effect, cut from its game pack's sheet (rule 34). */
+/** An ability's effect, cut from its game pack's sheet (rule 34), and its projectile where it has one (rule 35). */
 export interface EffectArt {
   readonly layout: EffectLayout;
   readonly frames: readonly Texture[];
+  readonly projectile: { readonly layout: ProjectileLayout; readonly frames: readonly Texture[] } | null;
 }
 
-/** A weapon's provenance, as much of it as the battle reads: the swing's frames, the one held, and each frame's grip. */
+const Pixel = z.tuple([z.number(), z.number()]);
+
+/** A weapon's provenance, as much of it as the battle reads: the swing's frames, the one held, each frame's grip, and for a bow its frames' lengths and nocks. */
 const WeaponProvenanceSchema = z.object({
-  animations: z.object({ swing: z.object({ frames: z.number(), holdFrame: z.number(), grips: z.array(z.tuple([z.number(), z.number()])) }) }),
+  animations: z.object({
+    swing: z.object({
+      frames: z.number(),
+      holdFrame: z.number(),
+      grips: z.array(Pixel),
+      frameMs: z.optional(z.array(z.number())),
+      nocks: z.optional(z.array(Pixel)),
+    }),
+  }),
 });
 
 /**
@@ -117,9 +132,10 @@ export function loadWeaponArt(set: string): Promise<WeaponArt> {
   const base = `/art/weapons/${set}`;
   return loadOnce(weapons, set, async () => {
     const provenance = await fetchJson(`${base}/provenance.json`, WeaponProvenanceSchema);
-    const { frames, holdFrame, grips } = provenance.animations.swing;
+    const { frames, holdFrame, grips, frameMs, nocks } = provenance.animations.swing;
     const swing = await Promise.all(range(frames).map((i) => Assets.load<Texture>(`${base}/swing-${i}.png`)));
-    return { swing, holdFrame, grips: grips.map(([x, y]) => ({ x, y })) };
+    const pixels = (list: readonly (readonly [number, number])[]) => list.map(([x, y]) => ({ x, y }));
+    return { swing, holdFrame, grips: pixels(grips), frameMs: frameMs ?? [], nocks: nocks ? pixels(nocks) : null };
   });
 }
 
@@ -127,10 +143,14 @@ export function loadWeaponArt(set: string): Promise<WeaponArt> {
 export function loadEffectArt(set: string): Promise<EffectArt> {
   const base = `/art/effects/${set}`;
   return loadOnce(effects, set, async () => {
-    const layout = effectLayout(await fetchJson(`${base}/manifest.json`, EffectManifestSchema));
-    const sheet = await Assets.load<Texture>(`${base}/${layout.sheet}`);
-    const frames = layout.frames.map((r) => new Texture({ source: sheet.source, frame: new Rectangle(r.x, r.y, r.width, r.height) }));
-    return { layout, frames };
+    const manifest = await fetchJson(`${base}/manifest.json`, EffectManifestSchema);
+    const cut = async (clip: { readonly sheet: string; readonly frames: readonly { x: number; y: number; width: number; height: number }[] }) => {
+      const sheet = await Assets.load<Texture>(`${base}/${clip.sheet}`);
+      return clip.frames.map((r) => new Texture({ source: sheet.source, frame: new Rectangle(r.x, r.y, r.width, r.height) }));
+    };
+    const layout = effectLayout(manifest);
+    const flying = projectileLayout(manifest);
+    return { layout, frames: await cut(layout), projectile: flying && { layout: flying, frames: await cut(flying) } };
   });
 }
 

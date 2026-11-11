@@ -19,7 +19,7 @@ import {
 import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/ground';
 import { fetchJson } from '../../static-json';
 import type { Field, FieldUnit } from '../field';
-import { effectFrameAt, heldFrame } from './action-sprites';
+import { effectFrameAt, flightAt, flightPoint, heldFrame, releaseMs } from './action-sprites';
 import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
 
@@ -31,8 +31,10 @@ import { battleView, type BattleView, entryOffset, spots } from './battle-layout
  * It draws from the field, where everyone stands and how they are, and
  * animates from the events: an action's act, held on its hold frame until
  * it resolves, with its weapon beside it, swung in step and held on its own
- * hold frame; the ability's effect on whatever the action lands on; a hit; a
- * fall, held; a step up a line or a collapse as a walk.
+ * hold frame; a projectile, where the ability's effect has one, let go at
+ * the hold frame and landing as the action resolves; the ability's effect on
+ * whatever the action lands on; a hit; a fall, held; a step up a line or a
+ * collapse as a walk.
  * The progression reads left to right: the party runs on from the left at
  * the start and walks in place while the road scrolls by on a travel; at a
  * fight or a gather the other side rushes on from the right as the road
@@ -121,6 +123,19 @@ interface EffectView {
   readonly mirrored: boolean;
   /** When it began, on the presentation clock. */
   readonly at: number;
+  readonly sprite: Sprite;
+}
+
+/**
+ * An action's projectile, from its declaration to its landing: on the
+ * string while a bow is drawn, then in flight from the actor to the target
+ * (assets.md, rules 33 and 35). On the adventure's clock, as the act is.
+ */
+interface ProjectileView {
+  art: EffectArt | null;
+  readonly actor: UnitView;
+  readonly target: UnitView;
+  readonly act: { readonly from: number; readonly resolve: number };
   readonly sprite: Sprite;
 }
 
@@ -216,6 +231,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
 
   const units = new Map<string, UnitView>();
   const effects: EffectView[] = [];
+  /** At most one a unit: its action in warmup. */
+  const projectiles = new Map<string, ProjectileView>();
   /** The presentation clock, the wall clock times the speed: what an effect plays on. */
   let shown = 0;
   let heroSets: ReadonlyMap<string, string> = new Map();
@@ -286,6 +303,65 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     void loadEffectArt(set).then((art) => {
       if (!destroyed) effect.art = art;
     });
+  };
+
+  const removeProjectile = (unitId: string) => {
+    projectiles.get(unitId)?.sprite.destroy();
+    projectiles.delete(unitId);
+  };
+
+  /** Readies an ability's projectile for the action just declared; an effect with none leaves nothing to draw. */
+  const addProjectile = (set: string, actor: UnitView, target: UnitView, act: { readonly from: number; readonly resolve: number }) => {
+    removeProjectile(actor.unit.unitId);
+    const sprite = new Sprite();
+    sprite.visible = false;
+    sprite.anchor.set(0, 0.5);
+    things.addChild(sprite);
+    const projectile: ProjectileView = { art: null, actor, target, act, sprite };
+    projectiles.set(actor.unit.unitId, projectile);
+    void loadEffectArt(set).then((art) => {
+      if (!destroyed) projectile.art = art;
+    });
+  };
+
+  /**
+   * Shows each projectile where it is at `simTime`: before its release on
+   * the bow's nock, its tail on the string (the owner's note on Issue-284);
+   * from the release, the moment the weapon or, for a unit with none, the
+   * act reaches its hold frame, along its flight; landed, gone.
+   */
+  const drawProjectiles = (simTime: number) => {
+    for (const [unitId, projectile] of [...projectiles]) {
+      const { actor, target, act, sprite } = projectile;
+      const flying = projectile.art?.projectile;
+      // An actor that fell in its warmup, or was left behind with the stage, never lets go.
+      if (actor.act !== act || actor.downAt !== null || !units.has(target.unit.unitId) || (projectile.art && !flying)) {
+        removeProjectile(unitId);
+        continue;
+      }
+      sprite.visible = false;
+      if (!flying) continue;
+      const { weapon } = actor;
+      const facing = actor.opponent ? -1 : 1;
+      const release = weapon ? releaseMs(weapon.holdFrame, ACT_MS, weapon.frameMs) : releaseMs(actor.art?.actHold ?? 0, ACT_MS);
+      const index = weapon ? heldFrame(simTime, act, weapon.holdFrame, weapon.swing.length, ACT_MS, weapon.frameMs) : null;
+      const nock = index === null ? undefined : weapon?.nocks?.[index];
+      const grip = index === null ? undefined : weapon?.grips[index];
+      // Where it is let go from: the nock of the bow in hand, or the hand itself.
+      const hand = { x: actor.x + facing * (HAND.x + (nock && grip ? nock.x - grip.x : 0)), y: actor.y + HAND.y + (nock && grip ? nock.y - grip.y + 0.5 : 0) };
+      const progress = flightAt(simTime, act, release);
+      let at: { x: number; y: number };
+      if (progress !== null) at = flightPoint(hand, { x: target.x, y: target.y - flying.layout.height }, progress, flying.layout.arc);
+      else if (simTime < act.from + release && nock) at = hand;
+      else continue;
+      const frame = progress === null ? 0 : Math.floor((simTime - act.from - release) / flying.layout.frameMs) % flying.frames.length;
+      sprite.texture = must(flying.frames[frame], `frame ${frame} of the projectile`);
+      sprite.scale.set(facing, 1);
+      // On the string its tail is on the nock; in flight its middle is on the path.
+      sprite.position.set(Math.round(at.x - (progress === null ? 0 : (facing * sprite.texture.width) / 2)), Math.round(at.y));
+      sprite.zIndex = Math.max(actor.y, target.y) + 0.45;
+      sprite.visible = true;
+    }
   };
 
   /** Shows each effect's frame on its target's feet, and lets go of those over. */
@@ -377,7 +453,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   /** The weapon in hand at the act's frame, its grip on the hand, or none outside an act. */
   const drawWeapon = (unitView: UnitView, simTime: number) => {
     const { weapon, weaponSprite, act } = unitView;
-    const index = weapon && act && unitView.downAt === null ? heldFrame(simTime, act, weapon.holdFrame, weapon.swing.length, ACT_MS) : null;
+    const index = weapon && act && unitView.downAt === null ? heldFrame(simTime, act, weapon.holdFrame, weapon.swing.length, ACT_MS, weapon.frameMs) : null;
     weaponSprite.visible = index !== null;
     if (index === null || !weapon) return;
     const grip = must(weapon.grips[index], `grip ${index} of the weapon`);
@@ -428,6 +504,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     reset(field, sets, enter) {
       heroSets = sets;
       for (const effect of [...effects]) removeEffect(effect);
+      for (const id of [...projectiles.keys()]) removeProjectile(id);
       for (const id of [...units.keys()]) removeUnit(id);
       scroll = 0;
       offset = 0;
@@ -474,10 +551,16 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       for (const event of events) {
         if (event.kind === 'action-declared' && event.abilityId !== 'move-up') {
           const unitView = units.get(event.unitId);
-          if (unitView) unitView.act = { from: event.timestamp, resolve: event.resolveTimestamp };
+          if (unitView) {
+            unitView.act = { from: event.timestamp, resolve: event.resolveTimestamp };
+            const set = ABILITY_EFFECTS[event.abilityId as AbilityId];
+            const target = units.get(event.targetIds[0] ?? '');
+            if (set && target && target !== unitView) addProjectile(set, unitView, target, unitView.act);
+          }
         } else if (event.kind === 'action-resolved') {
           const set = ABILITY_EFFECTS[event.abilityId as AbilityId];
           const actor = units.get(event.unitId);
+          removeProjectile(event.unitId);
           for (const effect of event.effects) {
             if (effect.kind === 'damage' || effect.kind === 'harvest') {
               const target = units.get(effect.targetId);
@@ -569,6 +652,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         drawBar(unitView);
       }
 
+      drawProjectiles(simTime);
       drawEffects();
 
       if ((entering === 'party' && partyOn) || (entering === 'opponents' && offset <= 0)) {
