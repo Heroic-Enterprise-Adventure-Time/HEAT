@@ -1,6 +1,6 @@
 import { uniq } from 'es-toolkit';
 
-import { type FacilityKind, isResourceType, type Job, jobsPostedBy, MONSTERS, RESOURCE_NODES, type ResourceType, type Stage } from '@heat/engine';
+import { type FacilityKind, isResourceType, type Job, jobsPostedBy, MONSTERS, type MonsterType, RESOURCE_NODES, type ResourceType, type Stage } from '@heat/engine';
 
 /** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133). */
 export function jobsAt(location: string, poster: FacilityKind): Job[] {
@@ -18,15 +18,23 @@ function count(n: number, name: string): string {
   return `${n} ${one.endsWith('f') ? `${one.slice(0, -1)}ves` : `${one}s`}`;
 }
 
-/** The resource nodes among what stands on the other side of a stage, by type and count; none for a stage with no other side. */
-function nodes(stage: Stage): { type: ResourceType; count: number }[] {
-  if (stage.kind !== 'fight' && stage.kind !== 'gather') return [];
-  return stage.opponents.flatMap(({ type, count: n }) => (isResourceType(type) ? [{ type, count: n }] : []));
+/**
+ * What stands on the other side of a stage, its resource nodes apart from its
+ * monsters, each by type and count; none for a stage with no other side. Two
+ * passes and not one `partition`, which cannot tell the compiler that what is
+ * left of one object type is the monsters.
+ */
+function otherSide(stage: Stage): { nodes: { type: ResourceType; count: number }[]; monsters: { type: MonsterType; count: number }[] } {
+  const opponents = stage.kind === 'fight' || stage.kind === 'gather' ? stage.opponents : [];
+  return {
+    nodes: opponents.flatMap(({ type, count: n }) => (isResourceType(type) ? [{ type, count: n }] : [])),
+    monsters: opponents.flatMap(({ type, count: n }) => (isResourceType(type) ? [] : [{ type, count: n }])),
+  };
 }
 
 /** The materials a stage yields, from its nodes, in order and once each. */
 function gathered(stage: Stage): string[] {
-  return uniq(nodes(stage).map((n) => RESOURCE_NODES[n.type].material));
+  return uniq(otherSide(stage).nodes.map((n) => RESOURCE_NODES[n.type].material));
 }
 
 /**
@@ -41,9 +49,10 @@ export function stageWords(stage: Stage): string {
       return 'Travel';
     case 'fight':
     case 'gather': {
-      const trees = nodes(stage).map((n) => count(n.count, RESOURCE_NODES[n.type].name));
-      const monsters = stage.opponents.flatMap((o) => (isResourceType(o.type) ? [] : [count(o.count, MONSTERS[o.type].name)]));
-      const gather = trees.length > 0 ? `Gather ${gathered(stage).join(' and ')} from ${trees.join(' and ')}` : null;
+      const { nodes, monsters: fought } = otherSide(stage);
+      const sources = nodes.map((n) => count(n.count, RESOURCE_NODES[n.type].name));
+      const monsters = fought.map((m) => count(m.count, MONSTERS[m.type].name));
+      const gather = sources.length > 0 ? `Gather ${gathered(stage).join(' and ')} from ${sources.join(' and ')}` : null;
       if (monsters.length === 0) return gather ?? 'Fight';
       return gather ? `${gather}, and fight ${monsters.join(' and ')}` : `Fight ${monsters.join(' and ')}`;
     }
@@ -75,7 +84,7 @@ export function credits(job: Job): Credit[] {
   };
   for (const reward of job.pay) entry(reward.material).pay += reward.amount;
   for (const stage of job.stages) {
-    for (const node of nodes(stage)) entry(RESOURCE_NODES[node.type].material).cargo += node.count * RESOURCE_NODES[node.type].maxYield;
+    for (const node of otherSide(stage).nodes) entry(RESOURCE_NODES[node.type].material).cargo += node.count * RESOURCE_NODES[node.type].maxYield;
   }
   return [...byMaterial].map(([material, c]) => ({ material, ...c }));
 }

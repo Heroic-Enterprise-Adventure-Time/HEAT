@@ -1,7 +1,7 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
-import { must } from '@heat/engine';
+import { must, UNIT_PROFILES } from '@heat/engine';
 
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
 import { routes } from '../../app.routes';
@@ -87,7 +87,7 @@ function adventureOf(heroIds: readonly string[]): AdventureView {
       jobId: 'wolves-on-the-mill-road',
       heroes: party
         .filter((h) => heroIds.includes(h.id))
-        .map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: 'timber', rating: 2 }, { material: 'ore', rating: 2 }] } })),
+        .map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: must(UNIT_PROFILES.villager, 'the villager profile').stats })),
     },
   };
 }

@@ -4,7 +4,7 @@ import { InMemoryCache } from '@apollo/client';
 import { APOLLO_TESTING_CACHE, ApolloTestingController, ApolloTestingModule, type TestOperation } from 'apollo-angular/testing';
 import { constantCase } from 'es-toolkit';
 
-import { must } from '@heat/engine';
+import { must, UNIT_PROFILES } from '@heat/engine';
 
 import { type AdventureResultView, type AdventureView, Game, type HeroView, overrideInput, type PlayerView, type SeenHeroView } from './game';
 import possibleTypes from './graphql/generated/possible-types';
@@ -142,7 +142,7 @@ function fakeHub(start: PlayerView) {
         snapshot: {
           version: 'v1',
           jobId,
-          heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: 'timber', rating: 2 }, { material: 'ore', rating: 2 }] } })),
+          heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: must(UNIT_PROFILES.villager, 'the villager profile').stats })),
         },
       };
       player = { ...player, openAdventure: adventure };
