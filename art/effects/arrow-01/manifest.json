@@ -1,0 +1,173 @@
+{
+ "app": "PixelLab VFX Creator",
+ "name": "HEAT arrow 01",
+ "fps": 12,
+ "frame_ms": 83,
+ "frames": 12,
+ "loop": false,
+ "canvas": {
+  "w": 80,
+  "h": 41
+ },
+ "anchor": {
+  "kind": "feet",
+  "x": 51,
+  "y": 38
+ },
+ "clips": [
+  {
+   "name": "whole",
+   "title": "the whole effect, no sprite",
+   "depth": "both",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 11,
+   "frame": {
+    "w": 63,
+    "h": 17
+   },
+   "sheets": [
+    {
+     "file": "whole.png",
+     "first_frame": 0,
+     "frames": 11,
+     "columns": 4,
+     "rows": 3
+    }
+   ],
+   "offset": {
+    "x": -48,
+    "y": -29
+   }
+  },
+  {
+   "name": "whole-with-sprite",
+   "title": "the whole effect with the sprite in it",
+   "depth": "both",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 12,
+   "frame": {
+    "w": 63,
+    "h": 34
+   },
+   "sheets": [
+    {
+     "file": "whole-with-sprite.png",
+     "first_frame": 0,
+     "frames": 12,
+     "columns": 4,
+     "rows": 3
+    }
+   ],
+   "offset": {
+    "x": -48,
+    "y": -34
+   }
+  },
+  {
+   "name": "front",
+   "title": "everything in front of the sprite",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 11,
+   "frame": {
+    "w": 63,
+    "h": 17
+   },
+   "sheets": [
+    {
+     "file": "front.png",
+     "first_frame": 0,
+     "frames": 11,
+     "columns": 4,
+     "rows": 3
+    }
+   ],
+   "offset": {
+    "x": -48,
+    "y": -29
+   }
+  },
+  {
+   "name": "part-projectile",
+   "title": "the projectile part, in place",
+   "role": "projectile",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 0,
+   "frames": 6,
+   "frame": {
+    "w": 17,
+    "h": 5
+   },
+   "sheets": [
+    {
+     "file": "part-projectile.png",
+     "first_frame": 0,
+     "frames": 6,
+     "columns": 3,
+     "rows": 2
+    }
+   ],
+   "offset": {
+    "x": -48,
+    "y": -23
+   },
+   "moves": [
+    {
+     "x": 0,
+     "y": 0
+    },
+    {
+     "x": 6.91,
+     "y": 0
+    },
+    {
+     "x": 13.82,
+     "y": 0
+    },
+    {
+     "x": 20.73,
+     "y": 0
+    },
+    {
+     "x": 27.64,
+     "y": 0
+    },
+    {
+     "x": 34.55,
+     "y": 0
+    }
+   ]
+  },
+  {
+   "name": "part-spark_burst",
+   "title": "the spark burst part",
+   "role": "impact",
+   "part": "spark_burst",
+   "depth": "front",
+   "loop": false,
+   "start_frame": 6,
+   "frames": 5,
+   "frame": {
+    "w": 24,
+    "h": 17
+   },
+   "sheets": [
+    {
+     "file": "part-spark_burst.png",
+     "first_frame": 0,
+     "frames": 5,
+     "columns": 3,
+     "rows": 2
+    }
+   ],
+   "offset": {
+    "x": -9,
+    "y": -29
+   }
+  }
+ ]
+}

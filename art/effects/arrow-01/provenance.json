@@ -1,0 +1,62 @@
+{
+  "set": "arrow-01",
+  "kind": "action effect",
+  "abilities": [],
+  "madeFor": "The ranger's shot of Issue-286: the arrow flies from the ranger's bow to its target and the sparks play where it lands. The engine has no such ability yet, so `abilities` is empty; Issue-286 names it here when it adds it.",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "effectId": "ea984155-6008-4fbd-845a-c9f5e72befed",
+    "name": "HEAT arrow 01",
+    "imageId": "09d832d8-03f2-473f-ad22-c5c230a6caaa"
+  },
+  "effect": {
+    "tool": "vfx_workbench",
+    "via": "MCP",
+    "createdAt": "2026-11-11",
+    "madeAround": "character:bcd8a090-6f8d-4c1e-a6db-17d39e557cd5:east (Goblin 02, the goblin's east rotation)",
+    "parts": [
+      {
+        "name": "projectile",
+        "tool": "throw",
+        "image": "arrow (PixelLab's own drawing: a wooden arrow, red fletching)",
+        "from": [88, 124],
+        "to": [126, 124],
+        "start": 0,
+        "end": 0.5,
+        "role": "projectile"
+      },
+      {
+        "name": "spark_burst",
+        "around": "the throw's end, the goblin's chest",
+        "size": 0.6,
+        "amount": 0.7,
+        "colour": ["#5a3a1c", "#b07a3a", "#e8c070", "#fff4d0", "#ffffff"],
+        "start": 0.5,
+        "end": 1,
+        "role": "impact",
+        "core": true
+      }
+    ],
+    "edits": [
+      "first thrown from [-14, 24] to [22, 24], which are the canvas's coordinates, not the sprite's, so it flew past the goblin; thrown again from the start step with the canvas's own numbers",
+      "the spark burst made smaller and sparser, 1 to 0.6 and 1 to 0.7, and given the slash's warm ramp"
+    ],
+    "export": ["export", "--name", "HEAT arrow 01", "--game-pack"],
+    "generations": 0
+  },
+  "files": {
+    "whole.png": "the game pack's whole clip: the effect without the sprite, a sheet of frames",
+    "manifest.json": "the game pack's manifest: the frame size, the sheet's layout, the fps and the offset from the target's feet",
+    "part-projectile.png": "the game pack's projectile clip, 6 frames",
+    "part-spark_burst.png": "the game pack's impact clip, 5 frames"
+  },
+  "frames": 11,
+  "fps": 12,
+  "verified": "whole.png, part-projectile.png, part-spark_burst.png and manifest.json are byte-identical to the same files in PixelLab's game pack of the effect, downloaded 2026-11-11."
+}

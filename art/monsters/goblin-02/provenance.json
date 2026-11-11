@@ -1,0 +1,152 @@
+{
+  "set": "goblin-02",
+  "kind": "monster sprite set",
+  "monsters": [],
+  "madeFor": "The goblin rock thrower of Issue-286, a monster on a rear line that throws rocks. The engine has no such monster yet, so `monsters` is empty; Issue-286 names it here when it adds it.",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "bcd8a090-6f8d-4c1e-a6db-17d39e557cd5",
+    "name": "Goblin 02",
+    "tags": ["heat", "monster", "goblin"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-11-11T04:29:49.959252+00:00",
+    "parameters": {
+      "description": "scrawny goblin with yellow-green skin, long pointed ears, a bald head and a patched leather vest with a rope belt, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "e97bb570-6b25-416b-ba77-a33be2a2e231",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["south", "east", "north"],
+          "generations": 9
+        }
+      ],
+      "generations": 9
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "e8e8be4f-f10b-4469-9e04-96e186bcc71f",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "act": {
+      "template": "throw-object",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "34170b5d-c07a-46ab-ad67-20f8b7e9d5a1",
+      "pixellabName": "throw",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "holdFrame": 3,
+      "files": "act-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3,
+          "note": "The owner chose the throw over the lead-jab on 2026-11-10; the hold frame, the arm at the release, was chosen by eye."
+        }
+      ],
+      "generations": 3
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "72294ad5-f2fc-435e-8518-3c8fb448e884",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "661ba612-d7fc-48c2-9e23-651a41faa6ad",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    }
+  },
+  "animationGenerations": 21,
+  "animationsNotKept": [
+    {
+      "name": "act",
+      "template": "lead-jab",
+      "groupId": "c5325c0e-c825-4b1b-9b93-dfb1842c860e",
+      "directions": ["east"],
+      "generations": 2,
+      "why": "Made beside the throw at the owner's word, to compare; it reads as a punch. It stays on the character in PixelLab under the name act."
+    }
+  ],
+  "rejected": [
+    {
+      "name": "Goblin 01",
+      "characterId": "ace8046a-323c-46cf-875d-0a298cfb320b",
+      "description": "small hunched goblin with olive green skin, large pointed ears and a ragged brown hide tunic, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-11-11)."
+}
