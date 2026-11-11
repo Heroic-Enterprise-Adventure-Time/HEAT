@@ -34,7 +34,10 @@
  *                                                   the version that issued it, start time; at settlement the result
  *   LOCATION#<id>  | SEEN#<heroId>                  a hero seen there: public fields only, no owner, and
  *                                                   expiresAt, the table's TTL attribute (decision 0029)
- *   LOCATION#<id>  | ...                            the feed, offers: the rest of build order step 3
+ *   LOCATION#<id>  | DONE#<settledAt>#<adventureId> an adventure completed there: public fields only, no owner, and
+ *                                                   expiresAt; settledAt is ISO 8601 in UTC, so the keys sort in
+ *                                                   time order (decision 0050)
+ *   LOCATION#<id>  | FACILITY#..., CONTRIB#...      kept for step 5's shared facilities, which are not designed
  */
 export const KEY = { pk: "PK", sk: "SK" } as const;
 
@@ -55,4 +58,5 @@ export const TEMPLATES = {
   adventure: "RECORD",
   locationPk: "LOCATION#${location}",
   sighting: "SEEN#${heroId}",
+  recent: "DONE#${settledAt}#${adventureId}",
 } as const;

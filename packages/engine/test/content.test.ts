@@ -11,6 +11,8 @@ import {
   hallCapacity,
   HERO_NAMES,
   heroNames,
+  jobOf,
+  JOBS,
   location,
   LOCATIONS,
   must,
@@ -120,6 +122,18 @@ describe("static content", () => {
     expect(new Set(all).size).toBe(all.length);
     const largestHall = Math.max(...HALL_CAPACITY);
     for (const p of PRESENTATIONS) expect(heroNames(p).length).toBeGreaterThan(largestHall);
+  });
+});
+
+describe("jobOf", () => {
+  it("answers every job of the content by its id", () => {
+    for (const [id, job] of Object.entries(JOBS)) expect(jobOf(id)).toBe(job);
+  });
+
+  it("answers nothing for an id the content does not know, an inherited property's name included", () => {
+    expect(jobOf("a-job-of-another-version")).toBeUndefined();
+    expect(jobOf("toString")).toBeUndefined();
+    expect(jobOf("__proto__")).toBeUndefined();
   });
 });
 
