@@ -206,13 +206,9 @@ const UnitStatsRef = builder.objectRef<UnitStats>("UnitStats").implement({
     maxHealth: t.exposeInt("maxHealth"),
     speed: t.exposeInt("speed", { description: "Turns per ten seconds." }),
     damage: t.exposeInt("damage"),
-    gather: t.field({
+    gather: t.expose("gather", {
       type: [GatherRatingRef],
       description: "The unit's gather rating for each material it harvests; a material with no entry is 0, and a hit on a node of it yields nothing.",
-      // A snapshot issued before the ratings (Issue-283) has none, and is
-      // still read while its adventure is open across that deploy: the
-      // previous deploy verifies it, and this one only has to answer it.
-      resolve: (stats) => (stats as Partial<UnitStats>).gather ?? [],
     }),
   }),
 });

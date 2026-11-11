@@ -13,6 +13,8 @@ import {
   type Reward,
   type StageResult,
   STARTING_LOCATION,
+  UNIT_PROFILES,
+  type UnitStats,
   type UnitType,
 } from "@heat/engine";
 
@@ -298,6 +300,29 @@ function toHero(i: MayLack<Stored<"hero">, "level" | "xp" | "picks" | "status">)
 }
 
 /**
+ * A snapshot with every hero's gather ratings. One issued before the ratings
+ * (Issue-283, decision 0051) has none, and is still read while its adventure
+ * is open across that deploy: its heroes take their unit type's ratings of
+ * today, so a client that resumes the run shows it gathering. The deploy that
+ * issued it verifies it, from the record as that deploy reads it (decision
+ * 0030), so what this adds is never what a result is computed from.
+ */
+export function rated(snapshot: AdventureSnapshot): AdventureSnapshot {
+  const heroes = snapshot.heroes.map((hero) => {
+    const stats: MayLack<UnitStats, "gather"> = hero.stats;
+    return stats.gather ? hero : { ...hero, stats: { ...hero.stats, gather: UNIT_PROFILES[hero.unitType]?.stats.gather ?? [] } };
+  });
+  return { ...snapshot, heroes };
+}
+
+const hasSnapshot = (i: MayLack<Stored<"adventure">, "snapshot">): boolean => i.snapshot !== undefined;
+
+/** A record from before Issue-113 has no snapshot and is answered as it is. */
+function toAdventure(i: Stored<"adventure">): AdventureRecord {
+  return hasSnapshot(i) ? { ...i, snapshot: rated(i.snapshot) } : i;
+}
+
+/**
  * What ElectroDB answers for a transaction: `failures` maps the index of a
  * cancelled item to the error to throw when its condition failed; a conflict
  * with another transaction throws TransactionConflict for the caller to
@@ -421,7 +446,7 @@ export class Repository {
 
   async getAdventure(adventureId: string): Promise<AdventureRecord | undefined> {
     const { data } = await this.service.entities.adventure.get({ adventureId }).go(STRONG);
-    return data ?? undefined;
+    return data ? toAdventure(data) : undefined;
   }
 
   /**
