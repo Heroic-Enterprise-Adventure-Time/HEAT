@@ -141,6 +141,7 @@
       "why": "Made beside the throw at the owner's word, to compare; it reads as a punch. It stays on the character in PixelLab under the name act."
     }
   ],
+  "animationGenerationsNotKept": 2,
   "waivedChecks": [
     {
       "failure": "act east: height drifts 7 px",

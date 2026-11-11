@@ -328,6 +328,8 @@ const TEMPLATES = { walk: "walking", stance: "fight-stance-idle-8-frames", act: 
 if (record) {
   const set = values.out.split(/[\\/]/).filter(Boolean).pop();
   const monster = record.kind === "monster";
+  // A set made before the engine has it names no monster or class, so its tags cannot be derived: they are given.
+  if (record.madeFor && !record.tags) throw new Error("a record with madeFor gives its PixelLab tags in full");
   const total = (calls) => calls.reduce((n, c) => n + c.generations, 0);
   const animations = Object.fromEntries(
     Object.entries(SET).map(([name, spec]) => {
@@ -375,7 +377,8 @@ if (record) {
     },
     animations,
     animationGenerations: Object.values(animations).reduce((n, a) => n + a.generations, 0),
-    ...(record.notKept ? { animationsNotKept: record.notKept } : {}),
+    // What the set cost is the two totals together: animationGenerations counts the kept animations only.
+    ...(record.notKept ? { animationsNotKept: record.notKept, animationGenerationsNotKept: record.notKept.reduce((n, a) => n + a.generations, 0) } : {}),
     ...(report.waived.length ? { waivedChecks: report.waived } : {}),
     ...(record.rejected ? { rejected: record.rejected } : {}),
     verified: values["mirror-west"]
