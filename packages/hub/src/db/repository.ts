@@ -18,6 +18,7 @@ import {
   type UnitType,
 } from "@heat/engine";
 
+import { type RecentAdventure, recentOf } from "../recent.js";
 import { type Sighting, sightingOf } from "../seen.js";
 import type { Tables } from "./client.js";
 import { createService, type HeatService } from "./entities.js";
@@ -40,7 +41,8 @@ import type { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
  * Start and settle write to both tables in one transaction: the player's
  * open item and ledger in the player table, the adventure record in the
  * location table. Recruit and retire do too, for the hero's sighting at its
- * location (decision 0029). TransactWriteItems spans tables in one account and
+ * location (decision 0029), and settle for the adventure's item in its
+ * location's feed (decision 0050). TransactWriteItems spans tables in one account and
  * region, so the split of decision 0023 costs the transactions nothing.
  *
  * Every read and every write goes through ElectroDB (entities.ts, decision 0041).
@@ -208,6 +210,7 @@ export interface SettledResult {
 export interface Settlement {
   adventureId: string;
   location: string;
+  jobId: string;
   warehouseLevel: number;
   holdings: { material: Material; read: number | null; credit: number; lost: number }[];
   survivors: { hero: Hero; xp: number; level: number }[];
@@ -537,8 +540,10 @@ export class Repository {
    * mark removed and its sighting deleted (decision 0029); each holding
    * written with its capped credit only if its balance is still the one
    * read, with a ledger entry per material that can exist once and records
-   * what the cap lost. Every hero's write is conditioned on its mark being
-   * this adventure's.
+   * what the cap lost; and the adventure's item put in its location's feed,
+   * its public line with no owner (decision 0050), so an adventure is in the
+   * feed exactly when it is settled. Every hero's write is conditioned on its
+   * mark being this adventure's.
    *
    * Throws AdventureClosed when the open item or the record has moved on,
    * which is a repeat or a race with a discard; CampChanged when a balance
@@ -619,6 +624,7 @@ export class Repository {
             : []),
           on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `credit#${material}`, location, material, delta: credit, lost }).commit()),
         ]),
+        on(AdventureClosed, items.recent.put(recentOf(s, now)).commit()),
       ])
       .go();
     throwIfCancelled(write, failures);
@@ -912,6 +918,22 @@ export class Repository {
         .go({ limit, data: "raw" }),
     );
     return { sightings: sighting.parse({ Items: page.Items }).data.map(toSighting), read: page.ScannedCount };
+  }
+
+  /**
+   * The adventures most recently settled at a location, newest first: one
+   * Query of its `DONE#` items in descending key order, which is time order,
+   * reading at most `limit`. The filter on expiry runs after the limit, so
+   * the read never passes it (decision 0050). Strongly consistent, so a
+   * player who has just settled finds the adventure in the list.
+   */
+  async recentAdventures(location: string, limit: number, now = new Date()): Promise<RecentAdventure[]> {
+    const seconds = Math.floor(now.getTime() / 1000);
+    const { data } = await this.service.entities.recent.query
+      .primary({ location })
+      .where((a, op) => op.gt(a.expiresAt, seconds))
+      .go({ ...STRONG, order: "desc", limit });
+    return data;
   }
 
   /** The player's `AT#` items, raw, every page: a raw read answers one page whatever `pages` says. */

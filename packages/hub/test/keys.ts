@@ -16,4 +16,5 @@ export const playerKeys = {
 export const locationKeys = {
   adventure: (adventureId: string) => ({ PK: `ADVENTURE#${adventureId}`, SK: "RECORD" }),
   seen: (location: string, heroId: string) => ({ PK: `LOCATION#${location}`, SK: `SEEN#${heroId}` }),
+  done: (location: string, settledAt: string, adventureId: string) => ({ PK: `LOCATION#${location}`, SK: `DONE#${settledAt}#${adventureId}` }),
 };

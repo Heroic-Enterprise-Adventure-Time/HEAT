@@ -500,9 +500,47 @@ type Query {
   player(id: ID!): Player
 
   """
+  The adventures most recently settled at the location, newest first, at most 20 and none older than a week; the caller's own are among them like anyone's, and nothing says whose an adventure was.
+  """
+  recentAdventuresAt(location: ID!): [RecentAdventure!]
+
+  """
   The deploy's version: the commit this route's deploy runs. /graphql answers the current deploy's, /previous/graphql the one before.
   """
   version: String
+}
+
+"""
+An adventure settled at a location within the last week: its public line, and nothing that says whose it was (decision 0050). Its replay is adventure(id).
+"""
+type RecentAdventure {
+  """What went into the warehouse."""
+  credited: [Reward!]!
+  id: ID!
+  job: Job!
+  outcome: AdventureOutcome!
+
+  """The party, in the order it set out."""
+  party: [RecentAdventureHero!]!
+  settledAt: DateTime!
+
+  """How each stage the party entered ended."""
+  stages: [StageResult!]!
+}
+
+"""
+One hero of a recently completed adventure's party: its public fields only, with no id and nothing that says whose it is (decision 0050).
+"""
+type RecentAdventureHero {
+  died: Boolean!
+
+  """The hero's level after settlement."""
+  level: Int!
+  name: String!
+
+  """The set's directory under art/heroes/."""
+  spriteSet: String!
+  unitType: UnitType!
 }
 
 """What to recruit, and the request's id."""

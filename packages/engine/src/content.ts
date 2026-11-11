@@ -530,6 +530,11 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   },
 };
 
+/** The job with this id, or undefined for an id this version's content does not know, as an adventure of another version may carry. */
+export function jobOf(id: string): Job | undefined {
+  return Object.hasOwn(JOBS, id) ? JOBS[id as JobId] : undefined;
+}
+
 /**
  * The jobs a poster at a location lists, in the content's order: the job
  * board's are those that name no facility, and a facility's those that name

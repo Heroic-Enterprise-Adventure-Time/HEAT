@@ -1,8 +1,9 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { CustomAttributeType, Entity, type EntityItem, Service } from "electrodb";
 
-import { type AdventureSnapshot, FACILITY_KINDS, MATERIALS, UNIT_TYPES } from "@heat/engine";
+import { ADVENTURE_OUTCOMES, type AdventureSnapshot, FACILITY_KINDS, MATERIALS, type Reward, type StageResult, UNIT_TYPES } from "@heat/engine";
 
+import type { RecentAdventure, RecentHero } from "../recent.js";
 import type { Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
 import { ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
@@ -17,7 +18,9 @@ import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
  * ElectroDB writes the composite attributes of a key on the item as well as
  * in it, and its identifiers `__edb_e__` and `__edb_v__`, so a player-table
  * item gains `playerId`. A sighting's composites are its location and hero,
- * so it still holds no owner (decision 0029).
+ * so it still holds no owner (decision 0029), and a feed item's are its
+ * location, the time it settled and the adventure, so neither does it
+ * (decision 0050).
  *
  * `required` is enforced on a write and not on a read. An item written before
  * some of these attributes existed may lack them, which the repository says
@@ -202,7 +205,35 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
     },
     onLocation,
   );
-  return new Service({ adventure, camp, facility, hero, holding, ledger, open, profile, sighting }, { client });
+  /**
+   * A settled adventure in its location's feed (decision 0050). The stages, the
+   * credits and the party are stored whole, as the record's result is: each is
+   * a list typed from its own type.
+   */
+  const recent = new Entity(
+    {
+      model: { entity: "recent", service, version },
+      attributes: {
+        location: text,
+        settledAt: text,
+        adventureId: text,
+        jobId: text,
+        outcome: { type: ADVENTURE_OUTCOMES, required: true },
+        stages: { type: CustomAttributeType<StageResult[]>("any"), required: true },
+        credited: { type: CustomAttributeType<Reward[]>("any"), required: true },
+        party: { type: CustomAttributeType<RecentHero[]>("any"), required: true },
+        expiresAt: count,
+      },
+      indexes: {
+        primary: {
+          pk: { field: KEY.pk, composite: ["location"], template: TEMPLATES.locationPk, casing: "none" },
+          sk: { field: KEY.sk, composite: ["settledAt", "adventureId"], template: TEMPLATES.recent, casing: "none" },
+        },
+      },
+    },
+    onLocation,
+  );
+  return new Service({ adventure, camp, facility, hero, holding, ledger, open, profile, recent, sighting }, { client });
 }
 
 export type HeatService = ReturnType<typeof createService>;
@@ -218,5 +249,6 @@ export type EntitiesCoverTheirItems = [
   NothingUndeclared<Exclude<keyof Hero, keyof EntityItem<HeatService["entities"]["hero"]>>>,
   NothingUndeclared<Exclude<keyof OpenAdventure, keyof EntityItem<HeatService["entities"]["open"]>>>,
   NothingUndeclared<Exclude<keyof Player, keyof EntityItem<HeatService["entities"]["profile"]>>>,
+  NothingUndeclared<Exclude<keyof RecentAdventure, keyof EntityItem<HeatService["entities"]["recent"]>>>,
   NothingUndeclared<Exclude<keyof Sighting, keyof EntityItem<HeatService["entities"]["sighting"]>>>,
 ];
