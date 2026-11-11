@@ -4,7 +4,7 @@ import {
   type AdventureSnapshot,
   FACILITIES,
   type Job,
-  JOBS,
+  jobOf,
   location,
   type Requirement,
   type SnapshotHero,
@@ -53,7 +53,7 @@ function refuseOpen(adventureId: string): never {
 
 /** The job, if the location posts it, on its board or at one of its facilities: every job names the location. */
 export function jobAt(locationId: string, jobId: string): Job | undefined {
-  const job = Object.hasOwn(JOBS, jobId) ? JOBS[jobId as keyof typeof JOBS] : undefined;
+  const job = jobOf(jobId);
   return job?.location === locationId ? job : undefined;
 }
 

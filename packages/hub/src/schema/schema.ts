@@ -9,7 +9,7 @@ import {
   type GatherRating,
   hallCapacity,
   type Job,
-  JOBS,
+  jobOf,
   location,
   MATERIALS,
   MAX_PARTY,
@@ -281,9 +281,9 @@ const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").i
   }),
 });
 
-/** The job of the content by its id, which an adventure of another version may name and this one not know. */
-function jobOf(jobId: string): Job {
-  const job = Object.hasOwn(JOBS, jobId) ? JOBS[jobId as keyof typeof JOBS] : undefined;
+/** The job an adventure names, which an adventure of another version may name and this one not know. */
+function knownJob(jobId: string): Job {
+  const job = jobOf(jobId);
   if (!job) throw new GraphQLError(`no job ${jobId} in this version`, { extensions: { code: "NO_SUCH_JOB" } });
   return job;
 }
@@ -296,7 +296,7 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     startedAt: t.expose("startedAt", { type: "DateTime" }),
     location: t.exposeID("location", { description: "The location's id in the static content." }),
     // A job this version does not know means the adventure is another version's.
-    job: t.field({ type: JobRef, resolve: (adventure) => jobOf(adventure.jobId) }),
+    job: t.field({ type: JobRef, resolve: (adventure) => knownJob(adventure.jobId) }),
     snapshot: t.expose("snapshot", { type: SnapshotRef }),
     version: t.exposeString("version", { description: "The deploy that issued the adventure, and the only one that verifies it." }),
     status: t.field({ type: AdventureStatusRef, resolve: (adventure) => adventure.status }),
@@ -330,7 +330,7 @@ const RecentAdventureRef = builder.objectRef<RecentAdventure>("RecentAdventure")
   fields: (t) => ({
     id: t.exposeID("adventureId"),
     // The list leaves out an adventure whose job this version does not know (recent.ts).
-    job: t.field({ type: JobRef, resolve: (recent) => jobOf(recent.jobId) }),
+    job: t.field({ type: JobRef, resolve: (recent) => knownJob(recent.jobId) }),
     outcome: t.expose("outcome", { type: AdventureOutcomeRef }),
     stages: t.expose("stages", { type: [StageResultRef], description: "How each stage the party entered ended." }),
     credited: t.expose("credited", { type: [RewardRef], description: "What went into the warehouse." }),

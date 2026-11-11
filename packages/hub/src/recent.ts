@@ -1,4 +1,4 @@
-import { type AdventureOutcome, JOBS, must, type Reward, type StageResult, type UnitType } from "@heat/engine";
+import { type AdventureOutcome, jobOf, must, type Reward, type StageResult, type UnitType } from "@heat/engine";
 
 import type { Repository, Settlement } from "./db/repository.js";
 
@@ -10,7 +10,7 @@ import type { Repository, Settlement } from "./db/repository.js";
  * owner, so nothing read from it says whose an adventure was.
  */
 
-/** A week, as a sighting lasts (seen.ts), for the same reason: use is sparse, and a shorter time would leave the list empty most days. */
+/** A week (decision 0050): use is sparse, and a shorter time would leave the list empty most days. The feed's own, whatever a sighting's week becomes. */
 export const RECENT_TTL_SECONDS = 7 * 24 * 60 * 60;
 /** Items one read of the list takes, at most, the expired included. */
 export const RECENT_READ = 20;
@@ -64,5 +64,5 @@ export function recentOf(s: Settlement, at: Date): RecentAdventure {
  */
 export async function recentAdventuresAt(repo: Repository, location: string, now = new Date()): Promise<RecentAdventure[]> {
   const recent = await repo.recentAdventures(location, RECENT_READ, now);
-  return recent.filter((adventure) => Object.hasOwn(JOBS, adventure.jobId));
+  return recent.filter((adventure) => jobOf(adventure.jobId) !== undefined);
 }
