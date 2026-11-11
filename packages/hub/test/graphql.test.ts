@@ -1,6 +1,5 @@
 import { randomUUID } from "node:crypto";
 
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
 import { beforeAll, describe, expect, it } from "vitest";
 
@@ -9,8 +8,7 @@ import { MAX_PARTY, must } from "@heat/engine";
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
-import { whole } from "./data.js";
-import { locationKeys } from "./keys.js";
+import { putRecentAdventure, recentAdventure } from "./data.js";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
@@ -264,18 +262,12 @@ describe("the camp through the graph", () => {
   it("lists the adventures recently completed at the location by their public fields, to any signed-in player", async () => {
     // Settled far in the future, so that it is first whatever the other test files settle at Millbrook meanwhile.
     const settledAt = "9999-01-01T00:00:00.000Z";
-    const adventureId = randomUUID();
     const config = configFromEnv();
-    await createDocumentClient(config).send(new PutCommand({
-      TableName: config.tables.location,
-      Item: whole("recent", {
-        ...locationKeys.done("millbrook", settledAt, adventureId),
-        adventureId, location: "millbrook", jobId: "wolves-on-the-mill-road", outcome: "retreat", settledAt,
-        stages: [{ stage: 0, kind: "travel", ended: "done", startedAtMs: 0, endedAtMs: 1000 }, { stage: 1, kind: "fight", ended: "retreat", startedAtMs: 1000, endedAtMs: 4000 }],
-        credited: [{ material: "cloth", amount: 3 }],
-        party: [{ name: "Ada", unitType: "villager", spriteSet: "villager-01", level: 2, died: false }, { name: "Bram", unitType: "fighter", spriteSet: "fighter-01", level: 1, died: true }],
-        expiresAt: Math.floor(new Date(settledAt).getTime() / 1000),
-      }),
+    const { adventureId } = await putRecentAdventure(createDocumentClient(config), config.tables.location, recentAdventure("millbrook", new Date(settledAt), {
+      outcome: "retreat",
+      stages: [{ stage: 0, kind: "travel", ended: "done", startedAtMs: 0, endedAtMs: 1000 }, { stage: 1, kind: "fight", ended: "retreat", startedAtMs: 1000, endedAtMs: 4000 }],
+      credited: [{ material: "cloth", amount: 3 }],
+      party: [{ name: "Ada", unitType: "villager", spriteSet: "villager-01", level: 2, died: false }, { name: "Bram", unitType: "fighter", spriteSet: "fighter-01", level: 1, died: true }],
     }));
 
     const recent = `query($at: ID!) { recentAdventuresAt(location: $at) { id job { id name } outcome stages { stage kind ended } credited { material amount } party { name unitType spriteSet level died } settledAt } }`;

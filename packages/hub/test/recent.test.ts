@@ -1,16 +1,13 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { range } from "es-toolkit";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-
-import { JOBS } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { RECENT_READ, RECENT_TTL_SECONDS, type RecentAdventure, recentAdventuresAt } from "../src/recent.js";
-import { reads, whole } from "./data.js";
-import { locationKeys } from "./keys.js";
+import { putRecentAdventure, reads, recentAdventure as recent } from "./data.js";
 
 /**
  * The adventures recently completed at a location, as they are read
@@ -38,30 +35,10 @@ afterEach(() => {
 
 /** Each test its own location, so no other test's adventures are in its list. */
 const place = () => `test-${randomUUID()}`;
-const job = JOBS["wolves-on-the-mill-road"];
 const now = new Date("2026-11-10T12:00:00.000Z");
 const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
 
-/** A feed item as settlement writes it, settled at the given time. */
-function recent(location: string, at: Date, overrides: Partial<RecentAdventure> = {}): RecentAdventure {
-  return {
-    adventureId: randomUUID(),
-    location,
-    jobId: job.id,
-    outcome: "complete",
-    stages: [{ stage: 0, kind: "travel", ended: "done", startedAtMs: 0, endedAtMs: 1000 }],
-    credited: [{ material: "cloth", amount: 10 }],
-    party: [{ name: "Ada", unitType: "villager", spriteSet: "villager-01", level: 2, died: false }],
-    settledAt: at.toISOString(),
-    expiresAt: Math.floor(at.getTime() / 1000) + RECENT_TTL_SECONDS,
-    ...overrides,
-  };
-}
-
-async function put(item: RecentAdventure): Promise<RecentAdventure> {
-  await db.send(new PutCommand({ TableName: tables.location, Item: whole("recent", { ...locationKeys.done(item.location, item.settledAt, item.adventureId), ...item }) }));
-  return item;
-}
+const put = (item: RecentAdventure) => putRecentAdventure(db, tables.location, item);
 
 describe("the adventures recently completed at a location", () => {
   it("answers each adventure as it was written, newest first", async () => {
