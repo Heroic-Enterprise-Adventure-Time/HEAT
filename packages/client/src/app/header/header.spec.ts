@@ -3,6 +3,8 @@ import { provideRouter } from '@angular/router';
 import { render, screen } from '@testing-library/angular/zoneless';
 import userEvent from '@testing-library/user-event';
 
+import { must, UNIT_PROFILES } from '@heat/engine';
+
 import { Game, type PlayerView } from '../game';
 import { Session, type SessionUser } from '../session';
 import { fakeSession, PLAYER } from '../testing/fake-session';
@@ -23,7 +25,7 @@ const player: PlayerView = {
     snapshot: {
       version: 'v1',
       jobId: 'wolves-on-the-mill-road',
-      heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
+      heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: must(UNIT_PROFILES.villager, 'the villager profile').stats }],
     },
   },
 };

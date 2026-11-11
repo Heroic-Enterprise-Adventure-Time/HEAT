@@ -171,7 +171,10 @@ function campFromWire(camp: CampFieldsFragment): CampView {
 function adventureFromWire(adventure: AdventureFieldsFragment): AdventureView {
   return {
     ...adventure,
-    snapshot: { ...adventure.snapshot, heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType) })) },
+    snapshot: {
+      ...adventure.snapshot,
+      heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType), stats: { ...h.stats, gather: materials(h.stats.gather) } })),
+    },
   };
 }
 

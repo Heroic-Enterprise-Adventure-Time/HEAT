@@ -5,7 +5,7 @@ import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { Entity, Service } from "electrodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { must } from "@heat/engine";
+import { must, UNIT_PROFILES } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
@@ -129,7 +129,7 @@ describe("an item from before ElectroDB", () => {
 
   it("reads a settled adventure back whole, nested fields no entity declares included", async () => {
     const adventureId = randomUUID();
-    const snapshot = { version: "v", jobId: "sticks", heroes: [{ heroId: "h", name: "Old", notDeclared: { deep: [1, null] } }] };
+    const snapshot = { version: "v", jobId: "sticks", heroes: [{ heroId: "h", name: "Old", stats: { gather: [] }, notDeclared: { deep: [1, null] } }] };
     const result = { outcome: "won", endedAtMs: 12, reachedStage: 0, stages: [{ stage: 0, kind: "battle", ended: "cleared", startedAtMs: 0, endedAtMs: 12 }], rewards: [{ material: "timber", amount: 3 }], credited: [], lost: [], heroes: [] };
     const record = {
       adventureId, playerId: "p", seed: "s", location: at, jobId: "sticks", snapshot, version: "v", startedAt: "2026-10-21T12:00:00.000Z",
@@ -137,6 +137,23 @@ describe("an item from before ElectroDB", () => {
     };
     await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
     expect(await repo.getAdventure(adventureId)).toEqual(record);
+  });
+
+  it("reads a snapshot from before the gather ratings with each hero's unit type's ratings of today, and one that has ratings as it is (Issue-283)", async () => {
+    const adventureId = randomUUID();
+    const hero = { heroId: "h", unitType: "villager", name: "Old", spriteSet: "villager-01", level: 1 };
+    const wolf = { heroId: "w", unitType: "wolf", name: "Odd", spriteSet: "wolf-01", level: 1 };
+    const own = { heroId: "o", unitType: "villager", name: "New", spriteSet: "villager-01", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "ore", rating: 1 }] } };
+    // As the deploy before wrote them: one `gathering` stat and no ratings.
+    const old = { maxHealth: 30, speed: 8, damage: 4, gathering: 4 };
+    const record = {
+      adventureId, playerId: "p", seed: "s", location: at, jobId: "sticks", version: "v", startedAt: "2026-11-09T12:00:00.000Z", status: "OPEN",
+      snapshot: { version: "v", jobId: "sticks", heroes: [{ ...hero, stats: old }, { ...wolf, stats: old }, own] },
+    };
+    await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
+    const { gather } = must(UNIT_PROFILES.villager, "the villager's profile").stats;
+    expect(gather).not.toEqual([]);
+    expect((await repo.getAdventure(adventureId))?.snapshot.heroes).toEqual([{ ...hero, stats: { ...old, gather } }, { ...wolf, stats: { ...old, gather: [] } }, own]);
   });
 
   it("reads a record from before Issue-113, which has no snapshot, as it is", async () => {

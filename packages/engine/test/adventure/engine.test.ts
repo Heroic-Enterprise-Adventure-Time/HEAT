@@ -16,6 +16,7 @@ const retreatAt = (acceptedAtSimTime: number): AdventureLogEntry => ({ kind: "pa
 const pressOnAt = (acceptedAtSimTime: number): AdventureLogEntry => ({ kind: "party", acceptedAtSimTime, order: "press-on" });
 
 const pair = [hero("fighter-1", "fighter"), hero("villager-1", "villager")];
+const villagers = [hero("villager-1", "villager"), hero("villager-2", "villager")];
 
 describe("A job run to the end", () => {
   it("runs the wolves job's stages in order on one clock and pays the job's reward and XP", () => {
@@ -43,25 +44,50 @@ describe("A job run to the end", () => {
     expect(timeline.events.at(-1)).toEqual({ kind: "adventure-end", timestamp: result.endedAtMs, outcome: "complete" });
   });
 
-  it("gathers up to what the party can carry, carries the cargo through the fight and pays it with the job's pay", () => {
-    const { timeline, result } = replay(snapshot(TIMBER, pair), "a", []);
-    const gather = JOBS[TIMBER].stages[1];
-    if (gather?.kind !== "gather") throw new Error("The timber job gathers second");
+  it("gathers until every node is down, carries the cargo through the fight and pays it with the job's pay", () => {
+    const { timeline, result } = replay(snapshot(TIMBER, villagers), "a", []);
     expect(result.outcome).toBe("complete");
     expect(result.stages.map((s) => s.ended)).toEqual(["done", "win", "win", "done"]);
-    expect(result.rewards).toEqual([{ material: "timber", amount: gather.carry }, ...JOBS[TIMBER].pay]);
+    // Two villagers, two trees: two thirds of each tree's 45.
+    expect(result.rewards).toEqual([{ material: "timber", amount: 60 }, ...JOBS[TIMBER].pay]);
     expect(result.xp.every((x) => x.xp === JOBS[TIMBER].xp)).toBe(true);
 
-    // Loaded before the woods were felled: not every tree went down.
+    // The gather ends on the last tree, not on a load.
     const trees = ofKind(timeline.events, "unit-down").filter((e) => e.unitId.includes("tree"));
-    expect(trees.length).toBeLessThan(3);
+    expect(trees).toHaveLength(2);
+    expect(trees.at(-1)?.timestamp).toBe(result.stages[1]?.endedAtMs);
     // The cargo is carried into the fight.
     expect(ofKind(timeline.events, "stage-end").map((e) => e.cargo)).toEqual([
       [],
-      [{ material: "timber", amount: gather.carry }],
-      [{ material: "timber", amount: gather.carry }],
-      [{ material: "timber", amount: gather.carry }],
+      [{ material: "timber", amount: 60 }],
+      [{ material: "timber", amount: 60 }],
+      [{ material: "timber", amount: 60 }],
     ]);
+  });
+
+  it("runs a stage of nodes and monsters together, which ends when all of them are down", () => {
+    const job: Job = {
+      ...JOBS[TIMBER],
+      id: "wolf-in-the-woods",
+      stages: [{ kind: "gather", opponents: [{ type: "tree", count: 1 }, { type: "wolf", count: 1 }], timeLimitMs: 90_000 }, { kind: "arrive" }],
+    };
+    const { timeline, result } = replay(snapshot(job.id, villagers), "a", [], contentWithJob(job));
+    expect(result.outcome).toBe("complete");
+    expect(result.stages.map((s) => [s.kind, s.ended])).toEqual([["gather", "win"], ["arrive", "done"]]);
+    expect(ofKind(timeline.events, "battle-start")[0]?.participants.filter((p) => p.side === "opponents").map((p) => p.kind).sort()).toEqual(["monster", "resource"]);
+    expect(ofKind(timeline.events, "unit-down").map((e) => e.unitId).sort()).toEqual(["s0-tree-1", "s0-wolf-1"]);
+    expect(result.rewards).toEqual([{ material: "timber", amount: 30 }, ...job.pay]);
+  });
+
+  it("gives every unit its own id when a stage names a type twice", () => {
+    const job: Job = {
+      ...JOBS[TIMBER],
+      id: "woods-either-side",
+      stages: [{ kind: "gather", opponents: [{ type: "tree", count: 1 }, { type: "wolf", count: 1 }, { type: "tree", count: 2 }], timeLimitMs: 90_000 }, { kind: "arrive" }],
+    };
+    const { timeline } = replay(snapshot(job.id, villagers), "a", [], contentWithJob(job));
+    const opponents = ofKind(timeline.events, "battle-start")[0]?.participants.filter((p) => p.side === "opponents");
+    expect(opponents?.map((p) => p.unitId)).toEqual(["s0-tree-1", "s0-wolf-1", "s0-tree-2", "s0-tree-3"]);
   });
 
   it("carries health from one stage to the next", () => {
@@ -69,8 +95,8 @@ describe("A job run to the end", () => {
       ...JOBS[WOLVES],
       id: "two-fights",
       stages: [
-        { kind: "fight", monsters: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
-        { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+        { kind: "fight", opponents: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
+        { kind: "fight", opponents: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
         { kind: "arrive" },
       ],
     };
@@ -85,7 +111,7 @@ describe("A job run to the end", () => {
 
   it("leaves a fallen hero out of later stages, lists it dead and gives XP only to the survivors", () => {
     const party = [hero("fighter-1", "fighter", { maxHealth: 5 }), hero("villager-1", "villager"), hero("villager-2", "villager")];
-    const job: Job = { ...JOBS[WOLVES], id: "wolves-then-woods", stages: [...JOBS[WOLVES].stages.slice(0, 2), { kind: "travel", lengthMs: 1000 }, { kind: "gather", nodes: [{ type: "tree", count: 1 }], carry: 10, timeLimitMs: 60_000 }, { kind: "arrive" }] };
+    const job: Job = { ...JOBS[WOLVES], id: "wolves-then-woods", stages: [...JOBS[WOLVES].stages.slice(0, 2), { kind: "travel", lengthMs: 1000 }, { kind: "gather", opponents: [{ type: "tree", count: 1 }], timeLimitMs: 60_000 }, { kind: "arrive" }] };
     const { timeline, result } = replay(snapshot(job.id, party), "a", [], contentWithJob(job));
     expect(result.outcome).toBe("complete");
     expect(result.dead).toEqual(["fighter-1"]);
@@ -135,8 +161,8 @@ describe("Retreat", () => {
   });
 
   it("from the lumber run keeps what was gathered and forfeits the pay", () => {
-    const gatherEnd = replay(snapshot(TIMBER, pair), "a", []).result.stages[1]?.endedAtMs ?? 0;
-    const { result } = replay(snapshot(TIMBER, pair), "a", [retreatAt(gatherEnd + 1)]);
+    const gatherEnd = replay(snapshot(TIMBER, villagers), "a", []).result.stages[1]?.endedAtMs ?? 0;
+    const { result } = replay(snapshot(TIMBER, villagers), "a", [retreatAt(gatherEnd + 1)]);
     expect(result.outcome).toBe("retreat");
     expect(result.stages.at(-1)?.kind).toBe("fight");
     expect(result.rewards).toEqual([{ material: "timber", amount: 60 }]);
@@ -165,7 +191,7 @@ describe("A stage's time limit", () => {
       id: "short-woods",
       stages: timber.stages.map((s) => (s.kind === "gather" ? { ...s, timeLimitMs: 3000 } : s)),
     };
-    const { timeline, result } = replay(snapshot(job.id, pair), "a", [], contentWithJob(job));
+    const { timeline, result } = replay(snapshot(job.id, villagers), "a", [], contentWithJob(job));
     expect(result.outcome).toBe("retreat");
     expect(result.stages.at(-1)).toMatchObject({ kind: "gather", ended: "timeout", endedAtMs: 4000 + 3000 });
     const timber_ = result.rewards.find((r) => r.material === "timber")?.amount ?? 0;

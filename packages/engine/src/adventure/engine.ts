@@ -63,10 +63,21 @@ function addTo(amounts: Partial<Record<Material, number>>, rewards: readonly Rew
   for (const { material, amount } of rewards) amounts[material] = (amounts[material] ?? 0) + amount;
 }
 
-/** The battle a fight or gather stage runs: its opponents, ids unique on the whole timeline. */
+/**
+ * The battle a fight or gather stage runs: its opponents, ids unique on the
+ * whole timeline. Each type is numbered across the stage's whole list, so a
+ * list that names a type twice still gives every unit its own id.
+ */
 function opponentsOf(stage: Stage, index: number): Opponent[] {
-  const groups = stage.kind === "fight" ? stage.monsters : stage.kind === "gather" ? stage.nodes : [];
-  return groups.flatMap(({ type, count }) => range(count).map((n) => ({ unitId: `s${String(index)}-${type}-${String(n + 1)}`, type })));
+  const groups = stage.kind === "fight" || stage.kind === "gather" ? stage.opponents : [];
+  const numbered = new Map<string, number>();
+  return groups.flatMap(({ type, count }) =>
+    range(count).map(() => {
+      const n = (numbered.get(type) ?? 0) + 1;
+      numbered.set(type, n);
+      return { unitId: `s${String(index)}-${type}-${String(n)}`, type };
+    }),
+  );
 }
 
 /**
@@ -288,7 +299,6 @@ export class AdventureEngine {
           party,
           opponents: opponentsOf(stage, index),
           timeLimitMs: stage.timeLimitMs,
-          ...(stage.kind === "gather" ? { carryLimit: stage.carry } : {}),
         },
         this.content.battle,
       );

@@ -314,6 +314,11 @@ export type MonsterType = (typeof MONSTER_TYPES)[number];
 export const RESOURCE_TYPES = ["tree", "ore-vein"] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
+/** Whether a stage's opponent is a resource node, not a monster: a stage lists both together (decision 0051). */
+export function isResourceType(type: string): type is ResourceType {
+  return (RESOURCE_TYPES as readonly string[]).includes(type);
+}
+
 export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "move-up";
 
 const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
@@ -326,7 +331,10 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
 /**
  * Every ability a unit type or monster's list names (game.md, "The battle").
  * A gather ability works the node with the least left, so a gatherer fells
- * one tree before starting the next (Issue-15).
+ * one tree before starting the next (Issue-15). Chop and mine are a strike
+ * at a node with their own look: the same damage and the same warmup, so
+ * that forcing a strike at a tree gains nothing over chopping it (decision
+ * 0051).
  */
 export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
   strike: {
@@ -366,7 +374,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     name: "Chop",
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
-    warmupMs: 500,
+    warmupMs: 300,
     effect: { kind: "gather", material: "timber" },
   },
   mine: {
@@ -374,7 +382,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     name: "Mine",
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
-    warmupMs: 500,
+    warmupMs: 300,
     effect: { kind: "gather", material: "ore" },
   },
   "move-up": {
@@ -390,18 +398,20 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
 /**
  * Each unit type's home line, base stats and one action list, the first
  * usable action winning. A unit type without one cannot join a battle yet.
- * A villager gathers both timber and ore, and a specialized gatherer later
- * does one of them better with a higher `gathering`.
+ * A villager's gather ratings are low in both timber and ore, below a
+ * node's difficulty, so it brings home a share of each; a specialized
+ * gatherer later meets the difficulty in one of them, and a combat unit has
+ * no rating, so its hits waste a node (decision 0051).
  */
 export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
   villager: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 },
+    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] },
     actions: ["strike", "chop", "mine", "move-up"],
   },
   fighter: {
     homeLine: "front",
-    stats: { maxHealth: 50, speed: 10, damage: 6, gathering: 0 },
+    stats: { maxHealth: 50, speed: 10, damage: 6, gather: [] },
     actions: ["guard", "strike"],
   },
 };
@@ -410,30 +420,33 @@ export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
   wolf: {
     name: "Wolf",
     homeLine: "front",
-    stats: { maxHealth: 24, speed: 12, damage: 3, gathering: 0 },
+    stats: { maxHealth: 24, speed: 12, damage: 3, gather: [] },
     actions: ["bite", "move-up"],
   },
   bandit: {
     name: "Bandit",
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 9, damage: 5, gathering: 0 },
+    stats: { maxHealth: 30, speed: 9, damage: 5, gather: [] },
     actions: ["strike-weakest", "move-up"],
   },
 };
 
-/** A node's amount is its health: the material it holds. */
+/**
+ * The resource nodes: health, the gather rating that harvests one in full,
+ * and the most it gives (decision 0051). A villager, at 2 against 3, brings
+ * home two thirds: 30 timber a tree, 20 ore a vein.
+ */
 export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>> = {
-  tree: { name: "Tree", homeLine: "front", material: "timber", amount: 40 },
-  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", amount: 40 },
+  tree: { name: "Tree", homeLine: "front", material: "timber", health: 40, difficulty: 3, maxYield: 45 },
+  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", health: 40, difficulty: 3, maxYield: 30 },
 };
 
-/** The content a battle reads by default. A regular attack on a node does half its damage as work and keeps half of that. */
+/** The content a battle reads by default. */
 export const BATTLE_CONTENT: BattleContent = {
   abilities: ABILITIES,
   heroes: UNIT_PROFILES,
   monsters: MONSTERS,
   resources: RESOURCE_NODES,
-  resourceHit: { workPercent: 50, yieldPercent: 50 },
 };
 
 // ── Jobs and advancement ───────────────────────────────────────────
@@ -443,9 +456,11 @@ export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
  * (game.md, "The battle"; decision 0031). A job that names a facility is
- * posted by it, not by the job board (Issue-133). A retreat forfeits the
- * pay; from a gathering job it keeps what was gathered. A retreat earns half
- * the XP.
+ * posted by it, not by the job board (Issue-133). A stage ends when
+ * everything on the other side is down, so its nodes' maximums are the most
+ * a job brings home, and what the party's gather ratings make of them is
+ * what it does (decision 0051). A retreat forfeits the pay; from a gathering
+ * job it keeps what was gathered. A retreat earns half the XP.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
   // A lone villager cannot fail it: no monster, and its time limit is beyond
@@ -457,7 +472,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", nodes: [{ type: "tree", count: 1 }], carry: 40, timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 1 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [],
@@ -467,12 +482,12 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   "timber-from-the-near-woods": {
     id: "timber-from-the-near-woods",
     name: "Timber from the near woods",
-    description: "Fell what you can carry in the near woods and bring it home. A wolf has been seen on the path.",
+    description: "Two trees in the near woods are marked for felling. Bring the wood home; a wolf has been seen on the path.",
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", nodes: [{ type: "tree", count: 3 }], carry: 60, timeLimitMs: 90_000 },
-      { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 2 }], timeLimitMs: 90_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 3 }],
@@ -488,7 +503,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "fight", monsters: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 10 }],
@@ -500,13 +515,13 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   "ore-from-the-hill": {
     id: "ore-from-the-hill",
     name: "Ore from the hill",
-    description: "Two veins show at the mine's mouth. Dig out what you can carry; a wolf dens in the old workings.",
+    description: "Two veins show at the mine's mouth. Dig them out; a wolf dens in the old workings.",
     location: "millbrook",
     facility: "mine",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", nodes: [{ type: "ore-vein", count: 2 }], carry: 40, timeLimitMs: 90_000 },
-      { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: 2 }], timeLimitMs: 90_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [],

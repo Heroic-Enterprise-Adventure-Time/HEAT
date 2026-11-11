@@ -8,9 +8,8 @@
  * unit holds, and the unit's own stats and action list.
  */
 
-import type { Material } from "../index.js";
 import type { AbilityDefinition } from "./ability.js";
-import type { Line, Side, UnitKind, UnitStats } from "./unit.js";
+import type { Line, ResourceNodeProfile, Side, UnitKind, UnitStats } from "./unit.js";
 
 /** A declared action in its warmup. */
 export interface DeclaredAction {
@@ -33,8 +32,10 @@ export interface UnitState {
   readonly stats: UnitStats;
   /** The unit's action list, resolved to abilities, in priority order. */
   readonly actions: readonly AbilityDefinition[];
-  /** The material a resource node yields; absent on every other unit. */
-  readonly material?: Material;
+  /** A resource node's profile; absent on every other unit. */
+  readonly node?: ResourceNodeProfile;
+  /** What a node's hits have earned toward its yield (`harvested`); 0 on every other unit. */
+  credit: number;
   /** False for a unit that never takes a turn, a resource node. */
   readonly acts: boolean;
   health: number;

@@ -20,21 +20,28 @@ describe('job words', () => {
 
   it('says each stage in order, without its time limit', () => {
     expect(wolves.stages.map(stageWords)).toEqual(['Travel', 'Fight 2 wolves', 'Arrive']);
-    expect(timber.stages.map(stageWords)).toEqual(['Travel', 'Gather timber from 3 trees, up to 60', 'Fight a wolf', 'Arrive']);
-    expect(ore.stages.map(stageWords)).toEqual(['Travel', 'Gather ore from 2 ore veins, up to 40', 'Fight a wolf', 'Arrive']);
+    expect(timber.stages.map(stageWords)).toEqual(['Travel', 'Gather timber from 2 trees', 'Fight a wolf', 'Arrive']);
+    expect(ore.stages.map(stageWords)).toEqual(['Travel', 'Gather ore from 2 ore veins', 'Fight a wolf', 'Arrive']);
   });
 
-  it('says what a job credits, its pay and what it can carry home, by material', () => {
+  it('says a stage of nodes and monsters together as both, whichever kind it is', () => {
+    const opponents = [{ type: 'tree', count: 2 }, { type: 'ore-vein', count: 1 }, { type: 'wolf', count: 1 }] as const;
+    for (const kind of ['gather', 'fight'] as const) {
+      expect(stageWords({ kind, opponents, timeLimitMs: 60_000 })).toBe('Gather timber and ore from 2 trees and an ore vein, and fight a wolf');
+    }
+  });
+
+  it("says what a job credits, its pay and the most its nodes give, by material", () => {
     expect(credits(wolves)).toEqual([{ material: 'cloth', pay: 10, cargo: 0 }]);
     expect(credits(timber)).toEqual([
       { material: 'cloth', pay: 3, cargo: 0 },
-      { material: 'timber', pay: 0, cargo: 60 },
+      { material: 'timber', pay: 0, cargo: 90 },
     ]);
-    expect(credits(timber).map(creditWords)).toEqual(['3 cloth', 'up to 60 timber']);
+    expect(credits(timber).map(creditWords)).toEqual(['3 cloth', 'up to 90 timber']);
     expect(creditWords({ material: 'timber', pay: 5, cargo: 60 })).toBe('5 and up to 60 timber');
     expect(yieldWords(wolves)).toBe('10 cloth');
-    expect(yieldWords(sticks)).toBe('up to 40 timber');
-    expect(yieldWords(timber)).toBe('3 cloth and up to 60 timber');
+    expect(yieldWords(sticks)).toBe('up to 45 timber');
+    expect(yieldWords(timber)).toBe('3 cloth and up to 90 timber');
     expect(yieldWords({ ...wolves, pay: [] })).toBe('nothing to bring home');
   });
 

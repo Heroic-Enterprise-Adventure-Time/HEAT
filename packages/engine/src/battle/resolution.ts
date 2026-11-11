@@ -9,18 +9,22 @@
  * conditions. A unit's list is walked in order and the first usable ability
  * wins.
  *
- * Resource nodes come last. The list is walked twice: first with regular
- * attacks aimed at units only, gather abilities at their own kind of node,
- * and guard and move up as they are; then, only if nothing was usable, with
- * regular attacks aimed at resource nodes.
+ * Resource nodes come last, and a node the actor would waste last of all
+ * (decision 0051). The list is walked twice: first with regular attacks aimed
+ * at units only, gather abilities at the nodes of their material the actor
+ * has a gather rating for, and guard and move up as they are; then, only if
+ * nothing was usable, with regular attacks aimed at resource nodes, those the
+ * actor has a rating for before those it has none for, and gather abilities
+ * at the nodes of their material whatever the rating. So a unit with no
+ * rating for a node hits it only when nothing else is in reach.
  */
 
 import type { AbilityDefinition } from "./ability.js";
 import type { SeededRng } from "./rng.js";
 import type { ActionContext, ActionSelection, UnitState } from "./state.js";
-import { type Line, lineAhead, lineIndex } from "./unit.js";
+import { gatherRating, type Line, lineAhead, lineIndex } from "./unit.js";
 
-/** The first walk of the list, or the second, which aims regular attacks at resource nodes. */
+/** The first walk of the list, or the second, which aims regular attacks at resource nodes and lets a hit waste one. */
 export type SelectionPass = "units" | "resources";
 
 /**
@@ -37,6 +41,11 @@ export function getReachableLines(ability: AbilityDefinition, actorLine: Line): 
 
 function belowHalf(unit: UnitState): boolean {
   return unit.health * 2 < unit.stats.maxHealth;
+}
+
+/** Whether the actor harvests anything from the node: it has a gather rating for the node's material. */
+function harvests(actor: UnitState, node: UnitState): boolean {
+  return node.node !== undefined && gatherRating(actor.stats, node.node.material) > 0;
 }
 
 function holdsGuard(actor: UnitState, clock: number): boolean {
@@ -69,10 +78,14 @@ export function targetCandidates(
   );
 
   switch (effect.kind) {
-    case "damage":
-      return pool.filter((u) => (pass === "units" ? u.kind !== "resource" : u.kind === "resource"));
+    case "damage": {
+      if (pass === "units") return pool.filter((u) => u.kind !== "resource");
+      const nodes = pool.filter((u) => u.kind === "resource");
+      const rated = nodes.filter((u) => harvests(actor, u));
+      return rated.length > 0 ? rated : nodes;
+    }
     case "gather":
-      return pass === "units" ? pool.filter((u) => u.kind === "resource" && u.material === effect.material) : [];
+      return pool.filter((u) => u.node?.material === effect.material && harvests(actor, u) === (pass === "units"));
     case "guard":
       if (pass !== "units" || holdsGuard(actor, clock)) return [];
       return pool.filter((u) => u.kind !== "resource" && belowHalf(u));

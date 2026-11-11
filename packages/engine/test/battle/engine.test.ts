@@ -7,9 +7,20 @@
  * guard and resource nodes are new.
  */
 
+import { sum } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { chargeMs, CombatEngine, findNextUnit, must, resolveBattle, type UnitState } from "../../src/index.js";
+import {
+  BATTLE_TIMELINE_SCHEMA_VERSION,
+  chargeMs,
+  CombatEngine,
+  findNextUnit,
+  harvested,
+  must,
+  resolveBattle,
+  RESOURCE_NODES,
+  type UnitState,
+} from "../../src/index.js";
 import { contentWith, hero, ofKind, opponent, runAll, setup } from "./helpers.js";
 
 function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = {}): UnitState {
@@ -18,7 +29,7 @@ function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = 
     kind: "hero",
     type: "villager",
     side: "party",
-    stats: { maxHealth: 30, speed: 10, damage: 4, gathering: 4 },
+    stats: { maxHealth: 30, speed: 10, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] },
     actions: [],
     acts: true,
     health: 30,
@@ -26,6 +37,7 @@ function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = 
     chargeTimer,
     currentAction: null,
     guard: null,
+    credit: 0,
     alive: true,
     ...extra,
   };
@@ -116,7 +128,7 @@ describe("CombatEngine", () => {
 
   it("populates the timeline's metadata and reads no clock", () => {
     const outcome = resolveBattle(setup(party, [opponent("wolf-1", "wolf")], "meta", 30_000));
-    expect(outcome.timeline).toMatchObject({ schemaVersion: 1, seed: "meta", timeLimitMs: 30_000, overrideLog: [] });
+    expect(outcome.timeline).toMatchObject({ schemaVersion: BATTLE_TIMELINE_SCHEMA_VERSION, seed: "meta", timeLimitMs: 30_000, overrideLog: [] });
     expect(outcome.timeline.participants).toEqual([
       { unitId: "fighter-1", kind: "hero", type: "fighter", side: "party", line: "front", health: 50, maxHealth: 50 },
       { unitId: "villager-1", kind: "hero", type: "villager", side: "party", line: "near", health: 30, maxHealth: 30 },
@@ -277,28 +289,80 @@ describe("Resource nodes", () => {
     expect(ofKind(events, "turn-start").some((e) => e.unitId === "tree-1")).toBe(false);
   });
 
-  it("are chopped by a villager for their full amount", () => {
+  it("take a hit's whole damage, and yield by the hitter's rating against their difficulty", () => {
+    // A villager's 2 against a tree's 3: two thirds of its 45.
     const outcome = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
     expect(outcome.result).toBe("win");
-    expect(outcome.gathered).toEqual({ timber: 40 });
+    expect(outcome.gathered).toEqual({ timber: 30 });
     const harvests = ofKind(outcome.timeline.events, "action-resolved").flatMap((e) => e.effects);
-    expect(harvests[0]).toEqual({ kind: "harvest", targetId: "tree-1", material: "timber", amount: 4, yield: 4, newHealth: 36 });
+    expect(harvests[0]).toEqual({ kind: "harvest", targetId: "tree-1", material: "timber", amount: 4, yield: 3, newHealth: 36 });
+  });
+
+  it("give exactly their maximum to a rating at their difficulty, and no more to one above it", () => {
+    const { difficulty, maxYield } = RESOURCE_NODES.tree;
+    for (const rating of [difficulty, difficulty + 4]) {
+      const outcome = resolveBattle(setup([hero("villager-1", "villager", undefined, [{ material: "timber", rating }])], [opponent("tree-1", "tree")]));
+      expect(outcome.gathered, String(rating)).toEqual({ timber: maxYield });
+    }
+  });
+
+  it("give nothing to a rating of zero, and fall all the same", () => {
+    const outcome = resolveBattle(setup([hero("fighter-1", "fighter")], [opponent("tree-1", "tree")]));
+    expect(outcome.result).toBe("win");
+    expect(outcome.gathered).toEqual({ timber: 0 });
+    const harvests = ofKind(outcome.timeline.events, "action-resolved").flatMap((e) => e.effects);
+    expect(harvests[0]).toEqual({ kind: "harvest", targetId: "tree-1", material: "timber", amount: 6, yield: 0, newHealth: 34 });
+    expect(ofKind(outcome.timeline.events, "unit-down").map((e) => e.unitId)).toEqual(["tree-1"]);
+  });
+
+  it("lose for good what a zero-rating hit took: the fighter beside a villager wastes the tree", () => {
+    const alone = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
+    const outcome = resolveBattle(setup([hero("fighter-1", "fighter"), hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
+    const hits = ofKind(outcome.timeline.events, "action-resolved").flatMap((e) => e.effects.flatMap((f) => (f.kind === "harvest" ? [{ by: e.unitId, ...f }] : [])));
+    const villagerDamage = sum(hits.filter((h) => h.by === "villager-1").map((h) => h.amount));
+    expect(hits.some((h) => h.by === "fighter-1" && h.amount > 0 && h.yield === 0)).toBe(true);
+    // What the villager's own hits earned, and nothing for the rest of the tree's health.
+    expect(outcome.gathered.timber).toBe(harvested(RESOURCE_NODES.tree, villagerDamage * 2));
+    expect(outcome.gathered.timber).toBeLessThan(alone.gathered.timber ?? 0);
+    expect(outcome.result).toBe("win");
+  });
+
+  it("round down on the running total, never on each hit", () => {
+    const node = { ...RESOURCE_NODES.tree, health: 40, difficulty: 3, maxYield: 10 };
+    // A villager's hit earns 4 x 2 of the 120 that would be the whole 10: two thirds of one.
+    expect(harvested(node, 8)).toBe(0);
+    expect(harvested(node, 16)).toBe(1);
+    expect(harvested(node, 40 * 2)).toBe(6);
+    expect(harvested(node, 40 * 3)).toBe(10);
+    expect(harvested(node, 0)).toBe(0);
   });
 
   it("are gathered only by the ability for their material", () => {
     const outcome = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree"), opponent("vein-1", "ore-vein")]));
-    expect(outcome.gathered).toEqual({ timber: 40, ore: 40 });
+    expect(outcome.gathered).toEqual({ timber: 30, ore: 20 });
     const resolved = ofKind(outcome.timeline.events, "action-resolved");
     expect(resolved.filter((e) => e.abilityId === "chop").every((e) => e.targetIds[0] === "tree-1")).toBe(true);
     expect(resolved.filter((e) => e.abilityId === "mine").every((e) => e.targetIds[0] === "vein-1")).toBe(true);
   });
 
-  it("fall to a regular attack slowly, for a poor yield", () => {
-    const outcome = resolveBattle(setup([hero("fighter-1", "fighter")], [opponent("tree-1", "tree")]));
+  it("yield the same to a strike as to a chop: the rating is the unit's, not the ability's", () => {
+    const engine = new CombatEngine(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
+    while (!engine.isComplete()) {
+      engine.submitOverride("villager-1", { kind: "force-action", abilityId: "strike" });
+      engine.step();
+    }
+    const outcome = engine.getOutcome();
+    expect(ofKind(outcome.timeline.events, "action-resolved").some((e) => e.abilityId === "strike")).toBe(true);
+    expect(outcome.gathered).toEqual({ timber: 30 });
+  });
+
+  it("stand with monsters in one battle, which ends only when all of them are down", () => {
+    const outcome = resolveBattle(setup([hero("villager-1", "villager"), hero("villager-2", "villager")], [opponent("wolf-1", "wolf"), opponent("tree-1", "tree")]));
     expect(outcome.result).toBe("win");
-    const harvests = ofKind(outcome.timeline.events, "action-resolved").flatMap((e) => e.effects);
-    expect(harvests[0]).toEqual({ kind: "harvest", targetId: "tree-1", material: "timber", amount: 3, yield: 1, newHealth: 37 });
-    expect(outcome.gathered.timber).toBeLessThan(40);
+    const downs = ofKind(outcome.timeline.events, "unit-down").map((e) => e.unitId);
+    expect(downs).toEqual(expect.arrayContaining(["wolf-1", "tree-1"]));
+    expect(outcome.timeline.events.at(-2)).toMatchObject({ kind: "unit-down" });
+    expect(outcome.gathered).toEqual({ timber: 30 });
   });
 
   it("wait until the monsters are down", () => {

@@ -271,7 +271,7 @@ describe("the adventure loop through the graph", () => {
     const { id: adventureId, seed } = must(start.data?.startAdventure.adventure, "the start's adventure");
 
     const me = await gql(
-      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gathering } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
+      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gather { material rating } } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
       {}, p,
     );
     expect(me.errors).toBeUndefined();
@@ -281,7 +281,7 @@ describe("the adventure loop through the graph", () => {
       job: { id: "wolves-on-the-mill-road", name: "Wolves on the mill road", location: "millbrook" },
       snapshot: {
         version, jobId: "wolves-on-the-mill-road",
-        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
+        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "TIMBER", rating: 2 }, { material: "ORE", rating: 2 }] } }],
       },
     });
 

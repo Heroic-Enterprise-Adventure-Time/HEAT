@@ -20,9 +20,12 @@ fragment AdventureFields on Adventure {
       unitType
       stats {
         damage
-        gathering
         maxHealth
         speed
+        gather {
+          material
+          rating
+        }
       }
     }
   }

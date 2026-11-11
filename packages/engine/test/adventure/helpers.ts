@@ -1,5 +1,7 @@
 /** Builders for the adventure tests. */
 
+import { range } from "es-toolkit";
+
 import {
   ADVENTURE_CONTENT,
   type AdventureContent,
@@ -30,6 +32,10 @@ export function contentWithJob(job: Job): AdventureContent {
 export function ofKind<K extends AdventureEvent["kind"]>(events: readonly AdventureEvent[], kind: K): Extract<AdventureEvent, { kind: K }>[] {
   return events.filter((e): e is Extract<AdventureEvent, { kind: K }> => e.kind === kind);
 }
+
+/** How many seeds a job is played over to say what a party brings home from it, and the seeds. */
+export const SEEDS = 500;
+export const seeds = range(SEEDS).map((i) => `seed-${i}`);
 
 export const STICKS = "pick-up-sticks";
 export const WOLVES = "wolves-on-the-mill-road";

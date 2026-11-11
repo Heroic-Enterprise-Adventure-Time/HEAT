@@ -11,14 +11,15 @@ describe("The adventure's content", () => {
       expect(job.stages.filter((s) => s.kind === "arrive")).toHaveLength(1);
       for (const stage of job.stages) {
         if (stage.kind === "travel") expect(stage.lengthMs).toBeGreaterThan(0);
-        if (stage.kind === "fight") {
+        if (stage.kind === "fight" || stage.kind === "gather") {
           expect(stage.timeLimitMs).toBeGreaterThan(0);
-          for (const m of stage.monsters) expect(Object.hasOwn(BATTLE_CONTENT.monsters, m.type) && m.count > 0).toBe(true);
-        }
-        if (stage.kind === "gather") {
-          expect(stage.timeLimitMs).toBeGreaterThan(0);
-          expect(stage.carry).toBeGreaterThan(0);
-          for (const n of stage.nodes) expect(Object.hasOwn(BATTLE_CONTENT.resources, n.type) && n.count > 0).toBe(true);
+          expect(stage.opponents.length).toBeGreaterThan(0);
+          for (const o of stage.opponents) {
+            expect(Object.hasOwn(BATTLE_CONTENT.monsters, o.type) || Object.hasOwn(BATTLE_CONTENT.resources, o.type)).toBe(true);
+            expect(o.count).toBeGreaterThan(0);
+          }
+          // A gather is a stage with a node to harvest; a fight has none of that to say.
+          if (stage.kind === "gather") expect(stage.opponents.some((o) => Object.hasOwn(BATTLE_CONTENT.resources, o.type))).toBe(true);
         }
       }
       for (const r of job.pay) expect(MATERIALS).toContain(r.material);

@@ -48,7 +48,7 @@ export type ResolvedEffect =
       readonly newHealth: number;
       readonly guarding?: string;
     }
-  /** Work done to a resource node, and the material it yielded. */
+  /** A hit on a resource node: `amount` is the damage to its health, `yield` the material that hit harvested (decision 0051). */
   | {
       readonly kind: "harvest";
       readonly targetId: string;
@@ -108,8 +108,13 @@ export type BattleEvent =
   | LineCollapsedEvent
   | BattleEndEvent;
 
-/** Bumped when the events' shape changes (architecture overview, "The adventure loop"). */
-export const BATTLE_TIMELINE_SCHEMA_VERSION = 1;
+/**
+ * Bumped when the events' shape or meaning changes (docs/architecture/adventure-loop.md).
+ * 2: a `harvest` effect's `amount` is damage and its `yield` is by gather
+ * rating, and a battle's opponents may be nodes and monsters together
+ * (decision 0051).
+ */
+export const BATTLE_TIMELINE_SCHEMA_VERSION = 2;
 
 export interface BattleTimeline {
   readonly schemaVersion: number;
