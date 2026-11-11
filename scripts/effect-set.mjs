@@ -6,23 +6,24 @@
 //   node scripts/effect-set.mjs --out art/effects/<set> --record <file> [--zip <file>]
 //
 // The game pack is downloaded from the export's link (the record's `imageId`
-// and `file`) unless --zip names a copy already on disk. Of its pieces only
-// the whole effect without the sprite is kept: `whole.png` and the
-// `manifest.json` that says where it stands. Every file written is the
-// pack's own bytes, checked by SHA-256. Prints a JSON report and exits 1 if a
-// check fails.
+// and `file`) unless --zip names a copy already on disk. Of its pieces these
+// are kept: `whole.png`, the whole effect without the sprite; the sheet of
+// every clip the manifest gives a role, a projectile's `part-projectile.png`
+// and its impact's `part-<impact>.png` (rule 35); and the `manifest.json`
+// that says where each stands. Every file written is the pack's own bytes,
+// checked by SHA-256, and a file in the set that this pack did not write is
+// a failure. Prints a JSON report; if a check fails it exits 1 and writes no
+// provenance.
 //
 // The record is the agent's note of what the pack does not hold:
 //   { "name": "HEAT slash 01", "abilities": ["strike"], "effectId": "...", "imageId": "...",
 //     "file": "heat-slash-01-game.zip", "createdAt": "...", "madeAround": "...",
 //     "parts": [{ "name": "slash_trail", "size": 0.7, "colour": [...], ... }], "edits": ["..."] }
-// A projectile's pack (rule 35) also holds clips with a role, the projectile and its impact; their sheets are
-// written beside whole.png. "madeFor" says what a set is for while its "abilities" are still empty, before the
-// engine has the ability.
+// "madeFor" says what a set is for while its "abilities" are still empty, before the engine has the ability.
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { parseArgs } from "node:util";
 import { inflateRawSync } from "node:zlib";
 
@@ -68,31 +69,42 @@ const zip = unzip(
     : Buffer.from(await (await fetch(`https://api.pixellab.ai/mcp/pixel-tools/${record.imageId}/${record.file}`)).arrayBuffer()),
 );
 const failures = [];
+const written = new Set();
 mkdirSync(values.out, { recursive: true });
-for (const file of ["whole.png", "manifest.json"]) {
+// Writes one of the pack's files into the set and says whether it is there, byte for byte. A name is the pack's
+// own, read from a download, so one that would leave the set's directory is refused.
+function keep(file) {
+  if (typeof file !== "string" || file !== basename(file) || file.startsWith(".")) {
+    failures.push(`the pack names a file outside the set: ${JSON.stringify(file)}`);
+    return false;
+  }
   const bytes = zip.get(file);
   if (!bytes) {
     failures.push(`the pack has no ${file}`);
-    continue;
+    return false;
   }
   writeFileSync(join(values.out, file), bytes);
-  if (sha(readFileSync(join(values.out, file))) !== sha(bytes)) failures.push(`${file} differs from the pack's`);
+  written.add(file);
+  if (sha(readFileSync(join(values.out, file))) === sha(bytes)) return true;
+  failures.push(`${file} differs from the pack's`);
+  return false;
 }
+keep("whole.png");
+keep("manifest.json");
 const manifest = JSON.parse(zip.get("manifest.json")?.toString("utf8") ?? "{}");
 // A projectile's pieces (rule 35): the clips the manifest gives a role, the projectile in place and its impact,
 // each a sheet of its own for the game to move and to play on resolve.
 const roleFiles = {};
 for (const clip of manifest.clips?.filter((c) => c.role) ?? []) {
-  for (const { file } of clip.sheets) {
-    const bytes = zip.get(file);
-    if (!bytes) {
-      failures.push(`the pack has no ${file}`);
-      continue;
-    }
-    writeFileSync(join(values.out, file), bytes);
-    if (sha(readFileSync(join(values.out, file))) !== sha(bytes)) failures.push(`${file} differs from the pack's`);
-    roleFiles[file] = `the game pack's ${clip.role} clip, ${clip.frames} frames`;
+  if (!Array.isArray(clip.sheets) || !clip.sheets.length) {
+    failures.push(`the ${clip.role} clip ${clip.name} has no sheets`);
+    continue;
   }
+  for (const { file } of clip.sheets) if (keep(file)) roleFiles[file] = `the game pack's ${clip.role} clip, ${clip.frames} frames`;
+}
+// A sheet an earlier export left behind, a part since renamed or dropped, is not this effect's.
+for (const file of readdirSync(values.out)) {
+  if (!written.has(file) && file !== "provenance.json") failures.push(`${file} is in the set and was not written from this pack`);
 }
 const whole = manifest.clips?.find((c) => c.name === "whole");
 if (!whole) failures.push("the manifest has no whole clip");
@@ -108,6 +120,11 @@ const SERVICE = {
   rights: "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity.",
 };
 const set = values.out.split(/[\\/]/).filter(Boolean).pop();
+// The provenance says every file is the pack's own, so it is written only when every check passed.
+if (failures.length) {
+  console.log(JSON.stringify({ set, frames: whole?.frames, fps: manifest.fps, failures }, null, 2));
+  process.exit(1);
+}
 const provenance = {
   set,
   kind: "action effect",
@@ -138,4 +155,3 @@ const json = JSON.stringify(provenance, null, 2).replace(/\[\s+([^[\]{}]*?)\s+\]
 writeFileSync(join(values.out, "provenance.json"), json + "\n");
 
 console.log(JSON.stringify({ set, frames: whole?.frames, fps: manifest.fps, failures }, null, 2));
-process.exit(failures.length ? 1 : 0);
