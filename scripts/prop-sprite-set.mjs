@@ -22,7 +22,9 @@
 //                              "replaced"?: [{ "groupId": "...", "description": "...", "generations": 1, "why": "..." }] } },
 //     "rejected"?: [{ "name": "...", "objectId": "...", "description": "..." }] }
 //   A weapon's has "kind": "weapon", "wielders": [...] in place of "props", and
-//   "pick": { "reviewObjectId": "...", "index": 0, "itemDescription": "..." }.
+//   "pick": { "reviewObjectId": "...", "index": 0, "itemDescription": "..." }. A swing that begins at a picture
+//   other than the icon gives it as "startFrame": { "from": "...", "generations": 0 }, beside "endFrame". A set made
+//   before the engine has its wielder leaves "wielders" empty and says what it is for in "madeFor" (rule 5).
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -115,6 +117,7 @@ const animations = Object.fromEntries(
     frameCount: a.frameCount,
     frames: a.frames,
     canvas: record.canvas,
+    ...(a.startFrame ? { startFrame: a.startFrame } : {}),
     ...(a.endFrame ? { endFrame: a.endFrame } : {}),
     ...(a.heldLast ? { heldLast: true } : {}),
     ...(a.fadeAboveEnd ? { fadeAboveEnd: true } : {}),
@@ -129,6 +132,7 @@ const provenance = {
   set,
   kind: weapon ? "weapon sprite set" : "prop sprite set",
   ...(weapon ? { wielders: record.wielders } : { props: record.props }),
+  ...(record.madeFor ? { madeFor: record.madeFor } : {}),
   service: SERVICE,
   pixellab: { objectId: values.object, name: record.name, tags: weapon ? record.tags : ["heat", "prop", ...record.props] },
   object: {
