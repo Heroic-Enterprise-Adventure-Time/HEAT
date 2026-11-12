@@ -1,0 +1,75 @@
+{
+  "set": "pickaxe-01",
+  "kind": "weapon sprite set",
+  "wielders": [],
+  "madeFor": "The miner's weapon; Issue-287 adds the miner to the engine and names it in wielders.",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "objectId": "c46ef82a-47e4-45d6-83a2-27e011e728cc",
+    "name": "Pickaxe 01",
+    "tags": ["heat", "weapon", "pickaxe"]
+  },
+  "object": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-11",
+    "pick": {
+      "reviewObjectId": "85f952e0-857d-4aef-af1d-5a2b50eef805",
+      "index": 0,
+      "itemDescription": "pickaxe: miner's pickaxe, long wooden haft, grey iron head with two points"
+    },
+    "parameters": {
+      "description": "single weapon on a transparent background, held by its grip at the lower left, blade or head pointing up and to the right, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat weapons 03",
+      "view": "top-down",
+      "size": null,
+      "styleImages": ["art/icons/adventure.png (32x32, which sets the output size)"],
+      "itemDescriptions": ["pickaxe: miner's pickaxe, long wooden haft, grey iron head with two points", "pickaxe: iron pickaxe with a curved double-pointed head and an ash handle", "pickaxe: heavy mining pick, dark iron head, worn wooden handle", "pickaxe: simple pickaxe, one point and one flat chisel end, brown haft", "pickaxe: old miner's pick with a leather-wrapped grip", "pickaxe: sturdy pickaxe with a steel head and a thick oak handle", "pickaxe: small prospector's pick with a narrow iron head", "pickaxe: rough iron pickaxe with a straight wooden haft", "pickaxe: miner's pickaxe with a broad curved head", "pickaxe: plain pickaxe, grey head, light wooden handle", "pickaxe: battered mining pick with a rusty head", "pickaxe: long-handled pickaxe with a slender curved head", "felling axe: lumberjack's felling axe, long wooden haft, broad grey iron head", "felling axe: big two-handed woodcutter's axe with a wide curved bit and an ash handle", "felling axe: heavy forest axe, long straight handle, dark iron head", "felling axe: long-hafted felling axe with a bearded blade", "felling axe: woodsman's axe with a wedge-shaped steel head and a hickory handle", "felling axe: large timber axe, flared bit, worn wooden haft", "felling axe: tall felling axe with a leather-wrapped grip", "felling axe: sturdy logging axe with a broad single bit", "felling axe: old lumberjack's axe with a rust-brown head", "felling axe: long axe with a narrow deep-cutting head", "felling axe: plain felling axe, grey head, light wooden handle", "felling axe: big woodcutter's axe with a slightly curved handle"],
+      "packGenerations": 10,
+      "packNote": "One call returned 64 candidates (review object 85f952e0-857d-4aef-af1d-5a2b50eef805, tagged heat, weapon, rejected); the owner picked 0, the pickaxe, and 13, the felling axe, from a numbered sheet at 3x. Every pickaxe came out as asked, grip at the lower left; every axe came out mirrored, its head up and to the left and its grip at the lower right. The pack's 10 generations are counted once, here."
+    },
+    "canvas": [32, 32],
+    "generations": 10
+  },
+  "files": {
+    "icon": {
+      "file": "icon.png",
+      "canvas": [32, 32],
+      "from": "the object's one rotation; also the weapon's icon in the inventory"
+    }
+  },
+  "animations": {
+    "swing": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "47534c83-3719-42cb-90b1-169b6ea0228b",
+      "animationDescription": "a swing: the pickaxe turns about the bottom end of its handle, which stays in place, from pointing up and to the right, through pointing straight ahead to the right, to pointing down and to the right; the same pickaxe the whole time, no particles, no effects, no motion trail",
+      "frameCount": 4,
+      "frames": 5,
+      "canvas": [32, 32],
+      "endFrame": {
+        "from": "icon.png turned a right angle clockwise (lossless), so the head points down and to the right; passed as end_frame_base64",
+        "generations": 0
+      },
+      "holdFrame": 2,
+      "grips": [
+        [5, 26],
+        [5, 21],
+        [5, 15],
+        [5, 8],
+        [5, 5]
+      ],
+      "files": "swing-<0..4>.png",
+      "generations": 1
+    }
+  },
+  "animationGenerations": 1,
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-11-12."
+}

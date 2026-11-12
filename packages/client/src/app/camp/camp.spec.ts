@@ -342,8 +342,9 @@ describe('Camp', () => {
     await user.click(panel().getByRole('button', { name: 'Build' }));
     const job = await panel().findByRole('link', { name: 'Ore from the hill' });
     expect(job).toHaveAttribute('href', '/camp/millbrook/mine/jobs/ore-from-the-hill');
-    expect(listItems('Jobs')).toHaveLength(1);
-    expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('up to 40 ore')).toBeInTheDocument();
+    expect(listItems('Jobs')).toHaveLength(2);
+    expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('up to 60 ore')).toBeInTheDocument();
+    expect(within(itemHolding('Jobs', 'link', 'Goblins in the old workings')).getByText('up to 90 ore')).toBeInTheDocument();
     expect(game.built).toEqual([['mine', 1]]);
   });
 
@@ -353,7 +354,7 @@ describe('Camp', () => {
     game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'mine' ? { kind: 'mine', level: 1 } : f)) });
     await renderCamp(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
     expect(panel().getByRole('heading', { name: 'Ore from the hill', level: 2 })).toBeInTheDocument();
-    expect(textsOf(listItems('Stages'))).toContain('Gather ore from 2 ore veins, up to 40');
+    expect(textsOf(listItems('Stages'))).toContain('Gather ore from 2 ore veins');
     expect(backTo('Mine')).toHaveAttribute('href', '/camp/millbrook/mine');
     expect(marked('Mine')).toBeInTheDocument();
   });

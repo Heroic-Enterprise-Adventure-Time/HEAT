@@ -16,4 +16,8 @@ export const playerKeys = {
 export const locationKeys = {
   adventure: (adventureId: string) => ({ PK: `ADVENTURE#${adventureId}`, SK: "RECORD" }),
   seen: (location: string, heroId: string) => ({ PK: `LOCATION#${location}`, SK: `SEEN#${heroId}` }),
+  done: (location: string, settledAt: string, adventureId: string) => ({ PK: `LOCATION#${location}`, SK: `DONE#${settledAt}#${adventureId}` }),
 };
+
+/** The keys a settled adventure's record carries for the location table's index, GSI1 (decision 0050). */
+export const replayKeys = (jobId: string, settledAt: string) => ({ GSI1PK: `JOB#${jobId}`, GSI1SK: settledAt });

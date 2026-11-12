@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type UnitType, warehouseCapacity } from "@heat/engine";
@@ -17,13 +17,15 @@ import { player, storedItem, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
+import { PREVIOUS_VERSION as previous, VERSION as version } from "./versions.js";
 
 /**
  * Submit, settlement and discard against DynamoDB Local, with the replay
  * bucket in memory (src/timelines.ts): the result is the hub's replay; XP
  * and levels; credits capped at the warehouse with the loss in the ledger;
  * a death with the camp's living count and the sighting; a repeated and a
- * concurrent submit that pay once; a balance moved during settlement; a
+ * concurrent submit that pay once; the adventure's item in its location's
+ * feed, which a discard never writes (decision 0050); a balance moved during settlement; a
  * stored timeline that wins; and a discard that only an unverifiable
  * adventure gets.
  *
@@ -45,8 +47,6 @@ beforeAll(() => {
 
 const at = "millbrook";
 const wolves = JOBS["wolves-on-the-mill-road"];
-const version = "0123456789abcdef0123456789abcdef01234567";
-const previous = "fedcba9876543210fedcba9876543210fedcba98";
 
 /** Living heroes of the given unit types and a camp that counts them, with their sightings. */
 async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): Promise<Hero[]> {
@@ -72,6 +72,19 @@ async function start(p: string, heroes: Hero[], issuedBy = version) {
   return startAdventure(repo, p, issuedBy, randomUUID(), at, wolves.id, heroes.map((h) => h.id));
 }
 
+
+/** The location's feed items for the adventure, read past the repository: one once it is settled, none before or after a discard. */
+async function inFeed(adventureId: string) {
+  const r = await db.send(new QueryCommand({
+    TableName: tables.location,
+    KeyConditionExpression: "PK = :pk AND begins_with(SK, :done)",
+    FilterExpression: "adventureId = :id",
+    ExpressionAttributeValues: { ":pk": `LOCATION#${at}`, ":done": "DONE#", ":id": adventureId },
+    ConsistentRead: true,
+  }));
+  expect(r.LastEvaluatedKey).toBeUndefined();
+  return r.Items ?? [];
+}
 
 async function cloth(p: string) {
   return (await repo.holdings(p, at)).find((h) => h.material === "cloth")?.balance;
@@ -114,6 +127,39 @@ describe("a party that completes the job", () => {
     expect(stored.version).toBe(version);
   });
 
+  it("is put in its location's feed as it settles, by its public fields and with no owner, expiring a week later", async () => {
+    const p = player();
+    const heroes = await putParty(p, ["fighter", "villager"]);
+    const started = await start(p, heroes);
+    expect(await inFeed(started.adventureId)).toEqual([]);
+    const now = new Date();
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, [], now);
+
+    const key = locationKeys.done(at, now.toISOString(), started.adventureId);
+    const item = await storedItem(db, tables.location, key);
+    const level = levelForXp(wolves.xp);
+    const stages = must(settled.result, "the result").stages;
+    expect(stages.length).toBeGreaterThan(0);
+    expect(item).toEqual({
+      ...key,
+      adventureId: started.adventureId,
+      location: at,
+      jobId: wolves.id,
+      outcome: "complete",
+      stages,
+      credited: wolves.pay,
+      party: heroes.map((hero) => ({ name: hero.name, unitType: hero.unitType, spriteSet: hero.spriteSet, level, died: false })),
+      settledAt: now.toISOString(),
+      expiresAt: Math.floor(now.getTime() / 1000) + 7 * 24 * 60 * 60,
+      // ElectroDB's identifiers, which say what the item is and nothing of whose (decision 0041).
+      __edb_e__: "recent",
+      __edb_v__: "1",
+    });
+    const stored = JSON.stringify(item);
+    expect(stored).not.toContain(p);
+    for (const hero of heroes) expect(stored).not.toContain(hero.id);
+  });
+
   it("pays once when the same submit is repeated, and once when two race", async () => {
     const p = player();
     const heroes = await putParty(p, ["fighter", "villager"]);
@@ -123,6 +169,7 @@ describe("a party that completes the job", () => {
     const repeat = await submitAdventure(repo, timelines, p, version, first.adventureId, []);
     expect(repeat.result).toEqual(settled.result);
     expect(await cloth(p)).toBe(10);
+    expect(await inFeed(first.adventureId)).toHaveLength(1);
 
     const second = await start(p, heroes);
     const both = await Promise.all([
@@ -130,6 +177,7 @@ describe("a party that completes the job", () => {
       submitAdventure(repo, timelines, p, version, second.adventureId, []),
     ]);
     expect(both.map((r) => r.status)).toEqual(["SETTLED", "SETTLED"]);
+    expect(await inFeed(second.adventureId)).toHaveLength(1);
     expect(await cloth(p)).toBe(20);
     for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(2 * wolves.xp);
   });
@@ -244,6 +292,10 @@ describe("a death", () => {
     expect(await repo.camp(p, at)).toMatchObject({ livingHeroes: 0, activeHeroes: 1 });
     expect(await storedItem(db, tables.location, locationKeys.seen(at, villager.id))).toBeUndefined();
     expect(await repo.holdings(p, at)).toEqual([]);
+    // A defeat is in the feed like any outcome, its hero at the level it died at.
+    expect(await inFeed(started.adventureId)).toEqual([
+      expect.objectContaining({ outcome: "defeat", credited: [], party: [{ name: villager.name, unitType: "villager", spriteSet: villager.spriteSet, level: 1, died: true }] }),
+    ]);
   });
 });
 
@@ -317,6 +369,7 @@ describe("discard", () => {
     expect(await repo.getAdventure(started.adventureId)).toMatchObject({ status: "DISCARDED" });
     for (const hero of heroes) expect(await repo.getHero(p, hero.id)).toMatchObject({ adventureId: null, xp: 0, status: "ALIVE" });
     expect(await repo.holdings(p, at)).toEqual([]);
+    expect(await inFeed(started.adventureId)).toEqual([]);
 
     expect((await discardAdventure(repo, p, versions, started.adventureId)).discardedAt).toBe(discarded.discardedAt);
     expect(await refusal(submitAdventure(repo, new MemoryTimelines(), p, "0".repeat(40), started.adventureId, []))).toBeInstanceOf(AdventureDiscarded);

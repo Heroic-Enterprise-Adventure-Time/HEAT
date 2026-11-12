@@ -201,6 +201,10 @@ export const LOCATIONS: readonly Location[] = [
       // pays for a villager, one run of the mine's first job for a fighter.
       { unitType: "villager", hallLevel: 1, cost: [{ material: "timber", amount: 20 }] },
       { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 40 }] },
+      // The next step (Issue-286): the wolves job's cloth pays for the hall's
+      // second level and then for a ranger, the first unit type a hall's
+      // level gates.
+      { unitType: "ranger", hallLevel: 2, cost: [{ material: "timber", amount: 40 }, { material: "cloth", amount: 10 }] },
     ],
   },
 ];
@@ -266,6 +270,9 @@ export const SPRITE_SET_PRESENTATION: Readonly<Record<string, Presentation>> = {
   "wizard-01": "either",
   "wizard-03": "masculine",
   "priest-02": "either",
+  // Made before their unit types (Issue-285), which Issue-287 adds to SPRITE_SETS.
+  "miner-01": "masculine",
+  "lumberjack-02": "feminine",
 };
 
 /**
@@ -307,14 +314,19 @@ export function heroNames(presentation: Presentation, taken: ReadonlySet<string>
 // ── The battle ─────────────────────────────────────────────────────
 
 /** The monsters, by the type a fight stage names. Their sprite sets are mapped beside them (Issue-111). */
-export const MONSTER_TYPES = ["wolf", "bandit"] as const;
+export const MONSTER_TYPES = ["wolf", "bandit", "goblin-rock-thrower"] as const;
 export type MonsterType = (typeof MONSTER_TYPES)[number];
 
 /** The resource nodes a gather stage names. */
 export const RESOURCE_TYPES = ["tree", "ore-vein"] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
-export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "move-up";
+/** Whether a stage's opponent is a resource node, not a monster: a stage lists both together (decision 0051). */
+export function isResourceType(type: string): type is ResourceType {
+  return (RESOURCE_TYPES as readonly string[]).includes(type);
+}
+
+export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "shoot" | "throw-rock" | "move-up";
 
 const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
 
@@ -326,7 +338,12 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
 /**
  * Every ability a unit type or monster's list names (game.md, "The battle").
  * A gather ability works the node with the least left, so a gatherer fells
- * one tree before starting the next (Issue-15).
+ * one tree before starting the next (Issue-15). Chop and mine are a strike
+ * at a node with their own look: the same damage and the same warmup, so
+ * that forcing a strike at a tree gains nothing over chopping it (decision
+ * 0051). A ranged attack reaches every line from every line, which is what
+ * makes it the answer to a monster standing behind resource nodes; its
+ * warmup is its wind-up and its projectile's flight together (decision 0052).
  */
 export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
   strike: {
@@ -366,7 +383,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     name: "Chop",
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
-    warmupMs: 500,
+    warmupMs: 300,
     effect: { kind: "gather", material: "timber" },
   },
   mine: {
@@ -374,8 +391,24 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     name: "Mine",
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
-    warmupMs: 500,
+    warmupMs: 300,
     effect: { kind: "gather", material: "ore" },
+  },
+  shoot: {
+    abilityId: "shoot",
+    name: "Shoot",
+    tags: ["ranged-attack", "physical", "piercing"],
+    targeting: { side: "enemy", reach: ANY_LINE, selection: "closest" },
+    warmupMs: 700,
+    effect: { kind: "damage" },
+  },
+  "throw-rock": {
+    abilityId: "throw-rock",
+    name: "Throw a rock",
+    tags: ["ranged-attack", "physical"],
+    targeting: { side: "enemy", reach: ANY_LINE, selection: "closest" },
+    warmupMs: 600,
+    effect: { kind: "damage" },
   },
   "move-up": {
     abilityId: "move-up",
@@ -390,19 +423,29 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
 /**
  * Each unit type's home line, base stats and one action list, the first
  * usable action winning. A unit type without one cannot join a battle yet.
- * A villager gathers both timber and ore, and a specialized gatherer later
- * does one of them better with a higher `gathering`.
+ * A villager's gather ratings are low in both timber and ore, below a
+ * node's difficulty, so it brings home a share of each; a specialized
+ * gatherer later meets the difficulty in one of them, and a combat unit has
+ * no rating, so its hits waste a node (decision 0051). A ranger stands at
+ * the back and shoots whatever is closest, monsters before nodes like any
+ * unit; with nothing else left it shoots a node and wastes its share of it
+ * (the owner's call on Issue-286).
  */
 export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
   villager: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 },
+    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] },
     actions: ["strike", "chop", "mine", "move-up"],
   },
   fighter: {
     homeLine: "front",
-    stats: { maxHealth: 50, speed: 10, damage: 6, gathering: 0 },
+    stats: { maxHealth: 50, speed: 10, damage: 6, gather: [] },
     actions: ["guard", "strike"],
+  },
+  ranger: {
+    homeLine: "far",
+    stats: { maxHealth: 26, speed: 10, damage: 6, gather: [] },
+    actions: ["shoot"],
   },
 };
 
@@ -410,42 +453,55 @@ export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
   wolf: {
     name: "Wolf",
     homeLine: "front",
-    stats: { maxHealth: 24, speed: 12, damage: 3, gathering: 0 },
+    stats: { maxHealth: 24, speed: 12, damage: 3, gather: [] },
     actions: ["bite", "move-up"],
   },
   bandit: {
     name: "Bandit",
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 9, damage: 5, gathering: 0 },
+    stats: { maxHealth: 30, speed: 9, damage: 5, gather: [] },
     actions: ["strike-weakest", "move-up"],
+  },
+  // Fragile and hard-hitting, on a line melee cannot reach while anything
+  // stands in front of it (decision 0052).
+  "goblin-rock-thrower": {
+    name: "Goblin rock thrower",
+    homeLine: "far",
+    stats: { maxHealth: 12, speed: 8, damage: 5, gather: [] },
+    actions: ["throw-rock"],
   },
 };
 
-/** A node's amount is its health: the material it holds. */
+/**
+ * The resource nodes: health, the gather rating that harvests one in full,
+ * and the most it gives (decision 0051). A villager, at 2 against 3, brings
+ * home two thirds: 30 timber a tree, 20 ore a vein.
+ */
 export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>> = {
-  tree: { name: "Tree", homeLine: "front", material: "timber", amount: 40 },
-  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", amount: 40 },
+  tree: { name: "Tree", homeLine: "front", material: "timber", health: 40, difficulty: 3, maxYield: 45 },
+  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", health: 40, difficulty: 3, maxYield: 30 },
 };
 
-/** The content a battle reads by default. A regular attack on a node does half its damage as work and keeps half of that. */
+/** The content a battle reads by default. */
 export const BATTLE_CONTENT: BattleContent = {
   abilities: ABILITIES,
   heroes: UNIT_PROFILES,
   monsters: MONSTERS,
   resources: RESOURCE_NODES,
-  resourceHit: { workPercent: 50, yieldPercent: 50 },
 };
 
 // ── Jobs and advancement ───────────────────────────────────────────
 
-export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road" | "ore-from-the-hill";
+export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road" | "ore-from-the-hill" | "goblins-in-the-old-workings";
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
  * (game.md, "The battle"; decision 0031). A job that names a facility is
- * posted by it, not by the job board (Issue-133). A retreat forfeits the
- * pay; from a gathering job it keeps what was gathered. A retreat earns half
- * the XP.
+ * posted by it, not by the job board (Issue-133). A stage ends when
+ * everything on the other side is down, so its nodes' maximums are the most
+ * a job brings home, and what the party's gather ratings make of them is
+ * what it does (decision 0051). A retreat forfeits the pay; from a gathering
+ * job it keeps what was gathered. A retreat earns half the XP.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
   // A lone villager cannot fail it: no monster, and its time limit is beyond
@@ -457,7 +513,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", nodes: [{ type: "tree", count: 1 }], carry: 40, timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 1 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [],
@@ -467,12 +523,12 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   "timber-from-the-near-woods": {
     id: "timber-from-the-near-woods",
     name: "Timber from the near woods",
-    description: "Fell what you can carry in the near woods and bring it home. A wolf has been seen on the path.",
+    description: "Two trees in the near woods are marked for felling. Bring the wood home; a wolf has been seen on the path.",
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", nodes: [{ type: "tree", count: 3 }], carry: 60, timeLimitMs: 90_000 },
-      { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 2 }], timeLimitMs: 90_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 3 }],
@@ -488,7 +544,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "fight", monsters: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 10 }],
@@ -500,20 +556,44 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   "ore-from-the-hill": {
     id: "ore-from-the-hill",
     name: "Ore from the hill",
-    description: "Two veins show at the mine's mouth. Dig out what you can carry; a wolf dens in the old workings.",
+    description: "Two veins show at the mine's mouth. Dig them out; a wolf dens in the old workings.",
     location: "millbrook",
     facility: "mine",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", nodes: [{ type: "ore-vein", count: 2 }], carry: 40, timeLimitMs: 90_000 },
-      { kind: "fight", monsters: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: 2 }], timeLimitMs: 90_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [],
     xp: 15,
     retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
   },
+  // The first mixed stage (Issue-286, decision 0052): the veins hold the
+  // front line and the goblins throw from behind them, out of melee's reach
+  // until the veins fall. Villagers alone need four and usually lose one; a
+  // ranger with two villagers clears it with no death.
+  "goblins-in-the-old-workings": {
+    id: "goblins-in-the-old-workings",
+    name: "Goblins in the old workings",
+    description: "Three good veins lie deeper in, and goblins have moved in behind them. They throw rocks at anyone who digs.",
+    location: "millbrook",
+    facility: "mine",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: 3 }, { type: "goblin-rock-thrower", count: 2 }], timeLimitMs: 120_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    xp: 25,
+    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+  },
 };
+
+/** The job with this id, or undefined for an id this version's content does not know, as an adventure of another version may carry. */
+export function jobOf(id: string): Job | undefined {
+  return Object.hasOwn(JOBS, id) ? JOBS[id as JobId] : undefined;
+}
 
 /**
  * The jobs a poster at a location lists, in the content's order: the job

@@ -1,6 +1,6 @@
 # 0030: The first adventure: the engine, the marching order, stage time limits, and one version per deploy
 
-- **Status:** Decided. Amended by Issue-115 on 2026-10-22, the owner's call: an outdated client reloads itself rather than prompting a refresh, at once with no adventure open and otherwise once the adventure is over, and a tab reloads away from a version only once. Amended by Issue-15 on 2026-10-22, the owner's call: a stage's time limit is shown as a countdown in whole seconds in its last ten seconds of simulated time.
+- **Status:** Decided. Amended by Issue-115 on 2026-10-22, the owner's call: an outdated client reloads itself rather than prompting a refresh, at once with no adventure open and otherwise once the adventure is over, and a tab reloads away from a version only once. Amended by Issue-15 on 2026-10-22, the owner's call: a stage's time limit is shown as a countdown in whole seconds in its last ten seconds of simulated time. Amended by 0051 on 2026-11-10 (Issue-283): a fight or a gather lists nodes and monsters together and ends when all of them are down, and a stored timeline of another schema version is "replay unavailable", never migrated.
 - **Date:** 2026-10-21
 - **Settles:** Issue-109: the shape that Issue-110 to Issue-115 and Issue-15 build, agreed in the planning session of 2026-10-21.
 
@@ -50,4 +50,4 @@
 
 ## Where it is described
 
-`docs/design/game.md`, "The adventure loop" and "The battle". `docs/architecture/overview.md`, "The adventure loop", "Camps, heroes and resources", "Environments" and "Engine provenance". Decision 0003 as amended.
+`docs/design/game.md`, "The adventure loop" and "The battle". `docs/architecture/adventure-loop.md` since Issue-282. `docs/architecture/overview.md`, "The adventure loop", "Camps, heroes and resources", "Environments" and "Engine provenance". Decision 0003 as amended.

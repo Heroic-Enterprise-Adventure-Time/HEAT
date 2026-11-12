@@ -2,7 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, InjectionToken, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { ABILITIES, type AbilityId, type JobId, JOBS, location, must, type PartyOrder, type StageEnding, UNIT_PROFILES, type UnitType } from '@heat/engine';
+import { ABILITIES, type AbilityId, isPlayableTimeline, type JobId, JOBS, location, must, type PartyOrder, type StageEnding, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
@@ -108,8 +108,8 @@ export class Adventure {
   /** Set once the scene has loaded, or failed to, and the run may start. */
   private readonly sceneReady = signal(false);
   private startedId: string | null = null;
-  /** The replay's timeline is being fetched, or could not be. */
-  protected readonly replayState = signal<'idle' | 'loading' | 'failed'>('idle');
+  /** The replay's timeline is being fetched, could not be, or was written before a change to the battle's events and is not played (decision 0051). */
+  protected readonly replayState = signal<'idle' | 'loading' | 'failed' | 'unavailable'>('idle');
 
   protected readonly from = computed(() => {
     const at = (this.game.settled()?.adventure ?? this.game.adventure())?.location ?? '';
@@ -211,6 +211,10 @@ export class Adventure {
     const timeline = await this.game.timeline(settled.adventure.id).catch(() => null);
     if (!timeline) {
       this.replayState.set('failed');
+      return;
+    }
+    if (!isPlayableTimeline(timeline)) {
+      this.replayState.set('unavailable');
       return;
     }
     this.replayState.set('idle');

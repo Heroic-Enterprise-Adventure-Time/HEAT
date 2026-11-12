@@ -1,6 +1,6 @@
 # 0031: The first progression: a first job a villager cannot fail, and one run per step
 
-- **Status:** Decided; the numbers are working assumptions in the engine's static content.
+- **Status:** Decided; the numbers are working assumptions in the engine's static content. The gather jobs' hauls, the timber job's trees and the table's rows for them are replaced by 0051 (Issue-283, 2026-11-10); the costs and the one run per step stand.
 - **Date:** 2026-10-22
 - **Settles:** Issue-126: the first job a new player can take, and the costs from there to a fighter, which Issue-82 (paid recruitment), Issue-93 (building facilities) and Issue-133 (the mine's first job) build to.
 

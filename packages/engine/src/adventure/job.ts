@@ -16,23 +16,25 @@ import type { Reward } from "../index.js";
  * One stage of a job.
  *
  * - `travel`: a fixed length in which nothing happens.
- * - `fight`: an encounter, the monsters by type and count, with its own time limit.
- * - `gather`: resource nodes by type and count, what the party can carry, and its own time limit.
+ * - `fight` and `gather`: what stands on the other side, monsters and
+ *   resource nodes together, by type and count, with its own time limit. The
+ *   stage ends when all of it is down. The two kinds run alike; the kind is
+ *   how the stage reads, a fight where the job is the monsters and a gather
+ *   where it is the nodes (decision 0051).
  * - `arrive`: the job is done.
  *
  * Reaching a fight's or a gather's time limit ends the adventure as a retreat.
  */
+export interface StageOpponents {
+  readonly type: MonsterType | ResourceType;
+  readonly count: number;
+}
+
 export type Stage =
   | { readonly kind: "travel"; readonly lengthMs: number }
   | {
-      readonly kind: "fight";
-      readonly monsters: readonly { readonly type: MonsterType; readonly count: number }[];
-      readonly timeLimitMs: number;
-    }
-  | {
-      readonly kind: "gather";
-      readonly nodes: readonly { readonly type: ResourceType; readonly count: number }[];
-      readonly carry: number;
+      readonly kind: "fight" | "gather";
+      readonly opponents: readonly StageOpponents[];
       readonly timeLimitMs: number;
     }
   | { readonly kind: "arrive" };

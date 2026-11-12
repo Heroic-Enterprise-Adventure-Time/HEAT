@@ -14,15 +14,14 @@
  * limit is the caller's and ends the battle as `timeout`, not a draw; when a
  * side's front line empties every unit on it moves up one line as one event,
  * also at the start; a guard redirects hits; resource nodes are units that
- * never act; the party can carry only so much, and the adventure can end a
- * battle as a retreat (Issue-112).
+ * never act, hit like any other and harvested by the hitter's gather rating
+ * (decision 0051); and the adventure can end a battle as a retreat
+ * (Issue-112).
  *
  * Nothing here reads a clock. The caller decides when to step: a live client
  * paced by wall-clock time, or the hub replaying an override log as fast as it
  * can. Both get the same timeline.
  */
-
-import { sum } from "es-toolkit";
 
 import { BATTLE_CONTENT } from "../content.js";
 import type { Material } from "../index.js";
@@ -38,7 +37,16 @@ import type { OverrideLogEntry, PlayerOverride } from "./override.js";
 import { selectAction, selectForced } from "./resolution.js";
 import { SeededRng } from "./rng.js";
 import type { ActionContext, ActionSelection, DeclaredAction, UnitState } from "./state.js";
-import { type BattleContent, type BattleSetup, lineAhead, type ParticipantSnapshot, type Side } from "./unit.js";
+import {
+  type BattleContent,
+  type BattleSetup,
+  gatherRating,
+  harvested,
+  lineAhead,
+  type ParticipantSnapshot,
+  type ResourceNodeProfile,
+  type Side,
+} from "./unit.js";
 
 /** The charge time of a unit, in whole milliseconds: speed is turns per ten seconds. */
 export function chargeMs(speed: number): number {
@@ -100,6 +108,7 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
       chargeTimer: firstCharge(member.stats.speed),
       currentAction: null,
       guard: null,
+      credit: 0,
       alive: true,
     });
   }
@@ -121,6 +130,7 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
         chargeTimer: firstCharge(monster.stats.speed),
         currentAction: null,
         guard: null,
+        credit: 0,
         alive: true,
       });
     } else if (node) {
@@ -129,15 +139,16 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
         kind: "resource",
         type: opponent.type,
         side: "opponents",
-        stats: { maxHealth: node.amount, speed: 0, damage: 0, gathering: 0 },
+        stats: { maxHealth: node.health, speed: 0, damage: 0, gather: [] },
         actions: [],
-        material: node.material,
+        node,
         acts: false,
-        health: node.amount,
+        health: node.health,
         line: node.homeLine,
         chargeTimer: 0,
         currentAction: null,
         guard: null,
+        credit: 0,
         alive: true,
       });
     } else {
@@ -152,7 +163,8 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
 
 /**
  * The battle engine. Units take turns as their charge timers fill, until one
- * side is down or the time limit is reached.
+ * side is down, the resource nodes among the opponents included, or the time
+ * limit is reached.
  *
  * Actions follow a declare, warmup, resolve lifecycle. During warmup, other
  * units keep acting.
@@ -188,9 +200,6 @@ export class CombatEngine {
     }
     if (!Number.isInteger(setup.timeLimitMs) || setup.timeLimitMs <= 0) {
       throw new Error("The time limit is a positive whole number of milliseconds");
-    }
-    if (setup.carryLimit !== undefined && (!Number.isInteger(setup.carryLimit) || setup.carryLimit <= 0)) {
-      throw new Error("The carry limit is a positive whole number");
     }
     this.content = content;
     this.rng = new SeededRng(setup.seed);
@@ -426,9 +435,8 @@ export class CombatEngine {
       switch (effect.kind) {
         case "damage":
           if (!target.alive) break;
-          if (target.kind === "resource") {
-            const { workPercent, yieldPercent } = this.content.resourceHit;
-            effects.push(this.harvest(target, Math.max(1, Math.floor((state.stats.damage * workPercent) / 100)), yieldPercent));
+          if (target.node) {
+            effects.push(this.harvest(state, target, target.node));
           } else {
             const guardian = this.guardianOf(target);
             const hit = guardian ?? target;
@@ -443,8 +451,8 @@ export class CombatEngine {
           }
           break;
         case "gather":
-          if (target.alive && target.material === effect.material) {
-            effects.push(this.harvest(target, Math.max(1, state.stats.gathering), 100));
+          if (target.alive && target.node?.material === effect.material) {
+            effects.push(this.harvest(state, target, target.node));
           }
           break;
         case "guard":
@@ -478,17 +486,20 @@ export class CombatEngine {
   }
 
   /**
-   * Work done to a resource node, capped at what it holds; the yield is a
-   * share of the work, capped at what the party can still carry.
+   * A hit on a resource node: the actor's damage to the node's health, and
+   * the material that hit harvests, by the actor's gather rating against the
+   * node's difficulty (`harvested`). A rating of zero yields nothing, and the
+   * health it took is lost to the party.
    */
-  private harvest(node: UnitState, work: number, yieldPercent: number): ResolvedEffect {
+  private harvest(actor: UnitState, target: UnitState, node: ResourceNodeProfile): ResolvedEffect {
     const { material } = node;
-    if (material === undefined) throw new Error(`${node.unitId} is not a resource node`);
-    const amount = Math.min(work, node.health);
-    const gained = Math.min(Math.floor((amount * yieldPercent) / 100), this.carryRoom());
-    node.health -= amount;
+    const amount = Math.min(actor.stats.damage, target.health);
+    const before = harvested(node, target.credit);
+    target.credit += amount * Math.min(gatherRating(actor.stats, material), node.difficulty);
+    const gained = harvested(node, target.credit) - before;
+    target.health -= amount;
     this.gathered[material] = (this.gathered[material] ?? 0) + gained;
-    return { kind: "harvest", targetId: node.unitId, material, amount, yield: gained, newHealth: node.health };
+    return { kind: "harvest", targetId: target.unitId, material, amount, yield: gained, newHealth: target.health };
   }
 
   /** The living unit holding an unexpired guard over this one, the first by id if several do. */
@@ -527,17 +538,9 @@ export class CombatEngine {
     }
   }
 
-  /** What the party can still carry; unbounded without a carry limit. */
-  private carryRoom(): number {
-    if (this.setup.carryLimit === undefined) return Infinity;
-    const carried = sum(Object.values(this.gathered));
-    return Math.max(0, this.setup.carryLimit - carried);
-  }
-
   private checkTermination(): BattleResult | null {
     if (!this.states.some((s) => s.side === "party" && s.alive)) return "loss";
     if (!this.states.some((s) => s.side === "opponents" && s.alive)) return "win";
-    if (this.carryRoom() === 0) return "win";
     return null;
   }
 }

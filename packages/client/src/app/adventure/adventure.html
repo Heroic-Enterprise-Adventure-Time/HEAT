@@ -60,6 +60,9 @@
         @if (replayState() === 'failed') {
           <p class="lost" role="alert">The replay could not be read.</p>
         }
+        @if (replayState() === 'unavailable') {
+          <p class="lost" role="alert">Replay unavailable: this adventure was played before the battles changed.</p>
+        }
       } @else {
         <p class="lost" role="alert">This adventure was lost to a game update. The party came home with nothing.</p>
         <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>

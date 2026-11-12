@@ -1,9 +1,9 @@
-/** The battle engine's two hooks for the adventure (Issue-112): the retreat and the carry limit. */
+/** The battle engine's hook for the adventure (Issue-112): the retreat. The carry limit went with Issue-283. */
 
 import { describe, expect, it } from "vitest";
 
-import { CombatEngine, resolveBattle } from "../../src/index.js";
-import { hero, ofKind, opponent, runAll, setup } from "./helpers.js";
+import { CombatEngine } from "../../src/index.js";
+import { hero, opponent, runAll, setup } from "./helpers.js";
 
 describe("Retreat", () => {
   it("ends a battle in progress as a retreat at the given time", () => {
@@ -25,26 +25,5 @@ describe("Retreat", () => {
     expect(() => engine.retreat(engine.getNextEventTime() + 1)).toThrow();
     runAll(engine);
     expect(() => engine.retreat(engine.getCurrentSimTime())).toThrow();
-  });
-});
-
-describe("The carry limit", () => {
-  it("caps what is gathered and ends the battle as a win once the party is loaded", () => {
-    const party = [hero("villager-1", "villager")];
-    const trees = [opponent("tree-1", "tree"), opponent("tree-2", "tree")];
-    const unlimited = resolveBattle(setup(party, trees));
-    expect(unlimited.gathered.timber).toBe(80);
-
-    const loaded = resolveBattle({ ...setup(party, trees), carryLimit: 10 });
-    expect(loaded.result).toBe("win");
-    expect(loaded.gathered.timber).toBe(10);
-    expect(ofKind(loaded.timeline.events, "unit-down")).toEqual([]);
-    expect(loaded.endedAtMs).toBeLessThan(unlimited.endedAtMs);
-  });
-
-  it("refuses a carry limit that is not a positive whole number", () => {
-    const battle = setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")]);
-    expect(() => new CombatEngine({ ...battle, carryLimit: 0 })).toThrow();
-    expect(() => new CombatEngine({ ...battle, carryLimit: 2.5 })).toThrow();
   });
 });

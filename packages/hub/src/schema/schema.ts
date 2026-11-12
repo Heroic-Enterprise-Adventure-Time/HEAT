@@ -6,9 +6,10 @@ import {
   ADVENTURE_OUTCOMES,
   type AdventureSnapshot,
   FACILITY_KINDS,
+  type GatherRating,
   hallCapacity,
   type Job,
-  JOBS,
+  jobOf,
   location,
   MATERIALS,
   MAX_PARTY,
@@ -29,6 +30,7 @@ import { type AdventureRecord, type Camp, campLevels, type Hero, type HeroOutcom
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "../db/statuses.js";
 import { discardAdventure } from "../discard.js";
 import { readAdventure } from "../read.js";
+import { type RecentAdventure, recentAdventuresAt, type RecentHero } from "../recent.js";
 import { recruitHero } from "../recruit.js";
 import {
   AdventureDiscarded,
@@ -49,6 +51,7 @@ import {
   Requires,
   type Shortfall,
 } from "../refusals.js";
+import { replaysOf } from "../replays.js";
 import { retireHero } from "../retire.js";
 import { heroesSeenAt, type Sighting } from "../seen.js";
 import { startAdventure } from "../start.js";
@@ -59,7 +62,8 @@ import { builder } from "./builder.js";
  * The graph: a player's public id; their name, camps, heroes and the open
  * adventure behind the `self` scope; other players' heroes seen at a location, by
  * their public fields only; a settled adventure, with its result and its
- * timeline; the deploy's version; joining, recruiting, retiring, building, and an
+ * timeline; the adventures recently completed at a location, by their public
+ * fields only; a job's replays, its settled adventures; the deploy's version; joining, recruiting, retiring, building, and an
  * adventure started from the job board or a facility, submitted for verification and
  * settlement, or discarded when no deploy can verify it.
  *
@@ -191,13 +195,24 @@ const JobRef = builder.objectRef<Job>("Job").implement({
   }),
 });
 
+const GatherRatingRef = builder.objectRef<GatherRating>("GatherRating").implement({
+  description: "How well a unit harvests the resource nodes of one material, the engine's `GatherRating`.",
+  fields: (t) => ({
+    material: t.expose("material", { type: MaterialRef }),
+    rating: t.exposeInt("rating", { description: "Set against a node's difficulty: a hit's yield is its share of the node's maximum, and a rating above the difficulty yields no more." }),
+  }),
+});
+
 const UnitStatsRef = builder.objectRef<UnitStats>("UnitStats").implement({
   description: "A unit's numbers in battle.",
   fields: (t) => ({
     maxHealth: t.exposeInt("maxHealth"),
     speed: t.exposeInt("speed", { description: "Turns per ten seconds." }),
     damage: t.exposeInt("damage"),
-    gathering: t.exposeInt("gathering", { description: "Work done to a resource node by a gather ability." }),
+    gather: t.expose("gather", {
+      type: [GatherRatingRef],
+      description: "The unit's gather rating for each material it harvests; a material with no entry is 0, and a hit on a node of it yields nothing.",
+    }),
   }),
 });
 
@@ -267,22 +282,23 @@ const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").i
   }),
 });
 
+/** The job an adventure names, which an adventure of another version may name and this one not know. */
+function knownJob(jobId: string): Job {
+  const job = jobOf(jobId);
+  if (!job) throw new GraphQLError(`no job ${jobId} in this version`, { extensions: { code: "NO_SUCH_JOB" } });
+  return job;
+}
+
 const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
   description: "An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.",
   fields: (t) => ({
     id: t.exposeID("adventureId"),
     seed: t.exposeString("seed"),
     startedAt: t.expose("startedAt", { type: "DateTime" }),
+    settledAt: t.expose("settledAt", { type: "DateTime", nullable: true, description: "When the adventure settled. Null until it has." }),
     location: t.exposeID("location", { description: "The location's id in the static content." }),
-    job: t.field({
-      type: JobRef,
-      resolve: (adventure) => {
-        const job = Object.hasOwn(JOBS, adventure.jobId) ? JOBS[adventure.jobId as keyof typeof JOBS] : undefined;
-        // A job this version does not know means the adventure is another version's.
-        if (!job) throw new GraphQLError(`no job ${adventure.jobId} in this version`, { extensions: { code: "NO_SUCH_JOB" } });
-        return job;
-      },
-    }),
+    // A job this version does not know means the adventure is another version's.
+    job: t.field({ type: JobRef, resolve: (adventure) => knownJob(adventure.jobId) }),
     snapshot: t.expose("snapshot", { type: SnapshotRef }),
     version: t.exposeString("version", { description: "The deploy that issued the adventure, and the only one that verifies it." }),
     status: t.field({ type: AdventureStatusRef, resolve: (adventure) => adventure.status }),
@@ -290,13 +306,38 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     timeline: t.field({
       type: "JSON",
       nullable: true,
-      description: "The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled.",
+      description: "The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled. Read from the store once per adventure, so it is asked of the one adventure being played, not of each in a list.",
       resolve: async (adventure, _args, ctx) => {
         if (adventure.status !== "SETTLED") return null;
         const body = await ctx.timelines.get(adventure.adventureId);
         return body === undefined ? null : (JSON.parse(body) as unknown);
       },
     }),
+  }),
+});
+
+const RecentAdventureHeroRef = builder.objectRef<RecentHero>("RecentAdventureHero").implement({
+  description: "One hero of a recently completed adventure's party: its public fields only, with no id and nothing that says whose it is (decision 0050).",
+  fields: (t) => ({
+    name: t.exposeString("name"),
+    unitType: t.expose("unitType", { type: UnitTypeRef }),
+    spriteSet: t.exposeString("spriteSet", { description: "The set's directory under art/heroes/." }),
+    level: t.exposeInt("level", { description: "The hero's level after settlement." }),
+    died: t.exposeBoolean("died"),
+  }),
+});
+
+const RecentAdventureRef = builder.objectRef<RecentAdventure>("RecentAdventure").implement({
+  description: "An adventure settled at a location within the last week: its public line, and nothing that says whose it was (decision 0050). Its replay is adventure(id).",
+  fields: (t) => ({
+    id: t.exposeID("adventureId"),
+    // The list leaves out an adventure whose job this version does not know (recent.ts).
+    job: t.field({ type: JobRef, resolve: (recent) => knownJob(recent.jobId) }),
+    outcome: t.expose("outcome", { type: AdventureOutcomeRef }),
+    stages: t.expose("stages", { type: [StageResultRef], description: "How each stage the party entered ended." }),
+    credited: t.expose("credited", { type: [RewardRef], description: "What went into the warehouse." }),
+    party: t.expose("party", { type: [RecentAdventureHeroRef], description: "The party, in the order it set out." }),
+    settledAt: t.expose("settledAt", { type: "DateTime" }),
   }),
 });
 
@@ -565,6 +606,10 @@ const DiscardAdventureInput = builder.inputType("DiscardAdventureInput", {
 // --- The roots. Every root field is nullable (graphql.md, rule 6), so one
 // field's failure nulls that field and not the response. ---
 
+/** A location of the static content, where a field does nothing else with the id (graphql.md, rule 14). */
+const knownLocation = z.string().check(z.refine((id) => location(id) !== undefined, { error: ({ input }) => `no location ${String(input)}` }));
+const postedJob = z.string().check(z.refine((id) => jobOf(id) !== undefined, { error: ({ input }) => `no job ${String(input)}` }));
+
 builder.queryFields((t) => ({
   player: t.field({
     type: PlayerRef,
@@ -598,13 +643,24 @@ builder.queryFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description: "A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.",
-    args: {
-      location: t.arg.id({
-        required: true,
-        validate: z.string().check(z.refine((id) => location(id) !== undefined, { error: ({ input }) => `no location ${String(input)}` })),
-      }),
-    },
+    args: { location: t.arg.id({ required: true, validate: knownLocation }) },
     resolve: (_root, args, ctx) => heroesSeenAt(ctx.repo, callerId(ctx), args.location),
+  }),
+  recentAdventuresAt: t.field({
+    type: [RecentAdventureRef],
+    nullable: true,
+    authScopes: { authenticated: true },
+    description: "The adventures most recently settled at the location, newest first, at most 20 and none older than a week; the caller's own are among them like anyone's, and nothing says whose an adventure was.",
+    args: { location: t.arg.id({ required: true, validate: knownLocation }) },
+    resolve: (_root, args, ctx) => recentAdventuresAt(ctx.repo, args.location),
+  }),
+  replaysOf: t.field({
+    type: [AdventureRef],
+    nullable: true,
+    authScopes: { authenticated: true },
+    description: "The job's replays: its adventures most recently settled, newest first, at most 20, whatever their outcome and whoever's they were, which nothing says. One settled a moment ago may not be listed yet. A job this version does not post is refused.",
+    args: { job: t.arg.id({ required: true, validate: postedJob }) },
+    resolve: (_root, args, ctx) => replaysOf(ctx.repo, args.job),
   }),
 }));
 

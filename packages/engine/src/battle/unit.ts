@@ -3,7 +3,8 @@
  *
  * Adapted from BattleScript Online, bso-game-shared/src/domain/entity.ts and
  * encounter.ts. Kept: the four lines (columns there), the unit kinds with a
- * resource kind among them, the participant snapshot. Left behind (decision
+ * resource kind among them, the participant snapshot. New: a node's
+ * difficulty and maximum yield, and a unit's gather ratings. Left behind (decision
  * 0030): the grid's rows, equipment, traits, skill trees, behavior sets,
  * quests and appearance. A line holds any number of units, with no order
  * within it; a unit starts on its type's home line.
@@ -32,13 +33,30 @@ export type Side = "party" | "opponents";
 
 export type UnitKind = "hero" | "monster" | "resource";
 
+/**
+ * A unit's gather rating for one material: how well it harvests a node of
+ * it. A hit's yield is by the rating against the node's difficulty, whatever
+ * the ability (decision 0051).
+ */
+export interface GatherRating {
+  readonly material: Material;
+  readonly rating: number;
+}
+
+/** A unit's ratings, one entry a material at most; a material with no entry is 0. A list, as a cost is, so the hub's snapshot is the engine's field for field. */
+export type GatherRatings = readonly GatherRating[];
+
 export interface UnitStats {
   readonly maxHealth: number;
   /** Turns per ten seconds; the charge timer is `chargeMs(speed)`. */
   readonly speed: number;
   readonly damage: number;
-  /** Work done to a resource node by a gather ability. */
-  readonly gathering: number;
+  readonly gather: GatherRatings;
+}
+
+/** The unit's gather rating for a material, 0 where its stats name none. */
+export function gatherRating(stats: UnitStats, material: Material): number {
+  return stats.gather.find((g) => g.material === material)?.rating ?? 0;
 }
 
 /** A unit type's or a monster's place in a battle: home line, stats and its one action list. */
@@ -53,20 +71,32 @@ export interface MonsterProfile extends CombatProfile {
   readonly name: string;
 }
 
-/** A resource node: health is the material it holds, and it never acts. */
+/**
+ * A resource node: an obstacle that holds its line like a monster and never
+ * acts. Every hit does its damage to the node's health; what the party
+ * harvests is by `harvested` (decision 0051).
+ */
 export interface ResourceNodeProfile {
   readonly name: string;
   readonly homeLine: Line;
   readonly material: Material;
-  readonly amount: number;
+  readonly health: number;
+  /** The gather rating that harvests the node in full; a lower one harvests its share, a higher one no more. */
+  readonly difficulty: number;
+  /** The most material the node gives, to hits that meet its difficulty all the way down. */
+  readonly maxYield: number;
 }
 
-/** How a regular attack fares against a resource node: poor work, poor yield. */
-export interface ResourceHit {
-  /** The share of the actor's damage done as work to the node. */
-  readonly workPercent: number;
-  /** The share of that work that becomes material. */
-  readonly yieldPercent: number;
+/**
+ * The material harvested from a node so far, from the credit its hits have
+ * earned: each hit adds the damage it did times its unit's gather rating, the
+ * rating capped at the node's difficulty. Whole numbers, rounded down on the
+ * running total, so hits that meet the difficulty all the way down harvest
+ * exactly the maximum, and a hit with a zero rating wastes its share of the
+ * node for good.
+ */
+export function harvested(node: ResourceNodeProfile, credit: number): number {
+  return Math.floor((credit * node.maxYield) / (node.health * node.difficulty));
 }
 
 /** The static content a battle reads; `BATTLE_CONTENT` in content.ts is the game's. */
@@ -75,7 +105,6 @@ export interface BattleContent {
   readonly heroes: Readonly<Partial<Record<UnitType, CombatProfile>>>;
   readonly monsters: Readonly<Record<MonsterType, MonsterProfile>>;
   readonly resources: Readonly<Record<ResourceType, ResourceNodeProfile>>;
-  readonly resourceHit: ResourceHit;
 }
 
 /** A hero as the snapshot gives it: effective stats and the health it has now. */
@@ -99,12 +128,6 @@ export interface BattleSetup {
   readonly opponents: readonly Opponent[];
   /** The fight's time limit on its own clock; reaching it ends the battle as `timeout`. */
   readonly timeLimitMs: number;
-  /**
-   * What the party can carry: material yielded beyond it is left behind, and
-   * reaching it ends the battle as a win, the party loaded. Absent, a battle
-   * yields whatever is harvested.
-   */
-  readonly carryLimit?: number;
 }
 
 /** A unit as it stood at the start, for the timeline. */

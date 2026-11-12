@@ -167,7 +167,7 @@ describe('Adventure', () => {
     expect(screen.getByRole('group', { name: 'Wren next action' })).toHaveAccessibleDescription(wait);
 
     await run(4100);
-    expect(stage('Stage 2 of 4: Gather timber from 3 trees, up to 60')).toBeInTheDocument();
+    expect(stage('Stage 2 of 4: Gather timber from 2 trees')).toBeInTheDocument();
     expect(abilities('Wren').getByRole('button', { name: 'Chop' })).toBeEnabled();
     expect(screen.queryByText(wait)).not.toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Wren next action' })).not.toHaveAccessibleDescription();
@@ -290,6 +290,20 @@ describe('Adventure', () => {
 
     await user.click(button('Back to the result'));
     expect(await screen.findByText('Job done.')).toBeInTheDocument();
+  });
+
+  it('says a replay stored before the battles changed is unavailable, and plays none of it', async () => {
+    const scene = fakeScene();
+    const game = fakeGame();
+    const stored = await game.timeline('a1');
+    game.timeline = () => Promise.resolve({ ...stored, schemaVersion: stored.schemaVersion - 1 });
+    const { run, user } = await renderAdventure(game, scene);
+    await run(120_000);
+    await user.click(await screen.findByRole('button', { name: 'Watch the replay' }));
+    expect(await screen.findByText('Replay unavailable: this adventure was played before the battles changed.')).toHaveRole('alert');
+    expect(scene.resets).toHaveLength(1);
+    expect(screen.queryByText('Replay')).not.toBeInTheDocument();
+    expect(screen.getByText('Job done.')).toBeInTheDocument();
   });
 
   it('says so when the adventure was lost to a game update', async () => {

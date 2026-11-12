@@ -1,0 +1,126 @@
+{
+  "set": "bow-01",
+  "kind": "weapon sprite set",
+  "wielders": ["ranger"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "objectId": "a8555529-a5a4-4d9a-80f1-9704b32b9cd3",
+    "name": "Bow 01",
+    "tags": ["heat", "weapon", "bow"]
+  },
+  "object": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-11",
+    "pick": {
+      "reviewObjectId": "bb862549-d680-4547-a4a2-9b6380b5f89a",
+      "index": 0,
+      "itemDescription": "bow: plain wooden hunting shortbow, upright, string on the left"
+    },
+    "parameters": {
+      "description": "single bow on a transparent background, standing upright, its wooden limbs curving out to the right and its taut string straight up and down on the left, no arrow, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat weapons 02",
+      "view": "top-down",
+      "size": null,
+      "styleImages": ["art/icons/adventure.png (32x32, which sets the output size)"],
+      "itemDescriptions": ["bow: plain wooden hunting shortbow, upright, string on the left", "bow: ranger's longbow of pale yew with a brown leather grip, upright, string on the left", "bow: simple curved shortbow of dark wood, upright, string on the left", "bow: recurve bow with tips curling forward, wrapped leather grip, upright, string on the left", "bow: rough hunter's bow cut from a branch, upright, string on the left", "bow: wooden longbow with a red cloth grip, upright, string on the left", "bow: short horn bow with a dark grip, upright, string on the left", "bow: slender elm bow with brass tips, upright, string on the left", "bow: sturdy war bow of brown wood with an iron-bound grip, upright, string on the left", "bow: light ash shortbow with a green leather grip, upright, string on the left", "bow: plain peasant's bow, thick in the middle and thin at the tips, upright, string on the left", "bow: weathered woodsman's bow with a cord-wrapped grip, upright, string on the left", "bow: flat wooden bow with squared tips, upright, string on the left", "bow: small curved bow of reddish wood, upright, string on the left", "bow: tall yew longbow with horn tips, upright, string on the left", "bow: simple bow with a pale string and a dark wooden stave, upright, string on the left"],
+      "packGenerations": 10,
+      "packNote": "One call returned 64 candidates (review object bb862549-d680-4547-a4a2-9b6380b5f89a, tagged heat, weapon, bow, rejected); the owner picked 0 from a numbered sheet at 3x. Every candidate came out on the diagonal, string from the lower left to the upper right, although each description asked for an upright bow: the style image is a diagonal icon."
+    },
+    "canvas": [32, 32],
+    "generations": 10
+  },
+  "files": {
+    "icon": {
+      "file": "icon.png",
+      "canvas": [32, 32],
+      "from": "the object's one rotation, the bow on the diagonal; the weapon's icon in the inventory, and not a frame of its swing"
+    }
+  },
+  "animations": {
+    "swing": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "1463f8a3-7f25-4539-904f-ba147fe7f81b",
+      "pixellabName": "swing",
+      "animationDescription": "an upright wooden bow is drawn and loosed: the thick brown wooden stave on the right keeps its size, its thickness and its curve and stays in place the whole time; only the thin string on the left moves: its middle is pulled smoothly back to the left, a little further each frame, into a V; then it snaps straight again; the same bow the whole time, no arrow, no particles, no effects, no motion trail",
+      "frameCount": 6,
+      "frames": 7,
+      "canvas": [32, 32],
+      "startFrame": {
+        "from": "frame 3 of the first swing made for this bow (listed under replaced), the bow standing upright with its string straight; passed as custom_start_frame_base64, so swing-0.png is that frame and not the icon",
+        "sha256": "f5594134b948878c8faa29350965253e7b698009532f844c53ed026b98964ef2",
+        "generations": 0
+      },
+      "endFrame": {
+        "from": "the same picture as the start frame, passed as end_frame_base64, so the bow ends at rest where it began",
+        "generations": 0
+      },
+      "holdFrame": 6,
+      "holdFrameNote": "The bow at rest just after the release, so that the arrow leaves as the hold begins (agreed with the owner 2026-11-10). The string is furthest back on frame 3.",
+      "frameMs": [90, 90, 90, 90, 45, 45],
+      "frameMsNote": "How long each frame before the hold lasts when it is played, in milliseconds on the action's clock: the draw at the act's 90, and the release, frames 4 and 5, at half that, on the owner's note under playing. The hold frame begins at 450, which is when the arrow leaves.",
+      "grips": [
+        [23, 14],
+        [22, 14],
+        [22, 14],
+        [23, 14],
+        [24, 14],
+        [23, 14],
+        [23, 14]
+      ],
+      "nocks": [
+        [13, 14],
+        [9, 14],
+        [7, 14],
+        [5, 14],
+        [7, 14],
+        [10, 15],
+        [13, 14]
+      ],
+      "nocksNote": "The pixel at the middle of the string on every frame, measured on a grid as the grips are: where an arrow's tail sits while the bow is drawn. No arrow is drawn in these frames.",
+      "playing": "The owner's notes for whatever plays it (2026-11-10): skip a frame of the release, or play that end faster, frames 4 and 5; and show the arrow's sprite (art/effects/arrow-01, part-projectile.png) on the bow while it is drawn, its tail on the nock.",
+      "files": "swing-<0..6>.png",
+      "generations": 1,
+      "replaced": [
+        {
+          "groupId": "819e2b27-3e17-4518-ba49-35080487431e",
+          "description": "a bow being shot to the right: the bow is raised until it stands upright, its wooden stave on the right and its string on the left; the middle of the string is pulled back to the left into a sharp V until the bow is fully drawn; then the string snaps straight again; the same bow the whole time, no arrow, no particles, no effects, no motion trail",
+          "frameCount": 6,
+          "generations": 1,
+          "why": "Began at the icon and rose upright by frame 3, then drew an arrow on the string that never left, and never pulled the string back. Its frame 3 is the start and end frame of the kept swing. Its frames are no longer in PixelLab: the next one was made over it."
+        },
+        {
+          "groupId": "819e2b27-3e17-4518-ba49-35080487431e",
+          "description": "a bow being shot to the right: the bow is raised until it stands upright, its wooden stave on the right and its string on the left; the middle of the string is pulled back to the left into a sharp V with an arrow on it; then the arrow is gone and the string is straight again; the last frame is the empty upright bow with a straight string and no arrow; the same bow the whole time, no particles, no effects, no motion trail",
+          "frameCount": 6,
+          "generations": 1,
+          "why": "Made again in the same group (replace_existing): the bow never stood upright, bent out of shape and shed pieces of an arrow."
+        },
+        {
+          "groupId": "2af2dfa4-37bc-4879-9443-5050f01461ff",
+          "description": "an upright bow is drawn and loosed: the bow stays upright and in place; the middle of its string is pulled back to the left into a sharp V and the bow's limbs bend; then the string snaps straight again and the bow is at rest; the same bow the whole time, no arrow, no particles, no effects, no motion trail",
+          "frameCount": 4,
+          "generations": 1,
+          "why": "The first with the upright start and end frames: it drew and loosed in five frames, and the owner did not keep it (\"the bow isn't great\")."
+        },
+        {
+          "groupId": "80646154-e3dc-45ec-8b25-18be0fe01b08",
+          "description": "an archer's upright wooden bow shoots to the right: the thick brown stave on the right keeps its size and thickness and stays in place; an arrow is laid across the bow pointing right and the string is pulled back to the left with it into a V until the bow is fully drawn; then the arrow has flown and is gone, and the string is straight again on the empty bow; the same bow the whole time, no particles, no effects, no motion trail",
+          "frameCount": 6,
+          "generations": 1,
+          "why": "Made beside the kept swing with an arrow drawn on the string; the owner kept the one without, the arrow being a sprite of its own."
+        }
+      ]
+    }
+  },
+  "animationGenerations": 5,
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-11-11."
+}

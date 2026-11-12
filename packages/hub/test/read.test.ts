@@ -10,6 +10,7 @@ import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
 import { player } from "./data.js";
+import { PREVIOUS_VERSION as version } from "./versions.js";
 
 /**
  * readAdventure against DynamoDB Local (graphql.md, rules 8 and 11): any
@@ -26,7 +27,6 @@ beforeAll(() => {
 
 const at = "millbrook";
 const wolves = "wolves-on-the-mill-road";
-const version = "fedcba9876543210fedcba9876543210fedcba98";
 
 /** A player's adventure, open, with the free villager. */
 async function opened(p: string) {

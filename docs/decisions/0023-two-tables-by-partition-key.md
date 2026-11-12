@@ -1,6 +1,6 @@
 # 0023: Two tables, named for their partition key: player and location
 
-- **Status:** Decided; the keys are written through ElectroDB's templates per 0041; the location table may store an owner id served only through a scope, per 0043
+- **Status:** Decided; the keys are written through ElectroDB's templates per 0041; the location table may store an owner id served only through a scope, per 0043; the one index serves replays by job and not "my history", and the location's collections for recent adventures are designed, per 0050
 - **Date:** 2026-10-17
 - **Amends:** 0013, "separate tables with separate access roles" for private and public data: the split stands, and its reason and its names are these.
 

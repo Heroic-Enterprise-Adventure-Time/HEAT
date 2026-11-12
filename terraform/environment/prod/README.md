@@ -2,17 +2,17 @@
 
 HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, in one root and one apply, the shape of the `dev` root: the `base` module (the hosted zone, the certificate for the zone name and its wildcard, the account's one user pool with Google as its identity provider), the `environment` module on top of it (the two tables, the function, the HTTP API, the site at the zone apex, the browser client, the alarms) and the `login-domain` module last (`auth.heat.dcg-games.com`). Applied by the pipeline on every merge to `release`, through the release pull request, followed by the smoke test, the tag and the GitHub Release (decisions 0016 as confirmed, 0017, 0018 as amended, 0020, 0021 as amended; the overview's "Environments"). History: Issue-41.
 
-**Status: at `v2026.11.09` (de0492f), the tenth release, applied by the pipeline on 2026-11-09 by the `Release` run on the merge of PR-250 (Issue-249), run 42701861339, under the `prod` GitHub environment.** The run:
-- guarded the merge as pull request 250 from `main`
+**Status: at `v2026.11.10` (334e363), the eleventh release, applied by the pipeline on 2026-11-10 by the `Release` run on the merge of PR-280 (Issue-279), run 42906143959, under the `prod` GitHub environment.** The run:
+- guarded the merge as pull request 280 from `main`
 - applied 0 added, 3 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code and both aliases moved
 - passed the allow-list check (33 resource types)
 - published the client and `config.json`
 - passed the anonymous smoke test
-- wrote the tag `v2026.11.09` and its GitHub Release
+- wrote the tag `v2026.11.10` and its GitHub Release
 
-It is the first release on the one guard job (PR-251) and on the actions lockfile (decision 0047). Read back at about 21:30 UTC:
-- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` de0492f and `HEAT_PREVIOUS_VERSION` 0f3a94d (`v2026.11.04.3`), on `nodejs24.x`; `live` points at version 10 and `previous` at 9.
-- **From the laptop:** `/config.json` reports version de0492f, and an anonymous `POST /graphql` is 401.
+It is the first release with Node 24.22.2 and Terraform 1.17.1 installed by `.github/actions/node` and `.github/actions/terraform`, each checked against its pinned checksum (decision 0048). Read back at about 21:45 UTC:
+- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` 334e363 and `HEAT_PREVIOUS_VERSION` de0492f (`v2026.11.09`), on `nodejs24.x`; `live` points at version 11 and `previous` at 10.
+- **From the laptop:** `/config.json` reports version 334e363, and an anonymous `POST /graphql` is 401.
 
 The first apply, below, is kept as the record of that apply and its read-back. Later releases have changed the root since.
 

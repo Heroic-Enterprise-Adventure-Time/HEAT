@@ -283,7 +283,7 @@ const start = await graphql(token, startMutation, { requestId: startId, heroIds:
 check(!start.errors && success(start, "startAdventure", "adventure")?.id, `startAdventure set out on the timber job: ${JSON.stringify(start.data)} (${start.ms} ms)`);
 const { id, seed } = success(start, "startAdventure", "adventure");
 
-const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gathering } } } } } }`);
+const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gather { material rating } } } } } } }`);
 const adventure = open.data?.me?.openAdventure;
 check(!open.errors && adventure?.id === id && adventure.seed === seed && adventure.job?.id === job, `me shows the open adventure: ${adventure?.job?.name} at ${adventure?.location} (${open.ms} ms)`);
 check(adventure.snapshot?.jobId === adventure.job.id && adventure.snapshot.heroes.length === 1 && adventure.snapshot.heroes[0].heroId === party.id && adventure.snapshot.heroes[0].unitType === "VILLAGER", `the snapshot holds the villager and the job: ${JSON.stringify(adventure.snapshot?.heroes)}`);
@@ -307,8 +307,15 @@ check(stale.extensions?.outdated === true, `a request carrying another version i
 // Submit with no overrides (Issue-114): the hub replays the run, stores the
 // timeline and settles. Its result must be the engine's own replay of the
 // snapshot and seed it issued, and the camp must hold what it credited.
-// The snapshot's unit types are the schema's enum values; the engine replays it by its own.
-const engineSnapshot = (snapshot) => ({ ...snapshot, heroes: snapshot.heroes.map((h) => ({ ...h, unitType: h.unitType.toLowerCase() })) });
+// The snapshot's unit types and materials are the schema's enum values; the engine replays it by its own.
+const engineSnapshot = (snapshot) => ({
+  ...snapshot,
+  heroes: snapshot.heroes.map((h) => ({
+    ...h,
+    unitType: h.unitType.toLowerCase(),
+    stats: { ...h.stats, gather: h.stats.gather.map((g) => ({ ...g, material: g.material.toLowerCase() })) },
+  })),
+});
 const expected = replay(engineSnapshot(adventure.snapshot), seed, []).result;
 const submitted = await graphql(token, submitMutation, { id, log: [] });
 const settledAdventure = success(submitted, "submitAdventure", "adventure");
@@ -336,6 +343,47 @@ check(free.data?.me?.openAdventure === null, `no adventure is open after the set
 const repeated = await graphql(token, submitMutation, { id, log: [] });
 const unchanged = (await graphql(token, heroQuery)).data?.me;
 check(!repeated.errors && JSON.stringify(success(repeated, "submitAdventure", "adventure")?.result) === JSON.stringify(result) && JSON.stringify(unchanged) === JSON.stringify(after), `a repeated submit answers the settled result and pays nothing (${repeated.ms} ms)`);
+
+// The location's recent adventures (Issue-288, decision 0050): the settle
+// transaction put this one in Millbrook's feed, where it is found by its id,
+// not by its place: on dev another player's adventure may settle between the
+// submit and this read, and the order is the data-layer test's to prove. It
+// is there by its public fields: the job, the outcome, the stages, what was credited
+// and the party, with no id of a hero or a player.
+const recentQuery = `{ recentAdventuresAt(location: "millbrook") { id job { id } outcome stages { stage kind ended } credited { material amount } party { name unitType spriteSet level died } settledAt } }`;
+const recent = await graphql(token, recentQuery);
+const newest = recent.data?.recentAdventuresAt?.find((r) => r.id === id);
+const sent = adventure.snapshot.heroes[0];
+check(!recent.errors && newest?.id === id && newest.job.id === job && newest.outcome === result.outcome, `the settled adventure is in Millbrook's recent adventures, at place ${recent.data?.recentAdventuresAt?.indexOf(newest)} of ${recent.data?.recentAdventuresAt?.length}: ${newest?.id} ${newest?.outcome} at ${newest?.settledAt} (${recent.ms} ms)`);
+check(newest.stages.length === expected.stages.length && newest.stages.every((s, i) => s.ended.toLowerCase() === expected.stages[i].ended), `it says how each stage ended: ${newest.stages.map((s) => s.ended).join(", ")}`);
+check(sorted(newest.credited) === sorted(result.credited), `it says what was credited: ${sorted(newest.credited)}`);
+check(JSON.stringify(newest.party) === JSON.stringify([{ name: sent.name, unitType: "VILLAGER", spriteSet: sent.spriteSet, level: villager.level, died: false }]), `its party is the villager by its public fields, at the level it came home at: ${JSON.stringify(newest.party)}`);
+check(!JSON.stringify(newest).includes(party.id) && !JSON.stringify(newest).includes(current.data.me.id), `nothing in it names the hero's id or the player's`);
+check(recent.data.recentAdventuresAt.length <= 20, `the list holds at most 20`);
+
+// The job's replays (Issue-289, decision 0050): settlement set the record's
+// keys for the location table's index, which is what replaysOf reads, with
+// the function's own role, on the index's own ARN. The index is eventually
+// consistent, so the read is repeated until the adventure is in it. Found by
+// its id, as above: on dev another player may settle the same job meanwhile.
+const replaysQuery = `query($job: ID!) { replaysOf(job: $job) { id job { id } status settledAt result { outcome } snapshot { heroes { heroId name } } } }`;
+const replaysWithinMs = 30_000;
+const replaysAsked = performance.now();
+const readReplays = async () => {
+  const answer = await graphql(token, replaysQuery, { job });
+  return { answer, found: answer.data?.replaysOf?.find((r) => r.id === id) };
+};
+let { answer: replays, found: replayed } = await readReplays();
+while (!replays.errors && !replayed && performance.now() - replaysAsked < replaysWithinMs) {
+  await sleep(1_000);
+  ({ answer: replays, found: replayed } = await readReplays());
+}
+const replaysWaited = Math.round(performance.now() - replaysAsked);
+check(!replays.errors && replayed?.id === id && replayed.job.id === job && replayed.status === "SETTLED" && replayed.result.outcome === result.outcome, `the settled adventure is in its job's replays, at place ${replays.data?.replaysOf?.indexOf(replayed)} of ${replays.data?.replaysOf?.length}, ${replaysWaited} ms after the first read: ${replayed?.id} ${replayed?.result?.outcome} ${JSON.stringify(replays.errors ?? "")}`);
+check(replayed.settledAt === newest.settledAt, `it settled when the feed says it did: ${replayed.settledAt}`);
+check(replayed.snapshot.heroes.length === 1 && replayed.snapshot.heroes[0].heroId === party.id, `its party is the villager that went`);
+check(replays.data.replaysOf.every((r, i, all) => i === 0 || all[i - 1].settledAt >= r.settledAt) && replays.data.replaysOf.length <= 20, `the list is newest first and holds at most 20`);
+check(!JSON.stringify(replays.data).includes(current.data.me.id), `nothing in it names the player`);
 
 // Paid recruitment (Issue-82): the timber run pays for a second villager,
 // 20 timber debited while the first lives. It is retired at once, on every
@@ -385,7 +433,7 @@ if (mineLevel(campBefore) === 0 && (timberBefore < 60 || clothBefore < 3)) {
 // which is the second run on a new stack, the villager brings home 40 ore,
 // which pays for a fighter, retired at once so the hall never fills.
 const oreJob = "ore-from-the-hill";
-const snapshotFields = `snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gathering } } }`;
+const snapshotFields = `snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gather { material rating } } } }`;
 const oreStartMutation = `mutation($requestId: UUID!, $heroIds: [ID!]!) { startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "${oreJob}", heroIds: $heroIds }) { ${startFields} ... on StartAdventureSuccess { adventure { id seed ${snapshotFields} } } } }`;
 const atMine = campIn((await graphql(token, facilitiesQuery)).data?.me);
 const miner = (await graphql(token, heroQuery)).data?.me?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");

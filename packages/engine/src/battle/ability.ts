@@ -13,7 +13,7 @@
 import type { Material } from "../index.js";
 import type { Line } from "./unit.js";
 
-export type AbilityTag = "melee-attack" | "physical" | "slashing" | "piercing" | "gather" | "support" | "movement";
+export type AbilityTag = "melee-attack" | "ranged-attack" | "physical" | "slashing" | "piercing" | "gather" | "support" | "movement";
 
 /** From the actor's line, the lines of the target side the ability reaches. */
 export interface LineReach {
@@ -42,10 +42,13 @@ export type Targeting =
 /**
  * What an ability does when it resolves.
  *
- * - `damage`: the actor's damage to a unit. It also reaches a resource node,
- *   for poor work and a poor yield, and only when nothing else is usable.
- * - `gather`: the actor's gathering to a resource node of this material, and
- *   to nothing else.
+ * - `damage`: the actor's damage to a unit or a resource node.
+ * - `gather`: the actor's damage to a resource node of this material, and to
+ *   nothing else: a strike with its own look.
+ *
+ * Either way a node's yield is by the actor's gather rating for its material
+ * (decision 0051), and a node the actor has no rating for is hit only when
+ * nothing else is usable (resolution.ts).
  * - `guard`: until it expires, hits aimed at the ally land on the actor.
  * - `move-up`: the actor steps up one line.
  */

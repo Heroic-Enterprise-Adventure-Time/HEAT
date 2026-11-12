@@ -1,13 +1,16 @@
 import { randomUUID } from "node:crypto";
 
+import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { MAX_PARTY, must } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
+import { emptyResult, putRecentAdventure, putSettledAdventure, recentAdventure, settledAdventure } from "./data.js";
+import { locationKeys } from "./keys.js";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
@@ -257,6 +260,83 @@ describe("the camp through the graph", () => {
     const nowhere = await gql(seen, { at: "atlantis" }, p);
     expect((nowhere.errors?.[0] as { extensions?: { code?: string } } | undefined)?.extensions?.code).toBe("BAD_USER_INPUT");
   });
+
+  it("lists the adventures recently completed at the location by their public fields, to any signed-in player", async () => {
+    // Settled far in the future, so that it is first whatever the other test files settle at Millbrook meanwhile.
+    const settledAt = "9999-01-01T00:00:00.000Z";
+    const config = configFromEnv();
+    const { adventureId } = await putRecentAdventure(createDocumentClient(config), config.tables.location, recentAdventure("millbrook", new Date(settledAt), {
+      outcome: "retreat",
+      stages: [{ stage: 0, kind: "travel", ended: "done", startedAtMs: 0, endedAtMs: 1000 }, { stage: 1, kind: "fight", ended: "retreat", startedAtMs: 1000, endedAtMs: 4000 }],
+      credited: [{ material: "cloth", amount: 3 }],
+      party: [{ name: "Ada", unitType: "villager", spriteSet: "villager-01", level: 2, died: false }, { name: "Bram", unitType: "fighter", spriteSet: "fighter-01", level: 1, died: true }],
+    }));
+
+    const recent = `query($at: ID!) { recentAdventuresAt(location: $at) { id job { id name } outcome stages { stage kind ended } credited { material amount } party { name unitType spriteSet level died } settledAt } }`;
+    const r = await gql(recent as Query<{ recentAdventuresAt: unknown[] }>, { at: "millbrook" }, `p-${randomUUID()}`);
+    expect(r.errors).toBeUndefined();
+    expect(r.data?.recentAdventuresAt.length).toBeLessThanOrEqual(20);
+    expect(r.data?.recentAdventuresAt[0]).toEqual({
+      id: adventureId,
+      job: { id: "wolves-on-the-mill-road", name: "Wolves on the mill road" },
+      outcome: "RETREAT",
+      stages: [{ stage: 0, kind: "TRAVEL", ended: "DONE" }, { stage: 1, kind: "FIGHT", ended: "RETREAT" }],
+      credited: [{ material: "CLOTH", amount: 3 }],
+      party: [{ name: "Ada", unitType: "VILLAGER", spriteSet: "villager-01", level: 2, died: false }, { name: "Bram", unitType: "FIGHTER", spriteSet: "fighter-01", level: 1, died: true }],
+      settledAt,
+    });
+
+    // Nothing on either type could say whose an adventure was: no owner, and no hero id.
+    const fieldsOf = async (type: string) =>
+      (await gql(`query($type: String!) { __type(name: $type) { fields { name } } }` as Query<{ __type: { fields: { name: string }[] } }>, { type })).data?.__type.fields.map((f) => f.name).sort();
+    expect(await fieldsOf("RecentAdventure")).toEqual(["credited", "id", "job", "outcome", "party", "settledAt", "stages"]);
+    expect(await fieldsOf("RecentAdventureHero")).toEqual(["died", "level", "name", "spriteSet", "unitType"]);
+
+    const anonymous = await gql(recent, { at: "millbrook" });
+    expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
+    const nowhere = await gql(recent, { at: "atlantis" }, `p-${randomUUID()}`);
+    expect(nowhere.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+  });
+
+  it("lists a job's replays, its settled adventures, to any signed-in player, and nothing of whose they were", async () => {
+    // Settled far in the future, so that it is first whatever the other test files settle of the job meanwhile.
+    const settledAt = "9999-01-01T00:00:00.000Z";
+    const wolves = "wolves-on-the-mill-road";
+    const config = configFromEnv();
+    const db = createDocumentClient(config);
+    const record = await putSettledAdventure(db, config.tables.location, settledAdventure(wolves, new Date(settledAt), { result: emptyResult("retreat") }));
+    // Taken out again, or it would be first in the job's replays for every test that runs after this one.
+    onTestFinished(async () => {
+      await db.send(new DeleteCommand({ TableName: config.tables.location, Key: locationKeys.adventure(record.adventureId) }));
+    });
+
+    const replays = `query($job: ID!) { replaysOf(job: $job) { id job { id } location status settledAt result { outcome } snapshot { jobId heroes { heroId } } } }`;
+    const viewer = `p-${randomUUID()}`;
+    // The index is eventually consistent (decision 0050).
+    const r = await vi.waitFor(async () => {
+      const answer = await gql(replays as Query<{ replaysOf: unknown[] }>, { job: wolves }, viewer);
+      expect(answer.data?.replaysOf[0]).toMatchObject({ id: record.adventureId });
+      return answer;
+    });
+    expect(r.errors).toBeUndefined();
+    expect(r.data?.replaysOf.length).toBeLessThanOrEqual(20);
+    expect(r.data?.replaysOf[0]).toEqual({
+      id: record.adventureId,
+      job: { id: wolves },
+      location: "millbrook",
+      status: "SETTLED",
+      settledAt,
+      result: { outcome: "RETREAT" },
+      snapshot: { jobId: wolves, heroes: [] },
+    });
+    // The record keeps its player's id, the index projects it, and no field serves it (decision 0043).
+    expect(JSON.stringify(r.data)).not.toContain(record.playerId);
+
+    const anonymous = await gql(replays, { job: wolves });
+    expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
+    const unposted = await gql(replays, { job: "a-job-of-another-version" }, viewer);
+    expect(unposted.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+  });
 });
 
 describe("the adventure loop through the graph", () => {
@@ -271,7 +351,7 @@ describe("the adventure loop through the graph", () => {
     const { id: adventureId, seed } = must(start.data?.startAdventure.adventure, "the start's adventure");
 
     const me = await gql(
-      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gathering } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
+      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gather { material rating } } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
       {}, p,
     );
     expect(me.errors).toBeUndefined();
@@ -281,7 +361,7 @@ describe("the adventure loop through the graph", () => {
       job: { id: "wolves-on-the-mill-road", name: "Wolves on the mill road", location: "millbrook" },
       snapshot: {
         version, jobId: "wolves-on-the-mill-road",
-        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } }],
+        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "TIMBER", rating: 2 }, { material: "ORE", rating: 2 }] } }],
       },
     });
 

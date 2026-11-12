@@ -1,6 +1,7 @@
+import { uniqBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { ABILITIES, MONSTER_TYPES, MONSTERS, RESOURCE_NODES, RESOURCE_TYPES, UNIT_PROFILES } from "../../src/index.js";
+import { ABILITIES, gatherRating, MONSTER_TYPES, MONSTERS, must, RESOURCE_NODES, RESOURCE_TYPES, UNIT_PROFILES } from "../../src/index.js";
 
 describe("The battle's content", () => {
   const profiles = [...Object.values(UNIT_PROFILES), ...Object.values(MONSTERS)];
@@ -17,6 +18,8 @@ describe("The battle's content", () => {
     expect(UNIT_PROFILES.fighter).toMatchObject({ homeLine: "front", actions: ["guard", "strike"] });
     expect(MONSTERS.wolf).toMatchObject({ homeLine: "front", actions: ["bite", "move-up"] });
     expect(MONSTERS.bandit).toMatchObject({ homeLine: "near", actions: ["strike-weakest", "move-up"] });
+    expect(UNIT_PROFILES.ranger).toMatchObject({ homeLine: "far", actions: ["shoot"] });
+    expect(MONSTERS["goblin-rock-thrower"]).toMatchObject({ homeLine: "far", actions: ["throw-rock"] });
   });
 
   it("uses positive whole numbers for stats, warmups and amounts", () => {
@@ -26,7 +29,22 @@ describe("The battle's content", () => {
       expect(Number.isInteger(stats.speed) && stats.speed > 0).toBe(true);
     }
     for (const ability of Object.values(ABILITIES)) expect(Number.isInteger(ability.warmupMs)).toBe(true);
-    for (const node of Object.values(RESOURCE_NODES)) expect(Number.isInteger(node.amount) && node.amount > 0).toBe(true);
+    for (const node of Object.values(RESOURCE_NODES)) {
+      for (const n of [node.health, node.difficulty, node.maxYield]) expect(Number.isInteger(n) && n > 0).toBe(true);
+    }
+    for (const profile of profiles) {
+      for (const { rating } of profile.stats.gather) expect(Number.isInteger(rating) && rating > 0).toBe(true);
+      expect(uniqBy(profile.stats.gather, (g) => g.material)).toHaveLength(profile.stats.gather.length);
+    }
+  });
+
+  it("rates a villager low in every node's material, below its difficulty, and a combat unit not at all (decision 0051)", () => {
+    for (const node of Object.values(RESOURCE_NODES)) {
+      const rating = gatherRating(must(UNIT_PROFILES.villager, "the villager").stats, node.material);
+      expect(rating).toBeGreaterThan(0);
+      expect(rating).toBeLessThan(node.difficulty);
+    }
+    for (const profile of [must(UNIT_PROFILES.fighter, "the fighter"), must(UNIT_PROFILES.ranger, "the ranger"), ...Object.values(MONSTERS)]) expect(profile.stats.gather).toEqual([]);
   });
 
   it("lists every monster and resource type", () => {

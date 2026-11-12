@@ -1,11 +1,12 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { CustomAttributeType, Entity, type EntityItem, Service } from "electrodb";
 
-import { type AdventureSnapshot, FACILITY_KINDS, MATERIALS, UNIT_TYPES } from "@heat/engine";
+import { ADVENTURE_OUTCOMES, type AdventureSnapshot, FACILITY_KINDS, MATERIALS, type Reward, type StageResult, UNIT_TYPES } from "@heat/engine";
 
+import type { RecentAdventure, RecentHero } from "../recent.js";
 import type { Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
-import { ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
+import { GSI1, ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
 import type { AdventureRecord, Hero, OpenAdventure, Player, SettledResult } from "./repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
 
@@ -17,7 +18,9 @@ import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
  * ElectroDB writes the composite attributes of a key on the item as well as
  * in it, and its identifiers `__edb_e__` and `__edb_v__`, so a player-table
  * item gains `playerId`. A sighting's composites are its location and hero,
- * so it still holds no owner (decision 0029).
+ * so it still holds no owner (decision 0029), and a feed item's are its
+ * location, the time it settled and the adventure, so neither does it
+ * (decision 0050).
  *
  * `required` is enforced on a write and not on a read. An item written before
  * some of these attributes existed may lack them, which the repository says
@@ -153,6 +156,18 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
    * The snapshot and the result are stored whole, typed from the engine's and
    * the settlement's own types: a `map` would state them a second time, and
    * drops a nested field it does not declare, on a write and on a read.
+   *
+   * `replays` is the record in GSI1 (decision 0050), keyed from two
+   * attributes that only settlement sets, so that an open or discarded record
+   * carries neither key. ElectroDB writes each key of an index as soon as a
+   * write holds that key's composites: keyed on `jobId`, a record being
+   * started would carry GSI1PK from its first write. And the library's own
+   * device for a sparse index, a `condition` callback, refuses that first
+   * write, because a write that names one of such an index's composites must
+   * name them all, and a record being started has no end. Hence `replayOf`,
+   * the job once more, set with `settledAt` and hidden, so no read answers
+   * it. ElectroDB 3.9.3, both tried on 2026-11-11 (decision 0053);
+   * test/replays.test.ts holds the keys on the items as stored.
    */
   const adventure = new Entity(
     {
@@ -170,11 +185,17 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         result: { type: CustomAttributeType<SettledResult>("any") },
         settledAt: { type: "string" },
         discardedAt: { type: "string" },
+        replayOf: { type: "string", hidden: true },
       },
       indexes: {
         primary: {
           pk: { field: KEY.pk, composite: ["adventureId"], template: TEMPLATES.adventurePk, casing: "none" },
           sk: { field: KEY.sk, composite: [], template: TEMPLATES.adventure, casing: "none" },
+        },
+        replays: {
+          index: GSI1.name,
+          pk: { field: GSI1.pk, composite: ["replayOf"], template: TEMPLATES.replaysPk, casing: "none" },
+          sk: { field: GSI1.sk, composite: ["settledAt"], template: TEMPLATES.replays, casing: "none" },
         },
       },
     },
@@ -202,7 +223,35 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
     },
     onLocation,
   );
-  return new Service({ adventure, camp, facility, hero, holding, ledger, open, profile, sighting }, { client });
+  /**
+   * A settled adventure in its location's feed (decision 0050). The stages, the
+   * credits and the party are stored whole, as the record's result is: each is
+   * a list typed from its own type.
+   */
+  const recent = new Entity(
+    {
+      model: { entity: "recent", service, version },
+      attributes: {
+        location: text,
+        settledAt: text,
+        adventureId: text,
+        jobId: text,
+        outcome: { type: ADVENTURE_OUTCOMES, required: true },
+        stages: { type: CustomAttributeType<StageResult[]>("any"), required: true },
+        credited: { type: CustomAttributeType<Reward[]>("any"), required: true },
+        party: { type: CustomAttributeType<RecentHero[]>("any"), required: true },
+        expiresAt: count,
+      },
+      indexes: {
+        primary: {
+          pk: { field: KEY.pk, composite: ["location"], template: TEMPLATES.locationPk, casing: "none" },
+          sk: { field: KEY.sk, composite: ["settledAt", "adventureId"], template: TEMPLATES.recent, casing: "none" },
+        },
+      },
+    },
+    onLocation,
+  );
+  return new Service({ adventure, camp, facility, hero, holding, ledger, open, profile, recent, sighting }, { client });
 }
 
 export type HeatService = ReturnType<typeof createService>;
@@ -218,5 +267,6 @@ export type EntitiesCoverTheirItems = [
   NothingUndeclared<Exclude<keyof Hero, keyof EntityItem<HeatService["entities"]["hero"]>>>,
   NothingUndeclared<Exclude<keyof OpenAdventure, keyof EntityItem<HeatService["entities"]["open"]>>>,
   NothingUndeclared<Exclude<keyof Player, keyof EntityItem<HeatService["entities"]["profile"]>>>,
+  NothingUndeclared<Exclude<keyof RecentAdventure, keyof EntityItem<HeatService["entities"]["recent"]>>>,
   NothingUndeclared<Exclude<keyof Sighting, keyof EntityItem<HeatService["entities"]["sighting"]>>>,
 ];

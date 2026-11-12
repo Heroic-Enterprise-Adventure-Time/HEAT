@@ -13,9 +13,12 @@ import {
   type Reward,
   type StageResult,
   STARTING_LOCATION,
+  UNIT_PROFILES,
+  type UnitStats,
   type UnitType,
 } from "@heat/engine";
 
+import { type RecentAdventure, recentOf } from "../recent.js";
 import { type Sighting, sightingOf } from "../seen.js";
 import type { Tables } from "./client.js";
 import { createService, type HeatService } from "./entities.js";
@@ -38,7 +41,8 @@ import type { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
  * Start and settle write to both tables in one transaction: the player's
  * open item and ledger in the player table, the adventure record in the
  * location table. Recruit and retire do too, for the hero's sighting at its
- * location (decision 0029). TransactWriteItems spans tables in one account and
+ * location (decision 0029), and settle for the adventure's item in its
+ * location's feed (decision 0050). TransactWriteItems spans tables in one account and
  * region, so the split of decision 0023 costs the transactions nothing.
  *
  * Every read and every write goes through ElectroDB (entities.ts, decision 0041).
@@ -206,6 +210,7 @@ export interface SettledResult {
 export interface Settlement {
   adventureId: string;
   location: string;
+  jobId: string;
   warehouseLevel: number;
   holdings: { material: Material; read: number | null; credit: number; lost: number }[];
   survivors: { hero: Hero; xp: number; level: number }[];
@@ -295,6 +300,29 @@ function toHero(i: MayLack<Stored<"hero">, "level" | "xp" | "picks" | "status">)
     retiredAt: i.retiredAt ?? null,
     adventureId: i.adventureId ?? null,
   };
+}
+
+/**
+ * A snapshot with every hero's gather ratings. One issued before the ratings
+ * (Issue-283, decision 0051) has none, and is still read while its adventure
+ * is open across that deploy: its heroes take their unit type's ratings of
+ * today, so a client that resumes the run shows it gathering. The deploy that
+ * issued it verifies it, from the record as that deploy reads it (decision
+ * 0030), so what this adds is never what a result is computed from.
+ */
+export function rated(snapshot: AdventureSnapshot): AdventureSnapshot {
+  const heroes = snapshot.heroes.map((hero) => {
+    const stats: MayLack<UnitStats, "gather"> = hero.stats;
+    return stats.gather ? hero : { ...hero, stats: { ...hero.stats, gather: UNIT_PROFILES[hero.unitType]?.stats.gather ?? [] } };
+  });
+  return { ...snapshot, heroes };
+}
+
+const hasSnapshot = (i: MayLack<Stored<"adventure">, "snapshot">): boolean => i.snapshot !== undefined;
+
+/** A record from before Issue-113 has no snapshot and is answered as it is. */
+function toAdventure(i: Stored<"adventure">): AdventureRecord {
+  return hasSnapshot(i) ? { ...i, snapshot: rated(i.snapshot) } : i;
 }
 
 /**
@@ -421,7 +449,7 @@ export class Repository {
 
   async getAdventure(adventureId: string): Promise<AdventureRecord | undefined> {
     const { data } = await this.service.entities.adventure.get({ adventureId }).go(STRONG);
-    return data ?? undefined;
+    return data ? toAdventure(data) : undefined;
   }
 
   /**
@@ -504,7 +532,8 @@ export class Repository {
   /**
    * Settle, in one transaction (decision 0014; overview, "Camps, heroes and
    * resources"): the open item deleted only if it is this adventure; the
-   * record marked settled with its result only if it is still open; the
+   * record marked settled with its result only if it is still open, and from
+   * then on in its job's replays, by the index's keys (decision 0050); the
    * camp's warehouse level checked against the one the cap was computed
    * from, and its living count decremented by the dead only if it covers
    * them; each survivor's XP and level set and its mark removed, and its
@@ -512,8 +541,10 @@ export class Repository {
    * mark removed and its sighting deleted (decision 0029); each holding
    * written with its capped credit only if its balance is still the one
    * read, with a ledger entry per material that can exist once and records
-   * what the cap lost. Every hero's write is conditioned on its mark being
-   * this adventure's.
+   * what the cap lost; and the adventure's item put in its location's feed,
+   * its public line with no owner (decision 0050), so an adventure is in the
+   * feed exactly when it is settled. Every hero's write is conditioned on its
+   * mark being this adventure's.
    *
    * Throws AdventureClosed when the open item or the record has moved on,
    * which is a repeat or a race with a discard; CampChanged when a balance
@@ -538,7 +569,8 @@ export class Repository {
           AdventureClosed,
           items.adventure
             .update({ adventureId })
-            .set({ status: "SETTLED", result: s.result, settledAt: now.toISOString() })
+            // `replayOf` and `settledAt` are what the index's keys are made from (entities.ts).
+            .set({ status: "SETTLED", result: s.result, settledAt: now.toISOString(), replayOf: s.jobId })
             .where((a, op) => op.eq(a.status, "OPEN"))
             .commit(),
         ),
@@ -594,6 +626,7 @@ export class Repository {
             : []),
           on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `credit#${material}`, location, material, delta: credit, lost }).commit()),
         ]),
+        on(AdventureClosed, items.recent.put(recentOf(s, now)).commit()),
       ])
       .go();
     throwIfCancelled(write, failures);
@@ -887,6 +920,34 @@ export class Repository {
         .go({ limit, data: "raw" }),
     );
     return { sightings: sighting.parse({ Items: page.Items }).data.map(toSighting), read: page.ScannedCount };
+  }
+
+  /**
+   * The adventures most recently settled at a location, newest first: one
+   * Query of its `DONE#` items in descending key order, which is time order,
+   * reading at most `limit`. The filter on expiry runs after the limit, so
+   * the read never passes it (decision 0050). Strongly consistent, so a
+   * player who has just settled finds the adventure in the list.
+   */
+  async recentAdventures(location: string, limit: number, now = new Date()): Promise<RecentAdventure[]> {
+    const seconds = Math.floor(now.getTime() / 1000);
+    const { data } = await this.service.entities.recent.query
+      .primary({ location })
+      .where((a, op) => op.gt(a.expiresAt, seconds))
+      .go({ ...STRONG, order: "desc", limit });
+    return data;
+  }
+
+  /**
+   * The settled adventures of a job, newest first: one Query of GSI1 on
+   * `JOB#<jobId>` in descending key order, which is the order they settled
+   * in, reading at most `limit` (decision 0050). Eventually consistent, as
+   * every read of a global secondary index is, so an adventure may be
+   * missing for a moment after it settles.
+   */
+  async replays(jobId: string, limit: number): Promise<AdventureRecord[]> {
+    const { data } = await this.service.entities.adventure.query.replays({ replayOf: jobId }).go({ order: "desc", limit });
+    return data.map(toAdventure);
   }
 
   /** The player's `AT#` items, raw, every page: a raw read answers one page whatever `pages` says. */

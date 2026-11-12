@@ -11,6 +11,8 @@ import {
   hallCapacity,
   HERO_NAMES,
   heroNames,
+  jobOf,
+  JOBS,
   location,
   LOCATIONS,
   must,
@@ -54,9 +56,9 @@ describe("static content", () => {
     }
   });
 
-  it("starts a new player at Millbrook, which recruits the villager and the fighter", () => {
+  it("starts a new player at Millbrook, which recruits the villager, the fighter and the ranger", () => {
     expect(location(STARTING_LOCATION)?.name).toBe("Millbrook");
-    expect(location(STARTING_LOCATION)?.recruits.map((r) => r.unitType)).toEqual(["villager", "fighter"]);
+    expect(location(STARTING_LOCATION)?.recruits.map((r) => r.unitType)).toEqual(["villager", "fighter", "ranger"]);
     expect(location(STARTING_LOCATION)?.sharedFacilities).toEqual(["job-board"]);
   });
 
@@ -120,6 +122,18 @@ describe("static content", () => {
     expect(new Set(all).size).toBe(all.length);
     const largestHall = Math.max(...HALL_CAPACITY);
     for (const p of PRESENTATIONS) expect(heroNames(p).length).toBeGreaterThan(largestHall);
+  });
+});
+
+describe("jobOf", () => {
+  it("answers every job of the content by its id", () => {
+    for (const [id, job] of Object.entries(JOBS)) expect(jobOf(id)).toBe(job);
+  });
+
+  it("answers nothing for an id the content does not know, an inherited property's name included", () => {
+    expect(jobOf("a-job-of-another-version")).toBeUndefined();
+    expect(jobOf("toString")).toBeUndefined();
+    expect(jobOf("__proto__")).toBeUndefined();
   });
 });
 

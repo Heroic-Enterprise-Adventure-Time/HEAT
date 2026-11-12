@@ -4,7 +4,7 @@ import { InMemoryCache } from '@apollo/client';
 import { APOLLO_TESTING_CACHE, ApolloTestingController, ApolloTestingModule, type TestOperation } from 'apollo-angular/testing';
 import { constantCase } from 'es-toolkit';
 
-import { must } from '@heat/engine';
+import { must, UNIT_PROFILES } from '@heat/engine';
 
 import { type AdventureResultView, type AdventureView, Game, type HeroView, overrideInput, type PlayerView, type SeenHeroView } from './game';
 import possibleTypes from './graphql/generated/possible-types';
@@ -22,7 +22,7 @@ const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCach
  */
 const wireHero = (hero: HeroView) => ({ __typename: 'Hero', ...hero, unitType: constantCase(hero.unitType) });
 const wireSeen = (hero: SeenHeroView) => ({ __typename: 'SeenHero', ...hero, unitType: constantCase(hero.unitType) });
-const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number }[]) =>
+const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number; rating?: number }[]) =>
   amounts.map((a) => ({ __typename: typename, ...a, material: constantCase(a.material) }));
 const wireAdventure = (a: AdventureView) => ({
   __typename: 'Adventure',
@@ -31,7 +31,7 @@ const wireAdventure = (a: AdventureView) => ({
   snapshot: {
     __typename: 'Snapshot',
     ...a.snapshot,
-    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats } })),
+    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, gather: wireAmounts('GatherRating', h.stats.gather) } })),
   },
 });
 const wirePlayer = (p: PlayerView) => ({
@@ -142,7 +142,7 @@ function fakeHub(start: PlayerView) {
         snapshot: {
           version: 'v1',
           jobId,
-          heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: { maxHealth: 30, speed: 8, damage: 4, gathering: 4 } })),
+          heroes: heroes.map((h) => ({ heroId: h.id, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: h.level, stats: must(UNIT_PROFILES.villager, 'the villager profile').stats })),
         },
       };
       player = { ...player, openAdventure: adventure };
@@ -260,6 +260,8 @@ describe('Game', () => {
     expect(game.recruits()).toEqual([
       { unitType: 'villager', cost: [], reason: null },
       { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
+      // The first unit type a hall's level gates (Issue-286): the level is said before what it costs.
+      { unitType: 'ranger', cost: [{ material: 'timber', amount: 40, balance: 0 }, { material: 'cloth', amount: 10, balance: 0 }], reason: 'Needs a level 2 hall.' },
     ]);
 
     const hero = must(await run(game.recruit('villager')), 'the hero');
@@ -285,7 +287,7 @@ describe('Game', () => {
   it('says the hall is full when every slot holds a dead hero, before what it costs', async () => {
     const { game, run } = setup(playerWith([], 4, 0));
     await run();
-    expect(game.recruits().map((r) => r.reason)).toEqual(['The hall is full.', 'The hall is full.']);
+    expect(game.recruits().map((r) => r.reason)).toEqual(['The hall is full.', 'The hall is full.', 'Needs a level 2 hall.']);
   });
 
   it('retires a hero, which moves it to the retired and makes the villager free again', async () => {

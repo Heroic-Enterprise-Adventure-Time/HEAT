@@ -9,7 +9,7 @@ import { sortBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { AdventureEngine, type AdventureSnapshot, type PartyOrder, type PlayerOverride, replay } from "../../src/index.js";
-import { hero, snapshot, TIMBER, WOLVES } from "./helpers.js";
+import { GOBLINS, hero, snapshot, TIMBER, WOLVES } from "./helpers.js";
 
 type Click =
   | { readonly atWallMs: number; readonly heroId: string; readonly override: PlayerOverride }
@@ -62,6 +62,22 @@ describe("Determinism within one version", () => {
         expect(live.timeline.overrideLog.some((e) => e.kind === "party")).toBe(true);
         expect(replay(snap, seed, live.timeline.overrideLog)).toEqual(live);
       }
+    }
+  });
+
+  it("gives the same timeline and result live and replayed with ranged units on both sides", () => {
+    const ranged = [hero("ranger-1", "ranger"), hero("villager-1", "villager"), hero("villager-2", "villager")];
+    const shots: readonly Click[] = [
+      { atWallMs: 4200, heroId: "ranger-1", override: { kind: "force-action", abilityId: "shoot" } },
+      { atWallMs: 5200, heroId: "villager-2", override: { kind: "force-action", abilityId: "mine" } },
+      { atWallMs: 9000, heroId: "ranger-1", override: { kind: "force-action", abilityId: "strike" } }, // not on its list: dropped
+    ];
+    for (const seed of ["a", "b", "c", "d", "e"]) {
+      const snap = snapshot(GOBLINS, ranged);
+      const live = playLive(snap, seed, shots);
+      expect(live.timeline.overrideLog.some((e) => e.kind === "unit" && e.unitId === "ranger-1")).toBe(true);
+      expect(replay(snap, seed, live.timeline.overrideLog)).toEqual(live);
+      for (const frameMs of [1, 33, 5000]) expect(playLive(snap, seed, [], frameMs)).toEqual(replay(snap, seed, []));
     }
   });
 

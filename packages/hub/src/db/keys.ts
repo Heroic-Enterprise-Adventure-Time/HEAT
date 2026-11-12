@@ -34,9 +34,22 @@
  *                                                   the version that issued it, start time; at settlement the result
  *   LOCATION#<id>  | SEEN#<heroId>                  a hero seen there: public fields only, no owner, and
  *                                                   expiresAt, the table's TTL attribute (decision 0029)
- *   LOCATION#<id>  | ...                            the feed, offers: the rest of build order step 3
+ *   LOCATION#<id>  | DONE#<settledAt>#<adventureId> an adventure completed there: public fields only, no owner, and
+ *                                                   expiresAt; settledAt is ISO 8601 in UTC, so the keys sort in
+ *                                                   time order (decision 0050)
+ *   LOCATION#<id>  | FACILITY#..., CONTRIB#...      kept for step 5's shared facilities, which are not designed
+ *
+ * The location table's one index, GSI1, with generic key names as the table's
+ * own are. It is sparse: only an item that carries both attributes is in it.
+ *
+ *   JOB#<jobId>    | <settledAt>                    the adventure record, from settlement on, so a job's replays
+ *                                                   are read newest first; an open or discarded record carries
+ *                                                   neither attribute (decision 0050)
  */
 export const KEY = { pk: "PK", sk: "SK" } as const;
+
+/** The location table's index and its key attributes, as Terraform and the tests' table name them. */
+export const GSI1 = { name: "GSI1", pk: "GSI1PK", sk: "GSI1SK" } as const;
 
 /** The version every entity is at, which ElectroDB writes on an item as `__edb_v__`. */
 export const ITEM_VERSION = "1";
@@ -55,4 +68,7 @@ export const TEMPLATES = {
   adventure: "RECORD",
   locationPk: "LOCATION#${location}",
   sighting: "SEEN#${heroId}",
+  recent: "DONE#${settledAt}#${adventureId}",
+  replaysPk: "JOB#${replayOf}",
+  replays: "${settledAt}",
 } as const;
