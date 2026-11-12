@@ -270,6 +270,9 @@ export const SPRITE_SET_PRESENTATION: Readonly<Record<string, Presentation>> = {
   "wizard-01": "either",
   "wizard-03": "masculine",
   "priest-02": "either",
+  // Made before their unit types (Issue-285), which Issue-287 adds to SPRITE_SETS.
+  "miner-01": "masculine",
+  "lumberjack-02": "feminine",
 };
 
 /**

@@ -1,0 +1,143 @@
+{
+  "set": "miner-01",
+  "kind": "hero sprite set",
+  "classes": [],
+  "presentation": "masculine",
+  "madeFor": "The miner, a hero unit type that Issue-287 adds to the engine; that issue names it in classes.",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "372679d6-8202-495e-bd7d-ac6488bd2d88",
+    "name": "Miner 01",
+    "tags": ["heat", "hero", "miner"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-11-11T23:22:04.196545+00:00",
+    "parameters": {
+      "description": "miner in a soot-grey wool tunic and a brown leather apron, a leather cap, a dark beard, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "e36c3c9f-12db-46ee-9668-f53825671b18",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["south", "east", "north"],
+          "generations": 9
+        }
+      ],
+      "generations": 9
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "3eb37081-bd59-4df3-8ff7-1bbc15c01090",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "act": {
+      "template": "lead-jab",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "c68ea31e-6067-47bf-9997-5b11e3afab2f",
+      "directions": ["east"],
+      "framesPerDirection": 3,
+      "canvas": [64, 64],
+      "holdFrame": 1,
+      "files": "act-east-<0..2>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 2
+        }
+      ],
+      "generations": 2
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "e6fa7003-69b2-481f-8fdb-b78aa40e60f4",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "6623925d-920f-481e-8bdc-7fd8b6aabbcc",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    }
+  },
+  "animationGenerations": 20,
+  "rejected": [
+    {
+      "name": "Miner 02",
+      "characterId": "e60c9e2e-6e23-4f5d-9f13-446ead0f3b6e",
+      "description": "miner woman in a dusty ochre tunic with rolled sleeves and dark hose, hair tied under a grey headscarf, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "generations": 1,
+      "parameters": "create_character through the MCP with the kept look's parameters (docs/process/assets.md, rule 8); only the description differs"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-11-12)."
+}
