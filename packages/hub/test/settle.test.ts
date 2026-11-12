@@ -17,6 +17,7 @@ import { player, storedItem, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
+import { PREVIOUS_VERSION as previous, VERSION as version } from "./versions.js";
 
 /**
  * Submit, settlement and discard against DynamoDB Local, with the replay
@@ -46,8 +47,6 @@ beforeAll(() => {
 
 const at = "millbrook";
 const wolves = JOBS["wolves-on-the-mill-road"];
-const version = "0123456789abcdef0123456789abcdef01234567";
-const previous = "fedcba9876543210fedcba9876543210fedcba98";
 
 /** Living heroes of the given unit types and a camp that counts them, with their sightings. */
 async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): Promise<Hero[]> {

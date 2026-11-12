@@ -361,6 +361,30 @@ check(JSON.stringify(newest.party) === JSON.stringify([{ name: sent.name, unitTy
 check(!JSON.stringify(newest).includes(party.id) && !JSON.stringify(newest).includes(current.data.me.id), `nothing in it names the hero's id or the player's`);
 check(recent.data.recentAdventuresAt.length <= 20, `the list holds at most 20`);
 
+// The job's replays (Issue-289, decision 0050): settlement set the record's
+// keys for the location table's index, which is what replaysOf reads, with
+// the function's own role, on the index's own ARN. The index is eventually
+// consistent, so the read is repeated until the adventure is in it. Found by
+// its id, as above: on dev another player may settle the same job meanwhile.
+const replaysQuery = `query($job: ID!) { replaysOf(job: $job) { id job { id } status settledAt result { outcome } snapshot { heroes { heroId name } } } }`;
+const replaysWithinMs = 30_000;
+const replaysAsked = performance.now();
+const readReplays = async () => {
+  const answer = await graphql(token, replaysQuery, { job });
+  return { answer, found: answer.data?.replaysOf?.find((r) => r.id === id) };
+};
+let { answer: replays, found: replayed } = await readReplays();
+while (!replays.errors && !replayed && performance.now() - replaysAsked < replaysWithinMs) {
+  await sleep(1_000);
+  ({ answer: replays, found: replayed } = await readReplays());
+}
+const replaysWaited = Math.round(performance.now() - replaysAsked);
+check(!replays.errors && replayed?.id === id && replayed.job.id === job && replayed.status === "SETTLED" && replayed.result.outcome === result.outcome, `the settled adventure is in its job's replays, at place ${replays.data?.replaysOf?.indexOf(replayed)} of ${replays.data?.replaysOf?.length}, ${replaysWaited} ms after the first read: ${replayed?.id} ${replayed?.result?.outcome} ${JSON.stringify(replays.errors ?? "")}`);
+check(replayed.settledAt === newest.settledAt, `it settled when the feed says it did: ${replayed.settledAt}`);
+check(replayed.snapshot.heroes.length === 1 && replayed.snapshot.heroes[0].heroId === party.id, `its party is the villager that went`);
+check(replays.data.replaysOf.every((r, i, all) => i === 0 || all[i - 1].settledAt >= r.settledAt) && replays.data.replaysOf.length <= 20, `the list is newest first and holds at most 20`);
+check(!JSON.stringify(replays.data).includes(current.data.me.id), `nothing in it names the player`);
+
 // Paid recruitment (Issue-82): the timber run pays for a second villager,
 // 20 timber debited while the first lives. It is retired at once, on every
 // stack, so dev's test user never fills its hall.

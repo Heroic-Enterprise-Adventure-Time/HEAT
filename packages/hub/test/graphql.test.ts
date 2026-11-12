@@ -1,14 +1,16 @@
 import { randomUUID } from "node:crypto";
 
+import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { MAX_PARTY, must } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
-import { putRecentAdventure, recentAdventure } from "./data.js";
+import { emptyResult, putRecentAdventure, putSettledAdventure, recentAdventure, settledAdventure } from "./data.js";
+import { locationKeys } from "./keys.js";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
@@ -294,6 +296,46 @@ describe("the camp through the graph", () => {
     expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
     const nowhere = await gql(recent, { at: "atlantis" }, `p-${randomUUID()}`);
     expect(nowhere.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+  });
+
+  it("lists a job's replays, its settled adventures, to any signed-in player, and nothing of whose they were", async () => {
+    // Settled far in the future, so that it is first whatever the other test files settle of the job meanwhile.
+    const settledAt = "9999-01-01T00:00:00.000Z";
+    const wolves = "wolves-on-the-mill-road";
+    const config = configFromEnv();
+    const db = createDocumentClient(config);
+    const record = await putSettledAdventure(db, config.tables.location, settledAdventure(wolves, new Date(settledAt), { result: emptyResult("retreat") }));
+    // Taken out again, or it would be first in the job's replays for every test that runs after this one.
+    onTestFinished(async () => {
+      await db.send(new DeleteCommand({ TableName: config.tables.location, Key: locationKeys.adventure(record.adventureId) }));
+    });
+
+    const replays = `query($job: ID!) { replaysOf(job: $job) { id job { id } location status settledAt result { outcome } snapshot { jobId heroes { heroId } } } }`;
+    const viewer = `p-${randomUUID()}`;
+    // The index is eventually consistent (decision 0050).
+    const r = await vi.waitFor(async () => {
+      const answer = await gql(replays as Query<{ replaysOf: unknown[] }>, { job: wolves }, viewer);
+      expect(answer.data?.replaysOf[0]).toMatchObject({ id: record.adventureId });
+      return answer;
+    });
+    expect(r.errors).toBeUndefined();
+    expect(r.data?.replaysOf.length).toBeLessThanOrEqual(20);
+    expect(r.data?.replaysOf[0]).toEqual({
+      id: record.adventureId,
+      job: { id: wolves },
+      location: "millbrook",
+      status: "SETTLED",
+      settledAt,
+      result: { outcome: "RETREAT" },
+      snapshot: { jobId: wolves, heroes: [] },
+    });
+    // The record keeps its player's id, the index projects it, and no field serves it (decision 0043).
+    expect(JSON.stringify(r.data)).not.toContain(record.playerId);
+
+    const anonymous = await gql(replays, { job: wolves });
+    expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
+    const unposted = await gql(replays, { job: "a-job-of-another-version" }, viewer);
+    expect(unposted.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
   });
 });
 

@@ -33,6 +33,28 @@ resource "aws_dynamodb_table" "player" {
 # Partitioned by location, and by adventure for the record settle looks up
 # by id. Public: what every player may see. Its TTL attribute, expiresAt in
 # epoch seconds, is set on the heroes seen at a location (decision 0029).
+#
+# GSI1 is the table's one index, with generic keys as the table's own are
+# (decision 0050): the adventure record carries GSI1PK = JOB#<jobId> and
+# GSI1SK = <settledAt> from settlement on, and nothing else carries either,
+# so the index holds the settled records and is what replaysOf reads. It
+# projects every attribute, because ElectroDB reads an index item as the
+# whole entity. On-demand like the table, so it costs nothing at rest.
+#
+# The provider adds the index to the live table in place: the plan against
+# heat-sb289 on 2026-11-11, provider 6.72.0, was an update of this resource
+# and no replacement, and its apply waited 8 min 36 s for the index to
+# become active on a table with almost nothing in it (decision 0053, "Facts
+# checked"). The index's keys are `key_schema` blocks, since that release
+# deprecates `hash_key` and `range_key` inside the index block.
+
+locals {
+  # The index's name, which the function's role reads for the one resource
+  # it may Query (functions.tf): one expression, so a rename cannot leave
+  # the policy naming an index that is gone.
+  replays_index = "GSI1"
+}
+
 resource "aws_dynamodb_table" "location" {
   name         = "${var.name_prefix}-location"
   billing_mode = "PAY_PER_REQUEST"
@@ -47,6 +69,31 @@ resource "aws_dynamodb_table" "location" {
   attribute {
     name = "SK"
     type = "S"
+  }
+
+  attribute {
+    name = "GSI1PK"
+    type = "S"
+  }
+
+  attribute {
+    name = "GSI1SK"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = local.replays_index
+    projection_type = "ALL"
+
+    key_schema {
+      attribute_name = "GSI1PK"
+      key_type       = "HASH"
+    }
+
+    key_schema {
+      attribute_name = "GSI1SK"
+      key_type       = "RANGE"
+    }
   }
 
   ttl {

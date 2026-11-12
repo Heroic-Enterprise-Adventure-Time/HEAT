@@ -1,5 +1,6 @@
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
+import { PREVIOUS_VERSION, VERSION } from "../versions.js";
 import { ensureTables } from "./table.js";
 
 /**
@@ -26,13 +27,13 @@ export async function setup(): Promise<void> {
   process.env["AWS_SECRET_ACCESS_KEY"] = "test";
   process.env["POWERTOOLS_LOG_LEVEL"] = "SILENT";
   process.env["POWERTOOLS_METRICS_DISABLED"] = "true";
-  process.env["HEAT_VERSION"] = "0123456789abcdef0123456789abcdef01234567";
-  process.env["HEAT_PREVIOUS_VERSION"] = "fedcba9876543210fedcba9876543210fedcba98";
+  process.env["HEAT_VERSION"] = VERSION;
+  process.env["HEAT_PREVIOUS_VERSION"] = PREVIOUS_VERSION;
   // Named only: the handler's tests never reach S3. Submit is proven
   // against the in-memory store, and the bucket by the stack test.
   process.env["HEAT_REPLAY_BUCKET"] = "heat-test-replays";
 
-  await ensureTables(endpoint, "heat-test-player", "heat-test-location");
+  await ensureTables(endpoint, ["heat-test-player", "heat-test-location"], ["heat-test-location"]);
 }
 
 export async function teardown(): Promise<void> {

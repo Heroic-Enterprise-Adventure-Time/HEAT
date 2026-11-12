@@ -18,6 +18,7 @@ import { player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
+import { PREVIOUS_VERSION as version } from "./versions.js";
 
 /**
  * startAdventure against DynamoDB Local: the job on the location's board,
@@ -38,7 +39,6 @@ beforeAll(() => {
 
 const at = "millbrook";
 const wolves = "wolves-on-the-mill-road";
-const version = "fedcba9876543210fedcba9876543210fedcba98";
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths leave them. */
 async function putHeroes(p: string, statuses: HeroStatus[], location = at): Promise<Hero[]> {

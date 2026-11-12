@@ -9,12 +9,15 @@ type Adventure {
   location: ID!
   result: AdventureResult
   seed: String!
+
+  """When the adventure settled. Null until it has."""
+  settledAt: DateTime
   snapshot: Snapshot!
   startedAt: DateTime!
   status: AdventureStatus!
 
   """
-  The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled.
+  The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled. Read from the store once per adventure, so it is asked of the one adventure being played, not of each in a list.
   """
   timeline: JSON
 
@@ -503,6 +506,11 @@ type Query {
   The adventures most recently settled at the location, newest first, at most 20 and none older than a week; the caller's own are among them like anyone's, and nothing says whose an adventure was.
   """
   recentAdventuresAt(location: ID!): [RecentAdventure!]
+
+  """
+  The job's replays: its adventures most recently settled, newest first, at most 20, whatever their outcome and whoever's they were, which nothing says. One settled a moment ago may not be listed yet. A job this version does not post is refused.
+  """
+  replaysOf(job: ID!): [Adventure!]
 
   """
   The deploy's version: the commit this route's deploy runs. /graphql answers the current deploy's, /previous/graphql the one before.
