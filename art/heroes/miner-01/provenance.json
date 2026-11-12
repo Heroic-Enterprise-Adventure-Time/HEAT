@@ -134,8 +134,10 @@
     {
       "name": "Miner 02",
       "characterId": "e60c9e2e-6e23-4f5d-9f13-446ead0f3b6e",
-      "description": "miner woman in a dusty ochre tunic with rolled sleeves and dark hose, hair tied under a grey headscarf, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors"
+      "description": "miner woman in a dusty ochre tunic with rolled sleeves and dark hose, hair tied under a grey headscarf, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "generations": 1,
+      "parameters": "create_character through the MCP with the kept look's parameters (docs/process/assets.md, rule 8); only the description differs"
     }
   ],
-  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-11-11)."
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-11-12)."
 }

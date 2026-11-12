@@ -23,8 +23,8 @@
 //     "rejected"?: [{ "name": "...", "objectId": "...", "description": "..." }] }
 //   A weapon's has "kind": "weapon", "wielders": [...] in place of "props", and
 //   "pick": { "reviewObjectId": "...", "index": 0, "itemDescription": "..." }. A swing that begins at a picture
-//   other than the icon gives it as "startFrame": { "from": "...", "generations": 0 }, beside "endFrame". A set made
-//   before the engine has its wielder leaves "wielders" empty and says what it is for in "madeFor" (rule 5).
+//   other than the icon gives it as "startFrame": { "from": "...", "sha256": "<of the bytes passed>", "generations": 0 }, beside "endFrame". A set made
+//   before the engine has its wielder leaves "wielders" empty and says what it is for in "madeFor" (docs/process/assets.md, rule 5).
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -122,7 +122,10 @@ const animations = Object.fromEntries(
     ...(a.heldLast ? { heldLast: true } : {}),
     ...(a.fadeAboveEnd ? { fadeAboveEnd: true } : {}),
     ...(a.holdFrame !== undefined ? { holdFrame: a.holdFrame } : {}),
+    ...(a.holdFrameNote ? { holdFrameNote: a.holdFrameNote } : {}),
+    ...(a.frameMs ? { frameMs: a.frameMs } : {}),
     ...(a.grips ? { grips: a.grips } : {}),
+    ...(a.nocks ? { nocks: a.nocks } : {}),
     files: `${name}-<0..${a.frames - 1}>.png`,
     generations: a.generations,
     ...(a.replaced ? { replaced: a.replaced } : {}),
@@ -152,9 +155,9 @@ const provenance = {
     },
   },
   animations,
-  // Everything the animations cost, the end states and the replaced takes too.
+  // Everything the animations cost, the start and end frames and the replaced takes too.
   animationGenerations: Object.values(animations).reduce(
-    (n, a) => n + a.generations + (a.endFrame?.generations ?? 0) + (a.replaced ?? []).reduce((m, r) => m + r.generations, 0),
+    (n, a) => n + a.generations + (a.startFrame?.generations ?? 0) + (a.endFrame?.generations ?? 0) + (a.replaced ?? []).reduce((m, r) => m + r.generations, 0),
     0,
   ),
   ...(record.rejected ? { rejected: record.rejected } : {}),
