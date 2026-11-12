@@ -1,6 +1,6 @@
 # 0050: Recent adventures as a feed item, replays by job as one sparse index
 
-- **Status:** Decided
+- **Status:** Decided; the index built by Issue-289, which checked the two facts left open, keys the index from an attribute only settlement sets, `replayOf`, because of how ElectroDB writes an index's keys, and answers `replaysOf` with the record as `Adventure`, hero ids included (the owner, 2026-11-11); `docs/architecture/camps.md`, "Built (Issue-289)"
 - **Date:** 2026-11-10
 - **Settles:** Issue-282: the location table's keys for the rest of build order step 3, which the overview's "Open" item and decisions 0013 and 0023 left to be designed before they are built: the adventures recently completed at a location, and the replays of a job.
 - **Amends:** 0023, "One global secondary index with generic keys serves 'replays of this job' and 'my history'": the index serves replays by job only.
