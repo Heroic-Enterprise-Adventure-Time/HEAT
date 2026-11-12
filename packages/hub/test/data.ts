@@ -9,6 +9,7 @@ import { ITEM_VERSION } from "../src/db/keys.js";
 import type { AdventureRecord, SettledResult } from "../src/db/repository.js";
 import { RECENT_TTL_SECONDS, type RecentAdventure } from "../src/recent.js";
 import { locationKeys, playerKeys, replayKeys } from "./keys.js";
+import { VERSION } from "./versions.js";
 
 /**
  * What the data-layer tests share for their data (typescript.md, rule 19): a
@@ -51,15 +52,14 @@ export const emptyResult = (outcome: AdventureOutcome): SettledResult => ({ outc
 
 /** A settled record of the job as settlement leaves it, settled at the given time: nobody's party home with nothing, unless overridden. */
 export function settledAdventure(jobId: string, at: Date, overrides: Partial<AdventureRecord> = {}): AdventureRecord {
-  const version = "0123456789abcdef0123456789abcdef01234567";
   return {
     adventureId: randomUUID(),
     playerId: player(),
     seed: randomUUID(),
     location: "millbrook",
     jobId,
-    snapshot: { version, jobId, heroes: [] },
-    version,
+    snapshot: { version: VERSION, jobId, heroes: [] },
+    version: VERSION,
     startedAt: new Date(at.getTime() - 60_000).toISOString(),
     status: "SETTLED",
     result: emptyResult("complete"),

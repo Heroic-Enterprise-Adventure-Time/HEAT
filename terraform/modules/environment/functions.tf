@@ -85,16 +85,25 @@ data "aws_iam_policy_document" "function" {
       "dynamodb:BatchWriteItem",
     ]
 
-    # A Query of an index is authorized on the index's own ARN, not the
-    # table's: Query's resource types are `table` and `index`, and an
-    # index's ARN is the table's with /index/<name> (AWS's service
-    # reference for DynamoDB, v1/dynamodb/dynamodb.json, read 2026-11-11).
-    # GSI1 is the location table's replays by job (tables.tf, decision 0050).
     resources = [
       aws_dynamodb_table.player.arn,
       aws_dynamodb_table.location.arn,
-      "${aws_dynamodb_table.location.arn}/index/GSI1",
     ]
+  }
+
+  # The location table's index, a job's replays (tables.tf, decision 0050),
+  # which the code only queries. A Query of an index is authorized on the
+  # index's own ARN, not the table's: Query's resource types are `table`
+  # and `index`, and an index's ARN is the table's with /index/<name>
+  # (AWS's service reference for DynamoDB, v1/dynamodb/dynamodb.json, read
+  # 2026-11-11).
+  statement {
+    sid    = "QueryTheReplaysIndex"
+    effect = "Allow"
+
+    actions = ["dynamodb:Query"]
+
+    resources = ["${aws_dynamodb_table.location.arn}/index/${local.replays_index}"]
   }
 
   # The timelines, one object per adventure (replays.tf, Issue-114). A

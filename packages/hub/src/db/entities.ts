@@ -166,8 +166,8 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
    * write, because a write that names one of such an index's composites must
    * name them all, and a record being started has no end. Hence `replayOf`,
    * the job once more, set with `settledAt` and hidden, so no read answers
-   * it. ElectroDB 3.9.3, both tried on 2026-11-11; test/replays.test.ts
-   * holds the keys on the items as stored.
+   * it. ElectroDB 3.9.3, both tried on 2026-11-11 (decision 0053);
+   * test/replays.test.ts holds the keys on the items as stored.
    */
   const adventure = new Entity(
     {

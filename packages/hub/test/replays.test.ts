@@ -13,6 +13,7 @@ import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
 import { emptyResult, player, putSettledAdventure, reads, settledAdventure as settled, storedItem } from "./data.js";
 import { locationKeys, replayKeys } from "./keys.js";
+import { VERSION as version } from "./versions.js";
 
 /**
  * The replays of a job (decision 0050), against DynamoDB Local with the
@@ -42,7 +43,6 @@ afterEach(() => {
 
 const at = "millbrook";
 const timber = "timber-from-the-near-woods";
-const version = "0123456789abcdef0123456789abcdef01234567";
 
 /** Each read test its own job, which no content knows, so no other test's adventures are in its list. */
 const job = () => `test-${randomUUID()}`;

@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 
+import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { MAX_PARTY, must } from "@heat/engine";
 
@@ -9,6 +10,7 @@ import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
 import { emptyResult, putRecentAdventure, putSettledAdventure, recentAdventure, settledAdventure } from "./data.js";
+import { locationKeys } from "./keys.js";
 
 /**
  * Drives the Lambda handler with synthesized HTTP API (payload 2.0) events,
@@ -301,7 +303,12 @@ describe("the camp through the graph", () => {
     const settledAt = "9999-01-01T00:00:00.000Z";
     const wolves = "wolves-on-the-mill-road";
     const config = configFromEnv();
-    const record = await putSettledAdventure(createDocumentClient(config), config.tables.location, settledAdventure(wolves, new Date(settledAt), { result: emptyResult("retreat") }));
+    const db = createDocumentClient(config);
+    const record = await putSettledAdventure(db, config.tables.location, settledAdventure(wolves, new Date(settledAt), { result: emptyResult("retreat") }));
+    // Taken out again, or it would be first in the job's replays for every test that runs after this one.
+    onTestFinished(async () => {
+      await db.send(new DeleteCommand({ TableName: config.tables.location, Key: locationKeys.adventure(record.adventureId) }));
+    });
 
     const replays = `query($job: ID!) { replaysOf(job: $job) { id job { id } location status settledAt result { outcome } snapshot { jobId heroes { heroId } } } }`;
     const viewer = `p-${randomUUID()}`;
