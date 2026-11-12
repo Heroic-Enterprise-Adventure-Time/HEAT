@@ -1,0 +1,150 @@
+{
+  "set": "lumberjack-02",
+  "kind": "hero sprite set",
+  "classes": [],
+  "presentation": "feminine",
+  "madeFor": "The lumberjack, a hero unit type that Issue-287 adds to the engine; that issue names it in classes.",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "characterId": "92e17dfa-4dde-4273-a052-d5e52c9b692b",
+    "name": "Lumberjack 02",
+    "tags": ["heat", "hero", "lumberjack"]
+  },
+  "character": {
+    "tool": "create_character",
+    "via": "MCP",
+    "createdAt": "2026-11-11T23:22:07.204462+00:00",
+    "parameters": {
+      "description": "lumberjack woman in a moss-green wool tunic and leather jerkin, a long blonde braid, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "mode": "standard",
+      "n_directions": 4,
+      "size": 32,
+      "view": "low top-down",
+      "outline": "single color black outline",
+      "shading": "flat shading",
+      "detail": "low detail",
+      "proportions": "default"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "still": {
+      "frames": ["still-south.png", "still-east.png", "still-north.png", "still-west.png"],
+      "canvas": [48, 48],
+      "from": "the character's rotations"
+    }
+  },
+  "animations": {
+    "walk": {
+      "template": "walking",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "528d1540-b43f-463c-9ca4-7e9509607b73",
+      "directions": ["south", "east", "north"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "walk-<direction>-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["south", "east", "north"],
+          "generations": 9
+        }
+      ],
+      "generations": 9
+    },
+    "stance": {
+      "template": "fight-stance-idle-8-frames",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "c7cc81aa-984d-4588-b1df-1f502f520534",
+      "directions": ["east"],
+      "framesPerDirection": 8,
+      "canvas": [64, 64],
+      "files": "stance-east-<0..7>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "act": {
+      "template": "lead-jab",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "1e00b37c-dd25-452c-93f4-5c4036d1d1d3",
+      "directions": ["east"],
+      "framesPerDirection": 3,
+      "canvas": [64, 64],
+      "holdFrame": 1,
+      "files": "act-east-<0..2>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 2
+        }
+      ],
+      "generations": 2
+    },
+    "hit": {
+      "template": "taking-punch",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "178c29c3-3767-4cb9-b8c4-715870d0d378",
+      "directions": ["east"],
+      "framesPerDirection": 6,
+      "canvas": [64, 64],
+      "files": "hit-east-<0..5>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        }
+      ],
+      "generations": 3
+    },
+    "down": {
+      "template": "falling-back-death",
+      "mode": "skeleton-v3",
+      "via": "MCP",
+      "groupId": "1e49dbcb-b73c-4234-b654-09d21d5e6bb6",
+      "directions": ["east"],
+      "framesPerDirection": 7,
+      "canvas": [64, 64],
+      "files": "down-east-<0..6>.png",
+      "calls": [
+        {
+          "directions": ["east"],
+          "generations": 3
+        },
+        {
+          "directions": ["east"],
+          "generations": 3,
+          "via": "website",
+          "date": "2026-11-12",
+          "note": "Re-rolled by the owner on PixelLab's website: frame 2 of the first had 11 grey pixels detached from the figure, a wisp beside the raised hand. The cost is the balance before and after, 1,904 and 1,901."
+        }
+      ],
+      "generations": 6
+    }
+  },
+  "animationGenerations": 23,
+  "rejected": [
+    {
+      "name": "Lumberjack 01",
+      "characterId": "d975c9c7-2739-45dc-b403-c6b1f0b91ef8",
+      "description": "lumberjack in a russet-red wool shirt with rolled sleeves and brown braces, a knitted cap, a full brown beard, empty hands, no weapon, no shield, warm earthy tones, NES-era retro pixel art, few colors",
+      "generations": 1,
+      "parameters": "create_character through the MCP with the kept look's parameters (docs/process/assets.md, rule 8); only the description differs"
+    }
+  ],
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the character (export version 3.1, 2026-11-12)."
+}
