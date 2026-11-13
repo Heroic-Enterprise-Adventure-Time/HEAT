@@ -294,7 +294,7 @@ describe('What was done here (Issue-290)', () => {
       'Pick up sticks Job done, 1 hour ago. Bram (fighter, level 2), Tansy (villager, level 1).',
       'Wolves on the mill road The party fell, 2 days ago. Bram (fighter, level 2), Tansy (villager, level 1, died).',
     ]);
-    expect(within(itemHolding('Recently here', 'link', 'Wolves on the mill road')).getByRole('link')).toHaveAttribute('href', '/replays/r2');
+    expect(within(itemHolding('Recently here', 'link', 'Wolves on the mill road: The party fell, 2 days ago.')).getByRole('link')).toHaveAttribute('href', '/replays/r2');
     expect(game.recentReads).toEqual(['millbrook']);
   });
 
@@ -335,8 +335,25 @@ describe('What was done here (Issue-290)', () => {
       '3 hours ago The party turned back. Bram (fighter, level 3).',
       'just now Job done. Bram (fighter, level 3).',
     ]);
-    expect(panel().getByRole('link', { name: '3 hours ago' })).toHaveAttribute('href', '/replays/a7');
+    expect(panel().getByRole('link', { name: '3 hours ago: The party turned back.' })).toHaveAttribute('href', '/replays/a7');
+    expect(panel().getByRole('link', { name: 'just now: Job done.' })).toHaveAttribute('href', '/replays/a6');
     expect(game.replayReads).toEqual(['wolves-on-the-mill-road']);
+  });
+
+  it("says Loading for another job's replays while they are read, never the last job's", async () => {
+    const game = fakeGame(party);
+    game.replays = () => Promise.resolve([wolvesReplay('a7', 'retreat', 3)]);
+    const { router } = await renderJobs(game, WOLVES);
+    await panel().findByRole('list', { name: 'Replays' });
+    let answer: (replays: readonly ReplayView[]) => void = () => undefined;
+    game.replays = () => new Promise((resolve) => { answer = resolve; });
+    // The page is not stable while the read is under way, so the navigation is waited for after it answers.
+    const going = router.navigateByUrl('/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
+    expect(await panel().findByText('Loading…')).toBeInTheDocument();
+    expect(panel().queryByRole('link', { name: /^3 hours ago/ })).not.toBeInTheDocument();
+    answer([]);
+    await going;
+    expect(await panel().findByText('No replays of this job yet.')).toBeInTheDocument();
   });
 
   it('says so when a job has no replays yet', async () => {

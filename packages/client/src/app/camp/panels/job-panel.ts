@@ -82,7 +82,8 @@ export class JobPanel {
   });
   private readonly replays = resource({ params: () => this.job()?.id, loader: ({ params }) => this.game.replaysOf(params) });
   protected readonly replayLines = computed(() =>
-    this.replays.hasValue() ? this.replays.value().flatMap((replay) => replayLine(replay) ?? []) : undefined,
+    // A list read again for another job says Loading, not the last job's lines.
+    this.replays.hasValue() && !this.replays.isLoading() ? this.replays.value().flatMap((replay) => replayLine(replay) ?? []) : undefined,
   );
   protected readonly replaysFailed = computed(() => this.replays.status() === 'error');
   protected readonly retreat = computed(() => {

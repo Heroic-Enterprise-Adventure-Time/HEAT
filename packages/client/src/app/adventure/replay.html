@@ -26,6 +26,8 @@
           <div class="after">
             <button type="button" (click)="watchAgain()">Watch from the start</button>
           </div>
+        } @else if (state() === 'unreadable') {
+          <p class="lost" role="alert">The replay could not be read.</p>
         } @else {
           <p class="lost" role="alert">Replay unavailable: this adventure was played before the battles changed.</p>
         }

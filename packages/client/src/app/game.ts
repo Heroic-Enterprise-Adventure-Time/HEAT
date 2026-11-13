@@ -210,18 +210,23 @@ function recentFromWire(recent: RecentAdventureFieldsFragment): RecentAdventureV
   return { ...recent, outcome: outcome(recent.outcome), party: recent.party.map((h) => ({ ...h, unitType: unitType(h.unitType) })) };
 }
 
+function replaySnapshotFromWire(snapshot: ReplayFieldsFragment['snapshot']): ReplayView['snapshot'] {
+  return { ...snapshot, heroes: snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType) })) };
+}
+
 function replayFromWire(replay: ReplayFieldsFragment): ReplayView {
   return {
     ...replay,
     result: replay.result ? { ...replay.result, outcome: outcome(replay.result.outcome) } : null,
-    snapshot: { ...replay.snapshot, heroes: replay.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType) })) },
+    snapshot: replaySnapshotFromWire(replay.snapshot),
   };
 }
 
 function replayedFromWire(replayed: ReplayAdventure): ReplayedView {
   return {
-    ...replayFromWire(replayed),
-    status: replayed.status,
+    ...replayed,
+    snapshot: replaySnapshotFromWire(replayed.snapshot),
+    // The page's whole result, mapped once: the fragment's part of it is in ResultFields too.
     result: replayed.result ? resultFromWire(replayed.result) : null,
     // The JSON scalar carries the engine's own AdventureTimeline, which the hub's replay wrote (decision 0030).
     timeline: (replayed.timeline as AdventureTimeline | null | undefined) ?? null,
@@ -552,7 +557,8 @@ export class Game {
 
   /** An adventure with its timeline, for its replay page; null when the hub answers none, an id unknown or another player's open one. */
   async replay(adventureId: string): Promise<ReplayedView | null> {
-    const data = await this.read(ReplayDocument, { id: adventureId });
+    // A settled timeline never changes and can be large, so it is neither kept in the cache nor normalized into it.
+    const data = await this.read(ReplayDocument, { id: adventureId }, 'no-cache');
     return data?.adventure ? replayedFromWire(data.adventure) : null;
   }
 
@@ -562,10 +568,18 @@ export class Game {
     answered(must(data.joinGame, 'joinGame'), 'JoinGameSuccess');
   }
 
-  /** One query read afresh from the hub, never the cache, answering its data or throwing what Apollo threw as an `ApiError`. */
-  private async read<TData, TVariables extends OperationVariables>(query: TypedDocumentNode<TData, TVariables>, variables: TVariables): Promise<TData | undefined> {
+  /**
+   * One query read afresh from the hub, never from the cache, answering its
+   * data or throwing what Apollo threw as an `ApiError`; `no-cache` also
+   * keeps the answer out of the cache.
+   */
+  private async read<TData, TVariables extends OperationVariables>(
+    query: TypedDocumentNode<TData, TVariables>,
+    variables: TVariables,
+    fetchPolicy: 'network-only' | 'no-cache' = 'network-only',
+  ): Promise<TData | undefined> {
     try {
-      return (await firstValueFrom(this.apollo.query({ query, variables, fetchPolicy: 'network-only' }))).data;
+      return (await firstValueFrom(this.apollo.query({ query, variables, fetchPolicy }))).data;
     } catch (e) {
       throw apiError(e);
     }

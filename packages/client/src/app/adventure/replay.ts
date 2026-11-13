@@ -11,8 +11,12 @@ import { Playback } from './playback';
 import { agoWords, partyWords, replayLine } from './replay-words';
 import { outcomeWords, stageResultWords } from './result-words';
 
-/** Where the replay page stands: reading, nothing to replay, the read failed, written before the battles changed, or playing. */
-type ReplayState = 'loading' | 'missing' | 'failed' | 'unavailable' | 'playing';
+/**
+ * Where the replay page stands: reading, nothing to replay, the read failed,
+ * settled with no timeline to read, written before the battles changed, or
+ * playing.
+ */
+type ReplayState = 'loading' | 'missing' | 'failed' | 'unreadable' | 'unavailable' | 'playing';
 
 /**
  * Any settled adventure's replay, `/replays/<id>` (Issue-290; game.md, "The
@@ -22,7 +26,8 @@ type ReplayState = 'loading' | 'missing' | 'failed' | 'unavailable' | 'playing';
  * never whose it was. It plays as soon as the scene is up, and again from the
  * start on asking. A timeline written under an older schema is not played,
  * and the page says the replay is unavailable (decision 0051); an id that is
- * no settled adventure is no replay.
+ * no settled adventure is no replay. Leaving one replay for another, as the
+ * browser's back does, stops the first while the second is read.
  */
 @Component({
   selector: 'heat-replay',
@@ -48,7 +53,8 @@ export class Replay {
     if (this.read.isLoading()) return 'loading';
     const adventure = this.adventure();
     if (!adventure) return 'missing';
-    return adventure.timeline && isPlayableTimeline(adventure.timeline) ? 'playing' : 'unavailable';
+    if (!adventure.timeline) return 'unreadable';
+    return isPlayableTimeline(adventure.timeline) ? 'playing' : 'unavailable';
   });
   /** The timeline to play, once it is read and playable. */
   private readonly timeline = computed((): AdventureTimeline | null => (this.state() === 'playing' ? this.adventure()?.timeline ?? null : null));
@@ -57,7 +63,7 @@ export class Replay {
     const at = this.adventure()?.location ?? this.game.location();
     return { id: at, name: location(at)?.name ?? at };
   });
-  /** Where and when, "At Millbrook, 3 hours ago." */
+  /** Where and when, "At Millbrook, 3 hours ago."; when is read as the page is drawn and does not tick, as in the lists. */
   protected readonly whereWhen = computed(() => {
     const settledAt = this.adventure()?.settledAt;
     return settledAt ? `At ${this.from().name}, ${agoWords(settledAt, Date.now())}.` : `At ${this.from().name}.`;
@@ -77,7 +83,12 @@ export class Replay {
     let started: AdventureTimeline | null = null;
     effect(() => {
       const timeline = this.timeline();
-      if (!timeline || !this.view().ready() || started === timeline) return;
+      if (!timeline) {
+        if (started) untracked(() => { this.play.stop(); });
+        started = null;
+        return;
+      }
+      if (!this.view().ready() || started === timeline) return;
       untracked(() => {
         started = timeline;
         this.start(timeline);

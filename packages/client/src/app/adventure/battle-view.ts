@@ -60,8 +60,9 @@ export class BattleView {
   private readonly createScene = inject(BATTLE_SCENE_FACTORY);
   private readonly readSizes = inject(LAYOUT_SIZES);
 
+  private readonly mounted = signal(false);
   /** Set once the scene has loaded, or failed to, and a run may start. */
-  readonly ready = signal(false);
+  readonly ready = this.mounted.asReadonly();
 
   /** The window and the regions' sizes, measured together, since a font-size change moves both. */
   private readonly viewport = signal(this.measured());
@@ -108,7 +109,7 @@ export class BattleView {
     } catch {
       this.scene = null;
     }
-    this.ready.set(true);
+    this.mounted.set(true);
   }
 
   private frame(ms: number): void {

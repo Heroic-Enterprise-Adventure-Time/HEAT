@@ -29,6 +29,9 @@ export class JobBoardPanel {
   protected readonly description = FACILITIES['job-board'].description;
   protected readonly jobs = computed(() => jobsAt(this.game.location(), 'job-board'));
   private readonly recent = resource({ params: () => this.game.location(), loader: ({ params }) => this.game.recentAdventuresAt(params) });
-  protected readonly recentLines = computed(() => (this.recent.hasValue() ? this.recent.value().map(recentLine) : undefined));
+  protected readonly recentLines = computed(() =>
+    // A list read again for another location says Loading, not the last one's lines.
+    this.recent.hasValue() && !this.recent.isLoading() ? this.recent.value().map(recentLine) : undefined,
+  );
   protected readonly recentFailed = computed(() => this.recent.status() === 'error');
 }

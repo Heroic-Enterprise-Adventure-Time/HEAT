@@ -1,18 +1,17 @@
 import { signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
-import { type AdventureEvent, type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
+import { type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
 
 import { Game, type ReplayedView } from '../game';
 import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
+import { fakeBattleScene, fakeFrameLoop } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf } from '../testing/texts-of';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
-import type { BattleSceneCallbacks } from './battle/battle-scene';
-import type { Field } from './field';
 import { Replay } from './replay';
 
 const snapshot = {
@@ -54,43 +53,21 @@ function settled(timeline: ReplayedView['timeline'] = played.timeline): Replayed
   };
 }
 
-/** A scene that draws nothing, records what it was given, and says everyone is on at once. */
-function fakeScene() {
-  const scene = {
-    resets: [] as { field: Field; sets: ReadonlyMap<string, string> }[],
-    fed: [] as AdventureEvent[],
-    factory: (_host: HTMLElement, callbacks: BattleSceneCallbacks) =>
-      Promise.resolve({
-        reset: (field: Field, sets: ReadonlyMap<string, string>, enter: boolean) => {
-          scene.resets.push({ field, sets });
-          if (enter) callbacks.onEntered();
-        },
-        feed: (events: readonly AdventureEvent[]) => {
-          scene.fed.push(...events);
-          callbacks.onEntered();
-        },
-        frame: () => undefined,
-        destroy: () => undefined,
-      }),
-  };
-  return scene;
-}
-
-/** A game whose replay read answers as the test says, recording each id asked for. */
-function fakeGame(answer: () => Promise<ReplayedView | null>) {
+/** A game whose replay read answers as the test says, for the id asked, recording each id. */
+function fakeGame(answer: (id: string) => Promise<ReplayedView | null>) {
   const fake = {
     location: signal('millbrook'),
     reads: [] as string[],
     replay: (id: string) => {
       fake.reads.push(id);
-      return answer();
+      return answer(id);
     },
   };
   return fake;
 }
 
-async function renderReplay(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
-  let onFrame: (ms: number) => void = () => undefined;
+async function renderReplay(game: ReturnType<typeof fakeGame>, scene = fakeBattleScene()) {
+  const frames = fakeFrameLoop();
   const view = await renderAt(
     '/replays/a9',
     [
@@ -100,16 +77,16 @@ async function renderReplay(game: ReturnType<typeof fakeGame>, scene = fakeScene
     ],
     [
       { provide: Game, useValue: game },
-      { provide: FRAME_LOOP, useValue: (f: (ms: number) => void) => ((onFrame = f), () => undefined) },
+      { provide: FRAME_LOOP, useValue: frames.loop },
       { provide: BATTLE_SCENE_FACTORY, useValue: scene.factory },
       testLayoutSizes,
     ],
   );
   const run = async (ms: number) => {
-    for (let left = ms; left > 0; left -= 250) onFrame(Math.min(250, left));
+    frames.advance(ms);
     await view.settle();
   };
-  return { ...view, run };
+  return { ...view, run, frames };
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
@@ -117,7 +94,7 @@ const panel = () => within(screen.getByRole('complementary', { name: /./ }));
 
 describe('Replay page (Issue-290)', () => {
   it('plays the stored timeline in the scene as soon as it is read, beside the job, where, when, how it ended, its stages and its party', async () => {
-    const scene = fakeScene();
+    const scene = fakeBattleScene();
     const game = fakeGame(() => Promise.resolve(settled()));
     const { run } = await renderReplay(game, scene);
     await waitFor(() => { expect(scene.resets).toHaveLength(1); });
@@ -142,7 +119,7 @@ describe('Replay page (Issue-290)', () => {
   });
 
   it("has the player's own replay's pause and speeds, and plays again from the start", async () => {
-    const scene = fakeScene();
+    const scene = fakeBattleScene();
     const { run, user } = await renderReplay(fakeGame(() => Promise.resolve(settled())), scene);
     await waitFor(() => { expect(scene.resets).toHaveLength(1); });
     const playback = within(screen.getByRole('group', { name: 'Playback' }));
@@ -162,7 +139,7 @@ describe('Replay page (Issue-290)', () => {
   });
 
   it('shows the health of each hero as the replay plays', async () => {
-    const scene = fakeScene();
+    const scene = fakeBattleScene();
     await renderReplay(fakeGame(() => Promise.resolve(settled())), scene);
     await waitFor(() => { expect(scene.resets).toHaveLength(1); });
     expect(await screen.findByRole('meter', { name: 'Bram health' })).toBeInTheDocument();
@@ -181,13 +158,42 @@ describe('Replay page (Issue-290)', () => {
   });
 
   it('says a replay stored before the battles changed is unavailable, and plays none of it, with the rest of the page', async () => {
-    const scene = fakeScene();
+    const scene = fakeBattleScene();
     const old = { ...played.timeline, schemaVersion: played.timeline.schemaVersion - 1 };
     await renderReplay(fakeGame(() => Promise.resolve(settled(old))), scene);
     expect(await screen.findByText('Replay unavailable: this adventure was played before the battles changed.')).toHaveRole('alert');
     expect(panel().getByText('Job done.')).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Playback' })).not.toBeInTheDocument();
     expect(scene.resets).toHaveLength(0);
+  });
+
+  it('says a settled replay whose timeline the hub could not give could not be read, and plays none of it, with the rest of the page', async () => {
+    const scene = fakeBattleScene();
+    await renderReplay(fakeGame(() => Promise.resolve(settled(null))), scene);
+    expect(await panel().findByText('The replay could not be read.')).toHaveRole('alert');
+    expect(panel().queryByText(/battles changed/)).not.toBeInTheDocument();
+    expect(panel().getByText('Job done.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Playback' })).not.toBeInTheDocument();
+    expect(scene.resets).toHaveLength(0);
+  });
+
+  it('stops the replay it left when the page goes on to another one', async () => {
+    const scene = fakeBattleScene();
+    let answer: (replayed: ReplayedView | null) => void = () => undefined;
+    const game = fakeGame((id) => (id === 'a9' ? Promise.resolve(settled()) : new Promise((resolve) => { answer = resolve; })));
+    const { router, frames } = await renderReplay(game, scene);
+    await waitFor(() => { expect(scene.resets).toHaveLength(1); });
+
+    const going = router.navigateByUrl('/replays/b2');
+    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    // The page is not stable while the read is under way, so the frames are run by hand, not with `run`.
+    const fed = scene.fed.length;
+    frames.advance(10_000);
+    expect(scene.fed).toHaveLength(fed);
+    answer(null);
+    await going;
+    expect(await panel().findByText('No such replay.')).toBeInTheDocument();
+    expect(game.reads).toEqual(['a9', 'b2']);
   });
 
   it('says there is no such replay for an id the hub answers none for', async () => {

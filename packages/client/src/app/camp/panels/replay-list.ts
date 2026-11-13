@@ -41,10 +41,14 @@ export class ReplayList {
     return lines.slice(0, REPLAYS_SHOWN).map((line) => {
       const when = agoWords(line.settledAt, now);
       const outcome = outcomeWords(line.outcome);
+      const link = this.withJob() ? line.job : when;
+      const says = this.withJob() ? `${outcome}, ${when}.` : `${outcome}.`;
       return {
         id: line.id,
-        link: this.withJob() ? line.job : when,
-        says: this.withJob() ? `${outcome}, ${when}.` : `${outcome}.`,
+        link,
+        // The link is named with how it ended too, so two settled in the same hour, or of one job, are told apart.
+        label: `${link}: ${says}`,
+        says,
         party: `${partyWords(line.party)}.`,
       };
     });

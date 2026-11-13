@@ -1,19 +1,18 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
-import { type AdventureEvent, type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
+import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
 
 import { type AdventureResultView, type AdventureView, Game, type SettledView } from '../game';
 import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
+import { fakeBattleScene, fakeFrameLoop } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { itemHolding, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf } from '../testing/texts-of';
 import { Adventure } from './adventure';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
-import type { BattleSceneCallbacks } from './battle/battle-scene';
-import { type Field, isEntry } from './field';
 import { AdventureRun, loadRun, saveRun } from './run';
 
 const adventure: AdventureView = {
@@ -59,39 +58,6 @@ const result: AdventureResultView = {
   ],
 };
 
-/**
- * A scene that draws nothing and records what it was given. By default it
- * says everyone is on at once, as if the rush in took no time; `holding`
- * keeps an entry waiting until the test calls `release`.
- */
-function fakeScene(holding = false) {
-  let callbacks: BattleSceneCallbacks | null = null;
-  const scene = {
-    resets: [] as { field: Field; enter: boolean }[],
-    fed: [] as AdventureEvent[],
-    frames: 0,
-    release: () => callbacks?.onEntered(),
-    factory: (_host: HTMLElement, given: BattleSceneCallbacks) => {
-      callbacks = given;
-      return Promise.resolve({
-        reset: (field: Field, _sets: ReadonlyMap<string, string>, enter: boolean) => {
-          scene.resets.push({ field, enter });
-          if (enter && !holding) given.onEntered();
-        },
-        feed: (events: readonly AdventureEvent[]) => {
-          scene.fed.push(...events);
-          if (events.some(isEntry) && !holding) given.onEntered();
-        },
-        frame: () => {
-          scene.frames++;
-        },
-        destroy: () => undefined,
-      });
-    },
-  };
-  return scene;
-}
-
 /** A game with the open adventure and a submit that answers as the test says, recording each log it was given. */
 function fakeGame(answer: () => AdventureResultView | null | Error = () => result) {
   const open = signal<AdventureView | null>(adventure);
@@ -119,8 +85,8 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
   return fake;
 }
 
-async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeScene()) {
-  let onFrame: (ms: number) => void = () => undefined;
+async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBattleScene()) {
+  const frames = fakeFrameLoop();
   const { router, settle, user } = await renderAt(
     '/adventure',
     [
@@ -129,7 +95,7 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeSc
     ],
     [
       { provide: Game, useValue: game },
-      { provide: FRAME_LOOP, useValue: (f: (ms: number) => void) => ((onFrame = f), () => undefined) },
+      { provide: FRAME_LOOP, useValue: frames.loop },
       { provide: BATTLE_SCENE_FACTORY, useValue: scene.factory },
       testLayoutSizes,
     ],
@@ -137,9 +103,8 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeSc
   // The scene loads after the first render; the run starts once it has.
   await waitFor(() => { expect(scene.resets.length).toBeGreaterThan(0); });
   await settle();
-  /** Runs `ms` of wall-clock time in frames of at most 250 ms, as the browser would. */
   const run = async (ms: number) => {
-    for (let left = ms; left > 0; left -= 250) onFrame(Math.min(250, left));
+    frames.advance(ms);
     await settle();
   };
   return { run, router, user };
@@ -224,7 +189,7 @@ describe('Adventure', () => {
   });
 
   it('holds the clock at an entry until the scene has brought everyone on', async () => {
-    const scene = fakeScene(true);
+    const scene = fakeBattleScene(true);
     const { run } = await renderAdventure(fakeGame(), scene);
     expect(scene.resets).toMatchObject([{ field: { stage: 0 }, enter: true }]);
     await run(2000);
@@ -247,7 +212,7 @@ describe('Adventure', () => {
     const earlier = new AdventureRun(adventure.snapshot as AdventureSnapshot, adventure.seed);
     earlier.advanceTo(8000);
     saveRun('a1', { log: earlier.log, simTime: earlier.simTime });
-    const scene = fakeScene();
+    const scene = fakeBattleScene();
     await renderAdventure(fakeGame(), scene);
     expect(screen.getByText('Picked up where you left off.')).toBeInTheDocument();
     // Picked up, everyone stands where they were: nobody runs on.
@@ -274,7 +239,7 @@ describe('Adventure', () => {
   });
 
   it('replays the stored timeline in the scene from its start, and goes back to the result', async () => {
-    const scene = fakeScene();
+    const scene = fakeBattleScene();
     const game = fakeGame();
     const { run, user } = await renderAdventure(game, scene);
     await run(120_000);
@@ -294,7 +259,7 @@ describe('Adventure', () => {
   });
 
   it('says a replay stored before the battles changed is unavailable, and plays none of it', async () => {
-    const scene = fakeScene();
+    const scene = fakeBattleScene();
     const game = fakeGame();
     const stored = await game.timeline('a1');
     game.timeline = () => Promise.resolve({ ...stored, schemaVersion: stored.schemaVersion - 1 });
