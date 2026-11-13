@@ -1,8 +1,7 @@
 {
   "set": "pickaxe-01",
   "kind": "weapon sprite set",
-  "wielders": [],
-  "madeFor": "The miner's weapon; Issue-287 adds the miner to the engine and names it in wielders.",
+  "wielders": ["miner"],
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

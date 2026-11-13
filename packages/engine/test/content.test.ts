@@ -56,9 +56,9 @@ describe("static content", () => {
     }
   });
 
-  it("starts a new player at Millbrook, which recruits the villager, the fighter and the ranger", () => {
+  it("starts a new player at Millbrook, which recruits the villager, the lumberjack, the miner, the fighter and the ranger", () => {
     expect(location(STARTING_LOCATION)?.name).toBe("Millbrook");
-    expect(location(STARTING_LOCATION)?.recruits.map((r) => r.unitType)).toEqual(["villager", "fighter", "ranger"]);
+    expect(location(STARTING_LOCATION)?.recruits.map((r) => r.unitType)).toEqual(["villager", "lumberjack", "miner", "fighter", "ranger"]);
     expect(location(STARTING_LOCATION)?.sharedFacilities).toEqual(["job-board"]);
   });
 
@@ -74,8 +74,8 @@ describe("static content", () => {
 
   it("prices Millbrook's recruits by the first progression, with the villager free when no hero is alive", () => {
     const recruits = must(location(STARTING_LOCATION), "the starting location").recruits;
-    const villager = must(recruits[0], "the villager recruit");
-    const fighter = must(recruits[1], "the fighter recruit");
+    const villager = must(recruits.find((r) => r.unitType === "villager"), "the villager recruit");
+    const fighter = must(recruits.find((r) => r.unitType === "fighter"), "the fighter recruit");
     expect(recruitCost(villager, 0)).toEqual([]);
     expect(recruitCost(villager, 1)).toEqual([{ material: "timber", amount: 20 }]);
     expect(recruitCost(fighter, 0)).toEqual([{ material: "ore", amount: 40 }]);
