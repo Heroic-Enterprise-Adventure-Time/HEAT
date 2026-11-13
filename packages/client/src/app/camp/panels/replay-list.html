@@ -1,0 +1,19 @@
+@if (failed()) {
+  <p>The list could not be read.</p>
+} @else if (rows(); as rows) {
+  @if (rows.length > 0) {
+    <ul class="replays" [attr.aria-labelledby]="labelledBy()">
+      @for (row of rows; track row.id) {
+        <li>
+          <a class="link" [routerLink]="['/replays', row.id]" [attr.aria-label]="row.label">{{ row.link }}</a>&ngsp;
+          <span>{{ row.says }}</span>&ngsp;
+          <span class="replay-party">{{ row.party }}</span>
+        </li>
+      }
+    </ul>
+  } @else {
+    <p>{{ empty() }}</p>
+  }
+} @else {
+  <p>Loading…</p>
+}

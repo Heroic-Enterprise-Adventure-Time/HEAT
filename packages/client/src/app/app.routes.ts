@@ -30,7 +30,8 @@ export const signedIn: CanActivateFn = (_route, state) => {
  * camp is `/camp/<location>/seen/<id>`, under no facility. A job's detail
  * sits under the job board, `/camp/<location>/job-board/jobs/<id>`, or under
  * the facility that posts it, `/camp/<location>/mine/jobs/<id>` (Issue-133), and the
- * open adventure is `/adventure`, outside any camp (Issue-115). Anything else
+ * open adventure is `/adventure`, outside any camp (Issue-115), and any settled
+ * adventure's replay is `/replays/<id>`, beside it (Issue-290). Anything else
  * goes home, which sends a signed-in player on to their camp.
  */
 export const routes: Routes = [
@@ -52,5 +53,7 @@ export const routes: Routes = [
   },
   // Loaded on first use, so the engine that plays it is a chunk of its own (Issue-15).
   { path: 'adventure', loadComponent: () => import('./adventure/adventure').then((m) => m.Adventure), canActivate: [signedIn] },
+  // The replay plays in the same scene, so it shares the battle's chunks.
+  { path: 'replays/:id', loadComponent: () => import('./adventure/replay').then((m) => m.Replay), canActivate: [signedIn] },
   { path: '**', redirectTo: '' },
 ];

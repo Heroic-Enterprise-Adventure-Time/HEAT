@@ -56,6 +56,9 @@
   @if (refusal(); as refusal) {
     <p class="refusal" role="alert">{{ refusal }}</p>
   }
+
+  <h3 id="replays-title">Replays</h3>
+  <heat-replay-list empty="No replays of this job yet." labelledBy="replays-title" [failed]="replaysFailed()" [lines]="replayLines()" />
 } @else {
   <h2 id="panel-title">Job</h2>
   <p>The {{ posterName() | lowercase }} has no such job.</p>

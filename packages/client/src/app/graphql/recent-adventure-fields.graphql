@@ -1,0 +1,15 @@
+fragment RecentAdventureFields on RecentAdventure {
+  id
+  outcome
+  settledAt
+  job {
+    id
+    name
+  }
+  party {
+    died
+    level
+    name
+    unitType
+  }
+}

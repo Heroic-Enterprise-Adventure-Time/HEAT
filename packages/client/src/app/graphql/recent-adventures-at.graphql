@@ -1,0 +1,7 @@
+#import "./recent-adventure-fields.graphql"
+
+query RecentAdventuresAt($location: ID!) {
+  recentAdventuresAt(location: $location) {
+    ...RecentAdventureFields
+  }
+}

@@ -3,9 +3,9 @@ import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
 import { must, UNIT_PROFILES } from '@heat/engine';
 
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/adventure';
+import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/battle-view';
 import { routes } from '../../app.routes';
-import { type AdventureView, Game, type HeroView } from '../../game';
+import { type AdventureView, Game, type HeroView, type RecentAdventureView, type ReplayView } from '../../game';
 import { Refusal } from '../../hub';
 import { Session } from '../../session';
 import { fakeCampScene } from '../../testing/fake-camp-scene';
@@ -28,6 +28,36 @@ function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): H
     xp: 0,
     status,
     retiredAt: null,
+  };
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+/** A time the given hours before now, as the hub writes one. */
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * HOUR_MS).toISOString();
+
+/** Another player's adventure settled here, as the job board's list reads it: no owner and no hero id (decision 0050). */
+function recent(id: string, jobId: string, name: string, outcome: RecentAdventureView['outcome'], hours: number): RecentAdventureView {
+  return {
+    id,
+    outcome,
+    settledAt: hoursAgo(hours),
+    job: { id: jobId, name },
+    party: [
+      { name: 'Bram', unitType: 'fighter', level: 2, died: false },
+      { name: 'Tansy', unitType: 'villager', level: 1, died: outcome === 'defeat' },
+    ],
+  };
+}
+
+/** A replay of the wolves job, as its list reads the adventure: the party as it set out and the result's levels and deaths. */
+function wolvesReplay(id: string, outcome: NonNullable<ReplayView['result']>['outcome'], hours: number): ReplayView {
+  return {
+    id,
+    location: 'millbrook',
+    settledAt: hoursAgo(hours),
+    job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road' },
+    result: { outcome, heroes: [{ heroId: 'x1', level: 3, dead: outcome === 'defeat' }] },
+    snapshot: { heroes: [{ heroId: 'x1', name: 'Bram', unitType: 'fighter', level: 2 }] },
   };
 }
 
@@ -62,6 +92,19 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     settled: signal(null),
     error: signal<string | null>(null),
     started: [] as { location: string; jobId: string; heroIds: readonly string[] }[],
+    /** What the two lists answer; each is a function, so a test can make one fail or never answer. */
+    recent: (): Promise<readonly RecentAdventureView[]> => Promise.resolve([]),
+    replays: (): Promise<readonly ReplayView[]> => Promise.resolve([]),
+    recentReads: [] as string[],
+    replayReads: [] as string[],
+    recentAdventuresAt: (at: string) => {
+      fake.recentReads.push(at);
+      return fake.recent();
+    },
+    replaysOf: (jobId: string) => {
+      fake.replayReads.push(jobId);
+      return fake.replays();
+    },
     startAdventure: (location: string, jobId: string, heroIds: readonly string[]) => {
       fake.started.push({ location, jobId, heroIds });
       const result = answer(heroIds);
@@ -235,5 +278,104 @@ describe('Job board', () => {
   it('sends /adventure to the camp when no adventure is open', async () => {
     const { router } = await renderJobs(fakeGame(party), '/adventure');
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
+  });
+});
+
+describe('What was done here (Issue-290)', () => {
+  const recentItems = () => listItems('Recently here');
+  const replayItems = () => listItems('Replays');
+
+  it('lists the adventures recently settled here, newest first, each with its job, how it ended, when and its party, opening its replay', async () => {
+    const game = fakeGame(party);
+    game.recent = () => Promise.resolve([recent('r1', 'pick-up-sticks', 'Pick up sticks', 'complete', 1), recent('r2', 'wolves-on-the-mill-road', 'Wolves on the mill road', 'defeat', 50)]);
+    await renderJobs(game, '/camp/millbrook/job-board');
+    expect(await panel().findByRole('list', { name: 'Recently here' })).toBeInTheDocument();
+    expect(textsOf(recentItems())).toEqual([
+      'Pick up sticks Job done, 1 hour ago. Bram (fighter, level 2), Tansy (villager, level 1).',
+      'Wolves on the mill road The party fell, 2 days ago. Bram (fighter, level 2), Tansy (villager, level 1, died).',
+    ]);
+    expect(within(itemHolding('Recently here', 'link', 'Wolves on the mill road: The party fell, 2 days ago.')).getByRole('link')).toHaveAttribute('href', '/replays/r2');
+    expect(game.recentReads).toEqual(['millbrook']);
+  });
+
+  it('shows ten of the twenty the hub may answer', async () => {
+    const game = fakeGame(party);
+    game.recent = () => Promise.resolve(Array.from({ length: 20 }, (_, i) => recent(`r${i}`, 'pick-up-sticks', 'Pick up sticks', 'complete', i)));
+    await renderJobs(game, '/camp/millbrook/job-board');
+    await panel().findByRole('list', { name: 'Recently here' });
+    expect(recentItems()).toHaveLength(10);
+  });
+
+  it('says so when nothing was done here in the last week', async () => {
+    await renderJobs(fakeGame(party), '/camp/millbrook/job-board');
+    expect(await panel().findByText('Nothing was done here in the last week.')).toBeInTheDocument();
+    expect(panel().queryByRole('list', { name: 'Recently here' })).not.toBeInTheDocument();
+  });
+
+  it('says Loading until the list answers, and that it could not be read if the read fails, while the jobs stay', async () => {
+    const game = fakeGame(party);
+    let fail: (e: Error) => void = () => undefined;
+    game.recent = () => new Promise((_, reject) => { fail = reject; });
+    // The page is not stable while the read is under way, so the render is waited for after it fails.
+    const view = renderJobs(game, '/camp/millbrook/job-board');
+    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    fail(new Error('the hub was not reached'));
+    await view;
+    const failed = await panel().findByText('The list could not be read.');
+    expect(failed).not.toHaveRole('alert');
+    expect(listItems('Jobs')).toHaveLength(3);
+  });
+
+  it("lists a job's replays, every outcome, each led by when it settled and opening its replay", async () => {
+    const game = fakeGame(party);
+    game.replays = () => Promise.resolve([wolvesReplay('a7', 'retreat', 3), wolvesReplay('a6', 'complete', 0)]);
+    await renderJobs(game, WOLVES);
+    expect(await panel().findByRole('list', { name: 'Replays' })).toBeInTheDocument();
+    expect(textsOf(replayItems())).toEqual([
+      '3 hours ago The party turned back. Bram (fighter, level 3).',
+      'just now Job done. Bram (fighter, level 3).',
+    ]);
+    expect(panel().getByRole('link', { name: '3 hours ago: The party turned back.' })).toHaveAttribute('href', '/replays/a7');
+    expect(panel().getByRole('link', { name: 'just now: Job done.' })).toHaveAttribute('href', '/replays/a6');
+    expect(game.replayReads).toEqual(['wolves-on-the-mill-road']);
+  });
+
+  it("says Loading for another job's replays while they are read, never the last job's", async () => {
+    const game = fakeGame(party);
+    game.replays = () => Promise.resolve([wolvesReplay('a7', 'retreat', 3)]);
+    const { router } = await renderJobs(game, WOLVES);
+    await panel().findByRole('list', { name: 'Replays' });
+    let answer: (replays: readonly ReplayView[]) => void = () => undefined;
+    game.replays = () => new Promise((resolve) => { answer = resolve; });
+    // The page is not stable while the read is under way, so the navigation is waited for after it answers.
+    const going = router.navigateByUrl('/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
+    expect(await panel().findByText('Loading…')).toBeInTheDocument();
+    expect(panel().queryByRole('link', { name: /^3 hours ago/ })).not.toBeInTheDocument();
+    answer([]);
+    await going;
+    expect(await panel().findByText('No replays of this job yet.')).toBeInTheDocument();
+  });
+
+  it('says so when a job has no replays yet', async () => {
+    await renderJobs(fakeGame(party), WOLVES);
+    expect(await panel().findByText('No replays of this job yet.')).toBeInTheDocument();
+    expect(panel().queryByRole('list', { name: 'Replays' })).not.toBeInTheDocument();
+  });
+
+  it('reads no replays for a job the board does not post', async () => {
+    const game = fakeGame(party);
+    await renderJobs(game, '/camp/millbrook/job-board/jobs/nothing');
+    expect(panel().queryByRole('heading', { name: 'Replays' })).not.toBeInTheDocument();
+    expect(game.replayReads).toEqual([]);
+  });
+
+  it('does not read the lists again after the player acts', async () => {
+    const game = fakeGame(party);
+    const { user } = await renderJobs(game, WOLVES);
+    await panel().findByText('No replays of this job yet.');
+    await user.click(box('Wren'));
+    game.all.set([...party, hero('h7', 'Pip')]);
+    await waitFor(() => { expect(box('Pip')).toBeInTheDocument(); });
+    expect(game.replayReads).toEqual(['wolves-on-the-mill-road']);
   });
 });
