@@ -1,0 +1,49 @@
+<heat-battle-view>
+  @switch (state()) {
+    @case ('loading') {
+      <h2 id="panel-title">Replay</h2>
+      <p>Loading…</p>
+    }
+    @case ('missing') {
+      <h2 id="panel-title">Replay</h2>
+      <p>No such replay.</p>
+      <a class="link" routerLink="/">Back to camp</a>
+    }
+    @case ('failed') {
+      <h2 id="panel-title">Replay</h2>
+      <p class="lost" role="alert">The replay could not be read.</p>
+      <a class="link" routerLink="/">Back to camp</a>
+    }
+    @default {
+      @if (adventure(); as adventure) {
+        <h2 id="panel-title">{{ adventure.job.name }}</h2>
+        <p class="note">Replay. {{ whereWhen() }}</p>
+        @if (outcome(); as outcome) {
+          <p class="outcome">{{ outcome }}</p>
+        }
+        @if (state() === 'playing') {
+          <heat-playback [health]="true" />
+          <div class="after">
+            <button type="button" (click)="watchAgain()">Watch from the start</button>
+          </div>
+        } @else {
+          <p class="lost" role="alert">Replay unavailable: this adventure was played before the battles changed.</p>
+        }
+
+        <h3 id="stages-title">Stages</h3>
+        <ol class="stages" aria-labelledby="stages-title">
+          @for (stage of stages(); track stage.stage) {
+            <li>{{ stage.words }}</li>
+          }
+        </ol>
+
+        @if (party(); as party) {
+          <h3 id="party-title">Party</h3>
+          <p>{{ party }}</p>
+        }
+
+        <a class="link" [routerLink]="['/camp', from().id, 'job-board']">Back to {{ from().name }}</a>
+      }
+    }
+  }
+</heat-battle-view>

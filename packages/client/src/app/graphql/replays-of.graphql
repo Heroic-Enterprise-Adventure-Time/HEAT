@@ -1,0 +1,7 @@
+#import "./replay-fields.graphql"
+
+query ReplaysOf($job: ID!) {
+  replaysOf(job: $job) {
+    ...ReplayFields
+  }
+}

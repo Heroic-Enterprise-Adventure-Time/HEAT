@@ -39,8 +39,14 @@ import {
   MeDocument,
   type MeQuery,
   type OverrideInput,
+  type RecentAdventureFieldsFragment,
+  RecentAdventuresAtDocument,
   RecruitHeroDocument,
   type RecruitHeroMutation,
+  ReplayDocument,
+  type ReplayFieldsFragment,
+  type ReplayQuery,
+  ReplaysOfDocument,
   type ResultFieldsFragment,
   RetireHeroDocument,
   type RetireHeroMutation,
@@ -93,6 +99,17 @@ export type CampView = Engine<CampFieldsFragment>;
 export type AdventureView = Engine<AdventureFieldsFragment>;
 /** What the hub's replay found and settlement wrote (Issue-114). */
 export type AdventureResultView = Engine<ResultFieldsFragment>;
+/** An adventure settled at a location in the last week, as the job board lists it: its public line, never whose it was (decision 0050). */
+export type RecentAdventureView = Engine<RecentAdventureFieldsFragment>;
+/** A settled adventure as a job's replays list it, with no timeline, which a list never asks for (decision 0053). */
+export type ReplayView = Engine<ReplayFieldsFragment>;
+type ReplayAdventure = NonNullable<ReplayQuery['adventure']>;
+/**
+ * Any settled adventure as its replay page shows it (Issue-290): the line a
+ * list shows, its status, its whole result, and the stored timeline, the
+ * engine's own, which the page plays with no engine (decision 0030).
+ */
+export type ReplayedView = Engine<Omit<ReplayAdventure, 'timeline'>> & { readonly timeline: AdventureTimeline | null };
 
 type MePlayer = NonNullable<MeQuery['me']>;
 /** The signed-in player: `camps` and `heroes` are nulled only for another caller (graphql.md, rule 11), never for the player's own read. */
@@ -186,6 +203,28 @@ function resultFromWire(result: ResultFieldsFragment): AdventureResultView {
     rewards: materials(result.rewards),
     credited: materials(result.credited),
     lost: materials(result.lost),
+  };
+}
+
+function recentFromWire(recent: RecentAdventureFieldsFragment): RecentAdventureView {
+  return { ...recent, outcome: outcome(recent.outcome), party: recent.party.map((h) => ({ ...h, unitType: unitType(h.unitType) })) };
+}
+
+function replayFromWire(replay: ReplayFieldsFragment): ReplayView {
+  return {
+    ...replay,
+    result: replay.result ? { ...replay.result, outcome: outcome(replay.result.outcome) } : null,
+    snapshot: { ...replay.snapshot, heroes: replay.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType) })) },
+  };
+}
+
+function replayedFromWire(replayed: ReplayAdventure): ReplayedView {
+  return {
+    ...replayFromWire(replayed),
+    status: replayed.status,
+    result: replayed.result ? resultFromWire(replayed.result) : null,
+    // The JSON scalar carries the engine's own AdventureTimeline, which the hub's replay wrote (decision 0030).
+    timeline: (replayed.timeline as AdventureTimeline | null | undefined) ?? null,
   };
 }
 
@@ -490,20 +529,46 @@ export class Game {
 
   /** The timeline the hub stored at settlement, for the replay: display only, played with no engine (decision 0030). */
   async timeline(adventureId: string): Promise<AdventureTimeline | null> {
-    let data;
-    try {
-      ({ data } = await firstValueFrom(this.apollo.query({ query: TimelineDocument, variables: { id: adventureId }, fetchPolicy: 'network-only' })));
-    } catch (e) {
-      throw apiError(e);
-    }
+    const data = await this.read(TimelineDocument, { id: adventureId });
     // The JSON scalar carries the engine's own AdventureTimeline, which the hub's replay wrote (decision 0030).
     return (data?.adventure?.timeline as AdventureTimeline | null | undefined) ?? null;
+  }
+
+  /**
+   * The adventures most recently settled at the location, newest first, for
+   * the job board (decision 0050). Read when the panel opens and not after
+   * each mutation, so the list stays put while the player acts (Issue-290).
+   */
+  async recentAdventuresAt(at: string): Promise<readonly RecentAdventureView[]> {
+    const data = await this.read(RecentAdventuresAtDocument, { location: at });
+    return (data?.recentAdventuresAt ?? []).map(recentFromWire);
+  }
+
+  /** The job's most recent replays, newest first, every outcome, read when its page opens (decision 0053). */
+  async replaysOf(jobId: string): Promise<readonly ReplayView[]> {
+    const data = await this.read(ReplaysOfDocument, { job: jobId });
+    return (data?.replaysOf ?? []).map(replayFromWire);
+  }
+
+  /** An adventure with its timeline, for its replay page; null when the hub answers none, an id unknown or another player's open one. */
+  async replay(adventureId: string): Promise<ReplayedView | null> {
+    const data = await this.read(ReplayDocument, { id: adventureId });
+    return data?.adventure ? replayedFromWire(data.adventure) : null;
   }
 
   /** Makes the player's profile if they have none; called before the player is read, after every sign-in. */
   private async join(): Promise<void> {
     const data = await this.mutate(JoinGameDocument, {});
     answered(must(data.joinGame, 'joinGame'), 'JoinGameSuccess');
+  }
+
+  /** One query read afresh from the hub, never the cache, answering its data or throwing what Apollo threw as an `ApiError`. */
+  private async read<TData, TVariables extends OperationVariables>(query: TypedDocumentNode<TData, TVariables>, variables: TVariables): Promise<TData | undefined> {
+    try {
+      return (await firstValueFrom(this.apollo.query({ query, variables, fetchPolicy: 'network-only' }))).data;
+    } catch (e) {
+      throw apiError(e);
+    }
   }
 
   /** One mutation, on the current deploy or the previous one, answering its data or throwing what Apollo threw as an `ApiError`. */

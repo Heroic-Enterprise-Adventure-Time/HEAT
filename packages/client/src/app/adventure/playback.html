@@ -1,0 +1,24 @@
+<div class="playback" role="group" aria-label="Playback">
+  <button type="button" [attr.aria-pressed]="play.paused()" (click)="play.togglePause()">
+    {{ pauseLabel() }}
+  </button>
+  @for (speed of speeds; track speed) {
+    <button type="button" [attr.aria-pressed]="play.speed() === speed" (click)="play.setSpeed(speed)">{{ speed }}×</button>
+  }
+</div>
+
+@if (health()) {
+  @if (play.field(); as field) {
+    <ul class="party">
+      @for (hero of field.party; track hero.unitId) {
+        <li [class.down]="hero.health <= 0">
+          <div class="who">
+            <strong>{{ hero.name }}</strong>
+            <span class="health">{{ hero.health }}/{{ hero.maxHealth }}</span>
+          </div>
+          <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="`${hero.name} health`"></meter>
+        </li>
+      }
+    </ul>
+  }
+}

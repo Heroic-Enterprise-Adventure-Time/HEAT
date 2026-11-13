@@ -22,7 +22,12 @@ type Documents = {
     "query HeroesSeenAt($location: ID!) {\n  heroesSeenAt(location: $location) {\n    ...SeenHeroFields\n  }\n}": typeof types.HeroesSeenAtDocument,
     "mutation JoinGame {\n  joinGame {\n    __typename\n    ... on JoinGameSuccess {\n      player {\n        id\n      }\n    }\n  }\n}": typeof types.JoinGameDocument,
     "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n  }\n}": typeof types.MeDocument,
+    "fragment RecentAdventureFields on RecentAdventure {\n  id\n  outcome\n  settledAt\n  job {\n    id\n    name\n  }\n  party {\n    died\n    level\n    name\n    unitType\n  }\n}": typeof types.RecentAdventureFieldsFragmentDoc,
+    "query RecentAdventuresAt($location: ID!) {\n  recentAdventuresAt(location: $location) {\n    ...RecentAdventureFields\n  }\n}": typeof types.RecentAdventuresAtDocument,
     "mutation RecruitHero($input: RecruitHeroInput!) {\n  recruitHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RecruitHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}": typeof types.RecruitHeroDocument,
+    "fragment ReplayFields on Adventure {\n  id\n  location\n  settledAt\n  job {\n    id\n    name\n  }\n  result {\n    outcome\n    heroes {\n      dead\n      heroId\n      level\n    }\n  }\n  snapshot {\n    heroes {\n      heroId\n      level\n      name\n      unitType\n    }\n  }\n}": typeof types.ReplayFieldsFragmentDoc,
+    "query Replay($id: ID!) {\n  adventure(id: $id) {\n    ...ReplayFields\n    status\n    timeline\n    result {\n      ...ResultFields\n    }\n  }\n}": typeof types.ReplayDocument,
+    "query ReplaysOf($job: ID!) {\n  replaysOf(job: $job) {\n    ...ReplayFields\n  }\n}": typeof types.ReplaysOfDocument,
     "fragment ResultFields on AdventureResult {\n  outcome\n  credited {\n    amount\n    material\n  }\n  heroes {\n    dead\n    heroId\n    level\n    xp\n    xpGained\n  }\n  lost {\n    amount\n    material\n  }\n  rewards {\n    amount\n    material\n  }\n  stages {\n    ended\n    kind\n    stage\n  }\n}": typeof types.ResultFieldsFragmentDoc,
     "mutation RetireHero($input: RetireHeroInput!) {\n  retireHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RetireHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}": typeof types.RetireHeroDocument,
     "fragment SeenHeroFields on SeenHero {\n  id\n  level\n  name\n  spriteSet\n  unitType\n}": typeof types.SeenHeroFieldsFragmentDoc,
@@ -39,7 +44,12 @@ const documents: Documents = {
     "query HeroesSeenAt($location: ID!) {\n  heroesSeenAt(location: $location) {\n    ...SeenHeroFields\n  }\n}": types.HeroesSeenAtDocument,
     "mutation JoinGame {\n  joinGame {\n    __typename\n    ... on JoinGameSuccess {\n      player {\n        id\n      }\n    }\n  }\n}": types.JoinGameDocument,
     "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n  }\n}": types.MeDocument,
+    "fragment RecentAdventureFields on RecentAdventure {\n  id\n  outcome\n  settledAt\n  job {\n    id\n    name\n  }\n  party {\n    died\n    level\n    name\n    unitType\n  }\n}": types.RecentAdventureFieldsFragmentDoc,
+    "query RecentAdventuresAt($location: ID!) {\n  recentAdventuresAt(location: $location) {\n    ...RecentAdventureFields\n  }\n}": types.RecentAdventuresAtDocument,
     "mutation RecruitHero($input: RecruitHeroInput!) {\n  recruitHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RecruitHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}": types.RecruitHeroDocument,
+    "fragment ReplayFields on Adventure {\n  id\n  location\n  settledAt\n  job {\n    id\n    name\n  }\n  result {\n    outcome\n    heroes {\n      dead\n      heroId\n      level\n    }\n  }\n  snapshot {\n    heroes {\n      heroId\n      level\n      name\n      unitType\n    }\n  }\n}": types.ReplayFieldsFragmentDoc,
+    "query Replay($id: ID!) {\n  adventure(id: $id) {\n    ...ReplayFields\n    status\n    timeline\n    result {\n      ...ResultFields\n    }\n  }\n}": types.ReplayDocument,
+    "query ReplaysOf($job: ID!) {\n  replaysOf(job: $job) {\n    ...ReplayFields\n  }\n}": types.ReplaysOfDocument,
     "fragment ResultFields on AdventureResult {\n  outcome\n  credited {\n    amount\n    material\n  }\n  heroes {\n    dead\n    heroId\n    level\n    xp\n    xpGained\n  }\n  lost {\n    amount\n    material\n  }\n  rewards {\n    amount\n    material\n  }\n  stages {\n    ended\n    kind\n    stage\n  }\n}": types.ResultFieldsFragmentDoc,
     "mutation RetireHero($input: RetireHeroInput!) {\n  retireHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RetireHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}": types.RetireHeroDocument,
     "fragment SeenHeroFields on SeenHero {\n  id\n  level\n  name\n  spriteSet\n  unitType\n}": types.SeenHeroFieldsFragmentDoc,
@@ -97,7 +107,27 @@ export function graphql(source: "query Me {\n  me {\n    id\n    camps {\n      
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
+export function graphql(source: "fragment RecentAdventureFields on RecentAdventure {\n  id\n  outcome\n  settledAt\n  job {\n    id\n    name\n  }\n  party {\n    died\n    level\n    name\n    unitType\n  }\n}"): (typeof documents)["fragment RecentAdventureFields on RecentAdventure {\n  id\n  outcome\n  settledAt\n  job {\n    id\n    name\n  }\n  party {\n    died\n    level\n    name\n    unitType\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "query RecentAdventuresAt($location: ID!) {\n  recentAdventuresAt(location: $location) {\n    ...RecentAdventureFields\n  }\n}"): (typeof documents)["query RecentAdventuresAt($location: ID!) {\n  recentAdventuresAt(location: $location) {\n    ...RecentAdventureFields\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
 export function graphql(source: "mutation RecruitHero($input: RecruitHeroInput!) {\n  recruitHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RecruitHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}"): (typeof documents)["mutation RecruitHero($input: RecruitHeroInput!) {\n  recruitHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RecruitHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "fragment ReplayFields on Adventure {\n  id\n  location\n  settledAt\n  job {\n    id\n    name\n  }\n  result {\n    outcome\n    heroes {\n      dead\n      heroId\n      level\n    }\n  }\n  snapshot {\n    heroes {\n      heroId\n      level\n      name\n      unitType\n    }\n  }\n}"): (typeof documents)["fragment ReplayFields on Adventure {\n  id\n  location\n  settledAt\n  job {\n    id\n    name\n  }\n  result {\n    outcome\n    heroes {\n      dead\n      heroId\n      level\n    }\n  }\n  snapshot {\n    heroes {\n      heroId\n      level\n      name\n      unitType\n    }\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "query Replay($id: ID!) {\n  adventure(id: $id) {\n    ...ReplayFields\n    status\n    timeline\n    result {\n      ...ResultFields\n    }\n  }\n}"): (typeof documents)["query Replay($id: ID!) {\n  adventure(id: $id) {\n    ...ReplayFields\n    status\n    timeline\n    result {\n      ...ResultFields\n    }\n  }\n}"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "query ReplaysOf($job: ID!) {\n  replaysOf(job: $job) {\n    ...ReplayFields\n  }\n}"): (typeof documents)["query ReplaysOf($job: ID!) {\n  replaysOf(job: $job) {\n    ...ReplayFields\n  }\n}"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

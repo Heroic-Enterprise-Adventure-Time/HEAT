@@ -1,65 +1,15 @@
-import { NgTemplateOutlet } from '@angular/common';
-import { afterNextRender, Component, computed, DestroyRef, effect, ElementRef, inject, InjectionToken, signal, untracked, viewChild } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { ABILITIES, type AbilityId, isPlayableTimeline, type JobId, JOBS, location, must, type PartyOrder, type StageEnding, UNIT_PROFILES, type UnitType } from '@heat/engine';
+import { ABILITIES, type AbilityId, isPlayableTimeline, type JobId, JOBS, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
-import { LAYOUT_SIZES } from '../camp/layout-sizes';
-import { isSideBySide } from '../camp/page-layout';
 import { stageWords } from '../camp/panels/job-words';
-import { type AdventureResultView, Game } from '../game';
-import { stackedBattleHeight } from './battle/battle-layout';
-import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
+import { Game } from '../game';
+import { BattleView } from './battle-view';
 import { secondsLeft, waitingWords } from './field';
-import { Play, SPEEDS } from './play';
-
-/** Calls `onFrame` with the wall-clock milliseconds since the last frame until stopped; a test provides one it drives by hand. */
-export type FrameLoop = (onFrame: (elapsedMs: number) => void) => () => void;
-
-/** The longest step one frame may take, so a tab coming back from the background does not leap ahead. */
-const MAX_FRAME_MS = 250;
-
-export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.adventure.frames', {
-  providedIn: 'root',
-  factory: () => (onFrame) => {
-    let last: number | null = null;
-    let id = requestAnimationFrame(function frame(now) {
-      if (last !== null) onFrame(Math.min(now - last, MAX_FRAME_MS));
-      last = now;
-      id = requestAnimationFrame(frame);
-    });
-    return () => { cancelAnimationFrame(id); };
-  },
-});
-
-export type BattleSceneFactory = (host: HTMLElement, callbacks: BattleSceneCallbacks) => Promise<BattleSceneHandle>;
-
-/** How the page gets its battle scene; a test provides one that draws nothing, since jsdom has no WebGL. */
-export const BATTLE_SCENE_FACTORY = new InjectionToken<BattleSceneFactory>('heat.adventure.scene', {
-  providedIn: 'root',
-  // Loaded on first use, so PixiJS is a chunk of its own, as the camp's scene is.
-  factory: () => async (host, callbacks) => (await import('./battle/battle-scene')).createBattleScene(host, callbacks),
-});
-
-/** How a stage ended, in the player's words: one for each of the engine's endings, so a new ending is a compile error here (angular.md, rule 6). */
-const ENDINGS: Readonly<Record<StageEnding, string>> = {
-  done: 'done',
-  win: 'won',
-  loss: 'lost',
-  timeout: 'time ran out',
-  retreat: 'turned back',
-};
-
-const OUTCOMES: Readonly<Record<AdventureResultView['outcome'], string>> = {
-  complete: 'Job done',
-  retreat: 'The party turned back',
-  defeat: 'The party fell',
-};
-
-/** A stage's ending in the player's words; one this client's engine lacks, sent by a newer deploy, as the hub put it (angular.md, rule 6). */
-function endingWords(ended: string): string {
-  return Object.hasOwn(ENDINGS, ended) ? ENDINGS[ended as StageEnding] : ended;
-}
+import { Play } from './play';
+import { Playback } from './playback';
+import { outcomeWords, stageResultWords } from './result-words';
 
 /**
  * The open adventure, `/adventure` (Issue-15): the battle in the stage, and
@@ -75,38 +25,20 @@ function endingWords(ended: string): string {
  */
 @Component({
   selector: 'heat-adventure',
-  imports: [NgTemplateOutlet],
+  imports: [BattleView, Playback],
   templateUrl: './adventure.html',
-  styleUrl: './adventure.css',
+  styleUrl: './battle-panel.css',
   providers: [Play],
-  host: {
-    '(window:resize)': 'measure()',
-  },
 })
 export class Adventure {
   protected readonly game = inject(Game);
   protected readonly play = inject(Play);
   private readonly router = inject(Router);
-  private readonly createScene = inject(BATTLE_SCENE_FACTORY);
-  private readonly readSizes = inject(LAYOUT_SIZES);
-  protected readonly speeds = SPEEDS;
-  protected readonly outcomes = OUTCOMES;
+  protected readonly outcomeWords = outcomeWords;
   /** Each stage of the settled result in words, "fight: won". */
-  protected readonly stages = computed(() => this.game.settled()?.result?.stages.map((s) => ({ stage: s.stage, words: `${s.kind}: ${endingWords(s.ended)}` })) ?? []);
-  /** What the pause toggle does next. */
-  protected readonly pauseLabel = computed(() => (this.play.paused() ? 'Resume' : 'Pause'));
+  protected readonly stages = computed(() => stageResultWords(this.game.settled()?.result?.stages ?? []));
 
-  /** The window and the regions' sizes, measured together, since a font-size change moves both. */
-  private readonly viewport = signal(this.measured());
-  protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height, this.viewport().sizes));
-  /** Stacked, the stage's box is the page's width by the stage's height at the scale that fits; side by side the grid sizes it. */
-  protected readonly stageHeight = computed(() =>
-    this.side() ? null : stackedBattleHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
-  );
-  private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
-  private scene: BattleSceneHandle | null = null;
-  /** Set once the scene has loaded, or failed to, and the run may start. */
-  private readonly sceneReady = signal(false);
+  private readonly view = viewChild.required(BattleView);
   private startedId: string | null = null;
   /** The replay's timeline is being fetched, could not be, or was written before a change to the battle's events and is not played (decision 0051). */
   protected readonly replayState = signal<'idle' | 'loading' | 'failed' | 'unavailable'>('idle');
@@ -148,11 +80,11 @@ export class Adventure {
   constructor() {
     effect(() => {
       const adventure = this.game.adventure();
-      if (!adventure || this.game.settled() || !this.sceneReady() || this.startedId === adventure.id) return;
+      if (!adventure || this.game.settled() || !this.view().ready() || this.startedId === adventure.id) return;
       untracked(() => {
         this.startedId = adventure.id;
         this.play.start(adventure);
-        this.scene?.reset(must(this.play.field(), 'the field'), new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
+        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])));
       });
     });
     effect(() => {
@@ -161,46 +93,6 @@ export class Adventure {
         void this.router.navigate(['/camp', this.game.location()], { replaceUrl: true });
       }
     });
-    const frames = inject(FRAME_LOOP);
-    const destroyRef = inject(DestroyRef);
-    let destroyed = false;
-    afterNextRender(() => {
-      void this.mount().then(() => {
-        if (!destroyed) destroyRef.onDestroy(frames((ms) => { this.frame(ms); }));
-      });
-    });
-    destroyRef.onDestroy(() => {
-      destroyed = true;
-      this.scene?.destroy();
-    });
-  }
-
-  protected measure(): void {
-    this.viewport.set(this.measured());
-  }
-
-  private measured() {
-    return { width: window.innerWidth, height: window.innerHeight, ratio: window.devicePixelRatio, sizes: this.readSizes() };
-  }
-
-  /** Loads the scene; without one, as where WebGL is missing, the run plays with the controls alone. */
-  private async mount(): Promise<void> {
-    try {
-      this.scene = await this.createScene(this.box().nativeElement, { onEntered: () => { this.play.entered(); } });
-      this.play.holdEntries = true;
-    } catch {
-      this.scene = null;
-    }
-    this.sceneReady.set(true);
-  }
-
-  /** One frame: the run moves on, and the scene animates what happened and moves on by the same time. */
-  private frame(ms: number): void {
-    const events = this.play.tick(ms);
-    const field = this.play.field();
-    if (!this.scene || !field) return;
-    if (events.length > 0) this.scene.feed(events, field);
-    this.scene.frame(this.play.paused() ? 0 : ms * this.play.speed(), this.play.simTime(), field);
   }
 
   /** Plays the stored timeline of the adventure just settled, read through the hub, in the same scene. */
@@ -219,7 +111,7 @@ export class Adventure {
     }
     this.replayState.set('idle');
     this.play.replay(timeline);
-    this.scene?.reset(must(this.play.field(), 'the field'), new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), this.play.entering());
+    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])));
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */
