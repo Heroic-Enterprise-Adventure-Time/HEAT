@@ -758,6 +758,8 @@ The unit types, the engine's `UnitType`: what a hero is and what the hall recrui
 enum UnitType {
   FIGHTER
   KNIGHT
+  LUMBERJACK
+  MINER
   PRIEST
   RANGER
   VILLAGER

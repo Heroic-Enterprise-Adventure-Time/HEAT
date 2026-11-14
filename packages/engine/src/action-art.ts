@@ -18,6 +18,8 @@ import type { AbilityId, MonsterType, UnitType } from "./content.js";
  */
 export const WEAPON_SPRITES: Readonly<Partial<Record<UnitType | MonsterType, string>>> = {
   villager: "hand-axe-01",
+  miner: "pickaxe-01",
+  lumberjack: "felling-axe-01",
   fighter: "sword-01",
   bandit: "dagger-01",
   ranger: "bow-01",

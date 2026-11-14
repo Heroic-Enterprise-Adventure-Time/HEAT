@@ -186,6 +186,39 @@ describe("recruitHero: paid", () => {
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
   });
 
+  it("recruits a lumberjack for 40 timber, drawn from its own sprite set, at hall level 1 (Issue-287)", async () => {
+    const p = player();
+    await putPaidCamp(p, 1, { timber: 45 });
+    const requestId = randomUUID();
+    const hero = await recruitHero(repo, p, "lumberjack", requestId);
+    expect(hero).toMatchObject({ id: requestId, unitType: "lumberjack", status: "ALIVE" });
+    expect(SPRITE_SETS.lumberjack).toContain(hero.spriteSet);
+    expect(heroNames(SPRITE_SET_PRESENTATION[hero.spriteSet] ?? "either")).toContain(hero.name);
+    expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 5 }]);
+    expect(await ledgerDelta(p, requestId, "timber")).toBe(-40);
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+  });
+
+  it("recruits a miner for 30 ore and 20 timber, one ledger entry per material, and says what is short without both (Issue-287)", async () => {
+    const p = player();
+    await putPaidCamp(p, 1, { ore: 30, timber: 10 });
+    const refused = await refusal(recruitHero(repo, p, "miner", randomUUID()));
+    expect(refused).toBeInstanceOf(InsufficientResources);
+    expect(refused).toMatchObject({ short: [{ material: "timber", amount: 20, balance: 10 }] });
+    await repo.setBalance(p, at, "timber", 25);
+    const requestId = randomUUID();
+    const hero = await recruitHero(repo, p, "miner", requestId);
+    expect(hero).toMatchObject({ id: requestId, unitType: "miner", status: "ALIVE" });
+    expect(SPRITE_SETS.miner).toContain(hero.spriteSet);
+    expect(byMaterial(await repo.holdings(p, at))).toEqual([
+      { material: "ore", balance: 0 },
+      { material: "timber", balance: 5 },
+    ]);
+    expect(await ledgerDelta(p, requestId, "ore")).toBe(-30);
+    expect(await ledgerDelta(p, requestId, "timber")).toBe(-20);
+    expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
+  });
+
   it("charges a fighter even when no hero is alive: only the villager is free", async () => {
     const p = player();
     const refused = await refusal(recruitHero(repo, p, "fighter", randomUUID()));

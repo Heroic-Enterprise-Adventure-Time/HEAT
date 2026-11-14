@@ -259,6 +259,8 @@ describe('Game', () => {
     await run();
     expect(game.recruits()).toEqual([
       { unitType: 'villager', cost: [], reason: null },
+      { unitType: 'lumberjack', cost: [{ material: 'timber', amount: 40, balance: 0 }], reason: 'Not enough timber.' },
+      { unitType: 'miner', cost: [{ material: 'ore', amount: 30, balance: 0 }, { material: 'timber', amount: 20, balance: 0 }], reason: 'Not enough ore or timber.' },
       { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
       // The first unit type a hall's level gates (Issue-286): the level is said before what it costs.
       { unitType: 'ranger', cost: [{ material: 'timber', amount: 40, balance: 0 }, { material: 'cloth', amount: 10, balance: 0 }], reason: 'Needs a level 2 hall.' },
@@ -287,7 +289,7 @@ describe('Game', () => {
   it('says the hall is full when every slot holds a dead hero, before what it costs', async () => {
     const { game, run } = setup(playerWith([], 4, 0));
     await run();
-    expect(game.recruits().map((r) => r.reason)).toEqual(['The hall is full.', 'The hall is full.', 'Needs a level 2 hall.']);
+    expect(game.recruits().map((r) => r.reason)).toEqual(['The hall is full.', 'The hall is full.', 'The hall is full.', 'The hall is full.', 'Needs a level 2 hall.']);
   });
 
   it('retires a hero, which moves it to the retired and makes the villager free again', async () => {

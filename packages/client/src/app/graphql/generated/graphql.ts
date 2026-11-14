@@ -126,6 +126,8 @@ export type SubmitAdventureInput = {
 export type UnitType =
   | 'FIGHTER'
   | 'KNIGHT'
+  | 'LUMBERJACK'
+  | 'MINER'
   | 'PRIEST'
   | 'RANGER'
   | 'VILLAGER'
