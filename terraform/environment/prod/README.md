@@ -2,18 +2,18 @@
 
 HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, in one root and one apply, the shape of the `dev` root: the `base` module (the hosted zone, the certificate for the zone name and its wildcard, the account's one user pool with Google as its identity provider), the `environment` module on top of it (the two tables, the function, the HTTP API, the site at the zone apex, the browser client, the alarms) and the `login-domain` module last (`auth.heat.dcg-games.com`). Applied by the pipeline on every merge to `release`, through the release pull request, followed by the smoke test, the tag and the GitHub Release (decisions 0016 as confirmed, 0017, 0018 as amended, 0020, 0021 as amended; the overview's "Environments"). History: Issue-41.
 
-**Status: at `v2026.11.12` (c72f06e), the twelfth release, applied by the pipeline on 2026-11-12 by the `Release` run on the merge of PR-301 (Issue-300), run 43322541174, under the `prod` GitHub environment.** The run:
-- guarded the merge as pull request 301 from `main`
-- applied 0 added, 5 changed, 0 destroyed from the bundles its no-role build job handed over: the index `GSI1` added to the location table in place (8 min 24 s), the hub role's policy given `QueryTheReplaysIndex`, the function's new code and both aliases moved
+**Status: at `v2026.11.17` (f361a3a), the thirteenth release, applied by the pipeline on 2026-11-17 by the `Release` run on the merge of PR-314 (Issue-313), run 44004872840, under the `prod` GitHub environment.** The run:
+- guarded the merge as pull request 314 from `main`
+- applied 0 added, 3 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code and both aliases moved
 - passed the allow-list check (33 resource types)
 - published the client and `config.json`
 - passed the anonymous smoke test
-- wrote the tag `v2026.11.12` and its GitHub Release
+- wrote the tag `v2026.11.17` and its GitHub Release
 
-It is the first prod apply that adds an index to a table holding records (decisions 0050 and 0053); no record was backfilled into it. Read back at about 23:44 UTC:
-- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` c72f06e and `HEAT_PREVIOUS_VERSION` 334e363 (`v2026.11.10`), on `nodejs24.x`; `live` points at version 12 and `previous` at 11; `heat-prod-location` has `GSI1` `ACTIVE`, projection ALL.
-- **From the laptop:** `/config.json` reports version c72f06e, and an anonymous `POST /graphql` is 401.
-- **The owner** signed in at `https://heat.dcg-games.com`, started an adventure and watched its replay.
+It is the first release with the AWS provider at 6.73.0, which changed nothing in prod, and the first with the hub's SDK clients set to 3 attempts (`packages/hub/src/sdk.ts`). Read back at about 02:46 UTC:
+- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` f361a3a and `HEAT_PREVIOUS_VERSION` c72f06e (`v2026.11.12`), on `nodejs24.x`; `live` points at version 13 and `previous` at 12.
+- **From the laptop:** `/config.json` reports version f361a3a, and an anonymous `POST /graphql` is 401.
+- **The owner** signed in at `https://heat.dcg-games.com`, saw "Recently here" on the job board and opened a replay from it.
 
 The first apply, below, is kept as the record of that apply and its read-back. Later releases have changed the root since.
 
