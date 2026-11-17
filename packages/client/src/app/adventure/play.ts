@@ -76,6 +76,14 @@ export class Play {
     this.begin(new TimelineRun(timeline), emptyField(timeline.party), true);
   }
 
+  /** Stops what was playing, the run and its field gone, until the next start or replay; a page that leaves a replay for another does. */
+  stop(): void {
+    this.run = null;
+    this.live = null;
+    this.replaying.set(false);
+    this.field.set(null);
+  }
+
   /** Leaves the replay; the result shows again. */
   endReplay(): void {
     this.replaying.set(false);

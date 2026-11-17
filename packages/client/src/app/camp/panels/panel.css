@@ -28,7 +28,8 @@ h3 {
 
 .jobs,
 .party,
-.recruits {
+.recruits,
+.replays {
   list-style: none;
   padding: 0;
   margin: 0 0 var(--space-lg);
@@ -36,7 +37,8 @@ h3 {
 
 .jobs li,
 .party li,
-.recruits li {
+.recruits li,
+.replays li {
   display: flex;
   flex-wrap: wrap;
   column-gap: var(--space-md);
@@ -119,4 +121,14 @@ dd {
 .recruits p {
   flex-basis: 100%;
   margin: 0;
+}
+
+.replays li {
+  margin-bottom: var(--space-sm);
+}
+
+/* A replay's party, on a line of its own under how it ended. */
+.replay-party {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
 }

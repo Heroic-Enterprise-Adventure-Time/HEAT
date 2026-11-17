@@ -14,8 +14,15 @@
  * - its timer starts with the request, so it bounds the connection too;
  * - the client's `defaultsMode` is `legacy` unless configured, which adds no
  *   timeout, and options given here replace what any other mode would add;
- * - the SDK retries a `TimeoutError` as transient: 3 attempts, with up to
- *   100 ms and then 200 ms of backoff between them.
+ * - the SDK retries a `TimeoutError` as transient, with up to 100 ms and
+ *   then 200 ms of backoff between attempts.
+ *
+ * The number of attempts is set here too, as `maxAttempts`, not left to the
+ * SDK: from `@aws-sdk/client-dynamodb` 3.1169.0 the DynamoDB client defaults
+ * to 4 attempts with a 25 ms base delay (its 2026 retry behaviour, behind a
+ * `Retry.v2026` switch in 3.1163.0), while S3 keeps 3. Read in the installed
+ * client's `dist-cjs/index.js` on 2026-11-17; a stalled call then took 8.2 s
+ * on DynamoDB against 6.1 s on S3.
  *
  * So a call that never answers fails after about 3 × 2 s plus the backoff,
  * well inside 10 s. The hub's whole invocation took 446 ms at most in `dev`
@@ -34,3 +41,6 @@ export const requestHandler = {
   requestTimeout: 2_000,
   throwOnRequestTimeout: true,
 } as const;
+
+/** Every client's attempts at one call, the first and two retries, whatever the SDK's default. */
+export const maxAttempts = 3;

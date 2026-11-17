@@ -4,3 +4,6 @@
   <p class="note">An adventure is under way: <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>.</p>
 }
 <heat-job-list [jobs]="jobs()" />
+
+<h3 id="recent-title">Recently here</h3>
+<heat-replay-list empty="Nothing was done here in the last week." labelledBy="recent-title" [failed]="recentFailed()" [lines]="recentLines()" [withJob]="true" />

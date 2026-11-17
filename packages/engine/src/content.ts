@@ -14,7 +14,7 @@ import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, Monste
 import type { Material } from "./index.js";
 
 /** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. The list declares the union (typescript.md, rule 18). */
-export const UNIT_TYPES = ["villager", "fighter", "knight", "ranger", "wizard", "priest"] as const;
+export const UNIT_TYPES = ["villager", "miner", "lumberjack", "fighter", "knight", "ranger", "wizard", "priest"] as const;
 export type UnitType = (typeof UNIT_TYPES)[number];
 
 /** A camp's own facilities: those every camp has and those it may build. */
@@ -200,6 +200,12 @@ export const LOCATIONS: readonly Location[] = [
       // The first progression (decision 0031): one run of "Pick up sticks"
       // pays for a villager, one run of the mine's first job for a fighter.
       { unitType: "villager", hallLevel: 1, cost: [{ material: "timber", amount: 20 }] },
+      // The specialized gatherers (Issue-287): the lumberjack for what
+      // villagers bring from one timber run, the miner for an ore run's worth
+      // of ore and timber, the alternative to a fighter. Neither needs its
+      // facility: the miner's jobs are the mine's already.
+      { unitType: "lumberjack", hallLevel: 1, cost: [{ material: "timber", amount: 40 }] },
+      { unitType: "miner", hallLevel: 1, cost: [{ material: "ore", amount: 30 }, { material: "timber", amount: 20 }] },
       { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 40 }] },
       // The next step (Issue-286): the wolves job's cloth pays for the hall's
       // second level and then for a ranger, the first unit type a hall's
@@ -237,6 +243,8 @@ export function warehouseCapacity(level: number): number {
  */
 export const SPRITE_SETS: Readonly<Record<UnitType, readonly string[]>> = {
   villager: ["villager-01", "villager-07", "villager-08", "villager-09", "villager-10", "villager-11", "villager-12"],
+  miner: ["miner-01"],
+  lumberjack: ["lumberjack-02"],
   fighter: ["fighter-02"],
   knight: ["knight-06"],
   ranger: ["ranger-01"],
@@ -270,7 +278,6 @@ export const SPRITE_SET_PRESENTATION: Readonly<Record<string, Presentation>> = {
   "wizard-01": "either",
   "wizard-03": "masculine",
   "priest-02": "either",
-  // Made before their unit types (Issue-285), which Issue-287 adds to SPRITE_SETS.
   "miner-01": "masculine",
   "lumberjack-02": "feminine",
 };
@@ -425,8 +432,12 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
  * usable action winning. A unit type without one cannot join a battle yet.
  * A villager's gather ratings are low in both timber and ore, below a
  * node's difficulty, so it brings home a share of each; a specialized
- * gatherer later meets the difficulty in one of them, and a combat unit has
- * no rating, so its hits waste a node (decision 0051). A ranger stands at
+ * gatherer meets the difficulty in one of them, and a combat unit has no
+ * rating, so its hits waste a node (decision 0051). The miner and the
+ * lumberjack have a villager's body and meet the difficulty in their own
+ * material, harvesting a node in full; in the other they rate 1, not 0, so
+ * that on a stage of nodes alone they still bring home a third of a node
+ * rather than wasting it as a fighter does (Issue-287). A ranger stands at
  * the back and shoots whatever is closest, monsters before nodes like any
  * unit; with nothing else left it shoots a node and wastes its share of it
  * (the owner's call on Issue-286).
@@ -436,6 +447,16 @@ export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> =
     homeLine: "near",
     stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] },
     actions: ["strike", "chop", "mine", "move-up"],
+  },
+  miner: {
+    homeLine: "near",
+    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 1 }, { material: "ore", rating: 3 }] },
+    actions: ["mine", "chop", "strike", "move-up"],
+  },
+  lumberjack: {
+    homeLine: "near",
+    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 3 }, { material: "ore", rating: 1 }] },
+    actions: ["chop", "mine", "strike", "move-up"],
   },
   fighter: {
     homeLine: "front",

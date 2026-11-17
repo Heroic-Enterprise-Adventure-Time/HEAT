@@ -1,8 +1,7 @@
 {
   "set": "felling-axe-01",
   "kind": "weapon sprite set",
-  "wielders": [],
-  "madeFor": "The lumberjack's weapon; Issue-287 adds the lumberjack to the engine and names it in wielders.",
+  "wielders": ["lumberjack"],
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

@@ -5,13 +5,13 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createDocumentClient } from "../src/db/client.js";
-import { requestHandler } from "../src/sdk.js";
+import { maxAttempts, requestHandler } from "../src/sdk.js";
 import { createS3Client } from "../src/timelines.js";
 
 /**
  * A stalled call fails within the hub's timeouts (Issue-211): a server that
  * accepts the connection and never answers stands in for a DynamoDB or S3
- * call that stalls. Each client gives up after its three attempts of
+ * call that stalls. Each client gives up after its `maxAttempts` attempts of
  * `requestTimeout` each, well inside the function's 10 seconds.
  */
 let server: Server;
@@ -48,8 +48,8 @@ async function stalled(call: () => Promise<unknown>): Promise<{ error: unknown; 
   return { error, ms: performance.now() - started };
 }
 
-/** Three attempts of the request timeout, the backoff between them, and slack for a busy runner. */
-const BOUND_MS = 3 * requestHandler.requestTimeout + 1_000;
+/** Every attempt's request timeout, the backoff between them, and slack for a busy runner. */
+const BOUND_MS = maxAttempts * requestHandler.requestTimeout + 1_000;
 
 describe("a stalled SDK call", () => {
   it("fails within the timeout on DynamoDB and on S3", async () => {
@@ -60,9 +60,9 @@ describe("a stalled SDK call", () => {
       stalled(() => s3.send(new GetObjectCommand({ Bucket: "b", Key: "k.json" }))),
     ]);
     for (const { error, ms } of [dynamo, bucket]) {
-      expect(error).toMatchObject({ name: "TimeoutError", $metadata: { attempts: 3 } });
+      expect(error).toMatchObject({ name: "TimeoutError", $metadata: { attempts: maxAttempts } });
       // The backoff can be 0 ms and a timer can fire a millisecond early against performance.now().
-      expect(ms).toBeGreaterThanOrEqual(3 * requestHandler.requestTimeout - 50);
+      expect(ms).toBeGreaterThanOrEqual(maxAttempts * requestHandler.requestTimeout - 50);
       expect(ms).toBeLessThan(BOUND_MS);
     }
   });

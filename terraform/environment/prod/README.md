@@ -2,17 +2,18 @@
 
 HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, in one root and one apply, the shape of the `dev` root: the `base` module (the hosted zone, the certificate for the zone name and its wildcard, the account's one user pool with Google as its identity provider), the `environment` module on top of it (the two tables, the function, the HTTP API, the site at the zone apex, the browser client, the alarms) and the `login-domain` module last (`auth.heat.dcg-games.com`). Applied by the pipeline on every merge to `release`, through the release pull request, followed by the smoke test, the tag and the GitHub Release (decisions 0016 as confirmed, 0017, 0018 as amended, 0020, 0021 as amended; the overview's "Environments"). History: Issue-41.
 
-**Status: at `v2026.11.10` (334e363), the eleventh release, applied by the pipeline on 2026-11-10 by the `Release` run on the merge of PR-280 (Issue-279), run 42906143959, under the `prod` GitHub environment.** The run:
-- guarded the merge as pull request 280 from `main`
-- applied 0 added, 3 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code and both aliases moved
+**Status: at `v2026.11.12` (c72f06e), the twelfth release, applied by the pipeline on 2026-11-12 by the `Release` run on the merge of PR-301 (Issue-300), run 43322541174, under the `prod` GitHub environment.** The run:
+- guarded the merge as pull request 301 from `main`
+- applied 0 added, 5 changed, 0 destroyed from the bundles its no-role build job handed over: the index `GSI1` added to the location table in place (8 min 24 s), the hub role's policy given `QueryTheReplaysIndex`, the function's new code and both aliases moved
 - passed the allow-list check (33 resource types)
 - published the client and `config.json`
 - passed the anonymous smoke test
-- wrote the tag `v2026.11.10` and its GitHub Release
+- wrote the tag `v2026.11.12` and its GitHub Release
 
-It is the first release with Node 24.22.2 and Terraform 1.17.1 installed by `.github/actions/node` and `.github/actions/terraform`, each checked against its pinned checksum (decision 0048). Read back at about 21:45 UTC:
-- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` 334e363 and `HEAT_PREVIOUS_VERSION` de0492f (`v2026.11.09`), on `nodejs24.x`; `live` points at version 11 and `previous` at 10.
-- **From the laptop:** `/config.json` reports version 334e363, and an anonymous `POST /graphql` is 401.
+It is the first prod apply that adds an index to a table holding records (decisions 0050 and 0053); no record was backfilled into it. Read back at about 23:44 UTC:
+- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` c72f06e and `HEAT_PREVIOUS_VERSION` 334e363 (`v2026.11.10`), on `nodejs24.x`; `live` points at version 12 and `previous` at 11; `heat-prod-location` has `GSI1` `ACTIVE`, projection ALL.
+- **From the laptop:** `/config.json` reports version c72f06e, and an anonymous `POST /graphql` is 401.
+- **The owner** signed in at `https://heat.dcg-games.com`, started an adventure and watched its replay.
 
 The first apply, below, is kept as the record of that apply and its read-back. Later releases have changed the root since.
 

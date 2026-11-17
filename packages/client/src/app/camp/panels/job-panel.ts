@@ -1,15 +1,17 @@
 import { LowerCasePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { upperFirst } from 'es-toolkit';
 
 import { FACILITIES, type FacilityKind, MAX_PARTY, type Stage } from '@heat/engine';
 
+import { replayLine } from '../../adventure/replay-words';
 import { Game, type StartRefusal } from '../../game';
 import { Refusal, refusalWords } from '../../hub';
 import { CampState } from '../camp-state';
 import { credits, creditWords, jobAt, retreatWords, stageWords } from './job-words';
+import { ReplayList } from './replay-list';
 
 /**
  * The hub's refusals of a start, by type, in the player's words; any other is
@@ -35,11 +37,13 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
  * retreat penalty in words; then the party pick, one to four of the camp's
  * living heroes in no order, since a unit type's home line places it; and
  * Depart, which starts it and goes to `/adventure`. A refusal is shown in
- * place, under Depart.
+ * place, under Depart. Last, the job's replays, anyone's and every outcome,
+ * each opening its replay page, read when the page opens (Issue-290,
+ * decision 0053).
  */
 @Component({
   selector: 'heat-job-panel',
-  imports: [LowerCasePipe, RouterLink],
+  imports: [LowerCasePipe, RouterLink, ReplayList],
   templateUrl: './job-panel.html',
   styleUrl: './panel.css',
 })
@@ -76,6 +80,12 @@ export class JobPanel {
       return { material: credit.material, words: upperFirst(words), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
     });
   });
+  private readonly replays = resource({ params: () => this.job()?.id, loader: ({ params }) => this.game.replaysOf(params) });
+  protected readonly replayLines = computed(() =>
+    // A list read again for another job says Loading, not the last job's lines.
+    this.replays.hasValue() && !this.replays.isLoading() ? this.replays.value().flatMap((replay) => replayLine(replay) ?? []) : undefined,
+  );
+  protected readonly replaysFailed = computed(() => this.replays.status() === 'error');
   protected readonly retreat = computed(() => {
     const job = this.job();
     return job ? retreatWords(job) : '';

@@ -1,0 +1,25 @@
+fragment ReplayFields on Adventure {
+  id
+  location
+  settledAt
+  job {
+    id
+    name
+  }
+  result {
+    outcome
+    heroes {
+      dead
+      heroId
+      level
+    }
+  }
+  snapshot {
+    heroes {
+      heroId
+      level
+      name
+      unitType
+    }
+  }
+}

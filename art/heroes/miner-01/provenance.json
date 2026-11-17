@@ -1,9 +1,8 @@
 {
   "set": "miner-01",
   "kind": "hero sprite set",
-  "classes": [],
+  "classes": ["miner"],
   "presentation": "masculine",
-  "madeFor": "The miner, a hero unit type that Issue-287 adds to the engine; that issue names it in classes.",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",

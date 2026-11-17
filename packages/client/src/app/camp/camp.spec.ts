@@ -38,6 +38,9 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
   const fake = {
     heroesHere: here,
     seenHere: signal<readonly SeenHeroView[]>(seen),
+    // The job board and a job read what was done there; nothing was, in these tests.
+    recentAdventuresAt: () => Promise.resolve([]),
+    replaysOf: () => Promise.resolve([]),
     retiredHere: computed(() => all().filter((h) => h.status === 'RETIRED')),
     camp: signal({
       location: 'millbrook',

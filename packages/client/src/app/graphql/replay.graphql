@@ -1,0 +1,13 @@
+#import "./replay-fields.graphql"
+#import "./result-fields.graphql"
+
+query Replay($id: ID!) {
+  adventure(id: $id) {
+    ...ReplayFields
+    status
+    timeline
+    result {
+      ...ResultFields
+    }
+  }
+}

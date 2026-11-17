@@ -1,46 +1,8 @@
 /*
- * The battle's regions (game.md, "The page"): the stage, then the party and
- * the controls below it on a narrow screen; side by side, where the camp
- * would be (page-layout.ts, isSideBySide), the stage beside a content area of
- * the camp's width, reserved for them and never over the scene.
+ * What a battle page's content area holds (battle-view.ts), shared by the
+ * pages that project into it, the open adventure and a replay, and by the
+ * playback controls they both show, as the panels share panel.css.
  */
-.adventure {
-  display: flex;
-  flex-direction: column;
-  min-height: calc(100dvh - var(--header-height));
-  background: var(--night);
-}
-
-.stage {
-  width: 100%;
-  overflow: hidden;
-  background: var(--night);
-  color: var(--light);
-}
-
-.panel {
-  flex: 1;
-  padding: var(--space-lg) var(--space-xl);
-  background: var(--parchment);
-  color: var(--ink);
-}
-
-.adventure.side {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--panel-width);
-  height: calc(100dvh - var(--header-height));
-  min-height: 0;
-}
-
-.side .stage {
-  height: 100%;
-}
-
-.side .panel {
-  overflow-y: auto;
-  border-left: var(--border-thick) solid var(--ink);
-}
-
 h2 {
   margin: 0 0 var(--space-sm);
   font-size: var(--text-lg);
@@ -132,5 +94,10 @@ meter {
 
 .outcome,
 .up {
+  font-weight: bold;
+}
+
+.link {
+  color: inherit;
   font-weight: bold;
 }

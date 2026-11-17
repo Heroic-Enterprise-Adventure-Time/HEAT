@@ -14,6 +14,14 @@ updates:
       npm-minor-and-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+      # The exception to "a major arrives on its own": codegen's CLI and its
+      # plugins change major together, and each alone fails the codegen check
+      # (Issue-309, PR-306 to PR-308). Their minors stay in the group above,
+      # because a dependency goes to the first group it matches (Dependabot
+      # options reference, "groups", read 2026-11-16).
+      graphql-codegen-major:
+        patterns: ["@graphql-codegen/*"]
+        update-types: [major]
     # The majors the standards hold back, each with its reason under
     # "Held back" in docs/standards/typescript.md. A major leaves this list
     # and that list in the same pull request.

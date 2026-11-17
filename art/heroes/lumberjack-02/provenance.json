@@ -1,9 +1,8 @@
 {
   "set": "lumberjack-02",
   "kind": "hero sprite set",
-  "classes": [],
+  "classes": ["lumberjack"],
   "presentation": "feminine",
-  "madeFor": "The lumberjack, a hero unit type that Issue-287 adds to the engine; that issue names it in classes.",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",
