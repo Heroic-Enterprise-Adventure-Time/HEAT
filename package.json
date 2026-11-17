@@ -37,6 +37,9 @@
     "vitest": "5.1.0"
   },
   "overrides": {
+    "@apollo/server": {
+      "@graphql-tools/utils": "12.1.0"
+    },
     "@graphql-eslint/eslint-plugin": {
       "@graphql-tools/utils": "12.1.0"
     }
