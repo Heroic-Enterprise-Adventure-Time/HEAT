@@ -1,10 +1,10 @@
 # Running the dev server from an issue's worktree
 
-How the Angular dev server is run for display work, from the issue's worktree, in a session of the Claude desktop app. `docs/process/code-changes.md`, rule 24, says when it runs, that there is one at a time and that the owner can see and stop it; `docs/process/development.md`, rule 5, says what it serves and how an agent signs in. This runbook is the order of work and what goes wrong. The Claude Code skill `.claude/skills/dev-server/` points here.
+How the Angular dev server is run for display work, from the issue's worktree, in a session of the Claude desktop app. `docs/process/code-changes.md`, rule 24, says when it runs, that there is one at a time, what a busy port means and that the owner can see and stop it; `docs/process/development.md`, rule 5, says what it serves and how an agent signs in. This runbook is the order of work and what goes wrong. The Claude Code skill `.claude/skills/dev-server/` points here.
 
 ## Rules
 
-1. **One server, on port 4200.** Before starting, check that nothing listens there (`netstat -ano | grep :4200` in the Bash tool, `Get-NetTCPConnection -LocalPort 4200` in PowerShell). A listener, or the dev server's own offer of another port, means another session's server is running: ask whose it is. Never take another port and never stop a server this session did not start, because the port is the one the stack's app client calls back to.
+1. **The port is checked first.** `netstat -ano | grep :4200` in the Bash tool, or `Get-NetTCPConnection -LocalPort 4200` in PowerShell. What a listener means, and what the session then does, is `docs/process/code-changes.md`, rule 24.
 2. **The worktree is made ready first.** In a fresh worktree, `npm ci`, then `npm run build --workspace @heat/engine` (`docs/process/development.md`, rule 10).
 3. **It runs in a terminal tab the owner can see, from the worktree.** `npm start --workspace @heat/client`, with the worktree as the tab's directory and a title that names the issue. The app's own preview server is not used: it is anchored to the directory the session started in, which is the checkout on `main`, and would serve `main`.
 4. **The page is `http://localhost:4200` in the session's browser,** signed in as a test user (`docs/process/development.md`, rule 5). The stack's sign-in carries over from the stack's own URL, so there is usually no second sign-in.
