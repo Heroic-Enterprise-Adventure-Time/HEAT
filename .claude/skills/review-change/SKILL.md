@@ -1,5 +1,6 @@
 ---
 name: review-change
+argument-hint: <pull request number>
 description: Review a HEAT pull request against the written standards, from a session that did not write it. Takes the pull request number. Reads the base, head and diff from the pull request, reviews the diff under the documents the runbook maps to the paths touched, posts each finding as a review thread citing one numbered rule, posts candidate rules as one comment, then runs the built-in code-review with --comment. Use when asked to review a pull request against the standards, or when a session is started for that review.
 ---
 

@@ -63,7 +63,7 @@ Either create `terraform.tfvars` in the root from its example, or set the values
 Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
 # paste the heat-platform Admin block from the access portal, then:
 aws sts get-caller-identity --query Account --output text   # must print the heat-platform id
-. C:\Users\chanc\IdeaProjects\HEAT\docs\private\heat-tfvars.ps1 -Environment dev
+. <the checkout>\docs\private\heat-tfvars.ps1 -Environment dev
 cd <the worktree>\terraform\bootstrap\dev
 terraform init
 terraform plan -out dev.tfplan
