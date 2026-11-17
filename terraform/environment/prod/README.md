@@ -13,7 +13,7 @@ HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, 
 It is the first release with the `@graphql-tools/utils` that Apollo Server nests overridden to 12.1.0 (PR-317, Dependabot alert 8), the one change in it that reaches what prod runs; the rest is documents and the agent's hooks and skills. Read back at about 22:00 UTC:
 - **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` cd012d5 and `HEAT_PREVIOUS_VERSION` f361a3a (`v2026.11.17`), on `nodejs24.x`, with the code hash the release pull request's plan showed; `live` points at version 14 and `previous` at 13.
 - **From the laptop:** `/config.json` reports version cd012d5, and an anonymous `POST /graphql` is 401.
-- **Not read:** a signed-in request. The 401 is the API's authorizer refusing before the function runs, so nothing this status records shows the function's new code answering in prod; `dev`'s signed-in test passed on the same lock file in the "Deploy" runs on 338b79b, d482279 and 3ec8dea.
+- **The owner** signed in at `https://heat.dcg-games.com` after the apply and reported that it works. That is the one signed-in request this status records: the 401 is the API's authorizer refusing before the function runs, and the smoke test signs in nowhere, so without it nothing here would show the function's new code answering in prod.
 
 The first apply, below, is kept as the record of that apply and its read-back. Later releases have changed the root since.
 
