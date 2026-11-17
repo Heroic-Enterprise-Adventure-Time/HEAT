@@ -75,7 +75,7 @@ Changes to Google's authorized origins and redirect URIs "can take from five min
 The agent plans this root before pushing a change to it (decision 0017, guardrail 5), through its `plan-heat-sandbox` profile, which may read this account's state prefix and nothing it should not. The root takes the account id and the two Google values, all three from the private script, whose copy of the Google values is the one decision 0020 allows for the sandbox base. From the worktree, in PowerShell:
 
 ```powershell
-. C:\Users\chanc\IdeaProjects\HEAT\docs\private\heat-tfvars.ps1 -Environment sandbox
+. <the checkout>\docs\private\heat-tfvars.ps1 -Environment sandbox
 $env:AWS_PROFILE = "plan-heat-sandbox"
 cd <the worktree>\terraform\environment\sandbox-base
 terraform init

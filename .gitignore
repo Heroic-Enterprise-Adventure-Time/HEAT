@@ -23,6 +23,9 @@ crash.log
 CLAUDE.local.md
 .claude/settings.local.json
 
+# Worktrees Claude Code makes for a session, each a checkout of its own
+.claude/worktrees/
+
 # Node
 node_modules/
 dist/

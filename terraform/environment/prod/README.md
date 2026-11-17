@@ -102,7 +102,7 @@ The Google project's publishing status is the owner's call, outside this root: i
 The agent plans this root before pushing an infrastructure change (decision 0017, guardrail 5), through its `plan-heat-prod` profile, from the worktree, with the bundle built and placeholders for the three values that never cross a laptop. In PowerShell:
 
 ```powershell
-. C:\Users\chanc\IdeaProjects\HEAT\docs\private\heat-tfvars.ps1 -Environment prod
+. <the checkout>\docs\private\heat-tfvars.ps1 -Environment prod
 $env:AWS_PROFILE = "plan-heat-prod"
 $env:TF_VAR_google_client_id = "000000000000-example.apps.googleusercontent.com"
 $env:TF_VAR_google_client_secret = "GOCSPX-example"

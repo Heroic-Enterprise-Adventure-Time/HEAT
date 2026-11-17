@@ -59,7 +59,7 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 ### Security fixes no update reaches
 
-21. **An `overrides` entry is the last resort for a security fix no dependency update reaches.** It is scoped under the package that holds the vulnerable range, pinned exactly (rule 2), and listed under "Held back" with what releases it and an open issue that tracks the release; it leaves `package.json` and that list in the same pull request. From the review of PR-236.
+21. **An `overrides` entry is the last resort for a security fix no dependency update reaches.** It is scoped under the package that holds the vulnerable range, pinned exactly (rule 2), and listed under "Held back" with what releases it and an open issue that tracks the release; it leaves `package.json` and that list in the same pull request. Where an override takes effect only once a nested entry is dropped from the lock file, that entry alone is dropped: dropping its siblings let npm hoist them past the parent's caps (Issue-316). From the review of PR-236.
 22. **A Dependabot alert is dismissed only with a "Held back" entry that gives the reason and what releases it, and an open issue that tracks the release.** Rule 1's ignore in `.github/dependabot.yml` is for a major of a direct dependency, and does not apply. From the review of PR-236.
 
 ## Held back

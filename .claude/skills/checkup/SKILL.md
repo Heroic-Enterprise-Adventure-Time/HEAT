@@ -1,5 +1,6 @@
 ---
 name: checkup
+argument-hint: "[area]"
 description: Review the whole HEAT tree on main against the written standards at a pause, from a session of its own, and file the findings in batches, one batch issue per pull request that would fix them, each finding a sub-issue labeled finding. Takes no argument for the whole tree, or one area name from the runbook's table (Packages, Client, Hub, Terraform, Pipeline, Documents, Art). Reads every finding issue and every open batch first so nothing open or excused is filed twice, cites one numbered rule per finding, caps the run in batches, and reports to the owner the candidate rules that pass the runbook's test. Use when asked to run the checkup, or when a session is started for it after a checkpoint merged or a step of the build order begun.
 ---
 

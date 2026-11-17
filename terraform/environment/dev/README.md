@@ -61,7 +61,7 @@ After the first apply, the owner confirms the alarms' email subscription from th
 The agent plans this root before pushing an infrastructure change (decision 0017, guardrail 5), through its `plan-heat-dev` profile, from the worktree, with the bundle built and placeholders for the three values that never cross a laptop. In PowerShell:
 
 ```powershell
-. C:\Users\chanc\IdeaProjects\HEAT\docs\private\heat-tfvars.ps1 -Environment dev
+. <the checkout>\docs\private\heat-tfvars.ps1 -Environment dev
 $env:AWS_PROFILE = "plan-heat-dev"
 $env:TF_VAR_google_client_id = "000000000000-example.apps.googleusercontent.com"
 $env:TF_VAR_google_client_secret = "GOCSPX-example"

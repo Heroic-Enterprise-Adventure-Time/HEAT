@@ -43,7 +43,7 @@ The account id reaches Terraform as `TF_VAR_workload_account_id` from the reposi
 The agent plans a stack before pushing an infrastructure change (decision 0017, guardrail 5), through its `plan-heat-sandbox` profile, from the worktree, with the bundle built. In PowerShell:
 
 ```powershell
-. C:\Users\chanc\IdeaProjects\HEAT\docs\private\heat-tfvars.ps1 -Environment sandbox
+. <the checkout>\docs\private\heat-tfvars.ps1 -Environment sandbox
 $env:AWS_PROFILE = "plan-heat-sandbox"
 $env:TF_VAR_app_version = git rev-parse HEAD
 npm run bundle

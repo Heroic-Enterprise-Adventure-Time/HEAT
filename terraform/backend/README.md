@@ -41,7 +41,7 @@ The bucket does not exist yet, so the first apply has to use local state. An ove
 Remove-Item Env:AWS_ACCESS_KEY_ID, Env:AWS_SECRET_ACCESS_KEY, Env:AWS_SESSION_TOKEN -ErrorAction SilentlyContinue
 # paste the heat-platform Admin block from the access portal, then:
 aws sts get-caller-identity --query Account --output text   # must print the heat-platform id
-cd C:\Users\chanc\IdeaProjects\HEAT\terraform\backend
+cd <the checkout>\terraform\backend
 
 # 1. Local state for the bootstrap. The block must span lines: HCL does not
 #    allow a nested block inside a single-line block.
