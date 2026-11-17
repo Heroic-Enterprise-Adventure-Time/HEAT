@@ -3,7 +3,7 @@ import { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import * as z from "zod/mini";
 
 import { parseEnv, requiredVariable } from "../env.js";
-import { requestHandler } from "../sdk.js";
+import { maxAttempts, requestHandler } from "../sdk.js";
 
 /**
  * Rule 1 of decision 0009: every AWS call goes through an SDK client whose
@@ -47,6 +47,7 @@ export function createDocumentClient(
 ): DynamoDBDocumentClient {
   const base = new DynamoDBClient({
     requestHandler,
+    maxAttempts,
     ...(config.region ? { region: config.region } : {}),
     ...(config.endpoint ? { endpoint: config.endpoint } : {}),
   });

@@ -2,7 +2,7 @@ import { GetObjectCommand, PutObjectCommand, S3Client, S3ServiceException } from
 import * as z from "zod/mini";
 
 import { parseEnv, requiredVariable } from "./env.js";
-import { requestHandler } from "./sdk.js";
+import { maxAttempts, requestHandler } from "./sdk.js";
 
 /**
  * The replay bucket (overview, "Services and data"; decision 0030): one
@@ -47,6 +47,7 @@ export function createS3Client(
   return instrument(
     new S3Client({
       requestHandler,
+      maxAttempts,
       region: config.region,
       ...(config.endpoint ? { endpoint: config.endpoint, forcePathStyle: true } : {}),
     }),
