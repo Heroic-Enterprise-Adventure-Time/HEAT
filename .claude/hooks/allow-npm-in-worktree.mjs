@@ -1,24 +1,41 @@
-// PreToolUse hook for Bash and mcp__terminal__run_in_terminal: allows the
-// repository's own npm scripts in an issue's worktree without a prompt (the
-// owner's standing rule, 2026-10-23; docs/process/sessions.md, rule 9). It only
-// ever answers "allow"; anything it does not recognize falls through to the
+// PreToolUse hook for Bash and mcp__terminal__run_in_terminal: answers "allow"
+// for the repository's own npm scripts in an issue's worktree, so they run
+// without a prompt (decision 0054; docs/process/sessions.md, rule 9). It never
+// answers anything else: what it does not recognize falls through to the
 // normal permission flow by printing nothing.
+//
+// It is a convenience, not a boundary. `npm test` runs whatever the branch
+// holds, and the agent writes the branch; what bounds an agent is in decision
+// 0054. What this file keeps out is everything that is not one of the
+// repository's scripts.
 //
 // A command qualifies when every segment of it, split on `;`, `&&` and line
 // ends, is one of:
 // - a `cd` into a worktree of this repository (`builtin cd "<path>"`);
-// - `npm run ...`, `npm test ...`, `npm ci ...` or `npm start ...`, optionally
-//   with `2>&1` or a redirection to /dev/null, and piped into read-only text
-//   filters (tail, head, grep, sed, sort, uniq, wc, cat, tr, cut);
-// - `echo ...` with no command substitution.
-// `npx` is not allowed: it runs code the repository does not hold.
+// - `npm test`, `npm ci`, `npm start` or `npm run <script>`, with no option
+//   but `--workspace <name>`, `-w <name>`, `--workspaces` and `--if-present`,
+//   then optionally `--` and the script's own arguments; optionally with
+//   `2>&1` or a redirection to /dev/null; optionally piped into tail, head,
+//   grep, wc, cut or tr, which read and do not write;
+// - `echo ...` with no command substitution and no redirection, which sessions
+//   use as a marker between steps.
+// Not allowed: `npx`, which runs code the repository does not hold; any other
+// npm option, because `--script-shell`, `--prefix` and `--registry` change
+// what runs or where it comes from; sed, sort and uniq, which can run a
+// command or write a file.
 //
 // A worktree of this repository is `<checkout>-<issue>`, beside the checkout,
 // or `<checkout>/.claude/worktrees/<name>`, where the checkout is found from
 // this file's own place in it. The directory a command runs in is the terminal
-// tool's `cwd`, the session's `cwd` for Bash, or a `cd` segment of the command;
-// a terminal tab used again carries no `cwd` and is taken to be where it was
-// opened.
+// tool's `cwd`, the session's `cwd` for Bash, or a `cd` segment of the command.
+// A terminal call that names no directory is not taken to be in a worktree.
+//
+// The splitting below is our own and not a library's (docs/standards/
+// typescript.md, rule 17): a hook runs before `npm ci`, in a checkout that may
+// have no node_modules, so it can import nothing but Node's own modules. It
+// refuses what it cannot read, which is the safe side for a hook that can only
+// answer "allow". `allow-npm-in-worktree.test.mjs` holds the commands it must
+// allow and the ones it must refuse.
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -49,10 +66,38 @@ const isWorktree = (path) => {
   );
 };
 
-const npm = /^npm\s+(run|test|ci|start)(\s|$)/;
-const filter = /^(tail|head|grep|sed|sort|uniq|wc|cat|tr|cut)\b[^|;&<>`$()]*$/;
+const filter = /^(tail|head|grep|wc|cut|tr)\b[^|;&<>`$()]*$/;
 const redirect = /\s(2>&1|(?:2|1)?>\s*\/dev\/null)(?=\s|$)/g;
 const stripRedirects = (text) => text.replace(redirect, ' ').trim();
+const scriptName = /^[\w:.-]+$/;
+const workspaceName = /^[@\w./-]+$/;
+
+// `npm test|ci|start` or `npm run <script>`, then only the workspace options,
+// then optionally `--` and whatever the script takes.
+const isNpmScript = (text) => {
+  if (/[`$()<>&]/.test(text)) return false;
+  const [npm, subcommand, ...rest] = text.split(/\s+/);
+  if (npm !== 'npm') return false;
+  if (subcommand === 'run') {
+    const script = rest.shift();
+    if (script === undefined || !scriptName.test(script)) return false;
+  } else if (!['test', 'ci', 'start'].includes(subcommand)) {
+    return false;
+  }
+  while (rest.length > 0) {
+    const option = rest.shift();
+    if (option === '--') return true;
+    if (option === '--workspaces' || option === '--if-present') continue;
+    if (option === '--workspace' || option === '-w') {
+      const name = rest.shift();
+      if (name === undefined || !workspaceName.test(name)) return false;
+      continue;
+    }
+    if (option.startsWith('--workspace=') && workspaceName.test(option.slice(12))) continue;
+    return false;
+  }
+  return true;
+};
 
 const allows = (input) => {
   const tool = String(input.tool_name ?? '');
@@ -62,7 +107,7 @@ const allows = (input) => {
 
   let inWorktree;
   if (tool === 'mcp__terminal__run_in_terminal') {
-    inWorktree = toolInput.cwd === undefined || isWorktree(toolInput.cwd);
+    inWorktree = isWorktree(toolInput.cwd);
   } else if (tool === 'Bash') {
     inWorktree = isWorktree(input.cwd);
   } else {
@@ -79,8 +124,7 @@ const allows = (input) => {
     }
     if (/^echo\b(?!.*(?:\$\(|`))[^|;&<>]*$/.test(segment)) continue;
     const [first, ...piped] = segment.split(/\s*\|\s*/);
-    const main = stripRedirects(` ${first}`);
-    if (!npm.test(main) || /[`$()<>&]/.test(main)) return false;
+    if (!isNpmScript(stripRedirects(` ${first}`))) return false;
     if (!piped.every((part) => filter.test(stripRedirects(` ${part}`)))) return false;
   }
   return inWorktree;
@@ -99,7 +143,7 @@ if (input !== undefined && allows(input)) {
       hookSpecificOutput: {
         hookEventName: 'PreToolUse',
         permissionDecision: 'allow',
-        permissionDecisionReason: "The repository's npm scripts in an issue's worktree (standing rule)",
+        permissionDecisionReason: "The repository's npm scripts in an issue's worktree (decision 0054)",
       },
     }),
   );
