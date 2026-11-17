@@ -1,6 +1,6 @@
 # 0054: The repository's npm scripts run in an issue's worktree without a prompt, through a committed hook that is a convenience and not a boundary
 
-- **Status:** Decided
+- **Status:** Decided; "the normal prompt" and "Everything else still asks" hold only in a session that prompts: what the hook does not answer goes through the session's normal permission flow, which in auto mode is the classifier and no prompt, as `docs/process/code-changes.md`, "What enforces this", now says (Issue-320)
 - **Date:** 2026-11-17
 - **Settles:** Issue-318: whether an agent may run the repository's own npm scripts without asking, and where that permission is written. It had been the owner's standing rule since 2026-10-23 (Issue-149), kept as a hook in one laptop's user-level settings. The review of PR-321, which moved the hook into the repository, found that it allowed more than its description said, and proposed that a loosening of an agent's permissions be a record.
 
