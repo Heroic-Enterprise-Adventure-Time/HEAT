@@ -11,13 +11,14 @@ Read and follow these documents in every session:
 - How the project owner and an agent work together: @docs/process/collaboration.md
 - How a change gets from an idea to `main`: @docs/process/code-changes.md
 - How decisions are made, especially about security and platform management: @docs/process/best-practices.md
+- What a session has to know about its shells, its tools and the desktop app: @docs/process/sessions.md
 
 ## Starting on an issue
 
 A session is one issue. Asked to work on issue N, in whatever words, read these in order before saying anything about the work:
 
 1. The issue, `gh issue view N`, and the open list, `gh issue list`. The issue body is the agreed shape of the checkpoint.
-2. `docs/private/heat-working-context.md`, if it exists. Git ignores it. It holds the AWS account ids, the standing rules summarized for a session without the repository, and the state of the work at the end of the last session, which the agent keeps current. Nothing in it is copied into a committed file.
+2. `docs/private/heat-working-context.md`, if it exists. Git ignores it. It holds what cannot be committed: the AWS account ids, how the agent reaches AWS, and the owner's own context. Nothing in it is copied into a committed file. It holds no state of the work: the issue, its comments, the open list and the log are the state.
 3. The sections of `docs/architecture/overview.md` and the records in `docs/decisions/` that the issue names.
 4. The README of each stack under `terraform/` and the `AGENTS.md` of each area under `packages/` that the issue touches.
 
@@ -35,6 +36,8 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | Why a choice was made, and what was rejected | `docs/decisions/` |
 | The Terraform state bucket, who applies, and the one-time bootstrap | `terraform/backend/README.md` |
 | Running and seeing a change: the sandbox stacks and the fast loop | `docs/process/development.md` |
+| Running the dev server from an issue's worktree, step by step | `docs/runbooks/dev-server.md` |
+| Taking an image of the scene or of a battle out of the session's browser | `docs/runbooks/capture-scene.md` |
 | Making art or audio: the services, the connectors, the hero sprite set, a camp's ground and facilities, the page's icons, monsters and props | `docs/process/assets.md` |
 | Making a hero or monster sprite set, step by step | `docs/runbooks/hero-sprite-set.md` |
 | The index of every project document, and how documents are written | `docs/README.md` |
