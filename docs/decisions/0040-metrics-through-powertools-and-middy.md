@@ -1,6 +1,6 @@
 # 0040: Metrics through Powertools, with middy as the handler's middleware chain
 
-- **Status:** Decided
+- **Status:** Decided; amended by decision 0055, which takes the tracer and `captureLambdaHandler` out of the hub. middy hosts the two middlewares that remain, and what keeps a request out of the trace is that decision's, not `captureResponse: false`
 - **Date:** 2026-11-03
 - **Settles:** Issue-199: the conflict-rate alarm agreed in the PR-197 session and held for the library review of 2026-11-03, whose rows 10 and 12 are this decision.
 

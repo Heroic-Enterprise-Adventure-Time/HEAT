@@ -1,11 +1,13 @@
 import SchemaBuilder from "@pothos/core";
 import ErrorsPlugin from "@pothos/plugin-errors";
 import ScopeAuthPlugin from "@pothos/plugin-scope-auth";
+import TracingPlugin, { isRootField } from "@pothos/plugin-tracing";
 import ValidationPlugin from "@pothos/plugin-validation";
 import { GraphQLError, type GraphQLScalarType } from "graphql";
 import { DateTimeResolver, JSONResolver, NonNegativeIntResolver, PositiveIntResolver, UUIDResolver } from "graphql-scalars";
 
 import { type Context, notSignedIn } from "../context.js";
+import { traceRootField } from "../observability.js";
 import { badInput } from "../refusals.js";
 
 /**
@@ -34,6 +36,11 @@ import { badInput } from "../refusals.js";
  * the shape the printed schema publishes, and nothing of any player. A failure
  * is `badInput`, as every other malformed input is, and says which field and
  * why.
+ *
+ * The tracing plugin wraps each root field, and only those, in a span
+ * (`traceRootField` in `src/observability.ts`). It is listed second, so that
+ * the span holds the scope's check as well as the resolver and the errors
+ * plugin still wraps both.
  */
 export const builder = new SchemaBuilder<{
   Context: Context;
@@ -58,8 +65,12 @@ export const builder = new SchemaBuilder<{
     PositiveInt: { Input: number; Output: number };
   };
 }>({
-  plugins: [ErrorsPlugin, ScopeAuthPlugin, ValidationPlugin],
+  plugins: [ErrorsPlugin, TracingPlugin, ScopeAuthPlugin, ValidationPlugin],
   defaultFieldNullability: false,
+  tracing: {
+    default: (config) => isRootField(config),
+    wrap: (resolver, options) => traceRootField(resolver, options),
+  },
   scopeAuth: {
     authScopes: (ctx) => ({
       authenticated: ctx.playerId !== undefined,

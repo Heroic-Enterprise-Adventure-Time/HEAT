@@ -37,21 +37,18 @@ export function configFromEnv(env: NodeJS.ProcessEnv = process.env): DbConfig {
 }
 
 /**
- * `instrument` wraps the low-level client before the document client is
- * built on it: the handler passes the tracer's capture, so every DynamoDB
- * call is a subsegment of the request's trace. Tests pass nothing.
+ * The document client, with the hub's timeouts (`sdk.ts`). Nothing wraps it
+ * for tracing: in Lambda the layer instruments the SDK as it is loaded
+ * (decision 0055).
  */
-export function createDocumentClient(
-  config: DbConfig,
-  instrument: (client: DynamoDBClient) => DynamoDBClient = (client) => client,
-): DynamoDBDocumentClient {
+export function createDocumentClient(config: DbConfig): DynamoDBDocumentClient {
   const base = new DynamoDBClient({
     requestHandler,
     maxAttempts,
     ...(config.region ? { region: config.region } : {}),
     ...(config.endpoint ? { endpoint: config.endpoint } : {}),
   });
-  return DynamoDBDocumentClient.from(instrument(base), {
+  return DynamoDBDocumentClient.from(base, {
     marshallOptions: { removeUndefinedValues: true },
   });
 }
