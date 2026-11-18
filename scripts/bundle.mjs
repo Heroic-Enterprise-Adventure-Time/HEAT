@@ -13,7 +13,7 @@ import { build } from "esbuild";
  *
  * The SDK is outside the file because the AWS Lambda Layer for OpenTelemetry
  * instruments a library by intercepting its load, and a library inside the
- * bundle is never loaded (the trial of Issue-326). It is the function's own
+ * bundle is never loaded (decision 0055). It is the function's own
  * copy and not the runtime's, which AWS says to rely on only "when you can't
  * include additional packages" (Lambda developer guide, "Using the SDK for
  * JavaScript v3 in your handler", read 2026-11-17).

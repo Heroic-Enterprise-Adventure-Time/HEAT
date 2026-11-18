@@ -12,7 +12,7 @@ locals {
 
   # The AWS Lambda Layer for OpenTelemetry, which AWS recommends in place of
   # the X-Ray SDK ("Migrating from X-Ray instrumentation to OpenTelemetry
-  # instrumentation", X-Ray developer guide, read 2026-11-17; Issue-326). The
+  # instrumentation", X-Ray developer guide, read 2026-11-17; decision 0055). The
   # ARN is AWS's own, its publisher's account and the version included, as
   # the ADOT documentation lists it for us-east-1 ("ADOT Lambda Layer ARNs",
   # read 2026-11-17, where Node.js 24.x on arm64 is a supported runtime). A
@@ -160,7 +160,8 @@ resource "aws_lambda_function" "function" {
   description   = "${each.key} of ${var.name_prefix}: ${each.value.export} from dist/${each.key}/index.mjs"
   role          = aws_iam_role.function[each.key].arn
 
-  # The bundle is one ESM file; the export name comes from the manifest.
+  # The bundle is one ESM file, with the AWS SDK's packages beside it
+  # (scripts/bundle.mjs); the export name comes from the manifest.
   # code_sha256, not source_code_hash: it is compared with what Lambda holds,
   # so a change made outside Terraform shows in the plan too (decision 0017,
   # facts checked; optional and computed in provider 6.69.1, read from its
