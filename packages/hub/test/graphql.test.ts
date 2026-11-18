@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
-import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
+import type { Context as LambdaContext } from "aws-lambda";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { MAX_PARTY, must } from "@heat/engine";
@@ -10,6 +10,7 @@ import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
 import { emptyResult, putRecentAdventure, putSettledAdventure, recentAdventure, settledAdventure } from "./data.js";
+import { event, type Handler } from "./event.js";
 import { locationKeys } from "./keys.js";
 
 /**
@@ -23,11 +24,6 @@ import { locationKeys } from "./keys.js";
  * as the client does, a refusal being a member of the union and malformed
  * input a GraphQLError in `errors`.
  */
-type Handler = (event: APIGatewayProxyEventV2WithJWTAuthorizer, context: LambdaContext) => Promise<{
-  statusCode?: number;
-  body?: string;
-}>;
-
 let handler: Handler;
 let repo: Repository;
 
@@ -38,38 +34,6 @@ beforeAll(async () => {
   const config = configFromEnv();
   repo = new Repository(createDocumentClient(config), config.tables);
 });
-
-function event(
-  query: string,
-  variables: Record<string, unknown> = {},
-  playerId?: string,
-  headers: Record<string, string> = {},
-): APIGatewayProxyEventV2WithJWTAuthorizer {
-  return {
-    version: "2.0",
-    routeKey: "POST /graphql",
-    rawPath: "/graphql",
-    rawQueryString: "",
-    headers: { "content-type": "application/json", ...headers },
-    requestContext: {
-      accountId: "000000000000",
-      apiId: "local",
-      domainName: "localhost",
-      domainPrefix: "local",
-      http: { method: "POST", path: "/graphql", protocol: "HTTP/1.1", sourceIp: "127.0.0.1", userAgent: "vitest" },
-      requestId: randomUUID(),
-      routeKey: "POST /graphql",
-      stage: "$default",
-      time: new Date().toISOString(),
-      timeEpoch: Date.now(),
-      authorizer: playerId
-        ? { principalId: playerId, integrationLatency: 0, jwt: { claims: { sub: playerId }, scopes: [] } }
-        : (undefined as unknown as APIGatewayProxyEventV2WithJWTAuthorizer["requestContext"]["authorizer"]),
-    },
-    body: JSON.stringify({ query, variables }),
-    isBase64Encoded: false,
-  };
-}
 
 /** The handler's reply: the data the query selected, the errors, and the extensions. */
 interface Reply<T> {

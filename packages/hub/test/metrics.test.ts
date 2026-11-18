@@ -1,9 +1,10 @@
 import { randomUUID } from "node:crypto";
 
-import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
+import type { Context as LambdaContext } from "aws-lambda";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import { Repository, TransactionConflict } from "../src/db/repository.js";
+import { event, type Handler } from "./event.js";
 
 /**
  * What the alarm reads, through the handler: a Conflict answered reaches the
@@ -21,39 +22,12 @@ vi.hoisted(() => {
   process.env["POWERTOOLS_SERVICE_NAME"] = "heat-hub";
 });
 
-type Handler = (event: APIGatewayProxyEventV2WithJWTAuthorizer, context: LambdaContext) => Promise<{ statusCode?: number; body?: string }>;
-
 let handler: Handler;
 
 beforeAll(async () => {
   // The handler reads its configuration at import time, as graphql.test.ts says.
   handler = (await import("../src/handler.js")).handler as unknown as Handler;
 });
-
-function event(query: string, variables: Record<string, unknown>, playerId: string): APIGatewayProxyEventV2WithJWTAuthorizer {
-  return {
-    version: "2.0",
-    routeKey: "POST /graphql",
-    rawPath: "/graphql",
-    rawQueryString: "",
-    headers: { "content-type": "application/json" },
-    requestContext: {
-      accountId: "000000000000",
-      apiId: "local",
-      domainName: "localhost",
-      domainPrefix: "local",
-      http: { method: "POST", path: "/graphql", protocol: "HTTP/1.1", sourceIp: "127.0.0.1", userAgent: "vitest" },
-      requestId: randomUUID(),
-      routeKey: "POST /graphql",
-      stage: "$default",
-      time: new Date().toISOString(),
-      timeEpoch: Date.now(),
-      authorizer: { principalId: playerId, integrationLatency: 0, jwt: { claims: { sub: playerId }, scopes: [] } },
-    },
-    body: JSON.stringify({ query, variables }),
-    isBase64Encoded: false,
-  };
-}
 
 async function call(query: string, variables: Record<string, unknown>, playerId: string): Promise<unknown> {
   const res = await handler(event(query, variables, playerId), {} as LambdaContext);

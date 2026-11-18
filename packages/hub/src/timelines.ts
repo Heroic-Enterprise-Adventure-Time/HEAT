@@ -37,21 +37,15 @@ export function replayBucketFromEnv(env: NodeJS.ProcessEnv = process.env): strin
 
 /**
  * The replay bucket's client, with the hub's timeouts (`sdk.ts`). In AWS the
- * endpoint is unset; a test sets one. `instrument` is the tracer's capture,
- * as for the DynamoDB client.
+ * endpoint is unset; a test sets one.
  */
-export function createS3Client(
-  config: { region: string; endpoint?: string | undefined },
-  instrument: (client: S3Client) => S3Client = (client) => client,
-): S3Client {
-  return instrument(
-    new S3Client({
-      requestHandler,
-      maxAttempts,
-      region: config.region,
-      ...(config.endpoint ? { endpoint: config.endpoint, forcePathStyle: true } : {}),
-    }),
-  );
+export function createS3Client(config: { region: string; endpoint?: string | undefined }): S3Client {
+  return new S3Client({
+    requestHandler,
+    maxAttempts,
+    region: config.region,
+    ...(config.endpoint ? { endpoint: config.endpoint, forcePathStyle: true } : {}),
+  });
 }
 
 const key = (adventureId: string) => `${adventureId}.json`;

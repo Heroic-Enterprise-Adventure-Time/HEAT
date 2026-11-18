@@ -195,9 +195,6 @@ resource "aws_lambda_function" "function" {
       AWS_LAMBDA_EXEC_WRAPPER              = "/opt/otel-instrument"
       OTEL_AWS_APPLICATION_SIGNALS_ENABLED = "false"
       OTEL_SERVICE_NAME                    = local.service_names[each.key]
-      # The trial of Issue-326: the Powertools tracer off, so that a trace
-      # shows what the layer records and nothing else.
-      POWERTOOLS_TRACE_ENABLED = "false"
 
       HEAT_PLAYER_TABLE       = aws_dynamodb_table.player.name
       HEAT_LOCATION_TABLE     = aws_dynamodb_table.location.name
