@@ -22,7 +22,7 @@
 
 **`@opentelemetry/api` is held at the layer's version, 1.9.1.** The API ignores a provider registered by an older minor, so a newer copy in the bundle would record nothing, silently, under a layer whose release carries 1.9.1. The SDK the tracing test registers is the 2.x line for the same reason, which npm marks deprecated in favour of a package that needs the API at 1.10. Both are listed under "Held back" in `docs/standards/typescript.md` and ignored in `.github/dependabot.yml`, and both move with the layer.
 
-**The cold start is measured, not budgeted** (the owner, 2026-11-17): it is reported on every run, watched, and its main contributors are later work. Each figure is one sample from the issue's stack:
+**The cold start is measured, not budgeted** (the owner, 2026-11-17): it is reported on every run, watched, and finding its main contributors is Issue-330. Each figure is one sample from the issue's stack:
 
 | | Initialization | First request | Memory |
 | --- | --- | --- | --- |
@@ -39,7 +39,7 @@
 - **Staying on the Powertools tracer until Powertools has an OpenTelemetry one.** Its RFC of 2025-07-17 says "we have not committed to implementing it", with no date for TypeScript, and the SDK under the tracer ends on 2027-02-25.
 - **An Apollo plugin of our own, or the client's operation name, for what a request did.** The first is machinery where the schema builder's own plugin exists (`docs/standards/typescript.md`, rule 17); the second is a free string from the caller.
 - **The managed policy `CloudWatchLambdaApplicationSignalsExecutionRolePolicy`, and Application Signals.** The guide attaches the policy; traces alone needed neither.
-- **The layer's opt-in mode, `OTEL_AWS_LAMBDA_FAST_START`,** traces only, which its source says "greatly reduces cold start" and less so on Node 24. Not tried: it belongs with the work on the cold start.
+- **The layer's opt-in mode, `OTEL_AWS_LAMBDA_FAST_START`,** traces only, which its source says "greatly reduces cold start" and less so on Node 24. Not tried: it belongs with the work on the cold start, Issue-330.
 
 ## Facts checked
 
