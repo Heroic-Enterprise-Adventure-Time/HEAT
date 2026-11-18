@@ -47,6 +47,10 @@ Standards for every stack under `terraform/`: `backend`, `bootstrap` and `enviro
 
 19. **A value the module sets on a function and an alarm then reads is one expression, not two literals,** because an alarm on a name nothing emits stays quiet under `treat_missing_data = "notBreaching"`. `local.service_names` is the function's `POWERTOOLS_SERVICE_NAME` and the conflict alarm's `service` dimension, so a rename fails the plan. From the review of PR-209.
 
+### Pins nothing tracks
+
+20. **A pin that no Dependabot ecosystem tracks is checked by the checkup against the latest release,** as the Node and Terraform pins are (`docs/runbooks/checkup.md`, rule 12), and the checkup's report names the pin, the version it holds and the latest. A resource that carries such a pin says in its comment that nothing tracks it. `otel_layer_arn` in `terraform/modules/environment/functions.tf` is one: a layer's version is a number in an ARN AWS publishes, and it is also what releases the `@opentelemetry/api` hold in `docs/standards/typescript.md`, "Held back". From the review of PR-331 (Issue-326).
+
 ## Held back
 
 - **The scale-downs trivy would fail, excused by id in `terraform/.trivyignore`** (Issue-157, 2026-11-02): encryption with a customer-managed key on the buckets, the tables and the log groups, which costs at rest (rule 12; decision 0008 for the state bucket); a WAF on the distribution, which costs at rest (rule 12); CloudFront access logs and S3 server access logs, a destination per environment with no reader, where the gateway's access log and the function's log are the request record. Each leaves the ignore file, and this list, in the pull request that builds the thing.

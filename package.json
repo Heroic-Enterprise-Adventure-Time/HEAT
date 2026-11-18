@@ -25,6 +25,7 @@
     "@graphql-codegen/fragment-matcher": "8.0.0",
     "@graphql-eslint/eslint-plugin": "4.4.2",
     "@types/node": "24.19.2",
+    "@vercel/nft": "1.11.7",
     "angular-eslint": "22.6.0",
     "esbuild": "0.28.2",
     "eslint": "10.15.0",

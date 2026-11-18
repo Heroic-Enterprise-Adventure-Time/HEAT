@@ -1,14 +1,16 @@
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync } from "node:fs";
-import { basename, dirname, join, relative, sep } from "node:path";
+import { cpSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { nodeFileTrace } from "@vercel/nft";
 import { build } from "esbuild";
 
 /**
  * Bundles each function for Lambda: one ESM file per function under
  * dist/<name>/, targeting the Node major in .node-version (the Lambda
  * runtime follows the same number), with Powertools and everything else
- * bundled in but the AWS SDK v3, which is copied beside the file as
+ * bundled in but the AWS SDK v3, whose files are copied beside it as
  * dist/<name>/node_modules, at the versions the lock file installed.
  *
  * The SDK is outside the file because the AWS Lambda Layer for OpenTelemetry
@@ -17,6 +19,11 @@ import { build } from "esbuild";
  * copy and not the runtime's, which AWS says to rely on only "when you can't
  * include additional packages" (Lambda developer guide, "Using the SDK for
  * JavaScript v3 in your handler", read 2026-11-17).
+ *
+ * Which files that is, is @vercel/nft's to say (docs/standards/typescript.md,
+ * rule 17): it traces what the bundle's imports load at run time, so a
+ * package's type declarations, its build for bundlers and the clients nothing
+ * calls stay behind.
  *
  * Terraform zips dist/<name>/ and passes the zip to the function with its
  * hash, so a change of code is a change in the plan (decision 0017). esbuild
@@ -33,53 +40,54 @@ const nodeMajor = readFileSync(new URL(".node-version", root), "utf8").trim().sp
 
 /** What stays out of the file: the AWS SDK v3's two scopes. */
 const EXTERNAL_SCOPES = ["@aws-sdk", "@smithy"];
+const isExternal = (specifier) => EXTERNAL_SCOPES.some((scope) => specifier.startsWith(`${scope}/`));
 
-/** `@scope/name/sub/path` is the package `@scope/name`. */
-const packageOf = (specifier) => specifier.split("/").slice(0, specifier.startsWith("@") ? 2 : 1).join("/");
-
-/** The directory Node would load `name` from for a module in `fromDir`, or undefined. */
-function installed(name, fromDir) {
-  for (let dir = fromDir; ; dir = dirname(dir)) {
-    const candidate = join(dir, "node_modules", name);
-    if (existsSync(join(candidate, "package.json"))) return candidate;
-    if (relative(rootDir, dir) === "" || dirname(dir) === dir) return undefined;
+/**
+ * The file each of the bundle's SDK imports loads, resolved as the function
+ * will resolve it: from the one file, so from the entry's place in the tree.
+ * Bundling moves every import into that file, so a bundled package that would
+ * have loaded a copy of its own, nested under it at another version, would be
+ * given the function's instead and nothing would say so. That is refused here.
+ */
+function sdkEntries(metafile, entry) {
+  const fromEntry = createRequire(entry);
+  const entries = new Set();
+  for (const [input, { imports }] of Object.entries(metafile.inputs)) {
+    const fromInput = createRequire(resolve(rootDir, input));
+    for (const { path: specifier, external } of imports) {
+      if (!external || !isExternal(specifier)) continue;
+      const loaded = fromEntry.resolve(specifier);
+      const wanted = fromInput.resolve(specifier);
+      if (wanted !== loaded) {
+        throw new Error(`${input} imports ${specifier} from ${wanted}, and the bundle would load ${loaded}`);
+      }
+      entries.add(loaded);
+    }
   }
+  return [...entries].sort();
 }
 
 /**
- * Copies the packages the bundle imports, and everything they depend on,
- * into `outdir`/node_modules, each at the place under node_modules it was
- * installed at, so that Node resolves there what it resolved here. Type
- * declarations are left behind: nothing loads them.
+ * Copies the files those entries load into `outdir`/node_modules, each at the
+ * place under node_modules it was installed at, so that Node resolves there
+ * what it resolved here. A workspace's own node_modules and the root's become
+ * one directory, and two files that would land on one path are an error.
  */
-function copyPackages(imported, entryDir, outdir) {
+async function copySdk(entries, outdir) {
   rmSync(join(outdir, "node_modules"), { recursive: true, force: true });
+  const { fileList } = await nodeFileTrace(entries, { base: rootDir, processCwd: rootDir });
   const copied = new Map();
-  const queue = imported.map((name) => ({ name, fromDir: entryDir, optional: false }));
-  for (let next = queue.shift(); next; next = queue.shift()) {
-    const source = installed(next.name, next.fromDir);
-    if (!source) {
-      if (next.optional) continue;
-      throw new Error(`${next.name} is imported by the bundle and is not installed for ${next.fromDir}`);
-    }
-    // A workspace's own node_modules and the root's become one directory.
-    const segments = relative(rootDir, source).split(sep);
-    const target = segments.slice(segments.indexOf("node_modules")).join("/");
+  for (const file of [...fileList].sort()) {
+    const segments = file.split(/[\\/]/);
+    const at = segments.indexOf("node_modules");
+    if (at === -1) throw new Error(`${file} is loaded by the SDK and is not under node_modules`);
+    const target = segments.slice(at).join("/");
     const earlier = copied.get(target);
-    if (earlier === source) continue;
-    if (earlier) throw new Error(`${target} would hold both ${earlier} and ${source}`);
-    copied.set(target, source);
-
-    cpSync(source, join(outdir, target), {
-      recursive: true,
-      dereference: true,
-      filter: (path) => !["node_modules", "dist-types"].includes(basename(path)) || path === source,
-    });
-    const pkg = JSON.parse(readFileSync(join(source, "package.json"), "utf8"));
-    for (const name of Object.keys(pkg.dependencies ?? {})) queue.push({ name, fromDir: source, optional: false });
-    for (const name of Object.keys({ ...pkg.optionalDependencies, ...pkg.peerDependencies })) {
-      queue.push({ name, fromDir: source, optional: true });
-    }
+    if (earlier) throw new Error(`${target} would hold both ${earlier} and ${file}`);
+    copied.set(target, file);
+    const destination = join(outdir, target);
+    mkdirSync(dirname(destination), { recursive: true });
+    cpSync(join(rootDir, file), destination, { dereference: true });
   }
   return copied.size;
 }
@@ -90,13 +98,13 @@ for (const name of names) {
     console.error(`unknown function "${name}"; known: ${Object.keys(manifest.functions).join(", ")}`);
     process.exit(1);
   }
-  const outdir = new URL(`dist/${name}/`, root);
+  const outdir = fileURLToPath(new URL(`dist/${name}/`, root));
   mkdirSync(outdir, { recursive: true });
   const entry = fileURLToPath(new URL(fn.entry, root));
 
-  const result = await build({
+  const { metafile } = await build({
     entryPoints: [entry],
-    outfile: fileURLToPath(new URL("index.mjs", outdir)),
+    outfile: join(outdir, "index.mjs"),
     bundle: true,
     platform: "node",
     target: `node${nodeMajor}`,
@@ -111,12 +119,6 @@ for (const name of names) {
     },
   });
 
-  const imported = new Set(
-    Object.values(result.metafile.outputs)
-      .flatMap((output) => output.imports)
-      .filter((imported) => imported.external && EXTERNAL_SCOPES.some((scope) => imported.path.startsWith(`${scope}/`)))
-      .map((imported) => packageOf(imported.path)),
-  );
-  const count = copyPackages([...imported].sort(), dirname(entry), fileURLToPath(outdir));
-  console.log(`bundled ${name} -> dist/${name}/index.mjs, with ${String(count)} packages in dist/${name}/node_modules`);
+  const count = await copySdk(sdkEntries(metafile, entry), outdir);
+  console.log(`bundled ${name} -> dist/${name}/index.mjs, with ${String(count)} files of the AWS SDK in ${relative(rootDir, outdir).split(sep).join("/")}/node_modules`);
 }

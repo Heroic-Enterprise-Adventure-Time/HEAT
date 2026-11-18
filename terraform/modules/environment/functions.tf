@@ -220,6 +220,17 @@ resource "aws_lambda_function" "function" {
     aws_cloudwatch_log_group.function,
     aws_iam_role_policy.function,
   ]
+
+  # The layer's ARN is us-east-1's, publisher and version included, and
+  # Lambda refuses a layer from another region. Every environment is in
+  # us-east-1 today; a root composed elsewhere fails here, at the plan, with
+  # the reason, not at the apply.
+  lifecycle {
+    precondition {
+      condition     = data.aws_region.current.region == "us-east-1"
+      error_message = "The OpenTelemetry layer's ARN in functions.tf is us-east-1's. In another region the ARN, its publisher's account and its version are different: take them from the ADOT documentation's layer table."
+    }
+  }
 }
 
 # What the routes point at. Rollback is this alias moved back to an earlier
