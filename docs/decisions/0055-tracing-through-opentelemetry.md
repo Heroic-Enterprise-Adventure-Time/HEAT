@@ -31,7 +31,8 @@
 | `main`'s code, the Powertools tracer | 918.70 ms | 81.15 ms | 143 MB |
 | The layer, the SDK bundled | 1196.80 ms | 96.26 ms | 219 MB |
 | The layer, the SDK in `node_modules` | 1513.26 ms | 216.10 ms | 199 MB |
-| As decided, the X-Ray SDK out of the bundle | 1442.77 ms | 223.55 ms | 201 MB |
+| The X-Ray SDK out of the bundle | 1442.77 ms | 223.55 ms | 201 MB |
+| As decided, the SDK's traced files in place of its packages | 1420.13 ms | 95.75 ms | 198 MB |
 
 ## Considered and not chosen
 
