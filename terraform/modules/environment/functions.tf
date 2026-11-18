@@ -136,9 +136,10 @@ data "aws_iam_policy_document" "function" {
     sid    = "WriteTraces"
     effect = "Allow"
 
-    # A trial on heat-sb326 (Issue-326): xray:PutTelemetryRecords, which the
-    # role held for the X-Ray SDK's daemon, is left out, to see whether the
-    # layer's spans still arrive through Lambda's own agent without it.
+    # One action. xray:PutTelemetryRecords, which the role held for the X-Ray
+    # SDK's daemon, went with the SDK: without it the layer's spans arrive
+    # whole through Lambda's own agent and the function's log shows no
+    # denial (heat-sb326, 2026-11-17; decision 0055).
     actions = [
       "xray:PutTraceSegments",
     ]
