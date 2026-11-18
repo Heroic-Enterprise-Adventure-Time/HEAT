@@ -9,6 +9,16 @@ locals {
   # The service each function names itself in its logs, traces and metrics. One
   # expression, because an alarm reads it (alarms.tf; terraform.md, rule 19).
   service_names = { for name, _ in var.functions : name => "heat-${name}" }
+
+  # The AWS Lambda Layer for OpenTelemetry, which AWS recommends in place of
+  # the X-Ray SDK ("Migrating from X-Ray instrumentation to OpenTelemetry
+  # instrumentation", X-Ray developer guide, read 2026-11-17; Issue-326). The
+  # ARN is AWS's own, its publisher's account and the version included, as
+  # the ADOT documentation lists it for us-east-1 ("ADOT Lambda Layer ARNs",
+  # read 2026-11-17, where Node.js 24.x on arm64 is a supported runtime). A
+  # layer version never changes, so the number is the pin; it moves by a
+  # change to this line, since nothing tracks it.
+  otel_layer_arn = "arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:16"
 }
 
 data "archive_file" "function" {
@@ -174,8 +184,21 @@ resource "aws_lambda_function" "function" {
     mode = "Active"
   }
 
+  layers = [local.otel_layer_arn]
+
   environment {
     variables = {
+      # The layer's wrapper starts the runtime with OpenTelemetry loaded, and
+      # traces only: Application Signals, its metrics and its managed policy,
+      # stays off ("Manually Add AWS Distro for OpenTelemetry (ADOT) Lambda
+      # Layers", read 2026-11-17).
+      AWS_LAMBDA_EXEC_WRAPPER              = "/opt/otel-instrument"
+      OTEL_AWS_APPLICATION_SIGNALS_ENABLED = "false"
+      OTEL_SERVICE_NAME                    = local.service_names[each.key]
+      # The trial of Issue-326: the Powertools tracer off, so that a trace
+      # shows what the layer records and nothing else.
+      POWERTOOLS_TRACE_ENABLED = "false"
+
       HEAT_PLAYER_TABLE       = aws_dynamodb_table.player.name
       HEAT_LOCATION_TABLE     = aws_dynamodb_table.location.name
       POWERTOOLS_SERVICE_NAME = local.service_names[each.key]
