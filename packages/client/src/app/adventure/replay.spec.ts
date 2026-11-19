@@ -101,6 +101,10 @@ describe('Replay page (Issue-290)', () => {
     expect(game.reads).toEqual(['a9']);
     expect(scene.resets[0]?.field).toMatchObject({ stage: 0, outcome: null });
     expect(scene.resets[0]?.sets).toEqual(new Map([['x1', 'fighter-02'], ['x2', 'villager-01']]));
+    // The scene was handed the replay's cast first: the party by its sprite sets, and who the timeline's battles set against it.
+    expect(scene.prepared).toHaveLength(1);
+    expect(scene.prepared[0]?.flatMap((member) => member.spriteSet ?? [])).toEqual(['fighter-02', 'villager-01']);
+    expect(scene.prepared[0]).toContainEqual({ kind: 'resource', type: 'tree' });
 
     expect(panel().getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
     expect(screen.getByRole('complementary')).toHaveAccessibleName('Timber from the near woods');

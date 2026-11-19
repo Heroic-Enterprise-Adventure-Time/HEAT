@@ -1,4 +1,4 @@
-import { artLoads } from './art-loads';
+import { artSettled } from './art-loads';
 
 /** A promise the test settles by hand. */
 function deferred<Value>() {
@@ -13,7 +13,7 @@ function deferred<Value>() {
 
 const LIMIT_MS = 8000;
 
-describe('artLoads', () => {
+describe('artSettled', () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -24,74 +24,61 @@ describe('artLoads', () => {
   /** Lets the settled promises' callbacks run, with no time passing. */
   const settled = () => vi.advanceTimersByTimeAsync(0);
 
-  it('has nothing pending before anything is asked for', () => {
-    expect(artLoads(LIMIT_MS, () => undefined).pending()).toBe(false);
+  /** Whether the wait is over, read without waiting for it. */
+  const watch = (wait: Promise<void>) => {
+    const state = { over: false };
+    void wait.then(() => { state.over = true; });
+    return state;
+  };
+
+  it('is over at once when nothing is asked for', async () => {
+    const wait = watch(artSettled([], LIMIT_MS, () => undefined));
+    await settled();
+    expect(wait.over).toBe(true);
   });
 
-  it('is pending until every load has arrived, and hands each its art', async () => {
-    const loads = artLoads(LIMIT_MS, () => undefined);
+  it('is over only when every load has arrived', async () => {
     const hero = deferred<string>();
     const sword = deferred<string>();
-    const used: string[] = [];
-    loads.load(hero.promise, (art) => used.push(art));
-    loads.load(sword.promise, (art) => used.push(art));
-    expect(loads.pending()).toBe(true);
+    const wait = watch(artSettled([hero.promise, sword.promise], LIMIT_MS, () => undefined));
 
     hero.resolve('fighter-02');
     await settled();
-    expect(used).toEqual(['fighter-02']);
-    expect(loads.pending()).toBe(true);
+    expect(wait.over).toBe(false);
 
     sword.resolve('sword-01');
     await settled();
-    expect(used).toEqual(['fighter-02', 'sword-01']);
-    expect(loads.pending()).toBe(false);
+    expect(wait.over).toBe(true);
   });
 
-  it('has the art in hand before the load stops being pending', async () => {
-    const loads = artLoads(LIMIT_MS, () => undefined);
-    const hero = deferred<string>();
-    let pendingWhenUsed: boolean | null = null;
-    loads.load(hero.promise, () => { pendingWhenUsed = loads.pending(); });
-    hero.resolve('fighter-02');
-    await settled();
-    expect(pendingWhenUsed).toBe(true);
-  });
-
-  it('counts a load that fails as over, uses nothing, and says why', async () => {
+  it('counts a load that fails as over, and says why', async () => {
     const failures: unknown[] = [];
-    const loads = artLoads(LIMIT_MS, (error) => failures.push(error));
     const hero = deferred<string>();
-    const used: string[] = [];
-    loads.load(hero.promise, (art) => used.push(art));
-    const missing = new Error('GET /art/heroes/none/sheet.json answered 404');
-    hero.reject(missing);
+    const wolf = deferred<string>();
+    const wait = watch(artSettled([hero.promise, wolf.promise], LIMIT_MS, (error) => failures.push(error)));
+    const missing = new Error('GET /art/monsters/none/sheet.json answered 404');
+    wolf.reject(missing);
     await settled();
-    expect(loads.pending()).toBe(false);
-    expect(used).toEqual([]);
+    expect(wait.over).toBe(false);
     expect(failures).toEqual([missing]);
-  });
 
-  it('stops waiting for a load that takes longer than the limit, and still uses its art when it arrives', async () => {
-    const loads = artLoads(LIMIT_MS, () => undefined);
-    const hero = deferred<string>();
-    const sword = deferred<string>();
-    const used: string[] = [];
-    loads.load(hero.promise, (art) => used.push(art));
-    await vi.advanceTimersByTimeAsync(LIMIT_MS - 1);
-    expect(loads.pending()).toBe(true);
-    await vi.advanceTimersByTimeAsync(1);
-    expect(loads.pending()).toBe(false);
-
-    // One asked for after the first gave up is waited for in its own right.
-    loads.load(sword.promise, (art) => used.push(art));
-    expect(loads.pending()).toBe(true);
     hero.resolve('fighter-02');
     await settled();
-    expect(used).toEqual(['fighter-02']);
-    expect(loads.pending()).toBe(true);
-    sword.resolve('sword-01');
+    expect(wait.over).toBe(true);
+  });
+
+  it('is over at the limit, whatever is still on its way', async () => {
+    const hero = deferred<string>();
+    const wait = watch(artSettled([hero.promise], LIMIT_MS, () => undefined));
+    await vi.advanceTimersByTimeAsync(LIMIT_MS - 1);
+    expect(wait.over).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(wait.over).toBe(true);
+  });
+
+  it('leaves no timer behind once every load has settled', async () => {
+    void artSettled([Promise.resolve('fighter-02')], LIMIT_MS, () => undefined);
     await settled();
-    expect(loads.pending()).toBe(false);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

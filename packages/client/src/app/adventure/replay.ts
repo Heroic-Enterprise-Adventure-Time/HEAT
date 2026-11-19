@@ -6,6 +6,7 @@ import { type AdventureTimeline, isPlayableTimeline, location } from '@heat/engi
 
 import { Game } from '../game';
 import { BattleView } from './battle-view';
+import { timelineCast } from './cast';
 import { Play } from './play';
 import { Playback } from './playback';
 import { agoWords, partyWords, replayLine } from './replay-words';
@@ -104,6 +105,6 @@ export class Replay {
 
   private start(timeline: AdventureTimeline): void {
     this.play.replay(timeline);
-    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])));
+    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events));
   }
 }
