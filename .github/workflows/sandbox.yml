@@ -19,8 +19,8 @@
 #             (decision 0056); the URL in the job summary, on the deployment
 #             and, when the branch has an open pull request, in one comment
 #             on it, with the report in another. The checks run here so that
-#             a stack always holds a commit
-#             that typechecks and passes the tests (0017); they also run in
+#             a stack always holds a commit that typechecks and passes the
+#             tests (0017); they also run in
 #             Build and test while a pull request is open (Issue-53, closed
 #             as not planned: the duplicate costs a minute or two and no
 #             wall-clock time).
