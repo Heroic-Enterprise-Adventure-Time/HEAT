@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
+import { parseArgs } from "node:util";
 
 /**
  * The trace report (decision 0056): what each request of a run did, read from
@@ -50,9 +51,12 @@ const COMMIT = /^[0-9a-f]{40}$/;
 const NO_ROOT_FIELD = "(no root field)";
 
 /**
- * The requests the hub logged, from its log lines. A request the `previous`
- * alias answered is the deploy before this one (decision 0030) and is left
- * out; a line that is not JSON, or not a request's, is skipped.
+ * The requests the hub logged, from its log lines, in the order the hub
+ * wrote them: the log is read across the function's streams, one for each
+ * instance, and the events do not come back in the order of their times, so
+ * each is placed by its own line's timestamp. A request the `previous` alias
+ * answered is the deploy before this one (decision 0030) and is left out; a
+ * line that is not JSON, or not a request's, is skipped.
  */
 export function requestsFromLog(messages) {
   const requests = [];
@@ -65,9 +69,9 @@ export function requestsFromLog(messages) {
     }
     if (line?.message !== "graphql request" || typeof line.xray_trace_id !== "string") continue;
     if (typeof line.function_arn === "string" && line.function_arn.endsWith(":previous")) continue;
-    requests.push({ errors: Number(line.errors) || 0, traceId: line.xray_trace_id });
+    requests.push({ at: Date.parse(line.timestamp) || 0, errors: Number(line.errors) || 0, traceId: line.xray_trace_id });
   }
-  return requests;
+  return requests.sort((a, b) => a.at - b.at);
 }
 
 /**
@@ -122,19 +126,19 @@ function median(values) {
 }
 
 /**
- * The report of one run. `requests` are the log's, `traces` what X-Ray
- * returned for them, keyed by trace id. A request whose root fields carry
+ * The report of one run. `requests` are the log's, `found` what their traces
+ * say each did (requestFromTrace), keyed by trace id; a request not in it has
+ * no trace yet. A request whose root fields carry
  * another deploy's version is counted and left out of the rows: after an
  * apply the previous deploy can answer the live alias for a minute
  * (docs/process/development.md, "Why").
  */
-export function buildReport({ requests, runId, since, stack, traces, version }) {
+export function buildReport({ found: all, requests, runId, since, stack, version }) {
   const shapes = new Map();
   let traced = 0;
   let otherVersion = 0;
   for (const request of requests) {
-    const trace = traces.get(request.traceId);
-    const found = trace === undefined ? undefined : requestFromTrace(trace);
+    const found = all.get(request.traceId);
     if (found === undefined) continue;
     traced += 1;
     if (version !== undefined && found.versions.some((v) => v !== version)) {
@@ -248,32 +252,39 @@ function readLog(logGroup, since, until) {
   return requestsFromLog(messages ?? []);
 }
 
-/** Fetches the traces not yet held whole, five ids to a call. */
-function fetchTraces(ids, traces) {
-  const missing = ids.filter((id) => !traces.has(id) || requestFromTrace(traces.get(id)) === undefined);
+/**
+ * Fetches the traces of the requests not yet in `found`, five ids to a call,
+ * and keeps what each says once it holds the hub's span. Answers how many
+ * are still missing.
+ */
+function fetchTraces(ids, found) {
+  const missing = ids.filter((id) => !found.has(id));
   for (let i = 0; i < missing.length; i += 5) {
     const answer = aws(["xray", "batch-get-traces", "--trace-ids", ...missing.slice(i, i + 5)]);
-    for (const trace of answer.Traces ?? []) traces.set(trace.Id, trace);
+    for (const trace of answer.Traces ?? []) {
+      const request = requestFromTrace(trace);
+      if (request !== undefined) found.set(trace.Id, request);
+    }
   }
-  return ids.filter((id) => !traces.has(id) || requestFromTrace(traces.get(id)) === undefined).length;
-}
-
-function parseArguments(argv) {
-  const options = { failed: false };
-  for (let i = 0; i < argv.length; i += 1) {
-    const name = argv[i];
-    if (name === "--failed") options.failed = true;
-    else if (["--baseline", "--markdown", "--out", "--since", "--stack", "--until", "--version"].includes(name)) options[name.slice(2)] = argv[(i += 1)];
-    else throw new Error(`unknown argument ${name}`);
-  }
-  if (!options.stack || !options.since || !options.markdown) {
-    throw new Error("usage: node scripts/trace-report.mjs --stack <name> --since <epoch ms> --markdown <file> [--out <file>] [--version <commit>] [--baseline <file>] [--until <epoch ms>] [--failed]");
-  }
-  return options;
+  return ids.filter((id) => !found.has(id)).length;
 }
 
 async function main() {
-  const options = parseArguments(process.argv.slice(2));
+  const { values: options } = parseArgs({
+    options: {
+      baseline: { type: "string" },
+      failed: { default: false, type: "boolean" },
+      markdown: { type: "string" },
+      out: { type: "string" },
+      since: { type: "string" },
+      stack: { type: "string" },
+      until: { type: "string" },
+      version: { type: "string" },
+    },
+  });
+  if (!options.stack || !options.since || !options.markdown) {
+    throw new Error("--stack, --since and --markdown are required; the head of scripts/trace-report.mjs has the usage");
+  }
   const logGroup = `/aws/lambda/${options.stack}-hub`;
   const since = Number(options.since);
   const until = options.until === undefined ? undefined : Number(options.until);
@@ -281,17 +292,18 @@ async function main() {
   // The log and the traces both lag the requests by seconds: read until every
   // logged request's trace holds the hub's span, for up to a minute.
   let requests = [];
-  const traces = new Map();
+  const found = new Map();
   for (let attempt = 0; attempt < 12; attempt += 1) {
     if (attempt > 0) await sleep(5000);
     requests = readLog(logGroup, since, until);
     if (requests.length === 0) continue;
-    if (fetchTraces(requests.map((request) => request.traceId), traces) === 0) break;
+    if (fetchTraces(requests.map((request) => request.traceId), found) === 0) break;
   }
 
-  const report = buildReport({ requests, runId: Number(process.env.GITHUB_RUN_ID ?? 0), since, stack: options.stack, traces, version: options.version });
-  const baseline = options.baseline !== undefined && existsSync(options.baseline) ? parseReport(readFileSync(options.baseline, "utf8")) : undefined;
-  if (options.baseline !== undefined && existsSync(options.baseline) && baseline === undefined) {
+  const report = buildReport({ found, requests, runId: Number(process.env.GITHUB_RUN_ID ?? 0), since, stack: options.stack, version: options.version });
+  const kept = options.baseline !== undefined && existsSync(options.baseline) ? readFileSync(options.baseline, "utf8") : undefined;
+  const baseline = kept === undefined ? undefined : parseReport(kept);
+  if (kept !== undefined && baseline === undefined) {
     console.error("the kept report is not one this script writes; reporting without it");
   }
   const repositoryUrl = process.env.GITHUB_SERVER_URL && process.env.GITHUB_REPOSITORY ? `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}` : undefined;

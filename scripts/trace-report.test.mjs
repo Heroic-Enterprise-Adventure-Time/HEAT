@@ -23,20 +23,37 @@ function trace(id, ms, subsegments) {
   return { Id: id, Segments: documents.map((document) => ({ Document: JSON.stringify(document) })) };
 }
 
-const logLine = (traceId, extra = {}) => JSON.stringify({ errors: 0, function_arn: "arn:aws:lambda:us-east-1:000000000000:function:heat-dev-hub:live", message: "graphql request", xray_trace_id: traceId, ...extra });
+const logLine = (traceId, second, extra = {}) =>
+  JSON.stringify({
+    errors: 0,
+    function_arn: "arn:aws:lambda:us-east-1:000000000000:function:heat-dev-hub:live",
+    message: "graphql request",
+    timestamp: `2026-11-18T05:53:0${second}.000Z`,
+    xray_trace_id: traceId,
+    ...extra,
+  });
+const at = (second) => Date.parse(`2026-11-18T05:53:0${second}.000Z`);
 
 test("the log's requests are the live alias's request lines", () => {
   const requests = requestsFromLog([
-    logLine("1-a"),
-    logLine("1-b", { errors: 2 }),
-    logLine("1-c", { function_arn: "arn:aws:lambda:us-east-1:000000000000:function:heat-dev-hub:previous" }),
+    logLine("1-a", 1),
+    logLine("1-b", 2, { errors: 2 }),
+    logLine("1-c", 3, { function_arn: "arn:aws:lambda:us-east-1:000000000000:function:heat-dev-hub:previous" }),
     JSON.stringify({ message: "graphql error", xray_trace_id: "1-d" }),
     "REPORT RequestId: not json",
   ]);
   assert.deepEqual(requests, [
-    { errors: 0, traceId: "1-a" },
-    { errors: 2, traceId: "1-b" },
+    { at: at(1), errors: 0, traceId: "1-a" },
+    { at: at(2), errors: 2, traceId: "1-b" },
   ]);
+});
+
+test("the requests are in the order the hub wrote them, whatever order the log's streams came back in", () => {
+  const requests = requestsFromLog([logLine("1-second", 2), logLine("1-last", 3), logLine("1-first", 1)]);
+  assert.deepEqual(
+    requests.map((request) => request.traceId),
+    ["1-first", "1-second", "1-last"],
+  );
 });
 
 test("a request is named for its root fields and counted by its calls, wherever they were made", () => {
@@ -60,15 +77,16 @@ test("calls read in the order of their names", () => {
 });
 
 function sampleReport() {
-  const traces = new Map([
+  const raw = [
     ["1-a", trace("1-a", 10, [field("Mutation.startAdventure", ["DynamoDB.GetItem", "DynamoDB.GetItem"])])],
     ["1-b", trace("1-b", 30, [field("Mutation.startAdventure", ["DynamoDB.GetItem", "DynamoDB.GetItem"])])],
     ["1-c", trace("1-c", 70, [field("Mutation.startAdventure", ["DynamoDB.GetItem", "DynamoDB.GetItem", "DynamoDB.TransactWriteItems"])])],
     ["1-d", trace("1-d", 1, [field("Query.version", [], OTHER)])],
     ["1-e", trace("1-e", 2, [field("Query.version")])],
-  ]);
+  ];
+  const found = new Map(raw.map(([id, one]) => [id, requestFromTrace(one)]));
   const requests = ["1-a", "1-b", "1-c", "1-d", "1-e", "1-missing"].map((traceId) => ({ errors: 0, traceId }));
-  return buildReport({ requests, runId: 7, since: 1, stack: "heat-sb328", traces, version: VERSION });
+  return buildReport({ found, requests, runId: 7, since: 1, stack: "heat-sb328", version: VERSION });
 }
 
 test("a report has one row for each shape of each request, with its median, and leaves out another deploy's answers", () => {
@@ -144,6 +162,6 @@ test("a failed test names the last request's trace, and a request that logged er
 });
 
 test("a run with no request says so", () => {
-  const report = buildReport({ requests: [], runId: 7, since: 1, stack: "heat-sb328", traces: new Map(), version: VERSION });
+  const report = buildReport({ found: new Map(), requests: [], runId: 7, since: 1, stack: "heat-sb328", version: VERSION });
   assert.match(renderReport(report), /0 of 0 requests[^\n]*\n\nNo trace to report for this run\./);
 });
