@@ -15,9 +15,11 @@
 #             allow-list, apply, the client published to the stack's
 #             bucket with config.json, the stack test through the stack's
 #             hostname, the browser test of the page (decision 0045), the
-#             cold start; the URL in the job summary, on the deployment and,
-#             when the branch has an open pull request, in one comment on
-#             it. The checks run here so that a stack always holds a commit
+#             cold start and what each request did, read from its traces
+#             (decision 0056); the URL in the job summary, on the deployment
+#             and, when the branch has an open pull request, in one comment
+#             on it, with the report in another. The checks run here so that
+#             a stack always holds a commit
 #             that typechecks and passes the tests (0017); they also run in
 #             Build and test while a pull request is open (Issue-53, closed
 #             as not planned: the duplicate costs a minute or two and no
@@ -54,7 +56,7 @@
 # npm and what it installs run in the checks, stack-test, name-deleted and
 # sweep-bundle jobs, which have no id-token permission and no environment, and
 # the jobs that assume the apply role run only Terraform, this repository's
-# scripts and the AWS CLI.
+# scripts, the AWS CLI and gh.
 name: Sandbox stacks
 
 on:
@@ -321,10 +323,15 @@ jobs:
           stack: ${{ needs.checks.outputs.name }}
           handover-key: ${{ secrets.HEAT_E2E_HANDOVER_KEY }}
 
-  # Back under the role, for the function's log, with nothing downloaded. Runs
-  # when the stack test got as far as calling the stack, whatever came after.
-  cold-start:
-    name: Report the stack's cold start
+  # Back under the role, for the function's log and its traces, with nothing
+  # downloaded (decision 0056). Runs when the stack test got as far as calling
+  # the stack, whatever came after: a failed test's report names the trace of
+  # the last request. The apply role, because the sandbox account's plan role
+  # does not trust a stack's environment; in deploy.yml the same job reads as
+  # dev's plan role. Not a gate: no ruleset requires it
+  # (docs/process/code-changes.md, rule 29).
+  stack-report:
+    name: Report the stack's cold start and traces
     if: ${{ github.event_name == 'push' && !cancelled() && needs.stack-test.outputs.since != '' }}
     needs: [checks, stack-test]
     runs-on: ubuntu-latest
@@ -334,6 +341,10 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # The last report kept from main, an artifact of a Deploy run.
+      actions: read
+      # The report as one comment on the branch's pull request.
+      pull-requests: write
     env:
       # A repository secret, so that GitHub masks the id in every log line
       # (docs/README.md, rule 9).
@@ -342,13 +353,18 @@ jobs:
       - name: Check out the branch
         uses: actions/checkout@v7.0.1
 
-      - name: Report the cold start
-        uses: $/.github/actions/cold-start
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
+
+      - name: Report the cold start and the traces
+        uses: $/.github/actions/stack-report
         with:
           role-arn: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-sandbox-apply
-          session-name: sandbox-cold-start-${{ needs.checks.outputs.issue }}
-          log-group: /aws/lambda/${{ needs.checks.outputs.name }}-hub
+          session-name: sandbox-report-${{ needs.checks.outputs.issue }}
+          stack: ${{ needs.checks.outputs.name }}
           since: ${{ needs.stack-test.outputs.since }}
+          test-result: ${{ needs.stack-test.result }}
+          comment: "true"
 
   # -------------------------------------------------------- pull request --
   comment-url:
@@ -438,7 +454,7 @@ jobs:
       name: sandbox-${{ needs.name-deleted.outputs.issue }}
     # The branch's push runs' own group (the workflow's concurrency above), so
     # the destroy waits for the whole of a running push, its stack test and
-    # cold start as well as its apply, and replaces one still queued. A job's
+    # report as well as its apply, and replaces one still queued. A job's
     # group and a workflow's share one namespace in the repository.
     concurrency:
       group: sandbox-run-refs/heads/${{ github.event.ref }}
