@@ -118,6 +118,12 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: ${{ matrix.environment }}
+    # One plan at a time for a pull request's root. Two runs seconds apart,
+    # a pull request opened and pushed to at once, each found no plan comment
+    # and each posted one (PR-333); the second now waits and edits the first's.
+    concurrency:
+      group: deploy-plan-${{ github.event.pull_request.number }}-${{ matrix.root }}
+      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
