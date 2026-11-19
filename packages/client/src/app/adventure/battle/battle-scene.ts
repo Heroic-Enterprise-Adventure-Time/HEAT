@@ -266,6 +266,20 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   const take = <Art>(art: Promise<Art>, use: (art: Art) => void) => {
     void art.then((arrived) => { if (!destroyed) use(arrived); }, failed);
   };
+  // The art in hand, by its set: what a run was prepared with. A unit takes its picture from here in the frame it
+  // appears; asked of `Assets`, even a sheet already loaded arrives a frame late, and its health bar stands alone in that one.
+  const unitArt = new Map<string, UnitArt>();
+  const weaponArt = new Map<string, WeaponArt>();
+  const unitArtOf = async (path: string) => {
+    const art = await loadUnitArt(path);
+    unitArt.set(path, art);
+    return art;
+  };
+  const weaponArtOf = async (set: string) => {
+    const art = await loadWeaponArt(set);
+    weaponArt.set(set, art);
+    return art;
+  };
 
   const addUnit = (unit: FieldUnit): UnitView => {
     const body = new Container();
@@ -299,8 +313,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       behind: false,
     };
     const path = artPath(unit.kind, unit.type, heroSets.get(unit.unitId));
-    if (path) take(loadUnitArt(path), (art) => { unitView.art = art; });
-    if (weapon) take(loadWeaponArt(weapon), (art) => { unitView.weapon = art; });
+    // A unit that was not in the run's cast loads now, and shows when its picture arrives.
+    if (path) {
+      unitView.art = unitArt.get(path) ?? null;
+      if (!unitView.art) take(unitArtOf(path), (art) => { unitView.art = art; });
+    }
+    if (weapon) {
+      unitView.weapon = weaponArt.get(weapon) ?? null;
+      if (!unitView.weapon) take(weaponArtOf(weapon), (art) => { unitView.weapon = art; });
+    }
     units.set(unit.unitId, unitView);
     return unitView;
   };
@@ -515,7 +536,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const weapons = uniq(cast.flatMap((member) => weaponOf(member.kind, member.type) ?? []));
       const effectSets = uniq(Object.values(ABILITY_EFFECTS));
       return artSettled(
-        [...sets.map((path) => loadUnitArt(path)), ...weapons.map((set) => loadWeaponArt(set)), ...effectSets.map((set) => loadEffectArt(set))],
+        [...sets.map((path) => unitArtOf(path)), ...weapons.map((set) => weaponArtOf(set)), ...effectSets.map((set) => loadEffectArt(set))],
         ART_WAIT_MS,
         failed,
       );
