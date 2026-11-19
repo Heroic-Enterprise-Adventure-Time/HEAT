@@ -16,11 +16,11 @@
 
 **Not a gate.** A duration on Lambda varies from run to run, and a required check on one would be red by noise. No ruleset names the job (`docs/process/code-changes.md`, rule 29). A real failure of the job, a read refused, fails the run and is fixed; a run with no trace says so and passes.
 
-**`dev`'s figures are kept, not read again.** `dev`'s run uploads its report as the artifact `trace-report`, kept ninety days, the most the repository allows. A later run downloads the last one kept from a finished `Deploy` run on a push to `main` (`scripts/fetch-trace-baseline.sh`) and sets it beside its own: a branch's run beside `dev`, and `dev`'s run beside the merge before it. The table is then the union of both runs' rows, with a dash where one of them did not take a shape. A branch's role is in `heat-sandbox` and cannot read `dev`'s traces, and the kept report names the commit it measured. It is another run's artifact, so it is read as data: every value that would reach the page is checked to be what the script writes, and a report that is not is refused whole.
+**`dev`'s figures are kept, not read again.** `dev`'s run uploads its report as the artifact `trace-report`, kept ninety days, the most the repository allows, and only when its tests passed: a run that stopped part-way took fewer paths, and beside it every later run would show rows no change caused. A later run downloads the last one kept from a finished `Deploy` run on a push to `main` (`scripts/fetch-trace-baseline.sh`) and sets it beside its own: a branch's run beside `dev`, and `dev`'s run beside the merge before it. The table is then the union of both runs' rows, with a dash where one of them did not take a shape. A branch's role is in `heat-sandbox` and cannot read `dev`'s traces, and the kept report names the commit it measured. It is another run's artifact, so it is read as data: every value that would reach the page is checked to be what the script writes, and a report that is not is refused whole (`docs/process/best-practices.md`, rule 16, which the review of this work's pull request added).
 
 **The job holds a role and runs nothing downloaded:** the AWS CLI, `gh`, and scripts that import only Node's own modules (`docs/process/best-practices.md`, rule 13). In `deploy.yml` the role is `heat-dev-plan`, which is read only and already trusts the `dev` environment, under which a pull request's plan runs (decision 0020); the cold start is read as that role too. In `sandbox.yml` it stays the apply role, as the cold start's job had it. **No `bootstrap` change:** the issue expected one, and both roles could already read traces.
 
-**A failed test names a trace from the log.** When the stack test or the browser test fails, the report names the trace of the last request the hub logged, and on any run the trace of each request that logged errors. An agent reads it through the plan role (decision 0055).
+**A failed test names a trace from the log.** When the stack test or the browser test fails, the report names the trace of the last request the hub logged, by the time on its own log line, since the log's streams do not come back in order, and on any run the trace of each request that logged errors. An agent reads it through the plan role (decision 0055).
 
 ## Considered and not chosen
 
@@ -32,6 +32,7 @@
 - **Comparing `dev`'s live alias with its previous one.** The previous alias takes one or two requests a run. The kept report of the merge before is the same comparison over the whole test.
 - **Asserting call counts in the hub's data-layer tests here.** That is where a count that should hold is asserted, with no stack; none is added by this work.
 - **A baseline committed to the repository.** It would be a commit on `main` for every merge.
+- **Preventing a second copy of a kept comment.** The pull request for this work was opened and pushed to within five seconds, and two runs each posted a plan comment for one root. A concurrency group for each writer, or a helper that deletes the copies, was weighed and set aside (the owner, 2026-11-19): a duplicate is rare and names its commit, and the stale one is deleted by hand. What `scripts/upsert-pr-comment.sh` now guarantees is that a duplicate never fails a run.
 
 ## Facts checked
 
@@ -46,4 +47,4 @@ All on 2026-11-18.
 
 ## Where it is described
 
-`docs/process/development.md`, rules 1 and 7; `docs/architecture/overview.md`, the pipeline's diagram; `scripts/trace-report.mjs` and its test; `.github/actions/stack-report/action.yml`; `terraform/environment/sandbox/README.md` and `terraform/environment/dev/README.md`, what a run verifies; `terraform/bootstrap/README.md`, what the plan role is assumed for.
+`docs/process/development.md`, rules 1, 7 and 14; `docs/standards/typescript.md`, rule 8, for the scripts' tests; `docs/process/best-practices.md`, rule 16; `docs/architecture/overview.md`, the pipeline's diagram; `scripts/trace-report.mjs` and its test; `.github/actions/stack-report/action.yml`; `terraform/environment/sandbox/README.md` and `terraform/environment/dev/README.md`, what a run verifies; `terraform/bootstrap/README.md`, what the plan role is assumed for.
