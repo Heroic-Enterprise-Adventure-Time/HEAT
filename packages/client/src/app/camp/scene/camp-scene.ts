@@ -3,7 +3,8 @@ import * as z from 'zod/mini';
 
 import { facilityArtLevel, type FacilityKind, must } from '@heat/engine';
 
-import { FigureSetSchema, loadSpriteSet } from '../../sprite-sheet';
+import type { SetClip } from '../../sprite-sets';
+import { loadSpriteSet } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
 import { sceneView, type SceneView } from '../page-layout';
 import { layGround, TilesetJsonSchema } from './ground';
@@ -68,9 +69,9 @@ interface HeroOnScreen {
 
 /** A hero set's art for the camp, from its sheet, which PixiJS keeps by its address (`sprite-sheet.ts`). */
 async function loadHeroArt(set: string): Promise<HeroArt> {
-  const sheet = await loadSpriteSet(`heroes/${set}`, FigureSetSchema);
+  const sheet = await loadSpriteSet(`heroes/${set}`, 'figure');
   const clips = new Map<string, HeroClip>();
-  const clip = (name: string, foot = name): HeroClip => {
+  const clip = (name: SetClip<'figure'>, foot = name): HeroClip => {
     let made = clips.get(name);
     if (!made) {
       made = { frames: sheet.clip(name).map((texture) => ({ texture, time: WALK_FRAME_MS })), foot: sheet.foot(foot) };
@@ -100,7 +101,7 @@ function stand(sprite: Sprite, foot: number, mirrored: boolean, size: number): v
 }
 
 /** The row each facility's picture stands on, by `<kind>/level-<n>`, which the build measures (assets.md, rule 18). */
-const BasesSchema = z.record(z.string(), z.number());
+const BasesSchema = z.record(z.string(), z.object({ image: z.string(), base: z.number() }));
 
 /**
  * Draws the camp in the host element. `levels` says which picture each
@@ -228,12 +229,14 @@ export async function createCampScene(
     const art = facilityArtLevel(kind, level);
     const shown = facilities.get(kind);
     if (shown?.art === art) return;
-    const texture = await Assets.load<Texture>(`/art/facilities/${kind}/level-${art}.png`);
+    // The build names the picture for its pixels and says so beside its base row, so the two are always of one picture.
+    const picture = must(bases[`${kind}/level-${art}`], `the picture of ${kind} at level ${art}`);
+    const texture = await Assets.load<Texture>(`/art/facilities/${kind}/${picture.image}`);
     const now = facilities.get(kind);
     if (!now || destroyed) return;
     now.art = art;
     now.sprite.texture = texture;
-    now.sprite.pivot.set(texture.width / 2, must(bases[`${kind}/level-${art}`], `the base row of ${kind} at level ${art}`) + 1);
+    now.sprite.pivot.set(texture.width / 2, picture.base + 1);
   };
   for (const spot of layout.facilities) {
     const sprite = new Sprite(Texture.EMPTY);

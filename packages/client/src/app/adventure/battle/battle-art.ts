@@ -1,6 +1,6 @@
 import { Assets, Rectangle, Texture } from 'pixi.js';
 
-import { FigureSetSchema, loadSpriteSet, PropSetSchema, WeaponSetSchema } from '../../sprite-sheet';
+import { loadSpriteSet, type SetPath } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
 import { effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileLayout, projectileLayout, type Rect } from './action-sprites';
 
@@ -36,14 +36,19 @@ export interface UnitArt {
   readonly fadeAbove: number | null;
 }
 
-async function figureArt(path: string): Promise<UnitArt> {
-  const sheet = await loadSpriteSet(path, FigureSetSchema);
-  const east = (animation: string): Frames => ({ textures: sheet.clip(`${animation}-east`), foot: sheet.foot(`${animation}-east`) });
+/** Where a unit's set is under `/art`: a hero's, a monster's or a prop's. */
+export type UnitArtPath = SetPath<'figure' | 'prop'>;
+
+const isProp = (path: UnitArtPath): path is SetPath<'prop'> => path.startsWith('props/');
+
+async function figureArt(path: SetPath<'figure'>): Promise<UnitArt> {
+  const sheet = await loadSpriteSet(path, 'figure');
+  const east = (animation: 'stance' | 'walk' | 'act' | 'hit' | 'down'): Frames => ({ textures: sheet.clip(`${animation}-east`), foot: sheet.foot(`${animation}-east`) });
   return { stance: east('stance'), walk: east('walk'), act: east('act'), actHold: sheet.set.actHold, hit: east('hit'), down: east('down'), fadeAbove: null };
 }
 
-async function propArt(path: string): Promise<UnitArt> {
-  const sheet = await loadSpriteSet(path, PropSetSchema);
+async function propArt(path: SetPath<'prop'>): Promise<UnitArt> {
+  const sheet = await loadSpriteSet(path, 'prop');
   // A prop keeps the ground its standing picture has, through its hit and its down (rule 31).
   const foot = sheet.foot('standing');
   const still: Frames = { textures: sheet.clip('standing'), foot };
@@ -72,7 +77,7 @@ export interface EffectArt {
 
 /** A weapon's art: `<set>` under `/art/weapons`. */
 export async function loadWeaponArt(set: string): Promise<WeaponArt> {
-  const sheet = await loadSpriteSet(`weapons/${set}`, WeaponSetSchema);
+  const sheet = await loadSpriteSet(`weapons/${set}`, 'weapon');
   const { holdFrame, grips, frameMs, nocks } = sheet.set.swing;
   const pixels = (list: readonly (readonly [number, number])[]) => list.map(([x, y]) => ({ x, y }));
   return { swing: sheet.clip('swing'), holdFrame, grips: pixels(grips), frameMs, nocks: nocks ? pixels(nocks) : null };
@@ -109,6 +114,6 @@ export function loadEffectArt(set: string): Promise<EffectArt> {
 }
 
 /** A set's art: `heroes/<set>`, `monsters/<set>` or `props/<set>` under `/art`. */
-export function loadUnitArt(path: string): Promise<UnitArt> {
-  return path.startsWith('props/') ? propArt(path) : figureArt(path);
+export function loadUnitArt(path: UnitArtPath): Promise<UnitArt> {
+  return isProp(path) ? propArt(path) : figureArt(path);
 }

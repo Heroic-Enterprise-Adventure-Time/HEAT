@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clipsOf, opaqueRows, packSet } from "./pack-art.mjs";
+import { SET_CLIPS } from "../src/app/sprite-sets.ts";
+import { clipsOf, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
 
 /** A picture of one colour per frame, opaque on the rows from `top` to `bottom` and transparent elsewhere. */
 function picture(name, width, height, top, bottom, shade = 200) {
@@ -159,4 +160,18 @@ test("packSet refuses a weapon whose grips are not one a frame, or whose provena
     () => packSet({ set: "weapons/test", kind: "weapon", frames, provenance: { animations: {} } }),
     /^Error: weapons\/test: its provenance gives the swing no holdFrame and grips$/,
   );
+});
+
+test("pictureName carries a hash of the file, so a picture made again is a new name", () => {
+  const first = pictureName("level-1", Buffer.from([1, 2, 3]));
+  assert.match(first, /^level-1\.[0-9a-f]{12}\.png$/);
+  assert.equal(pictureName("level-1", Buffer.from([1, 2, 3])), first);
+  assert.notEqual(pictureName("level-1", Buffer.from([1, 2, 4])), first);
+});
+
+test("packSet asks a set for the clips the page's own list names for its kind", () => {
+  // Every clip of the list but the last: the one left out is the one refused.
+  const clips = SET_CLIPS.prop;
+  const frames = clips.slice(0, -1).map((clip) => picture(clip, 8, 8, 1, 6));
+  assert.throws(() => packSet({ set: "props/test", kind: "prop", frames, provenance: {} }), new RegExp(`^Error: props/test: no ${clips.at(-1)}$`));
 });

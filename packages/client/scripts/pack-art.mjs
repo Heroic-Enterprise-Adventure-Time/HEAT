@@ -8,19 +8,17 @@
 //
 // Everything here is a function of the frames it is handed, so that it is
 // tested without a file; copy-art.mjs reads the files and writes the sheet.
+//
+// Which areas are packed, the kind of set each holds and the clips a scene
+// asks a set of each kind for are the page's own list, src/app/sprite-sets.ts,
+// which Node reads with its types stripped: a set without one of those clips
+// fails the build here, not the page (docs/standards/typescript.md, rule 23).
 import { createHash } from "node:crypto";
 
+import { sortBy } from "es-toolkit";
 import { MaxRectsPacker } from "maxrects-packer";
 
-/** The areas under art/ whose sets are packed, and what kind of set each holds. */
-export const PACKED_AREAS = { heroes: "figure", monsters: "figure", props: "prop", weapons: "weapon" };
-
-/** The clips the scenes ask a set of each kind for by name (camp-scene.ts, battle-art.ts): a set without one fails the build, not the page. */
-const NEEDED_CLIPS = {
-  figure: ["still-south", "still-east", "still-north", "still-west", "walk-south", "walk-east", "walk-north", "stance-east", "act-east", "hit-east", "down-east"],
-  prop: ["standing", "hit", "down"],
-  weapon: ["swing"],
-};
+import { SET_CLIPS } from "../src/app/sprite-sets.ts";
 
 /** No sheet is wider or taller than this, which every device's GPU takes; a set that outgrows it fails the build. */
 const MAX_SIDE = 2048;
@@ -94,6 +92,16 @@ function playOf(set, kind, clips, provenance) {
 }
 
 /**
+ * A picture's published name, for one that is copied as it is and read
+ * beside a fact the build measured from it: `level-1` is
+ * `level-1.<hash>.png`, the hash of the file, so that a picture made again
+ * is a new name and the fact always belongs to the picture it is read with.
+ */
+export function pictureName(name, file) {
+  return `${name}.${createHash("sha256").update(file).digest("hex").slice(0, 12)}.png`;
+}
+
+/**
  * One set's sheet: `image`, the frames laid out with a pixel between them,
  * and `json`, the atlas as PixiJS reads it with the set's own facts under
  * `set`. `frames` are the set's pictures as RGBA, each named for its file
@@ -109,13 +117,13 @@ function playOf(set, kind, clips, provenance) {
 export function packSet({ set, kind, frames, provenance }) {
   if (frames.length === 0) throw new Error(`${set}: no frames`);
   const clips = clipsOf(set, frames);
-  const absent = NEEDED_CLIPS[kind].filter((clip) => !clips.has(clip));
+  const absent = SET_CLIPS[kind].filter((clip) => !clips.has(clip));
   if (absent.length > 0) throw new Error(`${set}: no ${absent.join(", ")}`);
   checkCounts(set, kind, clips, provenance);
 
   const packer = new MaxRectsPacker(MAX_SIDE, MAX_SIDE, PADDING, { smart: true, pot: false, square: false, allowRotation: false });
   // In name order, so that the same frames always make the same sheet.
-  const ordered = [...frames].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+  const ordered = sortBy(frames, [(frame) => frame.name]);
   packer.addArray(ordered.map((frame) => ({ width: frame.width, height: frame.height, data: frame })));
   const [bin, ...more] = packer.bins;
   if (!bin || more.length > 0) throw new Error(`${set}: its frames do not fit one sheet of ${MAX_SIDE} by ${MAX_SIDE}`);

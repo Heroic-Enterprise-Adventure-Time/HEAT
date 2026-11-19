@@ -78,8 +78,8 @@ export class BattleView {
   private scene: BattleSceneHandle | null = null;
   /** The run handed over last, counted, so that an earlier run's art arriving late begins nothing. */
   private handedOver = 0;
-  /** True from a run's hand-over until the scene has its cast's art: no frame moves the run or the scene. */
-  private preparing = false;
+  /** The last run whose art the scene has. While it is not the one handed over last, no frame moves the run or the scene. */
+  private prepared = 0;
 
   constructor() {
     const frames = inject(FRAME_LOOP);
@@ -108,10 +108,9 @@ export class BattleView {
     if (!scene) return;
     const party = must(this.play.field(), 'the field').party.map((hero): CastMember => ({ kind: hero.kind, type: hero.type, spriteSet: spriteSets.get(hero.unitId) }));
     const run = ++this.handedOver;
-    this.preparing = true;
     void scene.prepare([...party, ...others]).then(() => {
       if (run !== this.handedOver || scene !== this.scene) return;
-      this.preparing = false;
+      this.prepared = run;
       // A page that stopped the run while its art was on its way has no field to show.
       const field = this.play.field();
       if (field) scene.reset(field, spriteSets, this.play.entering());
@@ -137,7 +136,7 @@ export class BattleView {
   }
 
   private frame(ms: number): void {
-    if (this.preparing) return;
+    if (this.prepared !== this.handedOver) return;
     const events = this.play.tick(ms);
     const field = this.play.field();
     if (!this.scene || !field) return;

@@ -8,22 +8,25 @@
 // A sprite set, under art/heroes, art/monsters, art/props and art/weapons, is
 // packed into one sheet, its image named for its pixels and sheet.json naming
 // it (pack-art.mjs; Issue-205): its frames and its provenance are not
-// published. art/effects,
-// art/facilities, art/ground and art/icons are copied as they are, and beside
-// the facilities' pictures goes bases.json, the row each one stands on
-// (docs/process/assets.md, rule 18), measured here so that the page reads no
-// pixels.
+// published. art/effects, art/ground and art/icons are copied as they are.
+// A facility's pictures are copied under names that carry a hash of the
+// file, and beside them goes bases.json: for each picture, that name and the
+// row it stands on (docs/process/assets.md, rule 18), measured here so that
+// the page reads no pixels. The page reads the picture's name there, so the
+// row is always the row of the picture it is drawn with, whatever a browser
+// has kept (the review of PR-334).
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { opaqueRows, PACKED_AREAS, packSet } from "./pack-art.mjs";
+import { PACKED_AREAS } from "../src/app/sprite-sets.ts";
+import { opaqueRows, packSet, pictureName } from "./pack-art.mjs";
 
 const from = fileURLToPath(new URL("../../../art/", import.meta.url));
 const to = fileURLToPath(new URL("../generated/art/", import.meta.url));
-const COPIED_AREAS = ["effects", "facilities", "ground", "icons"];
+const COPIED_AREAS = ["effects", "ground", "icons"];
 
 /** A picture's pixels as RGBA, whatever the PNG's own colour type. */
 async function pixels(file) {
@@ -60,8 +63,14 @@ for (const area of COPIED_AREAS) {
 
 const bases = {};
 for (const kind of directories(join(from, "facilities"))) {
-  for (const file of pictures(join(from, "facilities", kind))) bases[`${kind}/${basename(file, ".png")}`] = opaqueRows(await pixels(file)).bottom;
+  mkdirSync(join(to, "facilities", kind), { recursive: true });
+  for (const file of pictures(join(from, "facilities", kind))) {
+    const name = basename(file, ".png");
+    const image = pictureName(name, readFileSync(file));
+    cpSync(file, join(to, "facilities", kind, image));
+    bases[`${kind}/${name}`] = { image, base: opaqueRows(await pixels(file)).bottom };
+  }
 }
 writeFileSync(join(to, "facilities", "bases.json"), JSON.stringify(bases));
 
-console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")} and copied art/${COPIED_AREAS.join(", art/")} into packages/client/generated/art`);
+console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")} and copied art/${[...COPIED_AREAS, "facilities"].join(", art/")} into packages/client/generated/art`);

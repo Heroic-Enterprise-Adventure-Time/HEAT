@@ -22,7 +22,7 @@ import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
 import { effectFrameAt, heldFrame, projectileAt } from './action-sprites';
 import { artSettled } from './art-loads';
-import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type WeaponArt } from './battle-art';
+import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
 
 /**
@@ -155,7 +155,7 @@ interface ProjectileView {
 }
 
 /** Where a unit's sprite set is under `/art`: a hero's own set, anyone else's by its type; null where there is none. */
-function artPath(kind: FieldUnit['kind'], type: string, heroSet: string | undefined): string | null {
+function artPath(kind: FieldUnit['kind'], type: string, heroSet: string | undefined): UnitArtPath | null {
   if (kind === 'hero') return heroSet ? `heroes/${heroSet}` : null;
   if (kind === 'monster') {
     // A stored timeline may name a monster this build no longer has.
@@ -270,7 +270,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   // appears; asked of `Assets`, even a sheet already loaded arrives a frame late, and its health bar stands alone in that one.
   const unitArt = new Map<string, UnitArt>();
   const weaponArt = new Map<string, WeaponArt>();
-  const unitArtOf = async (path: string) => {
+  const unitArtOf = async (path: UnitArtPath) => {
     const art = await loadUnitArt(path);
     unitArt.set(path, art);
     return art;
