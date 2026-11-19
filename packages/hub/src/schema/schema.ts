@@ -671,7 +671,12 @@ builder.mutationFields((t) => ({
     authScopes: { authenticated: true },
     description: "Makes the signed-in player's profile if they have none, named with their id, and answers it. Called by the client after every sign-in; a repeat changes nothing. Nothing refuses it.",
     errors: answers("JoinGame", { field: "player", what: "the player's profile, made or found" }, []),
-    resolve: (_root, _args, ctx) => ctx.repo.joinPlayer(callerId(ctx)),
+    resolve: async (_root, _args, ctx) => {
+      // A read the field does not need, for one push: Issue-328 is verified by
+      // its showing in the trace report. The next commit removes it.
+      await ctx.repo.getPlayer(callerId(ctx));
+      return ctx.repo.joinPlayer(callerId(ctx));
+    },
   }),
   recruitHero: t.field({
     type: HeroRef,
