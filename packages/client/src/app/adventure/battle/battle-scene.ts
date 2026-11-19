@@ -410,9 +410,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     for (const unitView of units.values()) if (!present.has(unitView.unit.unitId)) unitView.behind = true;
   };
 
-  const drawBar = (unitView: UnitView) => {
+  /** `awaited`: its picture is still on its way and the entry is held for it, so there is nobody yet for a bar to stand under. */
+  const drawBar = (unitView: UnitView, awaited: boolean) => {
     const { unit } = unitView;
-    const shown = unit.kind === 'resource' || unit.health <= 0 || unitView.behind ? '' : `${unit.health}/${unit.maxHealth}`;
+    const shown = awaited || unit.kind === 'resource' || unit.health <= 0 || unitView.behind ? '' : `${unit.health}/${unit.maxHealth}`;
     unitView.bar.position.set(Math.round(unitView.x) - 7, Math.round(unitView.y) + 2);
     unitView.bar.zIndex = unitView.y + 0.5;
     if (shown === unitView.barShown) return;
@@ -610,7 +611,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
             continue;
           }
           draw(unitView, simTime, false, false, unitView.opponent);
-          drawBar(unitView);
+          drawBar(unitView, false);
           continue;
         }
         const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
@@ -651,7 +652,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           }
         }
         draw(unitView, simTime, moving, rushing, mirrored);
-        drawBar(unitView);
+        drawBar(unitView, held && unitView.art === null);
       }
 
       drawProjectiles(simTime);
