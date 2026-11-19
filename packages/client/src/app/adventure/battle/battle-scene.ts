@@ -80,6 +80,8 @@ const DOWN_MS = 100;
 const WALK_MS = 100;
 const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
+/** The longest an entry waits for one picture, on the wall clock: past it the run goes on, and the picture shows when it arrives. */
+const ART_WAIT_MS = 8000;
 /** A fallen monster or a felled tree lies this long after its fall, then fades over the next. */
 const FADE_AFTER_MS = 600;
 const FADE_MS = 500;
@@ -250,7 +252,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   let destroyed = false;
   // The units' and weapons' art on its way: an entry waits for it. A failure is reported as the page's own
   // uncaught error, which is where a load's failure always went and where the browser test reads it.
-  const loads = artLoads((error) => { reportError(error); });
+  const loads = artLoads(ART_WAIT_MS, (error) => { reportError(error); });
   // The effects are few and small, and are fetched now, so that the first blow's is there when it lands.
   for (const set of uniq(Object.values(ABILITY_EFFECTS))) void loadEffectArt(set).catch(() => undefined);
 

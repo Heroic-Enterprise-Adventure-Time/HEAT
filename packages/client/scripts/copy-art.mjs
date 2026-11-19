@@ -6,8 +6,9 @@
 // test; generated/ is ignored.
 //
 // A sprite set, under art/heroes, art/monsters, art/props and art/weapons, is
-// packed into one sheet, sheet.png and sheet.json (pack-art.mjs; Issue-205):
-// its frames and its provenance are not published. art/effects,
+// packed into one sheet, its image named for its pixels and sheet.json naming
+// it (pack-art.mjs; Issue-205): its frames and its provenance are not
+// published. art/effects,
 // art/facilities, art/ground and art/icons are copied as they are, and beside
 // the facilities' pictures goes bases.json, the row each one stands on
 // (docs/process/assets.md, rule 18), measured here so that the page reads no
@@ -44,7 +45,7 @@ for (const [area, kind] of Object.entries(PACKED_AREAS)) {
     const { image, json } = packSet({ set: `${area}/${name}`, kind, frames, provenance });
     const out = join(to, area, name);
     mkdirSync(out, { recursive: true });
-    await sharp(image.data, { raw: { width: image.width, height: image.height, channels: 4 } }).png({ compressionLevel: 9 }).toFile(join(out, "sheet.png"));
+    await sharp(image.data, { raw: { width: image.width, height: image.height, channels: 4 } }).png({ compressionLevel: 9 }).toFile(join(out, image.name));
     writeFileSync(join(out, "sheet.json"), JSON.stringify(json));
     sheets++;
   }

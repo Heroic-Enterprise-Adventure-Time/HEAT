@@ -48,7 +48,8 @@ test("clipsOf refuses an animation with a frame missing, naming the set", () => 
 test("packSet writes every frame's pixels where the atlas says, with a pixel between any two", () => {
   const frames = figure();
   const { image, json } = packSet({ set: "heroes/test", kind: "figure", frames, provenance: figureProvenance });
-  assert.deepEqual(json.meta, { image: "sheet.png", format: "RGBA8888", size: { w: image.width, h: image.height }, scale: "1" });
+  assert.match(image.name, /^sheet\.[0-9a-f]{12}\.png$/);
+  assert.deepEqual(json.meta, { image: image.name, format: "RGBA8888", size: { w: image.width, h: image.height }, scale: "1" });
   assert.equal(image.data.length, image.width * image.height * 4);
   for (const frame of frames) {
     const at = json.frames[frame.name].frame;
@@ -82,6 +83,15 @@ test("packSet makes the same sheet whatever order the frames come in", () => {
   const other = packSet({ set: "heroes/test", kind: "figure", frames: figure().reverse(), provenance: figureProvenance });
   assert.equal(JSON.stringify(other.json), JSON.stringify(one.json));
   assert.ok(other.image.data.equals(one.image.data));
+});
+
+test("packSet names the image for its pixels, so a changed frame is a new name and the atlas names it", () => {
+  const one = packSet({ set: "heroes/test", kind: "figure", frames: figure(), provenance: figureProvenance });
+  const frames = figure();
+  frames[0].data[3] = 254;
+  const other = packSet({ set: "heroes/test", kind: "figure", frames, provenance: figureProvenance });
+  assert.notEqual(other.image.name, one.image.name);
+  assert.equal(other.json.meta.image, other.image.name);
 });
 
 test("packSet holds a figure's act on its first frame where the provenance names none", () => {

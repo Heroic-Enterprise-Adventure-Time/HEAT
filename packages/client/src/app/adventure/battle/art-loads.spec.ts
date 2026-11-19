@@ -11,16 +11,25 @@ function deferred<Value>() {
   return { promise, resolve, reject };
 }
 
-/** Lets the settled promises' callbacks run. */
-const settled = () => new Promise<void>((resolve) => { setTimeout(resolve); });
+const LIMIT_MS = 8000;
 
 describe('artLoads', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  /** Lets the settled promises' callbacks run, with no time passing. */
+  const settled = () => vi.advanceTimersByTimeAsync(0);
+
   it('has nothing pending before anything is asked for', () => {
-    expect(artLoads(() => undefined).pending()).toBe(false);
+    expect(artLoads(LIMIT_MS, () => undefined).pending()).toBe(false);
   });
 
   it('is pending until every load has arrived, and hands each its art', async () => {
-    const loads = artLoads(() => undefined);
+    const loads = artLoads(LIMIT_MS, () => undefined);
     const hero = deferred<string>();
     const sword = deferred<string>();
     const used: string[] = [];
@@ -40,7 +49,7 @@ describe('artLoads', () => {
   });
 
   it('has the art in hand before the load stops being pending', async () => {
-    const loads = artLoads(() => undefined);
+    const loads = artLoads(LIMIT_MS, () => undefined);
     const hero = deferred<string>();
     let pendingWhenUsed: boolean | null = null;
     loads.load(hero.promise, () => { pendingWhenUsed = loads.pending(); });
@@ -51,7 +60,7 @@ describe('artLoads', () => {
 
   it('counts a load that fails as over, uses nothing, and says why', async () => {
     const failures: unknown[] = [];
-    const loads = artLoads((error) => failures.push(error));
+    const loads = artLoads(LIMIT_MS, (error) => failures.push(error));
     const hero = deferred<string>();
     const used: string[] = [];
     loads.load(hero.promise, (art) => used.push(art));
@@ -61,5 +70,28 @@ describe('artLoads', () => {
     expect(loads.pending()).toBe(false);
     expect(used).toEqual([]);
     expect(failures).toEqual([missing]);
+  });
+
+  it('stops waiting for a load that takes longer than the limit, and still uses its art when it arrives', async () => {
+    const loads = artLoads(LIMIT_MS, () => undefined);
+    const hero = deferred<string>();
+    const sword = deferred<string>();
+    const used: string[] = [];
+    loads.load(hero.promise, (art) => used.push(art));
+    await vi.advanceTimersByTimeAsync(LIMIT_MS - 1);
+    expect(loads.pending()).toBe(true);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(loads.pending()).toBe(false);
+
+    // One asked for after the first gave up is waited for in its own right.
+    loads.load(sword.promise, (art) => used.push(art));
+    expect(loads.pending()).toBe(true);
+    hero.resolve('fighter-02');
+    await settled();
+    expect(used).toEqual(['fighter-02']);
+    expect(loads.pending()).toBe(true);
+    sword.resolve('sword-01');
+    await settled();
+    expect(loads.pending()).toBe(false);
   });
 });

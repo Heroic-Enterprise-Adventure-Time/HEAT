@@ -8,6 +8,8 @@
 //
 // Everything here is a function of the frames it is handed, so that it is
 // tested without a file; copy-art.mjs reads the files and writes the sheet.
+import { createHash } from "node:crypto";
+
 import { MaxRectsPacker } from "maxrects-packer";
 
 /** The areas under art/ whose sets are packed, and what kind of set each holds. */
@@ -96,6 +98,13 @@ function playOf(set, kind, clips, provenance) {
  * and `json`, the atlas as PixiJS reads it with the set's own facts under
  * `set`. `frames` are the set's pictures as RGBA, each named for its file
  * without the extension; `set` is `<area>/<name>`, for a failure's message.
+ *
+ * The image is named for its pixels, `sheet.<hash>.png`, and the atlas
+ * names it. Everything under /art is published to be kept for a year
+ * (scripts/publish-client.sh), which is right for a picture whose name
+ * changes when it does and wrong for an atlas, whose frames must be those
+ * of the picture beside it: sheet.json is published to be read again within
+ * a minute, and so always names the image it was packed with.
  */
 export function packSet({ set, kind, frames, provenance }) {
   if (frames.length === 0) throw new Error(`${set}: no frames`);
@@ -127,11 +136,14 @@ export function packSet({ set, kind, frames, provenance }) {
     };
   }
 
+  const hash = createHash("sha256").update(`${image.width}x${image.height}:`).update(image.data).digest("hex").slice(0, 12);
+  image.name = `sheet.${hash}.png`;
+
   const names = [...clips.keys()].sort();
   const json = {
     frames: Object.fromEntries(ordered.map((frame) => [frame.name, atlas[frame.name]])),
     animations: Object.fromEntries(names.map((clip) => [clip, clips.get(clip).map((frame) => frame.name)])),
-    meta: { image: "sheet.png", format: "RGBA8888", size: { w: image.width, h: image.height }, scale: "1" },
+    meta: { image: image.name, format: "RGBA8888", size: { w: image.width, h: image.height }, scale: "1" },
     set: {
       kind,
       // The row a clip stands on: the lowest opaque row of its first frame (rules 11 and 31).
