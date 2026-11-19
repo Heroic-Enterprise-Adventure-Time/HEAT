@@ -6,9 +6,9 @@ import { type Field, isEntry } from '../adventure/field';
 
 /**
  * A battle scene that draws nothing, since jsdom has no WebGL, and records
- * what it was given. By default it says everyone is on at once, as if the
- * rush in took no time; `holding` keeps an entry waiting until the test
- * calls `release`.
+ * what it was given. By default it says everyone is on at once, after a
+ * reset and after an entry, as if the art were there and the rush in took
+ * no time; `holding` keeps either waiting until the test calls `release`.
  */
 export function fakeBattleScene(holding = false) {
   let callbacks: BattleSceneCallbacks | null = null;
@@ -22,7 +22,7 @@ export function fakeBattleScene(holding = false) {
       return Promise.resolve({
         reset: (field: Field, sets: ReadonlyMap<string, string>, enter: boolean) => {
           scene.resets.push({ field, sets, enter });
-          if (enter && !holding) given.onEntered();
+          if (!holding) given.onEntered();
         },
         feed: (events: readonly AdventureEvent[]) => {
           scene.fed.push(...events);

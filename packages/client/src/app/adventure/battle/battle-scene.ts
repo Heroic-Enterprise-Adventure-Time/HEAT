@@ -1,4 +1,4 @@
-import { clamp, range } from 'es-toolkit';
+import { clamp, range, uniq } from 'es-toolkit';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
 
 import {
@@ -20,6 +20,7 @@ import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/gro
 import { fetchJson } from '../../static-json';
 import type { Field, FieldUnit } from '../field';
 import { effectFrameAt, heldFrame, projectileAt } from './action-sprites';
+import { artLoads } from './art-loads';
 import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
 
@@ -44,14 +45,18 @@ import { battleView, type BattleView, entryOffset, spots } from './battle-layout
  */
 
 export interface BattleSceneCallbacks {
-  /** Everyone is on after an entry: the clock may run. */
+  /** Everyone is on and has their art, after a reset or an entry: the clock may run. */
   readonly onEntered: () => void;
 }
 
 export interface BattleSceneHandle {
-  /** Shows the field as it stands; `enter` runs the party on from the left first. */
+  /**
+   * Shows the field as it stands; `enter` runs the party on from the left
+   * first. Says `onEntered` once everyone's art is loaded and, with `enter`,
+   * the party is on.
+   */
   reset(field: Field, heroSets: ReadonlyMap<string, string>, enter: boolean): void;
-  /** Animates the events just happened; a fight or a gather beginning brings the other side on. */
+  /** Animates the events just happened; a fight or a gather beginning brings the other side on, once its art is loaded. */
   feed(events: readonly AdventureEvent[], field: Field): void;
   /** Moves on by `ms` of presentation time, the wall clock times the speed, with the clock at `simTime`. */
   frame(ms: number, simTime: number, field: Field): void;
@@ -238,11 +243,16 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   /** The presentation clock, the wall clock times the speed: what an effect plays on. */
   let shown = 0;
   let heroSets: ReadonlyMap<string, string> = new Map();
-  /** The party running on from the left, the other side rushing on from the right, or neither. */
-  let entering: 'party' | 'opponents' | null = null;
+  /** The party running on from the left, the other side rushing on from the right, everyone placed where they stand, or nothing awaited. */
+  let entering: 'party' | 'opponents' | 'placed' | null = null;
   /** How far right of its spots the other side still is while it rushes on. */
   let offset = 0;
   let destroyed = false;
+  // The units' and weapons' art on its way: an entry waits for it. A failure is reported as the page's own
+  // uncaught error, which is where a load's failure always went and where the browser test reads it.
+  const loads = artLoads((error) => { reportError(error); });
+  // The effects are few and small, and are fetched now, so that the first blow's is there when it lands.
+  for (const set of uniq(Object.values(ABILITY_EFFECTS))) void loadEffectArt(set).catch(() => undefined);
 
   const addUnit = (unit: FieldUnit): UnitView => {
     const body = new Container();
@@ -277,16 +287,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       behind: false,
     };
     const path = artPath(unit, heroSets);
-    if (path) {
-      void loadUnitArt(path).then((art) => {
-        if (!destroyed) unitView.art = art;
-      });
-    }
-    if (weapon) {
-      void loadWeaponArt(weapon).then((art) => {
-        if (!destroyed) unitView.weapon = art;
-      });
-    }
+    if (path) loads.load(loadUnitArt(path), (art) => { if (!destroyed) unitView.art = art; });
+    if (weapon) loads.load(loadWeaponArt(weapon), (art) => { if (!destroyed) unitView.weapon = art; });
     units.set(unit.unitId, unitView);
     return unitView;
   };
@@ -435,13 +437,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       top.visible = false;
       return;
     }
-    // A fading down: the rows above the cut with their own alpha, the rest as drawn (rule 30).
-    const source = texture.source;
-    top.texture = new Texture({ source, frame: new Rectangle(0, 0, texture.width, cut) });
+    // A fading down: the rows above the cut with their own alpha, the rest as drawn (rule 30), each cut from the frame's place on its sheet.
+    const { source, frame } = texture;
+    top.texture = new Texture({ source, frame: new Rectangle(frame.x, frame.y, texture.width, cut) });
     top.pivot.set(texture.width / 2, frames.foot + 1);
     top.alpha = fade;
     top.visible = true;
-    picture.texture = new Texture({ source, frame: new Rectangle(0, cut, texture.width, texture.height - cut) });
+    picture.texture = new Texture({ source, frame: new Rectangle(frame.x, frame.y + cut, texture.width, texture.height - cut) });
     picture.pivot.set(texture.width / 2, frames.foot + 1 - cut);
   };
 
@@ -514,7 +516,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         unitView.x = enter && !unitView.opponent ? spot.x - runOn : spot.x;
         if (unitView.unit.health <= 0) unitView.downAt = -Infinity;
       }
-      entering = enter ? 'party' : null;
+      // With no entry, a resumed run, everyone is placed where they stand, and the clock still waits for their art.
+      entering = enter ? 'party' : 'placed';
       if (!enter) placeRoad();
     },
 
@@ -579,8 +582,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const at = targets(field);
       const travelling = entering === null && field.outcome === null && field.stageKind === 'travel';
       const retreating = field.outcome === 'retreat';
+      // An entry stands still until the art of everyone in it has arrived.
+      const held = entering !== null && loads.pending();
       let rolled = 0;
-      if (entering === 'opponents') {
+      if (entering === 'opponents' && !held) {
         const step = Math.min(offset, (RUSH_SPEED * ms) / 1000);
         offset -= step;
         rolled = step;
@@ -626,7 +631,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           const dx = spot.x - unitView.x;
           const dy = spot.y - unitView.y;
           const distance = Math.hypot(dx, dy);
-          const step = (speed * ms) / 1000;
+          const step = held ? 0 : (speed * ms) / 1000;
           if (distance > step) {
             unitView.x += (dx / distance) * step;
             unitView.y += (dy / distance) * step;
@@ -638,7 +643,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           }
           rushing = entering === 'party';
           // The party walks in place while the road goes by.
-          if (!unitView.opponent && standing && (travelling || entering === 'opponents')) {
+          if (!unitView.opponent && standing && (travelling || (entering === 'opponents' && !held))) {
             moving = true;
             rushing = true;
           }
@@ -650,7 +655,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       drawProjectiles(simTime);
       drawEffects();
 
-      if ((entering === 'party' && partyOn) || (entering === 'opponents' && offset <= 0)) {
+      if (!held && (entering === 'placed' || (entering === 'party' && partyOn) || (entering === 'opponents' && offset <= 0))) {
         entering = null;
         callbacks.onEntered();
       }

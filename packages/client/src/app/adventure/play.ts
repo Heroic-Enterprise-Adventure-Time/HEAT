@@ -25,6 +25,8 @@ const SAVE_EVERY_MS = 1000;
  * clock waits while the scene brings everyone on, when `holdEntries` is set
  * by a page that has a scene, until `entered` is called (the owner's call on
  * Issue-15: the rush in is flavor, and the fight's clock starts after it).
+ * It waits the same way when a run begins with no entry, a resumed one,
+ * until the scene has the art of everyone in it (Issue-205).
  */
 @Injectable()
 export class Play {
@@ -42,8 +44,10 @@ export class Play {
   readonly simTime = signal(0);
   readonly paused = signal(false);
   readonly speed = signal<Speed>(1);
-  /** True while the clock waits at an entry for the scene. */
+  /** True while the clock waits for the scene: at an entry, and when a run begins, until `entered`. */
   readonly entering = signal(false);
+  /** Whether the run just begun starts with the party running on: a fresh run or a replay, not one resumed. */
+  readonly runsOn = signal(false);
   /** True while a stored timeline is played rather than the engine. */
   readonly replaying = signal(false);
   /** Forced actions waiting for their hero's next turn, by hero. */
@@ -107,7 +111,7 @@ export class Play {
     return events;
   }
 
-  /** The scene has brought everyone on: the clock runs again. */
+  /** The scene has everyone on, with their art: the clock runs again. */
   entered(): void {
     this.entering.set(false);
   }
@@ -146,7 +150,9 @@ export class Play {
     this.queued.set(new Map());
     this.field.set(run.events.reduce(applyEvent, start));
     this.simTime.set(run.simTime);
-    this.entering.set(this.holdEntries && run.events.some(isEntry) && !this.resumed());
+    this.runsOn.set(this.holdEntries && run.events.some(isEntry) && !this.resumed());
+    // A scene says `entered` after every reset, once it has the art, whether or not the party runs on.
+    this.entering.set(this.holdEntries);
   }
 
   /** A forced action is used or dropped at its hero's next turn, and any still waiting go with the battle. */

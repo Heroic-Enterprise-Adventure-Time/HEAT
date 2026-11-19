@@ -45,7 +45,8 @@ export const BATTLE_SCENE_FACTORY = new InjectionToken<BattleSceneFactory>('heat
  * on, and the scene animates what happened and moves on by the same time.
  * Without a scene, as where WebGL is missing, the run plays with the
  * controls alone. The page starts a run once `ready` is set, and hands the
- * scene the run's start with `reset`.
+ * scene the run's start with `reset`; the run's clock then waits until the
+ * scene has the art of everyone in it and says so.
  */
 @Component({
   selector: 'heat-battle-view',
@@ -91,7 +92,7 @@ export class BattleView {
 
   /** Hands the scene the field of the run just begun, with each hero's sprite set, by hero id. */
   reset(spriteSets: ReadonlyMap<string, string>): void {
-    this.scene?.reset(must(this.play.field(), 'the field'), spriteSets, this.play.entering());
+    this.scene?.reset(must(this.play.field(), 'the field'), spriteSets, this.play.runsOn());
   }
 
   protected measure(): void {

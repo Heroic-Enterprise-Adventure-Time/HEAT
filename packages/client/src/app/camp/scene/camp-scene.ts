@@ -1,9 +1,9 @@
-import { range } from 'es-toolkit';
-import { Application, Assets, Container, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
+import { AnimatedSprite, Application, Assets, Container, type FrameObject, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
+import * as z from 'zod/mini';
 
 import { facilityArtLevel, type FacilityKind, must } from '@heat/engine';
 
-import { lowestOpaqueRow } from '../../pixel-art';
+import { FigureSetSchema, loadSpriteSet } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
 import { sceneView, type SceneView } from '../page-layout';
 import { layGround, TilesetJsonSchema } from './ground';
@@ -43,63 +43,64 @@ export interface CampSceneHandle {
 }
 
 type WalkDirection = 'south' | 'east' | 'north';
-const WALK_DIRECTIONS: readonly WalkDirection[] = ['south', 'east', 'north'];
-const STILL_DIRECTIONS: readonly Facing[] = ['south', 'east', 'north', 'west'];
-const WALK_FRAMES = 6;
 const WALK_FRAME_MS = 100;
 
-interface HeroFrames {
-  still: Record<Facing, Texture>;
-  walk: Record<WalkDirection, Texture[]>;
-  /** The row of the lowest opaque pixel: of the south still for the stills, of each walk's first frame for the walk. */
-  stillFoot: number;
-  walkFoot: Record<WalkDirection, number>;
+/** One thing a hero shows in the camp: a still, or a walk's frames with how long each lasts, and the row it stands on. */
+interface HeroClip {
+  readonly frames: FrameObject[];
+  /** The row of the lowest opaque pixel of the clip's first frame. */
+  readonly foot: number;
+}
+
+interface HeroArt {
+  /** The clip of a hero walking or standing while facing `facing`; a walk west is the walk east, drawn mirrored. */
+  readonly clip: (walking: boolean, facing: Facing) => HeroClip;
 }
 
 interface HeroOnScreen {
-  sprite: Sprite;
+  /** Plays a walk's loop on the scene's own ticker, and holds a still. */
+  sprite: AnimatedSprite;
   walker: Walker;
-  frames: HeroFrames;
-  clockMs: number;
+  art: HeroArt;
+  /** The clip the sprite holds, so that it is handed its frames only when they change. */
+  showing: HeroClip | null;
 }
 
-const heroFrames = new Map<string, Promise<HeroFrames>>();
-
-function loadHeroFrames(set: string): Promise<HeroFrames> {
-  let frames = heroFrames.get(set);
-  if (!frames) {
-    frames = (async () => {
-      const base = `/art/heroes/${set}`;
-      const still = Object.fromEntries(
-        await Promise.all(STILL_DIRECTIONS.map(async (d) => [d, await Assets.load<Texture>(`${base}/still-${d}.png`)] as const)),
-      ) as Record<Facing, Texture>;
-      const walk = Object.fromEntries(
-        await Promise.all(
-          WALK_DIRECTIONS.map(async (d) => [
-            d,
-            await Promise.all(range(WALK_FRAMES).map((i) => Assets.load<Texture>(`${base}/walk-${d}-${i}.png`))),
-          ] as const),
-        ),
-      ) as Record<WalkDirection, Texture[]>;
-      const walkFoot = Object.fromEntries(WALK_DIRECTIONS.map((d) => [d, lowestOpaqueRow(must(walk[d][0], `the first ${d} walk frame`))])) as Record<WalkDirection, number>;
-      return { still, walk, stillFoot: lowestOpaqueRow(still.south), walkFoot };
-    })();
-    heroFrames.set(set, frames);
-  }
-  return frames;
+/** A hero set's art for the camp, from its sheet, which PixiJS keeps by its address (`sprite-sheet.ts`). */
+async function loadHeroArt(set: string): Promise<HeroArt> {
+  const sheet = await loadSpriteSet(`heroes/${set}`, FigureSetSchema);
+  const clips = new Map<string, HeroClip>();
+  const clip = (name: string, foot = name): HeroClip => {
+    let made = clips.get(name);
+    if (!made) {
+      made = { frames: sheet.clip(name).map((texture) => ({ texture, time: WALK_FRAME_MS })), foot: sheet.foot(foot) };
+      clips.set(name, made);
+    }
+    return made;
+  };
+  return {
+    clip: (walking, facing) => {
+      const direction: WalkDirection = facing === 'west' ? 'east' : facing;
+      // Every still stands on the south still's row, so a hero turning on the spot does not hop.
+      return walking ? clip(`walk-${direction}`) : clip(`still-${facing}`, 'still-south');
+    },
+  };
 }
 
 /**
- * Shows a frame with its foot row on the sprite's position and its canvas
- * centred there, at `size` of the map's scale; the click area, in the frame's
- * own pixels, shrinks with it.
+ * Stands the sprite's picture with its foot row on the sprite's position
+ * and its canvas centred there, at `size` of the map's scale; the click
+ * area, in the frame's own pixels, shrinks with it.
  */
-function show(sprite: Sprite, texture: Texture, foot: number, mirrored: boolean, size: number): void {
-  sprite.texture = texture;
-  sprite.pivot.set(texture.width / 2, foot + 1);
+function stand(sprite: Sprite, foot: number, mirrored: boolean, size: number): void {
+  const { width } = sprite.texture;
+  sprite.pivot.set(width / 2, foot + 1);
   sprite.scale.set(mirrored ? -size : size, size);
-  sprite.hitArea = new Rectangle(texture.width / 2 - 8, foot - 27, 16, 28);
+  sprite.hitArea = new Rectangle(width / 2 - 8, foot - 27, 16, 28);
 }
+
+/** The row each facility's picture stands on, by `<kind>/level-<n>`, which the build measures (assets.md, rule 18). */
+const BasesSchema = z.record(z.string(), z.number());
 
 /**
  * Draws the camp in the host element. `levels` says which picture each
@@ -127,6 +128,7 @@ export async function createCampScene(
 
   const tileset = await fetchJson(`/art/ground/${layout.ground}/tileset.json`, TilesetJsonSchema);
   const sheet = await Assets.load<Texture>(`/art/ground/${layout.ground}/tileset.png`);
+  const bases = await fetchJson('/art/facilities/bases.json', BasesSchema);
 
   // The world: the ground, then the facilities and heroes back to front by the
   // line they stand on, all in the map's coordinates, moved as one to centre
@@ -231,7 +233,7 @@ export async function createCampScene(
     if (!now || destroyed) return;
     now.art = art;
     now.sprite.texture = texture;
-    now.sprite.pivot.set(texture.width / 2, lowestOpaqueRow(texture) + 1);
+    now.sprite.pivot.set(texture.width / 2, must(bases[`${kind}/level-${art}`], `the base row of ${kind} at level ${art}`) + 1);
   };
   for (const spot of layout.facilities) {
     const sprite = new Sprite(Texture.EMPTY);
@@ -260,15 +262,18 @@ export async function createCampScene(
         continue;
       }
       const { facing } = hero.walker;
-      if (walking) {
-        hero.clockMs += ticker.deltaMS;
-        const direction: WalkDirection = facing === 'west' ? 'east' : facing;
-        const frame = Math.floor(hero.clockMs / WALK_FRAME_MS) % WALK_FRAMES;
-        show(hero.sprite, must(hero.frames.walk[direction][frame], `walk frame ${frame}`), hero.frames.walkFoot[direction], facing === 'west', size);
-      } else {
-        hero.clockMs = 0;
-        show(hero.sprite, hero.frames.still[facing], hero.frames.stillFoot, false, size);
+      const clip = hero.art.clip(walking, facing);
+      if (clip !== hero.showing) {
+        // A hero that turns while walking keeps its place in the stride; one that sets off starts it.
+        const stride = walking && hero.sprite.playing ? hero.sprite.currentFrame : 0;
+        hero.showing = clip;
+        hero.sprite.textures = clip.frames;
+        if (walking) hero.sprite.gotoAndPlay(stride);
+        else hero.sprite.gotoAndStop(0);
       }
+      // The loop runs on this ticker, not PixiJS's shared one, so a hero's stride and its steps keep one clock.
+      hero.sprite.update(ticker);
+      stand(hero.sprite, clip.foot, walking && facing === 'west', size);
       // On a whole canvas pixel, a device pixel, so every art pixel of the hero covers whole ones.
       hero.sprite.position.set(Math.round(hero.walker.x * view.scale) / view.scale, Math.round(hero.walker.y * view.scale) / view.scale);
       hero.sprite.zIndex = hero.walker.y;
@@ -295,19 +300,19 @@ export async function createCampScene(
       }
       for (const h of list) {
         if (heroes.has(h.id)) continue;
-        void loadHeroFrames(h.spriteSet).then((frames) => {
+        void loadHeroArt(h.spriteSet).then((art) => {
           if (destroyed || heroes.has(h.id)) return;
           // A new recruit steps out of the hall; the rest are already about.
           const walker =
             h.id === arriving
               ? newWalker(layout.hallDoor, Math.random, randomSpot(layout.walkable, Math.random))
               : newWalker(randomSpot(layout.walkable, Math.random), Math.random);
-          const sprite = new Sprite(frames.still.south);
+          const sprite = new AnimatedSprite({ textures: art.clip(false, 'south').frames, autoUpdate: false });
           sprite.eventMode = 'static';
           sprite.cursor = 'pointer';
           sprite.on('pointertap', () => { callbacks.onHero(h.id); });
           things.addChild(sprite);
-          heroes.set(h.id, { sprite, walker, frames, clockMs: 0 });
+          heroes.set(h.id, { sprite, walker, art, showing: null });
         });
       }
     },

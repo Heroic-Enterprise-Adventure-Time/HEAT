@@ -220,6 +220,20 @@ describe('Adventure', () => {
     expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
   });
 
+  it('holds the clock of a resumed run until the scene has its art, though nobody runs on', async () => {
+    const earlier = new AdventureRun(adventure.snapshot as AdventureSnapshot, adventure.seed);
+    earlier.advanceTo(8000);
+    saveRun('a1', { log: earlier.log, simTime: earlier.simTime });
+    const scene = fakeBattleScene(true);
+    const { run } = await renderAdventure(fakeGame(), scene);
+    expect(scene.resets.map((r) => r.enter)).toEqual([false]);
+    await run(3000);
+    expect(scene.fed).toEqual([]);
+    scene.release();
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(0);
+  });
+
   it("submits the log at the end, shows the result in the player's words, and goes back to camp", async () => {
     const game = fakeGame();
     const { run, router, user } = await renderAdventure(game);
