@@ -35,10 +35,11 @@
 # with no invalidation. The favicon is art (art/icons/favicon.png) but sits
 # at a fixed address, /favicon.png, because browsers ask for it by name. The sync deletes assets of earlier builds; the
 # three short-lived objects are excluded from it and written on their own.
-# So is every sprite set's atlas, art/<area>/<set>/sheet.json (Issue-205): it
-# keeps its name from build to build and names the sheet's image, which is
-# named for its pixels, so the atlas is re-read within a minute and the image
-# it names is kept for the year.
+# So is what the art build writes under a name that stays from build to build
+# (Issue-205): every sprite set's atlas, art/<area>/<set>/sheet.json, which
+# names the sheet's image, itself named for its pixels and kept for the year;
+# and art/facilities/bases.json, which gains a row with every facility
+# picture added.
 set -eu
 
 bucket="${1:?bucket}"
@@ -65,12 +66,13 @@ short="public, max-age=60"
 long="public, max-age=31536000, immutable"
 
 aws s3 sync "$build_dir" "s3://$bucket" --delete --only-show-errors \
-  --exclude index.html --exclude favicon.png --exclude config.json --exclude "art/*/sheet.json" \
+  --exclude index.html --exclude favicon.png --exclude config.json \
+  --exclude "art/*/sheet.json" --exclude art/facilities/bases.json \
   --cache-control "$long"
 
-# The atlases alone: everything else under art/ went with the sync above.
+# The atlases and the base rows alone: everything else under art/ went with the sync above.
 aws s3 sync "$build_dir/art" "s3://$bucket/art" --delete --only-show-errors \
-  --exclude "*" --include "*/sheet.json" \
+  --exclude "*" --include "*/sheet.json" --include facilities/bases.json \
   --cache-control "$short" --content-type "application/json"
 
 aws s3 cp "$build_dir/index.html" "s3://$bucket/index.html" --only-show-errors \
