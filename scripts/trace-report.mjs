@@ -29,13 +29,14 @@ import { pathToFileURL } from "node:url";
  *
  * Usage: node scripts/trace-report.mjs --stack <name> --since <epoch ms>
  *          --markdown <file> [--out <file>] [--version <commit>]
- *          [--baseline <file>] [--failed]
+ *          [--baseline <file>] [--until <epoch ms>] [--failed]
  *   --stack     heat-sb<issue> or heat-dev; the log group is /aws/lambda/<stack>-hub
  *   --since     when the stack test began, in epoch milliseconds
  *   --markdown  where the report is written as Markdown
  *   --out       where the report is written as JSON, to be kept
  *   --version   the deploy's commit; a request answered by another is left out
  *   --baseline  a kept report to set beside this one; a missing file is no baseline
+ *   --until     where the window ends, for an earlier run read on a laptop; now when left out
  *   --failed    the stack test or the browser test failed: name the last request's trace
  */
 
@@ -241,8 +242,9 @@ export function renderReport(report, { baseline, failed = false, repositoryUrl, 
 
 const aws = (args) => JSON.parse(execFileSync("aws", [...args, "--output", "json"], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 }));
 
-function readLog(logGroup, since) {
-  const messages = aws(["logs", "filter-log-events", "--log-group-name", logGroup, "--start-time", String(since), "--filter-pattern", '{ $.message = "graphql request" }', "--query", "events[].message"]);
+function readLog(logGroup, since, until) {
+  const window = until === undefined ? [] : ["--end-time", String(until)];
+  const messages = aws(["logs", "filter-log-events", "--log-group-name", logGroup, "--start-time", String(since), ...window, "--filter-pattern", '{ $.message = "graphql request" }', "--query", "events[].message"]);
   return requestsFromLog(messages ?? []);
 }
 
@@ -261,11 +263,11 @@ function parseArguments(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const name = argv[i];
     if (name === "--failed") options.failed = true;
-    else if (["--baseline", "--markdown", "--out", "--since", "--stack", "--version"].includes(name)) options[name.slice(2)] = argv[(i += 1)];
+    else if (["--baseline", "--markdown", "--out", "--since", "--stack", "--until", "--version"].includes(name)) options[name.slice(2)] = argv[(i += 1)];
     else throw new Error(`unknown argument ${name}`);
   }
   if (!options.stack || !options.since || !options.markdown) {
-    throw new Error("usage: node scripts/trace-report.mjs --stack <name> --since <epoch ms> --markdown <file> [--out <file>] [--version <commit>] [--baseline <file>] [--failed]");
+    throw new Error("usage: node scripts/trace-report.mjs --stack <name> --since <epoch ms> --markdown <file> [--out <file>] [--version <commit>] [--baseline <file>] [--until <epoch ms>] [--failed]");
   }
   return options;
 }
@@ -274,6 +276,7 @@ async function main() {
   const options = parseArguments(process.argv.slice(2));
   const logGroup = `/aws/lambda/${options.stack}-hub`;
   const since = Number(options.since);
+  const until = options.until === undefined ? undefined : Number(options.until);
 
   // The log and the traces both lag the requests by seconds: read until every
   // logged request's trace holds the hub's span, for up to a minute.
@@ -281,7 +284,7 @@ async function main() {
   const traces = new Map();
   for (let attempt = 0; attempt < 12; attempt += 1) {
     if (attempt > 0) await sleep(5000);
-    requests = readLog(logGroup, since);
+    requests = readLog(logGroup, since, until);
     if (requests.length === 0) continue;
     if (fetchTraces(requests.map((request) => request.traceId), traces) === 0) break;
   }
