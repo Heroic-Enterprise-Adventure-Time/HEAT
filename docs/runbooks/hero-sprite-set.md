@@ -12,7 +12,7 @@ How one hero sprite set is made with PixelLab, from an appearance and a class to
 6. **The agent writes and checks the files** with `scripts/hero-sprite-set.mjs` (below), and shows the owner every animation, playing and frame by frame, with the script's failures and `review` items marked. The hands are empty in every frame, which no script checks.
 7. **The owner reviews and re-rolls, in PixelLab's website.** Any direction the owner does not keep is re-rolled there, with the button that re-rolls one direction of an animation; the agent never re-rolls an animation. The MCP could not do it anyway: PixelLab answers "already complete" to a second skeleton-v3 call for the same template and direction, and its only other route is `delete_animation` and a new call, which is permanent and loses the group. The owner tells the agent which directions were re-rolled, and waives (rule 13) any failure kept as it is.
 8. **The agent writes the set again** from the new export, runs the checks, and records each re-roll in the record with `"via": "website"` and its generations read from `get_balance` before and after, since the website shows no receipt. Steps 6 to 8 repeat until the owner keeps every direction.
-9. **Commit** the set and its `provenance.json` in the issue's pull request, and say in its description which checks were waived.
+9. **Commit** the set and its `provenance.json` in the issue's pull request, and say in its description which checks were waived. Nothing else is made or committed for the page to draw it: the client's build packs the set's sheet from these files (`docs/process/assets.md`, rule 4).
 
 ## The script
 

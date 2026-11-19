@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene) and 2026-10-22 by Issue-130 (an action's weapon and effect)
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene), 2026-10-22 by Issue-130 (an action's weapon and effect) and 2026-11-19 by Issue-205 (a sheet per set, packed by the build, and an entry that waits for its art)
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -63,6 +63,25 @@
 
 **Still no particle emitter.** PixelLab's effects tool bakes its particles into frames, so the battle plays frames and needs no emitter library.
 
+## Amendment: a sheet per set, packed by the build, and an entry that waits for its art (Issue-205, 2026-11-19)
+
+**A sprite set reaches the page as one sheet, which the build packs.** The scenes loaded one PNG per frame, 46 requests for a hero set and 918 frames across the sets, read each picture back through a canvas to find the row it stands on, and kept their own caches. The client's art build (`packages/client/scripts/copy-art.mjs`, before every serve, build and test) now packs each set under `art/heroes`, `art/monsters`, `art/props` and `art/weapons` into `sheet.png` and `sheet.json`: PixiJS's atlas, the frames and the animations they make, and beside it under `set` what a scene reads about the set, the row each clip stands on, measured from the pixels, and how the provenance says it plays. The frames under `art/` stay the one source, as PixelLab exported them; nothing packed is committed, so adding a set is committing its frames; and neither the frames nor the provenance is published. sharp reads and writes the pixels and maxrects-packer places the frames, a pixel apart, so a frame drawn mirrored or split for a fade never samples its neighbour. The step takes about two seconds, and the hero sets' sheets are 360 kB where their frames were 637 kB.
+
+**The scenes load a set through PixiJS's `Assets`** (`sprite-sheet.ts`), which keeps a sheet by its address and tries a failed load again on the next call, so the caches the scenes kept for units, weapons and the camp's heroes are gone, and so is the readback of pixels: the facilities' base rows are measured by the same build. A set is one asset, its sheet, so no bundle is declared for it. An effect is still its game pack's own sheet and manifest (`docs/process/assets.md`, rule 34), cut where it is loaded.
+
+**The camp's walk is an `AnimatedSprite`,** with `autoUpdate` off and `update` called from the scene's own ticker, so a hero's stride and its steps keep one clock. The battle's unit is not: one sprite there shows five animations, and three of them, the act, the hit and the fall, are placed on other clocks, the act held on the adventure's until its action resolves. That is not `AnimatedSprite`'s model, and one way of choosing a frame for a unit, by its clock, reads better than two.
+
+**An entry waits for its art.** The battle scene was ready once its ground was loaded and loaded each unit's art without waiting, so on a first visit the party ran on unseen. The scene now holds an entry, the party's run on or the other side's rush on, while the art of any unit or weapon in the field is on its way, and says `onEntered` after every `reset`, with or without an entry; the adventure's clock waits for that, so a resumed run and a replay wait for their art too (`Play`, `art-loads.ts`). A load that fails is over: it is reported as the page's uncaught error, and the run goes on without that picture, as it goes on with no scene at all where WebGL is missing. The effects are few and small, and are fetched when the scene is made.
+
+**Considered and not chosen:**
+
+- **One sheet for everything.** It would fit: the 918 frames are 3.35 million pixels, inside 2048 by 2048, 12.8 MiB once decoded. Every player would download every set to see six of them, one changed frame would replace the whole file in every browser, and it grows with every set, a hero set being 170,000 pixels. Drawing gains nothing from it at this size: PixiJS batches as many textures into one draw as the GPU has texture units, commonly 16 (`getMaxTexturesPerBatch`).
+- **Sheets packed by the set scripts and committed,** as Issue-205 was first written. A second copy of every frame in git, a step to remember when a set is added, and a sheet that can fall behind its frames. The owner asked for the build to do it.
+- **AssetPack,** PixiJS's own asset pipeline, which packs atlases and also hashes names (Issue-91). Its last release was 2025-11-07, a year before this, on sharp and maxrects-packer versions since superseded, and its dependencies include an ffmpeg installer and font tools; it also could not write the rows a set stands on. The two libraries it packs with are current and are used directly.
+- **Our own PNG codec and a row per animation,** which the set scripts already carry on Node's own modules because they may import nothing else. The build may, and reading and placing pictures are common problems with known libraries (`docs/standards/typescript.md`, rule 17).
+
+The amendment of Issue-15 above says the frame counts and hold frames are read from each set's `provenance.json`: since this amendment the build reads them there and the page reads the sheet.
+
 ## Considered and not chosen
 
 **A plain canvas with its 2D context**, drawn by the client. It needs no dependency and is enough for a few dozen sprites. The agent first recommended it. The owner prefers a library over code of our own, and Pixi's sprites, animation, pointer events and depth sorting are exactly the code a plain canvas would need written.
@@ -71,4 +90,4 @@
 
 ## Where it is described
 
-`packages/client/src/app/camp/`: the component, and the scene under `scene/`. `packages/client/src/app/adventure/battle/`: the battle scene. `docs/standards/typescript.md`, rule 15, for how the art reaches the build.
+`packages/client/src/app/camp/`: the component, and the scene under `scene/`. `packages/client/src/app/adventure/battle/`: the battle scene. `packages/client/src/app/sprite-sheet.ts` and `packages/client/scripts/pack-art.mjs`: a set's sheet, loaded and packed. `docs/standards/typescript.md`, rule 15, and `docs/process/assets.md`, rule 4, for how the art reaches the build.
