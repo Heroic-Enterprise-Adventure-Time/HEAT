@@ -13,6 +13,13 @@ import { MaxRectsPacker } from "maxrects-packer";
 /** The areas under art/ whose sets are packed, and what kind of set each holds. */
 export const PACKED_AREAS = { heroes: "figure", monsters: "figure", props: "prop", weapons: "weapon" };
 
+/** The clips the scenes ask a set of each kind for by name (camp-scene.ts, battle-art.ts): a set without one fails the build, not the page. */
+const NEEDED_CLIPS = {
+  figure: ["still-south", "still-east", "still-north", "still-west", "walk-south", "walk-east", "walk-north", "stance-east", "act-east", "hit-east", "down-east"],
+  prop: ["standing", "hit", "down"],
+  weapon: ["swing"],
+};
+
 /** No sheet is wider or taller than this, which every device's GPU takes; a set that outgrows it fails the build. */
 const MAX_SIDE = 2048;
 /** Transparent pixels between two frames, so that a frame drawn mirrored or split never samples its neighbour. */
@@ -93,6 +100,8 @@ function playOf(set, kind, clips, provenance) {
 export function packSet({ set, kind, frames, provenance }) {
   if (frames.length === 0) throw new Error(`${set}: no frames`);
   const clips = clipsOf(set, frames);
+  const absent = NEEDED_CLIPS[kind].filter((clip) => !clips.has(clip));
+  if (absent.length > 0) throw new Error(`${set}: no ${absent.join(", ")}`);
   checkCounts(set, kind, clips, provenance);
 
   const packer = new MaxRectsPacker(MAX_SIDE, MAX_SIDE, PADDING, { smart: true, pot: false, square: false, allowRotation: false });

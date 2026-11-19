@@ -15,12 +15,13 @@ function picture(name, width, height, top, bottom, shade = 200) {
 
 const pixel = (image, x, y) => [...image.data.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 4)];
 
-/** A figure's frames: a still and a walk of three, each frame its own shade. */
+/** A figure's frames, every clip the scenes ask for: the four stills, a walk east of three, and one frame of each other animation, each frame its own shade. */
 const figure = () => [
-  picture("still-south", 8, 8, 1, 5, 10),
+  ...["south", "east", "north", "west"].map((d, i) => picture(`still-${d}`, 8, 8, 1, 5, 10 + i)),
   picture("walk-east-0", 12, 12, 2, 9, 20),
   picture("walk-east-1", 12, 12, 2, 10, 30),
   picture("walk-east-2", 12, 12, 3, 11, 40),
+  ...["walk-south", "walk-north", "stance-east", "act-east", "hit-east", "down-east"].map((clip, i) => picture(`${clip}-0`, 12, 12, 2, 8, 50 + i)),
 ];
 const figureProvenance = { animations: { walk: { directions: ["east"], framesPerDirection: 3 }, act: { directions: [], holdFrame: 2 } } };
 
@@ -34,7 +35,7 @@ test("opaqueRows answers the top row for an empty picture", () => {
 
 test("clipsOf reads an animation from its numbered frames, in order, and a still as a clip of one", () => {
   const clips = clipsOf("heroes/test", figure().reverse());
-  assert.deepEqual([...clips.keys()].sort(), ["still-south", "walk-east"]);
+  assert.equal(clips.size, 11);
   assert.deepEqual(clips.get("walk-east").map((f) => f.name), ["walk-east-0", "walk-east-1", "walk-east-2"]);
   assert.deepEqual(clips.get("still-south").map((f) => f.name), ["still-south"]);
 });
@@ -69,8 +70,11 @@ test("packSet writes every frame's pixels where the atlas says, with a pixel bet
 
 test("packSet names each clip's frames in order, and the row each clip's first frame stands on", () => {
   const { json } = packSet({ set: "heroes/test", kind: "figure", frames: figure(), provenance: figureProvenance });
-  assert.deepEqual(json.animations, { "still-south": ["still-south"], "walk-east": ["walk-east-0", "walk-east-1", "walk-east-2"] });
-  assert.deepEqual(json.set, { kind: "figure", feet: { "still-south": 5, "walk-east": 9 }, actHold: 2 });
+  assert.deepEqual(json.animations["still-south"], ["still-south"]);
+  assert.deepEqual(json.animations["walk-east"], ["walk-east-0", "walk-east-1", "walk-east-2"]);
+  assert.deepEqual(Object.keys(json.set), ["kind", "feet", "actHold"]);
+  assert.deepEqual([json.set.kind, json.set.actHold], ["figure", 2]);
+  assert.deepEqual([json.set.feet["still-south"], json.set.feet["walk-east"], json.set.feet["act-east"]], [5, 9, 8]);
 });
 
 test("packSet makes the same sheet whatever order the frames come in", () => {
@@ -89,7 +93,15 @@ test("packSet refuses a set with fewer frames than its provenance says, naming t
   const provenance = { animations: { walk: { directions: ["east", "north"], framesPerDirection: 3 } } };
   assert.throws(
     () => packSet({ set: "heroes/test", kind: "figure", frames: figure(), provenance }),
-    /^Error: heroes\/test: walk-north has 0 frames, and its provenance says 3$/,
+    /^Error: heroes\/test: walk-north has 1 frames, and its provenance says 3$/,
+  );
+});
+
+test("packSet refuses a set without a clip the scenes ask for, naming the set and the clip", () => {
+  const frames = figure().filter((f) => f.name !== "act-east-0" && f.name !== "still-west");
+  assert.throws(
+    () => packSet({ set: "heroes/test", kind: "figure", frames, provenance: figureProvenance }),
+    /^Error: heroes\/test: no still-west, act-east$/,
   );
 });
 
