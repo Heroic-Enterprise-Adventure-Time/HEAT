@@ -100,8 +100,8 @@ function stand(sprite: Sprite, foot: number, mirrored: boolean, size: number): v
   sprite.hitArea = new Rectangle(width / 2 - 8, foot - 27, 16, 28);
 }
 
-/** The row each facility's picture stands on, by `<kind>/level-<n>`, which the build measures (assets.md, rule 18). */
-const BasesSchema = z.record(z.string(), z.object({ image: z.string(), base: z.number() }));
+/** Each facility picture's published name, which carries a hash of the file, and the row it stands on, by `<kind>/level-<n>`: the build names and measures it (assets.md, rule 18). */
+const PicturesSchema = z.record(z.string(), z.object({ image: z.string(), base: z.number() }));
 
 /**
  * Draws the camp in the host element. `levels` says which picture each
@@ -129,7 +129,7 @@ export async function createCampScene(
 
   const tileset = await fetchJson(`/art/ground/${layout.ground}/tileset.json`, TilesetJsonSchema);
   const sheet = await Assets.load<Texture>(`/art/ground/${layout.ground}/tileset.png`);
-  const bases = await fetchJson('/art/facilities/bases.json', BasesSchema);
+  const pictures = await fetchJson('/art/facilities/pictures.json', PicturesSchema);
 
   // The world: the ground, then the facilities and heroes back to front by the
   // line they stand on, all in the map's coordinates, moved as one to centre
@@ -230,7 +230,7 @@ export async function createCampScene(
     const shown = facilities.get(kind);
     if (shown?.art === art) return;
     // The build names the picture for its pixels and says so beside its base row, so the two are always of one picture.
-    const picture = must(bases[`${kind}/level-${art}`], `the picture of ${kind} at level ${art}`);
+    const picture = must(pictures[`${kind}/level-${art}`], `the picture of ${kind} at level ${art}`);
     const texture = await Assets.load<Texture>(`/art/facilities/${kind}/${picture.image}`);
     const now = facilities.get(kind);
     if (!now || destroyed) return;

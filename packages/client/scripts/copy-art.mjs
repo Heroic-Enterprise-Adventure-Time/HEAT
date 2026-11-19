@@ -10,7 +10,7 @@
 // it (pack-art.mjs; Issue-205): its frames and its provenance are not
 // published. art/effects, art/ground and art/icons are copied as they are.
 // A facility's pictures are copied under names that carry a hash of the
-// file, and beside them goes bases.json: for each picture, that name and the
+// file, and beside them goes pictures.json: for each picture, that name and the
 // row it stands on (docs/process/assets.md, rule 18), measured here so that
 // the page reads no pixels. The page reads the picture's name there, so the
 // row is always the row of the picture it is drawn with, whatever a browser
@@ -61,16 +61,16 @@ for (const area of COPIED_AREAS) {
   });
 }
 
-const bases = {};
+const facilityPictures = {};
 for (const kind of directories(join(from, "facilities"))) {
   mkdirSync(join(to, "facilities", kind), { recursive: true });
   for (const file of pictures(join(from, "facilities", kind))) {
     const name = basename(file, ".png");
     const image = pictureName(name, readFileSync(file));
     cpSync(file, join(to, "facilities", kind, image));
-    bases[`${kind}/${name}`] = { image, base: opaqueRows(await pixels(file)).bottom };
+    facilityPictures[`${kind}/${name}`] = { image, base: opaqueRows(await pixels(file)).bottom };
   }
 }
-writeFileSync(join(to, "facilities", "bases.json"), JSON.stringify(bases));
+writeFileSync(join(to, "facilities", "pictures.json"), JSON.stringify(facilityPictures));
 
 console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")} and copied art/${[...COPIED_AREAS, "facilities"].join(", art/")} into packages/client/generated/art`);

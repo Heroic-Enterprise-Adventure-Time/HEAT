@@ -38,7 +38,7 @@
 # their own. So is what the art build writes under a name that stays from
 # build to build (Issue-205): every sprite set's atlas,
 # art/<area>/<set>/sheet.json, which names the sheet's image, itself named
-# for its pixels and kept for the year; and art/facilities/bases.json, which
+# for its pixels and kept for the year; and art/facilities/pictures.json, which
 # names each facility picture the same way, beside the row it stands on.
 #
 # The order: everything long-lived first, with nothing deleted; then the
@@ -76,13 +76,13 @@ long="public, max-age=31536000, immutable"
 
 # What is written on its own, and so neither uploaded nor deleted by the syncs of the long-lived.
 set -- --exclude index.html --exclude favicon.png --exclude config.json \
-  --exclude "art/*/sheet.json" --exclude art/facilities/bases.json
+  --exclude "art/*/sheet.json" --exclude art/facilities/pictures.json
 
 aws s3 sync "$build_dir" "s3://$bucket" --only-show-errors "$@" --cache-control "$long"
 
 # The atlases and the facilities' pictures' names alone: everything else under art/ went with the sync above.
 aws s3 sync "$build_dir/art" "s3://$bucket/art" --delete --only-show-errors \
-  --exclude "*" --include "*/sheet.json" --include facilities/bases.json \
+  --exclude "*" --include "*/sheet.json" --include facilities/pictures.json \
   --cache-control "$short" --content-type "application/json"
 
 aws s3 cp "$build_dir/index.html" "s3://$bucket/index.html" --only-show-errors \
