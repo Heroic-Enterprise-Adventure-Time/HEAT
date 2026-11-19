@@ -14,14 +14,17 @@
 # the apply publishes the client build with config.json and creates the test
 # users; then dev's stack-test job runs the smoke test through the
 # environment's hostname and the browser test (decision 0045), and its
-# cold-start job reads the cold start, as sandbox.yml does for a per-issue
-# stack; sandbox-base has no code and skips those steps.
+# stack-report job reads the cold start and what each request did, as
+# sandbox.yml does for a per-issue stack, and keeps the figures for the runs
+# that come after (decision 0056); sandbox-base has no code and skips those
+# steps.
 #
 # A job that runs downloaded code holds no role and no environment's secrets,
 # because a step cannot give up what its job holds
 # (docs/process/best-practices.md, rule 13; decision 0046): npm and what it
 # installs run in the build and stack-test jobs, and the plan, apply and
-# cold-start jobs run only Terraform, this repository's scripts and the AWS CLI.
+# stack-report jobs run only Terraform, this repository's scripts, the AWS CLI
+# and gh.
 #
 # Why pull_request_target and not pull_request: the pull request's plan must
 # run under the root's environment to see its real values, and the
@@ -241,7 +244,7 @@ jobs:
           # 0020). The step reads the environment's HEAT_TEST_USER_PASSWORD;
           # the name is the same in every environment and the environment
           # supplies the value. stack names the environment's resources,
-          # heat-<environment>, for the smoke test and the cold start.
+          # heat-<environment>, for the smoke test and the report.
           - root: sandbox-base
             environment: sandbox-base
             role: heat-sandbox-apply
@@ -444,11 +447,19 @@ jobs:
           stack: heat-dev
           handover-key: ${{ secrets.HEAT_E2E_HANDOVER_KEY }}
 
-  # Back under the role, for the function's log, with nothing downloaded. Runs
-  # when the smoke test got as far as calling the environment, whatever came
-  # after.
-  cold-start:
-    name: Report dev's cold start
+  # Back under a role, for the function's log and its traces, with nothing
+  # downloaded (decision 0056). Runs when the smoke test got as far as calling
+  # the environment, whatever came after. The plan role and not the apply
+  # role: the job only reads, and dev's plan role trusts the dev environment,
+  # under which a pull request's plan already runs (decision 0020). The report
+  # is set beside the last one kept, the merge before this one, and kept in
+  # turn for the next merge and for every branch's run until then, unless the
+  # smoke test or the browser test failed: a run that stopped part-way took
+  # fewer paths, and beside it every later run would show rows that no change
+  # caused. Not a gate: no ruleset requires it (docs/process/code-changes.md,
+  # rule 29).
+  stack-report:
+    name: Report dev's cold start and traces
     if: ${{ github.event_name == 'push' && !cancelled() && needs.stack-test.outputs.since != '' }}
     needs: stack-test
     runs-on: ubuntu-latest
@@ -458,6 +469,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # The last report kept from main, an artifact of the Deploy run before.
+      actions: read
     env:
       # A repository secret, so that GitHub masks the id in every log line
       # (docs/README.md, rule 9).
@@ -466,10 +479,17 @@ jobs:
       - name: Check out main
         uses: actions/checkout@v7.0.1
 
-      - name: Report the cold start
-        uses: $/.github/actions/cold-start
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
+
+      - name: Report the cold start and the traces
+        uses: $/.github/actions/stack-report
         with:
-          role-arn: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-dev-apply
-          session-name: deploy-cold-start-dev
-          log-group: /aws/lambda/heat-dev-hub
+          role-arn: arn:aws:iam::${{ env.ACCOUNT_ID }}:role/heat-dev-plan
+          session-name: deploy-report-dev
+          stack: heat-dev
           since: ${{ needs.stack-test.outputs.since }}
+          test-result: ${{ needs.stack-test.result }}
+          # The most the repository keeps an artifact; nothing when the
+          # tests failed.
+          keep-days: ${{ needs.stack-test.result == 'success' && '90' || '' }}

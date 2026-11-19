@@ -65,4 +65,4 @@
 
 ## Where it is described
 
-`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `terraform/environment/prod/README.md`; `.github/workflows/`; `.github/actions/stack-test`, `.github/actions/bundle` and `.github/actions/cold-start`; `scripts/stack-handover.sh`. The actions' commits, the deferral above: decision 0047 and `.github/workflows/actions.lock`.
+`docs/process/best-practices.md`, rule 13; `docs/process/development.md`, rule 1; `docs/architecture/overview.md`, "Environments"; `terraform/environment/sandbox/README.md`; `terraform/environment/dev/README.md`; `terraform/environment/prod/README.md`; `.github/workflows/`; `.github/actions/stack-test`, `.github/actions/bundle` and `.github/actions/stack-report`, which was `.github/actions/cold-start` until Issue-328; `scripts/stack-handover.sh`. The actions' commits, the deferral above: decision 0047 and `.github/workflows/actions.lock`.

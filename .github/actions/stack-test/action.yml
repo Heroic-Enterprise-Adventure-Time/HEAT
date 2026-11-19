@@ -17,10 +17,10 @@ inputs:
 
 outputs:
   since:
-    description: When the stack test began, in epoch milliseconds, for the cold start
+    description: When the stack test began, in epoch milliseconds, for the stack's report
     value: ${{ steps.e2e.outputs.since }}
   site_url:
-    description: The stack's URL, for the deployment the cold start's job records
+    description: The stack's URL, for the deployment the report's job records
     value: ${{ steps.e2e.outputs.site_url }}
 
 runs:

@@ -40,12 +40,4 @@ trap 'rm -rf "$work"' EXIT
   echo "Re-applied and re-tested on every push; destroyed when the branch is deleted. [Latest run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)."
 } > "$work/comment.md"
 
-existing="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr_number/comments" --paginate \
-  --jq "[.[] | select(.body | startswith(\"$marker\"))] | first | .id // empty")"
-if [ -n "$existing" ]; then
-  gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F "body=@$work/comment.md" > /dev/null
-  echo "updated the stack URL comment $existing on pull request $pr_number"
-else
-  gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$pr_number/comments" -F "body=@$work/comment.md" > /dev/null
-  echo "posted the stack URL comment on pull request $pr_number"
-fi
+sh "$(dirname "$0")/upsert-pr-comment.sh" "$pr_number" "$marker" "$work/comment.md" "the stack URL comment"
