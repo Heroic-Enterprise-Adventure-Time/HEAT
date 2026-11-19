@@ -118,12 +118,6 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: ${{ matrix.environment }}
-    # One plan at a time for a pull request's root. Two runs seconds apart,
-    # a pull request opened and pushed to at once, each found no plan comment
-    # and each posted one (PR-333); the second now waits and edits the first's.
-    concurrency:
-      group: deploy-plan-${{ github.event.pull_request.number }}-${{ matrix.root }}
-      cancel-in-progress: false
     permissions:
       contents: read
       id-token: write
@@ -459,8 +453,11 @@ jobs:
   # role: the job only reads, and dev's plan role trusts the dev environment,
   # under which a pull request's plan already runs (decision 0020). The report
   # is set beside the last one kept, the merge before this one, and kept in
-  # turn for the next merge and for every branch's run until then. Not a gate:
-  # no ruleset requires it (docs/process/code-changes.md, rule 29).
+  # turn for the next merge and for every branch's run until then, unless the
+  # smoke test or the browser test failed: a run that stopped part-way took
+  # fewer paths, and beside it every later run would show rows that no change
+  # caused. Not a gate: no ruleset requires it (docs/process/code-changes.md,
+  # rule 29).
   stack-report:
     name: Report dev's cold start and traces
     if: ${{ github.event_name == 'push' && !cancelled() && needs.stack-test.outputs.since != '' }}
@@ -493,5 +490,6 @@ jobs:
           stack: heat-dev
           since: ${{ needs.stack-test.outputs.since }}
           test-result: ${{ needs.stack-test.result }}
-          # The most the repository keeps an artifact.
-          keep-days: "90"
+          # The most the repository keeps an artifact; nothing when the
+          # tests failed.
+          keep-days: ${{ needs.stack-test.result == 'success' && '90' || '' }}
