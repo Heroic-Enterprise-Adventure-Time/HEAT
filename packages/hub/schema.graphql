@@ -215,15 +215,11 @@ type FacilityLevel {
 }
 
 """
-How well a unit harvests the resource nodes of one material, the engine's `GatherRating`.
+The gathering traits, the engine's `GatheringTrait`, each named for its craft: what a party must carry for an enemy's drop to fall to it.
 """
-type GatherRating {
-  material: Material!
-
-  """
-  Set against a node's difficulty: a hit's yield is its share of the node's maximum, and a rating above the difficulty yields no more.
-  """
-  rating: Int!
+enum GatheringTrait {
+  MINING
+  WOODCUTTING
 }
 
 """The heroes hall holds no more active heroes at its level."""
@@ -734,6 +730,17 @@ type SubmitAdventureSuccess {
 }
 
 """
+One gathering trait a unit carries and its level in it, the engine's `TraitLevel`.
+"""
+type TraitLevel {
+  """
+  A whole number from 1. When an enemy goes down, the highest level of its drop's trait among the heroes standing says how much of the drop falls.
+  """
+  level: Int!
+  trait: GatheringTrait!
+}
+
+"""
 A field whose value is a generic Universally Unique Identifier: https://en.wikipedia.org/wiki/Universally_unique_identifier.
 """
 scalar UUID
@@ -741,15 +748,15 @@ scalar UUID
 """A unit's numbers in battle."""
 type UnitStats {
   damage: Int!
-
-  """
-  The unit's gather rating for each material it harvests; a material with no entry is 0, and a hit on a node of it yields nothing.
-  """
-  gather: [GatherRating!]!
   maxHealth: Int!
 
   """Turns per ten seconds."""
   speed: Int!
+
+  """
+  The unit's gathering traits, one entry a trait at most; a trait with no entry is not carried, and a party with no carrier of a drop's trait gets none of that drop.
+  """
+  traits: [TraitLevel!]!
 }
 
 """

@@ -303,17 +303,20 @@ function toHero(i: MayLack<Stored<"hero">, "level" | "xp" | "picks" | "status">)
 }
 
 /**
- * A snapshot with every hero's gather ratings. One issued before the ratings
- * (Issue-283, decision 0051) has none, and is still read while its adventure
- * is open across that deploy: its heroes take their unit type's ratings of
- * today, so a client that resumes the run shows it gathering. The deploy that
- * issued it verifies it, from the record as that deploy reads it (decision
- * 0030), so what this adds is never what a result is computed from.
+ * A snapshot with every hero's gathering traits. One issued before the
+ * traits (Issue-339, decision 0058) has none, its stats carrying the gather
+ * ratings of decision 0051 or the one stat before them, and is still read:
+ * while its adventure is open across that deploy, and for good once settled,
+ * since a settled adventure answers its snapshot. Its heroes take their unit
+ * type's traits of today, as they took its ratings (Issue-283), so a client
+ * that resumes the run shows it gathering. The deploy that issued it
+ * verifies it, from the record as that deploy reads it (decision 0030), so
+ * what this adds is never what a result is computed from.
  */
-export function rated(snapshot: AdventureSnapshot): AdventureSnapshot {
+export function withTraits(snapshot: AdventureSnapshot): AdventureSnapshot {
   const heroes = snapshot.heroes.map((hero) => {
-    const stats: MayLack<UnitStats, "gather"> = hero.stats;
-    return stats.gather ? hero : { ...hero, stats: { ...hero.stats, gather: UNIT_PROFILES[hero.unitType]?.stats.gather ?? [] } };
+    const stats: MayLack<UnitStats, "traits"> = hero.stats;
+    return stats.traits ? hero : { ...hero, stats: { ...hero.stats, traits: UNIT_PROFILES[hero.unitType]?.stats.traits ?? [] } };
   });
   return { ...snapshot, heroes };
 }
@@ -322,7 +325,7 @@ const hasSnapshot = (i: MayLack<Stored<"adventure">, "snapshot">): boolean => i.
 
 /** A record from before Issue-113 has no snapshot and is answered as it is. */
 function toAdventure(i: Stored<"adventure">): AdventureRecord {
-  return hasSnapshot(i) ? { ...i, snapshot: rated(i.snapshot) } : i;
+  return hasSnapshot(i) ? { ...i, snapshot: withTraits(i.snapshot) } : i;
 }
 
 /**
