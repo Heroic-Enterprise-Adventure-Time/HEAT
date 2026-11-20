@@ -34,6 +34,8 @@ const SAVE_EVERY_MS = 1000;
  * time, the wall clock times the speed, and not at all while paused. Both
  * waits are the page's: the engine's clock, its events and the log know
  * nothing of them, so a run and its replay wait alike and verify as before.
+ * The run's last action is waited for too: the log is submitted, and the
+ * result shown, once that wait is over.
  */
 @Injectable()
 export class Play {
@@ -45,6 +47,8 @@ export class Play {
   private savedEntries = 0;
   /** What is left of the wait for the clips the last events began, in presentation milliseconds. */
   private held = 0;
+  /** The run is over and not yet submitted: it waits for its last action to be shown. */
+  private ending = false;
 
   /** Whether an entry holds the clock until the scene says everyone is on. */
   holdEntries = false;
@@ -103,10 +107,15 @@ export class Play {
   /** Moves the run on by `wallMs` of wall-clock time at the chosen speed, and answers the events that happened. */
   tick(wallMs: number): readonly AdventureEvent[] {
     const run = this.run;
-    if (!run || run.complete || this.paused() || this.entering()) return [];
+    if (!run || this.paused() || this.entering() || (run.complete && !this.ending)) return [];
     const { held, left } = spendHold(this.held, wallMs * this.speed());
     this.held = held;
     if (held > 0) return [];
+    if (this.ending) {
+      this.ending = false;
+      void this.finish();
+      return [];
+    }
     const events = run.advanceTo(run.simTime + Math.round(left));
     if (events.length > 0) {
       this.field.update((field) => events.reduce(applyEvent, must(field, 'the field while events play')));
@@ -116,7 +125,8 @@ export class Play {
     this.simTime.set(run.simTime);
     if (this.live) {
       this.save(false);
-      if (this.live.complete) void this.finish();
+      // Over: the frames that follow wait for what the scene asks for its last action, then submit.
+      if (this.live.complete) this.ending = true;
     }
     return events;
   }
@@ -167,6 +177,7 @@ export class Play {
     this.replaying.set(replaying);
     this.queued.set(new Map());
     this.held = 0;
+    this.ending = false;
     this.field.set(run.events.reduce(applyEvent, start));
     this.simTime.set(run.simTime);
     this.entering.set(this.holdEntries && run.events.some(isEntry) && !this.resumed());

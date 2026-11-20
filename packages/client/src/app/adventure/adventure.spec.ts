@@ -272,6 +272,23 @@ describe('Adventure', () => {
     expect(scene.fed.length).toBeGreaterThan(fed);
   });
 
+  it('submits the run only once the hold for its last action is over', async () => {
+    const game = fakeGame();
+    const scene = fakeBattleScene();
+    const over = (events: readonly { readonly kind: string }[]) => events.some((event) => event.kind === 'adventure-end');
+    scene.holdFor = (events) => (over(events) ? 3000 : 0);
+    const { run } = await renderAdventure(game, scene);
+    for (let frame = 0; frame < 600 && !over(scene.fed); frame++) await run(250);
+    expect(over(scene.fed)).toBe(true);
+    // The run is over and its log is kept; the hub hears of it when the last action has been shown.
+    expect(game.submitted).toHaveLength(0);
+    expect(loadRun('a1')).not.toBeNull();
+    await run(2750);
+    expect(game.submitted).toHaveLength(0);
+    await run(500);
+    expect(game.submitted).toHaveLength(1);
+  });
+
   it('resumes from the log saved in the browser, at the time it reached', async () => {
     const earlier = new AdventureRun(adventure.snapshot as AdventureSnapshot, adventure.seed);
     earlier.advanceTo(8000);
