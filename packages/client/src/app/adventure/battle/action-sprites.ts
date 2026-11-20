@@ -105,6 +105,11 @@ export function effectFrameAt(layout: EffectLayout, ms: number): number | null {
   return Math.max(-1, index);
 }
 
+/** How long an effect lasts from the moment its action resolves: the frames it leaves empty, then the ones it draws. */
+export function effectMs(layout: EffectLayout): number {
+  return (layout.delayFrames + layout.frames.length) * layout.frameMs;
+}
+
 /**
  * The frame of an act, or of the weapon swung with it, at `simTime`: the
  * frames up to `hold` from the declaration, `hold` until the action

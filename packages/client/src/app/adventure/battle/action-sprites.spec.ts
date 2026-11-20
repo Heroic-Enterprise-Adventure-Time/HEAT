@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { must } from '@heat/engine';
 
-import { effectFrameAt, effectLayout, type EffectManifest, flightAt, flightPoint, heldFrame, projectileAt, projectileLayout, releaseMs, type Thrower } from './action-sprites';
+import { effectFrameAt, effectLayout, type EffectManifest, effectMs, flightAt, flightPoint, heldFrame, projectileAt, projectileLayout, releaseMs, type Thrower } from './action-sprites';
 
 const manifest: EffectManifest = {
   frame_ms: 71,
@@ -55,6 +55,12 @@ describe('effectFrameAt', () => {
     expect(effectFrameAt(layout, 71)).toBe(0);
     expect(effectFrameAt(layout, 71 * 5)).toBe(4);
     expect(effectFrameAt(layout, 71 * 6)).toBeNull();
+  });
+
+  it('lasts from the resolve to the end of its last frame, the wait included', () => {
+    expect(effectMs(layout)).toBe(71 * 6);
+    expect(effectFrameAt(layout, effectMs(layout) - 1)).toBe(4);
+    expect(effectFrameAt(layout, effectMs(layout))).toBeNull();
   });
 });
 
@@ -120,6 +126,8 @@ describe('an effect with a projectile', () => {
     expect(layout.offset).toEqual({ x: -18, y: -31 });
     expect(layout.delayFrames).toBe(0);
     expect(effectFrameAt(layout, 0)).toBe(0);
+    // Its length is the impact's alone: the flight before it is the action's warmup.
+    expect(effectMs(layout)).toBe(83 * 5);
   });
 
   it('cuts its projectile, lands its middle where the pack\'s own path ends, and keeps the arc of that path', () => {

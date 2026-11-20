@@ -20,10 +20,11 @@ import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/gro
 import { fetchJson } from '../../static-json';
 import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
-import { effectFrameAt, heldFrame, projectileAt } from './action-sprites';
+import { effectFrameAt, effectMs, heldFrame, projectileAt } from './action-sprites';
 import { artSettled } from './art-loads';
 import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
+import { clipHold } from './clip-hold';
 
 /**
  * The battle scene, drawn with PixiJS like the camp (decision 0028): the
@@ -41,7 +42,11 @@ import { battleView, type BattleView, entryOffset, spots } from './battle-layout
  * the start and walks in place while the road scrolls by on a travel; at a
  * fight or a gather the other side rushes on from the right as the road
  * scrolls with it, and only then does the clock run (the owner's call on
- * Issue-15). What is left of a stage scrolls away on the next travel. The
+ * Issue-15). What is left of a stage scrolls away on the next travel. A
+ * hit, an effect and a fall play on the presentation clock, and the scene
+ * says how long the adventure's clock should wait for the ones just begun
+ * (`HOLD_SHARE`, Issue-335); an act, its weapon and a projectile are drawn
+ * from the adventure's clock, so they stand still through that wait. The
  * scene knows nothing of the engine or the hub; the page feeds it, and
  * before a run it hands over the run's cast, whose art is loaded before the
  * run is shown (`prepare`, Issue-205).
@@ -62,8 +67,13 @@ export interface BattleSceneHandle {
   prepare(cast: readonly CastMember[]): Promise<void>;
   /** Shows the field as it stands; `enter` runs the party on from the left first. */
   reset(field: Field, heroSets: ReadonlyMap<string, string>, enter: boolean): void;
-  /** Animates the events just happened; a fight or a gather beginning brings the other side on. */
-  feed(events: readonly AdventureEvent[], field: Field): void;
+  /**
+   * Animates the events just happened; a fight or a gather beginning brings
+   * the other side on. Answers how long the clock should wait for the clips
+   * they began, a hit, an effect and a fall, in presentation time: nothing
+   * where they began none.
+   */
+  feed(events: readonly AdventureEvent[], field: Field): number;
   /** Moves on by `ms` of presentation time, the wall clock times the speed, with the clock at `simTime`. */
   frame(ms: number, simTime: number, field: Field): void;
   destroy(): void;
@@ -79,13 +89,21 @@ const RUSH_SPEED = 320;
 /** The party's run on at the start is no scroll, and goes at four times the pace, so that it is over quickly (the owner's call). */
 const RUN_ON_SPEED = 4 * RUSH_SPEED;
 const STEP_SPEED = 90;
-/** Milliseconds a frame: on the clock for an act, a hit and a fall; on the presentation clock for a walk and the stance. */
+/** Milliseconds a frame: on the adventure's clock for an act; on the presentation clock for a hit, a fall, a walk and the stance. */
 const ACT_MS = 90;
 const HIT_MS = 70;
 const DOWN_MS = 100;
 const WALK_MS = 100;
 const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
+/**
+ * The share of a hit, an effect or a fall that the adventure's clock waits
+ * for, so that one blow reads before the next lands (Issue-335): 0 for no
+ * wait, 1 for the whole clip. Of the longest clip one frame's events begin,
+ * in presentation time, so the wait shortens at 2× and 4× as the clips do.
+ * A taste, set by looking; it changes nothing the engine decides.
+ */
+const HOLD_SHARE = 0.5;
 /** The longest a run waits for its art before it begins, on the wall clock: past it the run begins, and a picture shows when it arrives. */
 const ART_WAIT_MS = 8000;
 /** A fallen monster or a felled tree lies this long after its fall, then fades over the next. */
@@ -280,6 +298,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     weaponArt.set(set, art);
     return art;
   };
+  // An effect's too: its length is what the clock's wait is a share of, read in the frame its action resolves.
+  const effectArt = new Map<string, EffectArt>();
+  const effectArtOf = async (set: string) => {
+    const art = await loadEffectArt(set);
+    effectArt.set(set, art);
+    return art;
+  };
 
   const addUnit = (unit: FieldUnit): UnitView => {
     const body = new Container();
@@ -331,16 +356,18 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     effect.sprite.destroy();
   };
 
-  /** Starts an ability's effect on the unit its action landed on. */
-  const addEffect = (set: string, target: UnitView, mirrored: boolean) => {
+  /** Starts an ability's effect on the unit its action landed on, and answers how long it lasts: nothing for one whose art is not in hand yet. */
+  const addEffect = (set: string, target: UnitView, mirrored: boolean): number => {
     const sprite = new Sprite();
     sprite.visible = false;
     things.addChild(sprite);
-    const effect: EffectView = { art: null, target, mirrored, at: shown, sprite };
+    const effect: EffectView = { art: effectArt.get(set) ?? null, target, mirrored, at: shown, sprite };
     effects.push(effect);
-    void loadEffectArt(set).then((art) => {
+    if (effect.art) return effectMs(effect.art.layout);
+    void effectArtOf(set).then((art) => {
       if (!destroyed) effect.art = art;
     });
+    return 0;
   };
 
   const removeProjectile = (unitId: string) => {
@@ -536,7 +563,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const weapons = uniq(cast.flatMap((member) => weaponOf(member.kind, member.type) ?? []));
       const effectSets = uniq(Object.values(ABILITY_EFFECTS));
       return artSettled(
-        [...sets.map((path) => unitArtOf(path)), ...weapons.map((set) => weaponArtOf(set)), ...effectSets.map((set) => loadEffectArt(set))],
+        [...sets.map((path) => unitArtOf(path)), ...weapons.map((set) => weaponArtOf(set)), ...effectSets.map((set) => effectArtOf(set))],
         ART_WAIT_MS,
         failed,
       );
@@ -589,6 +616,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         }
         entering = 'opponents';
       }
+      // How long each clip these events begin lasts, for the clock's wait: a unit whose art is not in hand yet shows none, and waits for none.
+      const clips: number[] = [];
       for (const event of events) {
         if (event.kind === 'action-declared' && event.abilityId !== 'move-up') {
           const unitView = units.get(event.unitId);
@@ -605,19 +634,27 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           for (const effect of event.effects) {
             if (effect.kind === 'damage' || effect.kind === 'harvest') {
               const target = units.get(effect.targetId);
-              if (target && effect.newHealth > 0) target.hitAt = target.clock;
+              if (target && effect.newHealth > 0) {
+                target.hitAt = target.clock;
+                if (target.art) clips.push(target.art.hit.textures.length * HIT_MS);
+              }
             }
             // The effect lands on whoever the action reached: a guard that took a hit, not the ally it covered.
             if (set && effect.kind !== 'move') {
               const target = units.get(effect.targetId);
-              if (target) addEffect(set, target, actor?.opponent ?? false);
+              if (target) clips.push(addEffect(set, target, actor?.opponent ?? false));
             }
           }
         } else if (event.kind === 'unit-down') {
           const unitView = units.get(event.unitId);
-          if (unitView) unitView.downAt = unitView.clock;
+          if (unitView) {
+            unitView.downAt = unitView.clock;
+            // The fall alone: the while it lies and its fading are not waited for.
+            if (unitView.art) clips.push(unitView.art.down.textures.length * DOWN_MS);
+          }
         }
       }
+      return clipHold(clips, HOLD_SHARE);
     },
 
     frame(ms, simTime, field) {

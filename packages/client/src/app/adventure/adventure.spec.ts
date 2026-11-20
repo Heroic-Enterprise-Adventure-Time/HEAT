@@ -6,13 +6,14 @@ import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROF
 import { type AdventureResultView, type AdventureView, Game, type SettledView } from '../game';
 import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
-import { fakeBattleScene, fakeFrameLoop } from '../testing/fake-battle';
+import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { itemHolding, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf } from '../testing/texts-of';
 import { Adventure } from './adventure';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
+import { isEntry } from './field';
 import { AdventureRun, loadRun, saveRun } from './run';
 
 const adventure: AdventureView = {
@@ -206,6 +207,69 @@ describe('Adventure', () => {
     await run(3000);
     expect(scene.fed.length).toBeGreaterThan(fed);
     expect(scene.frames).toBeGreaterThan(0);
+  });
+
+  it('holds the clock after a blow for as long as the scene asks, and runs on when that is over (Issue-335)', async () => {
+    const scene = fakeBattleScene();
+    const { run } = await renderAdventure(fakeGame(), scene);
+    // Asked for nothing, the clock runs on: three seconds after a blow, more has happened.
+    let fed = await runToBlow(run, scene);
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
+
+    // Asked for three seconds after a blow, nothing more happens for three seconds, and then it does.
+    scene.holdFor = (events) => (landsBlow(events) ? 3000 : 0);
+    fed = await runToBlow(run, scene);
+    await run(3000);
+    expect(scene.fed).toHaveLength(fed);
+    // The scene is still drawn through the wait: its clips play while the clock stands.
+    const frames = scene.frames;
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
+    expect(scene.frames).toBeGreaterThan(frames);
+  });
+
+  it('runs a hold down in presentation time, so that it is over sooner at a higher speed', async () => {
+    const scene = fakeBattleScene();
+    scene.holdFor = (events) => (landsBlow(events) ? 3000 : 0);
+    const { run, user } = await renderAdventure(fakeGame(), scene);
+    await user.click(button('4×'));
+    await waitFor(() => { expect(button('4×')).toHaveAttribute('aria-pressed', 'true'); });
+    const fed = await runToBlow(run, scene);
+    // Three seconds of hold are three quarters of a second at 4×: two frames in, it still holds.
+    await run(500);
+    expect(scene.fed).toHaveLength(fed);
+    // The third frame ends it, and the frames after move the run.
+    await run(1000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
+  });
+
+  it('does not run a hold down while paused', async () => {
+    const scene = fakeBattleScene();
+    scene.holdFor = (events) => (landsBlow(events) ? 3000 : 0);
+    const { run, user } = await renderAdventure(fakeGame(), scene);
+    const fed = await runToBlow(run, scene);
+    await user.click(button('Pause'));
+    await run(10_000);
+    await user.click(button('Resume'));
+    await run(3000);
+    expect(scene.fed).toHaveLength(fed);
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
+  });
+
+  it('lets an entry take the place of a hold asked for in the same frame', async () => {
+    const scene = fakeBattleScene(true);
+    scene.holdFor = (events) => (events.some(isEntry) ? 60_000 : 0);
+    const { run } = await renderAdventure(fakeGame(), scene);
+    scene.release();
+    await run(4100);
+    expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+    const fed = scene.fed.length;
+    // Everyone on, the clock runs at once: the minute asked for with the entry was never held.
+    scene.release();
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
   });
 
   it('resumes from the log saved in the browser, at the time it reached', async () => {

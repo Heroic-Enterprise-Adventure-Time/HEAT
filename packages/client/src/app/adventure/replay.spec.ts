@@ -6,7 +6,7 @@ import { type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engin
 import { Game, type ReplayedView } from '../game';
 import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
-import { fakeBattleScene, fakeFrameLoop } from '../testing/fake-battle';
+import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
@@ -140,6 +140,18 @@ describe('Replay page (Issue-290)', () => {
     await user.click(button('Watch from the start'));
     await waitFor(() => { expect(scene.resets).toHaveLength(2); });
     expect(scene.resets[1]?.field).toMatchObject({ stage: 0, outcome: null });
+  });
+
+  it('holds the clock after a blow as a run does, for as long as the scene asks (Issue-335)', async () => {
+    const scene = fakeBattleScene();
+    scene.holdFor = (events) => (landsBlow(events) ? 3000 : 0);
+    const { run } = await renderReplay(fakeGame(() => Promise.resolve(settled())), scene);
+    await waitFor(() => { expect(scene.resets).toHaveLength(1); });
+    const fed = await runToBlow(run, scene);
+    await run(3000);
+    expect(scene.fed).toHaveLength(fed);
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
   });
 
   it('shows the health of each hero as the replay plays', async () => {
