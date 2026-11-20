@@ -100,8 +100,8 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBa
       testLayoutSizes,
     ],
   );
-  // The scene loads after the first render; the run starts once it has.
-  await waitFor(() => { expect(scene.resets.length).toBeGreaterThan(0); });
+  // The scene loads after the first render; the run starts once it has, and is handed over for its art.
+  await waitFor(() => { expect(scene.prepared.length).toBeGreaterThan(0); });
   await settle();
   const run = async (ms: number) => {
     frames.advance(ms);
@@ -218,6 +218,43 @@ describe('Adventure', () => {
     // Picked up, everyone stands where they were: nobody runs on.
     expect(scene.resets.map((r) => r.enter)).toEqual([false]);
     expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+  });
+
+  it('begins a run only once the scene has the art of the party and of everyone the job may set against it', async () => {
+    const scene = fakeBattleScene(false, true);
+    const { run } = await renderAdventure(fakeGame(), scene);
+    expect(scene.prepared).toEqual([
+      [
+        { kind: 'hero', type: 'fighter', spriteSet: 'fighter-02' },
+        { kind: 'hero', type: 'villager', spriteSet: 'villager-01' },
+        { kind: 'resource', type: 'tree' },
+        { kind: 'monster', type: 'wolf' },
+      ],
+    ]);
+    // Until the art is in, the scene is shown nothing and the run does not move.
+    await run(5000);
+    expect(scene.resets).toEqual([]);
+    expect(scene.frames).toBe(0);
+    expect(stage('Stage 1 of 4: Travel')).toBeInTheDocument();
+    await scene.artArrives();
+    await run(4100);
+    expect(scene.resets).toMatchObject([{ field: { stage: 0 }, enter: true }]);
+    expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+  });
+
+  it('holds a resumed run the same way, where nobody runs on', async () => {
+    const earlier = new AdventureRun(adventure.snapshot as AdventureSnapshot, adventure.seed);
+    earlier.advanceTo(8000);
+    saveRun('a1', { log: earlier.log, simTime: earlier.simTime });
+    const scene = fakeBattleScene(false, true);
+    const { run } = await renderAdventure(fakeGame(), scene);
+    await run(3000);
+    expect(scene.resets).toEqual([]);
+    expect(scene.fed).toEqual([]);
+    await scene.artArrives();
+    await run(3000);
+    expect(scene.resets.map((r) => r.enter)).toEqual([false]);
+    expect(scene.fed.length).toBeGreaterThan(0);
   });
 
   it("submits the log at the end, shows the result in the player's words, and goes back to camp", async () => {

@@ -33,8 +33,22 @@
 # new build is a new set of names; the page, the favicon and config.json
 # are re-read within a minute, which is how a new build reaches the browser
 # with no invalidation. The favicon is art (art/icons/favicon.png) but sits
-# at a fixed address, /favicon.png, because browsers ask for it by name. The sync deletes assets of earlier builds; the
-# three short-lived objects are excluded from it and written on their own.
+# at a fixed address, /favicon.png, because browsers ask for it by name.
+# Those three are excluded from the sync of the long-lived and written on
+# their own. So is what the art build writes under a name that stays from
+# build to build (Issue-205): every sprite set's atlas,
+# art/<area>/<set>/sheet.json, which names the sheet's image, itself named
+# for its pixels and kept for the year; and art/facilities/pictures.json, which
+# names each facility picture the same way, beside the row it stands on.
+#
+# The order: everything long-lived first, with nothing deleted; then the
+# short-lived files, each of which names long-lived ones, the atlases their
+# images, the page its scripts; and only then are the earlier builds' files
+# deleted. Deleting first, as the one sync used to, left an atlas of the
+# last build naming an image already gone until the new atlas was written
+# (the review of PR-334). A copy of a short-lived file that a browser or the
+# distribution took in its last minute can still name a deleted one until
+# that minute is over.
 set -eu
 
 bucket="${1:?bucket}"
@@ -60,9 +74,16 @@ esac
 short="public, max-age=60"
 long="public, max-age=31536000, immutable"
 
-aws s3 sync "$build_dir" "s3://$bucket" --delete --only-show-errors \
-  --exclude index.html --exclude favicon.png --exclude config.json \
-  --cache-control "$long"
+# What is written on its own, and so neither uploaded nor deleted by the syncs of the long-lived.
+set -- --exclude index.html --exclude favicon.png --exclude config.json \
+  --exclude "art/*/sheet.json" --exclude art/facilities/pictures.json
+
+aws s3 sync "$build_dir" "s3://$bucket" --only-show-errors "$@" --cache-control "$long"
+
+# The atlases and the facilities' pictures' names alone: everything else under art/ went with the sync above.
+aws s3 sync "$build_dir/art" "s3://$bucket/art" --delete --only-show-errors \
+  --exclude "*" --include "*/sheet.json" --include facilities/pictures.json \
+  --cache-control "$short" --content-type "application/json"
 
 aws s3 cp "$build_dir/index.html" "s3://$bucket/index.html" --only-show-errors \
   --cache-control "$short" --content-type "text/html; charset=utf-8"
@@ -75,5 +96,8 @@ trap 'rm -f "$config"' EXIT
 printf '{"graphqlPath":"%s","userPoolId":"%s","clientId":"%s","loginHost":"%s","passwordSignIn":%s,"version":"%s"}\n' "$graphql_path" "$user_pool_id" "$client_id" "$login_host" "$password_sign_in" "$version" >"$config"
 aws s3 cp "$config" "s3://$bucket/config.json" --only-show-errors \
   --cache-control "$short" --content-type "application/json"
+
+# Last, what earlier builds left: the same sync again, which finds nothing to upload and deletes what this build does not hold.
+aws s3 sync "$build_dir" "s3://$bucket" --delete --only-show-errors "$@" --cache-control "$long"
 
 echo "published the client to s3://$bucket with config.json: $(cat "$config")"

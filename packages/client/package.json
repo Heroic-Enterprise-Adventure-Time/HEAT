@@ -11,7 +11,7 @@
     "prebuild": "npm run art",
     "build": "ng build",
     "pretest": "npm run art",
-    "test": "ng test --watch=false",
+    "test": "node --test \"scripts/*.test.mjs\" && ng test --watch=false",
     "typecheck": "tsc -p tsconfig.e2e.json --noEmit",
     "e2e": "playwright test"
   },
@@ -40,6 +40,8 @@
     "@testing-library/angular": "19.6.0",
     "@testing-library/dom": "10.4.2",
     "@testing-library/jest-dom": "7.0.1",
-    "@testing-library/user-event": "14.6.10"
+    "@testing-library/user-event": "14.6.10",
+    "maxrects-packer": "3.0.0",
+    "sharp": "0.35.5"
   }
 }

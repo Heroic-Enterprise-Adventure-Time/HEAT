@@ -6,6 +6,7 @@ import { ABILITIES, type AbilityId, isPlayableTimeline, type JobId, JOBS, locati
 import { stageWords } from '../camp/panels/job-words';
 import { Game } from '../game';
 import { BattleView } from './battle-view';
+import { jobCast, timelineCast } from './cast';
 import { secondsLeft, waitingWords } from './field';
 import { Play } from './play';
 import { Playback } from './playback';
@@ -21,7 +22,8 @@ import { outcomeWords, stageResultWords } from './result-words';
  * controls' place, with the replay, which plays the stored timeline in the
  * same scene with no engine, and Back to camp. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
- * to load, so that the party can run on from the start.
+ * to load, and for the art of everyone the job may set against the party, so
+ * that the party is seen running on from the start.
  */
 @Component({
   selector: 'heat-adventure',
@@ -84,7 +86,7 @@ export class Adventure {
       untracked(() => {
         this.startedId = adventure.id;
         this.play.start(adventure);
-        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])));
+        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), jobCast(adventure.snapshot.jobId));
       });
     });
     effect(() => {
@@ -111,7 +113,7 @@ export class Adventure {
     }
     this.replayState.set('idle');
     this.play.replay(timeline);
-    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])));
+    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events));
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */

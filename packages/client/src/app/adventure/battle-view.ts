@@ -6,6 +6,7 @@ import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
+import type { CastMember } from './cast';
 import { Play } from './play';
 
 /** Calls `onFrame` with the wall-clock milliseconds since the last frame until stopped; a test provides one it drives by hand. */
@@ -44,8 +45,10 @@ export const BATTLE_SCENE_FACTORY = new InjectionToken<BattleSceneFactory>('heat
  * the frame loop with the `Play` its page provides: each frame the run moves
  * on, and the scene animates what happened and moves on by the same time.
  * Without a scene, as where WebGL is missing, the run plays with the
- * controls alone. The page starts a run once `ready` is set, and hands the
- * scene the run's start with `reset`.
+ * controls alone. The page starts a run once `ready` is set, and hands
+ * over the run's start with `reset`, with who the run may set against the
+ * party: the scene loads the art of that whole cast first, and until it has,
+ * the run does not move and the scene is not shown it (Issue-205).
  */
 @Component({
   selector: 'heat-battle-view',
@@ -73,6 +76,10 @@ export class BattleView {
   );
   private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
   private scene: BattleSceneHandle | null = null;
+  /** The run handed over last, counted, so that an earlier run's art arriving late begins nothing. */
+  private handedOver = 0;
+  /** The last run whose art the scene has. While it is not the one handed over last, no frame moves the run or the scene. */
+  private prepared = 0;
 
   constructor() {
     const frames = inject(FRAME_LOOP);
@@ -85,13 +92,29 @@ export class BattleView {
     });
     destroyRef.onDestroy(() => {
       destroyed = true;
+      // Art still on its way for a run handed over begins nothing in a scene that is gone.
+      this.handedOver++;
       this.scene?.destroy();
     });
   }
 
-  /** Hands the scene the field of the run just begun, with each hero's sprite set, by hero id. */
-  reset(spriteSets: ReadonlyMap<string, string>): void {
-    this.scene?.reset(must(this.play.field(), 'the field'), spriteSets, this.play.entering());
+  /**
+   * Hands the scene the run just begun: each hero's sprite set, by hero id,
+   * and `others`, everyone the run may set against the party. The scene
+   * shows the run's field once it has the art of all of them.
+   */
+  reset(spriteSets: ReadonlyMap<string, string>, others: readonly CastMember[]): void {
+    const scene = this.scene;
+    if (!scene) return;
+    const party = must(this.play.field(), 'the field').party.map((hero): CastMember => ({ kind: hero.kind, type: hero.type, spriteSet: spriteSets.get(hero.unitId) }));
+    const run = ++this.handedOver;
+    void scene.prepare([...party, ...others]).then(() => {
+      if (run !== this.handedOver || scene !== this.scene) return;
+      this.prepared = run;
+      // A page that stopped the run while its art was on its way has no field to show.
+      const field = this.play.field();
+      if (field) scene.reset(field, spriteSets, this.play.entering());
+    });
   }
 
   protected measure(): void {
@@ -113,6 +136,7 @@ export class BattleView {
   }
 
   private frame(ms: number): void {
+    if (this.prepared !== this.handedOver) return;
     const events = this.play.tick(ms);
     const field = this.play.field();
     if (!this.scene || !field) return;

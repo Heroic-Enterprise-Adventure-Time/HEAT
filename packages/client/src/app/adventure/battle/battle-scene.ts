@@ -1,4 +1,4 @@
-import { clamp, range } from 'es-toolkit';
+import { clamp, range, uniq } from 'es-toolkit';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
 
 import {
@@ -18,9 +18,11 @@ import {
 
 import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/ground';
 import { fetchJson } from '../../static-json';
+import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
 import { effectFrameAt, heldFrame, projectileAt } from './action-sprites';
-import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type WeaponArt } from './battle-art';
+import { artSettled } from './art-loads';
+import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
 
 /**
@@ -40,7 +42,9 @@ import { battleView, type BattleView, entryOffset, spots } from './battle-layout
  * fight or a gather the other side rushes on from the right as the road
  * scrolls with it, and only then does the clock run (the owner's call on
  * Issue-15). What is left of a stage scrolls away on the next travel. The
- * scene knows nothing of the engine or the hub; the page feeds it.
+ * scene knows nothing of the engine or the hub; the page feeds it, and
+ * before a run it hands over the run's cast, whose art is loaded before the
+ * run is shown (`prepare`, Issue-205).
  */
 
 export interface BattleSceneCallbacks {
@@ -49,6 +53,13 @@ export interface BattleSceneCallbacks {
 }
 
 export interface BattleSceneHandle {
+  /**
+   * Loads the art of everyone a run may show, their weapons and every
+   * ability's effect, before the run is handed over with `reset`. Over when
+   * each has arrived or failed, or at the limit; it never fails, and a
+   * failure is the page's uncaught error.
+   */
+  prepare(cast: readonly CastMember[]): Promise<void>;
   /** Shows the field as it stands; `enter` runs the party on from the left first. */
   reset(field: Field, heroSets: ReadonlyMap<string, string>, enter: boolean): void;
   /** Animates the events just happened; a fight or a gather beginning brings the other side on. */
@@ -75,6 +86,8 @@ const DOWN_MS = 100;
 const WALK_MS = 100;
 const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
+/** The longest a run waits for its art before it begins, on the wall clock: past it the run begins, and a picture shows when it arrives. */
+const ART_WAIT_MS = 8000;
 /** A fallen monster or a felled tree lies this long after its fall, then fades over the next. */
 const FADE_AFTER_MS = 600;
 const FADE_MS = 500;
@@ -141,17 +154,21 @@ interface ProjectileView {
   readonly sprite: Sprite;
 }
 
-function artPath(unit: FieldUnit, heroSets: ReadonlyMap<string, string>): string | null {
-  if (unit.kind === 'hero') {
-    const set = heroSets.get(unit.unitId);
-    return set ? `heroes/${set}` : null;
-  }
-  if (unit.kind === 'monster') {
-    const set = MONSTER_SPRITE_SETS[unit.type as MonsterType][0];
+/** Where a unit's sprite set is under `/art`: a hero's own set, anyone else's by its type; null where there is none. */
+function artPath(kind: FieldUnit['kind'], type: string, heroSet: string | undefined): UnitArtPath | null {
+  if (kind === 'hero') return heroSet ? `heroes/${heroSet}` : null;
+  if (kind === 'monster') {
+    // A stored timeline may name a monster this build no longer has.
+    const set = Object.hasOwn(MONSTER_SPRITE_SETS, type) ? MONSTER_SPRITE_SETS[type as MonsterType][0] : undefined;
     return set ? `monsters/${set}` : null;
   }
-  const set = PROP_SPRITE_SETS[unit.type as ResourceType]?.[0];
+  const set = PROP_SPRITE_SETS[type as ResourceType]?.[0];
   return set ? `props/${set}` : null;
+}
+
+/** The weapon by unit type for now; a hero's equipped weapon replaces this lookup (game.md, "Heroes"). */
+function weaponOf(kind: FieldUnit['kind'], type: string): string | undefined {
+  return kind === 'resource' ? undefined : WEAPON_SPRITES[type as UnitType | MonsterType];
 }
 
 /** A hero with no line yet, before its first fight, stands on its unit type's home line. */
@@ -243,6 +260,26 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   /** How far right of its spots the other side still is while it rushes on. */
   let offset = 0;
   let destroyed = false;
+  // A load's failure is the page's own uncaught error, which is where it always went and where the browser test reads it.
+  const failed = (error: unknown) => { reportError(error); };
+  /** Hands a unit its art when it arrives: at once for a run that was prepared, since `Assets` keeps a sheet it has loaded. */
+  const take = <Art>(art: Promise<Art>, use: (art: Art) => void) => {
+    void art.then((arrived) => { if (!destroyed) use(arrived); }, failed);
+  };
+  // The art in hand, by its set: what a run was prepared with. A unit takes its picture from here in the frame it
+  // appears; asked of `Assets`, even a sheet already loaded arrives a frame late, and its health bar stands alone in that one.
+  const unitArt = new Map<string, UnitArt>();
+  const weaponArt = new Map<string, WeaponArt>();
+  const unitArtOf = async (path: UnitArtPath) => {
+    const art = await loadUnitArt(path);
+    unitArt.set(path, art);
+    return art;
+  };
+  const weaponArtOf = async (set: string) => {
+    const art = await loadWeaponArt(set);
+    weaponArt.set(set, art);
+    return art;
+  };
 
   const addUnit = (unit: FieldUnit): UnitView => {
     const body = new Container();
@@ -254,8 +291,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     const bar = new Graphics();
     body.addChild(picture, top, weaponSprite);
     things.addChild(body, bar);
-    // The weapon by unit type for now; a hero's equipped weapon replaces this lookup (game.md, "Heroes").
-    const weapon = unit.kind === 'resource' ? undefined : WEAPON_SPRITES[unit.type as UnitType | MonsterType];
+    const weapon = weaponOf(unit.kind, unit.type);
     const unitView: UnitView = {
       unit,
       opponent: unit.side === 'opponents',
@@ -276,16 +312,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       clock: 0,
       behind: false,
     };
-    const path = artPath(unit, heroSets);
+    const path = artPath(unit.kind, unit.type, heroSets.get(unit.unitId));
+    // A unit that was not in the run's cast loads now, and shows when its picture arrives.
     if (path) {
-      void loadUnitArt(path).then((art) => {
-        if (!destroyed) unitView.art = art;
-      });
+      unitView.art = unitArt.get(path) ?? null;
+      if (!unitView.art) take(unitArtOf(path), (art) => { unitView.art = art; });
     }
     if (weapon) {
-      void loadWeaponArt(weapon).then((art) => {
-        if (!destroyed) unitView.weapon = art;
-      });
+      unitView.weapon = weaponArt.get(weapon) ?? null;
+      if (!unitView.weapon) take(weaponArtOf(weapon), (art) => { unitView.weapon = art; });
     }
     units.set(unit.unitId, unitView);
     return unitView;
@@ -435,13 +470,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       top.visible = false;
       return;
     }
-    // A fading down: the rows above the cut with their own alpha, the rest as drawn (rule 30).
-    const source = texture.source;
-    top.texture = new Texture({ source, frame: new Rectangle(0, 0, texture.width, cut) });
+    // A fading down: the rows above the cut with their own alpha, the rest as drawn (rule 30), each cut from the frame's place on its sheet.
+    const { source, frame } = texture;
+    top.texture = new Texture({ source, frame: new Rectangle(frame.x, frame.y, texture.width, cut) });
     top.pivot.set(texture.width / 2, frames.foot + 1);
     top.alpha = fade;
     top.visible = true;
-    picture.texture = new Texture({ source, frame: new Rectangle(0, cut, texture.width, texture.height - cut) });
+    picture.texture = new Texture({ source, frame: new Rectangle(frame.x, frame.y + cut, texture.width, texture.height - cut) });
     picture.pivot.set(texture.width / 2, frames.foot + 1 - cut);
   };
 
@@ -496,6 +531,17 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   };
 
   return {
+    prepare(cast) {
+      const sets = uniq(cast.flatMap((member) => artPath(member.kind, member.type, member.spriteSet) ?? []));
+      const weapons = uniq(cast.flatMap((member) => weaponOf(member.kind, member.type) ?? []));
+      const effectSets = uniq(Object.values(ABILITY_EFFECTS));
+      return artSettled(
+        [...sets.map((path) => unitArtOf(path)), ...weapons.map((set) => weaponArtOf(set)), ...effectSets.map((set) => loadEffectArt(set))],
+        ART_WAIT_MS,
+        failed,
+      );
+    },
+
     reset(field, sets, enter) {
       heroSets = sets;
       for (const effect of [...effects]) removeEffect(effect);
