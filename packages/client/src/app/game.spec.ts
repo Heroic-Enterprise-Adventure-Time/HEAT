@@ -22,7 +22,7 @@ const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCach
  */
 const wireHero = (hero: HeroView) => ({ __typename: 'Hero', ...hero, unitType: constantCase(hero.unitType) });
 const wireSeen = (hero: SeenHeroView) => ({ __typename: 'SeenHero', ...hero, unitType: constantCase(hero.unitType) });
-const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number; rating?: number }[]) =>
+const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number }[]) =>
   amounts.map((a) => ({ __typename: typename, ...a, material: constantCase(a.material) }));
 const wireAdventure = (a: AdventureView) => ({
   __typename: 'Adventure',
@@ -31,7 +31,7 @@ const wireAdventure = (a: AdventureView) => ({
   snapshot: {
     __typename: 'Snapshot',
     ...a.snapshot,
-    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, gather: wireAmounts('GatherRating', h.stats.gather) } })),
+    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, traits: h.stats.traits.map((t) => ({ __typename: 'TraitLevel', ...t, trait: constantCase(t.trait) })) } })),
   },
 });
 const wirePlayer = (p: PlayerView) => ({
@@ -344,6 +344,25 @@ describe('Game', () => {
     await run(game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id]));
     await expect(run(game.retire(villager.id))).rejects.toMatchObject({ kind: 'HeroAdventuring', message: 'Wren is away on an adventure' });
     expect(game.heroesHere().map((h) => h.status)).toEqual(['ALIVE']);
+  });
+
+  it('keeps the player it holds when a later read of it fails, and says why: a tab the hub has refused can still be told it is outdated', async () => {
+    const { controller, game, run, hub } = setup(playerWith([]));
+    await run();
+    const work = game.recruit('villager');
+    for (let i = 0; i < 50; i++) {
+      TestBed.tick();
+      for (const operation of controller.match(() => true)) {
+        const call = callOf(operation);
+        if (call.op === 'Me') operation.networkError(new Error('the hub answered 400'));
+        else operation.flush({ data: hub.answer(call) });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await work;
+    expect(game.error()).toBe('the hub answered 400');
+    // The player as last read, before the recruit: the page keeps what it showed.
+    expect(game.player()).toMatchObject({ id: 'p1', heroes: [] });
   });
 
   it('says why the player could not be read when the join fails, and loads nothing', async () => {

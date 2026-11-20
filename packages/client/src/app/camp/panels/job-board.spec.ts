@@ -1,7 +1,7 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
-import { must, UNIT_PROFILES } from '@heat/engine';
+import { JOBS, must, UNIT_PROFILES } from '@heat/engine';
 
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/battle-view';
 import { routes } from '../../app.routes';
@@ -154,27 +154,27 @@ const depart = () => screen.getByRole('button', { name: 'Depart' });
 const job = (name: string) => within(itemHolding('Jobs', 'link', name));
 
 describe('Job board', () => {
-  it("lists the board's jobs, easiest first, with what each brings home, each linked to its detail", async () => {
+  it("lists the board's jobs, easiest first, each with its pay and its bonus XP and nothing of what it drops, each linked to its detail", async () => {
     await renderJobs(fakeGame([]), '/camp/millbrook/job-board');
     expect(panel().getByRole('heading', { name: 'Job board', level: 2 })).toBeInTheDocument();
     expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Pick up sticks', 'Timber from the near woods', 'Wolves on the mill road']);
-    expect(job('Pick up sticks').getByText('up to 45 timber')).toBeInTheDocument();
-    expect(job('Timber from the near woods').getByText('3 cloth and up to 90 timber')).toBeInTheDocument();
-    expect(job('Wolves on the mill road').getByText('10 cloth')).toBeInTheDocument();
+    expect(job('Pick up sticks').getByText('No pay, 2 bonus XP')).toBeInTheDocument();
+    expect(job('Timber from the near woods').getByText('3 cloth, 4 bonus XP')).toBeInTheDocument();
+    expect(job('Wolves on the mill road').getByText('10 cloth, 10 bonus XP')).toBeInTheDocument();
+    expect(panel().queryByText(/timber$|up to/)).not.toBeInTheDocument();
     expect(panel().getByRole('link', { name: 'Pick up sticks' })).toHaveAttribute('href', '/camp/millbrook/job-board/jobs/pick-up-sticks');
     expect(menu().getByRole('link', { name: 'Job board', current: 'page' })).toBeInTheDocument();
   });
 
-  it("shows a job's stages in order, its credits beside the camp's balance and room, and its retreat penalty", async () => {
+  it("shows a job's description, its pay beside the camp's balance and room, its bonus XP and what a retreat keeps, and neither its stages nor what it drops (decision 0058)", async () => {
     await renderJobs(fakeGame([must(party[0], 'the first of the party')]), '/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
     expect(panel().getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
-    expect(textsOf(listItems('Stages'))).toEqual(['Travel', 'Gather timber from 2 trees', 'Fight a wolf', 'Arrive']);
-    expect(textsOf(listItems('Reward'))).toEqual([
-      '3 cloth. Millbrook holds 0, with room for 100 more.',
-      'Up to 90 timber. Millbrook holds 90, with room for 10 more.',
-      '15 XP to each hero who comes back.',
-    ]);
-    expect(panel().getByText('A retreat forfeits the pay, keeps the timber gathered, and earns half the XP.')).toBeInTheDocument();
+    expect(panel().getByText(JOBS['timber-from-the-near-woods'].description)).toBeInTheDocument();
+    // The camp holds 90 timber of 100, and the page does not say so: the room for a drop would name the drop.
+    expect(textsOf(listItems('Reward'))).toEqual(['3 cloth. Millbrook holds 0, with room for 100 more.', 'Bonus: 4 XP to each hero who arrives.']);
+    expect(panel().getByText('A retreat keeps what dropped and the XP earned, and loses the pay and the bonus.')).toBeInTheDocument();
+    expect(panel().queryByRole('list', { name: 'Stages' })).not.toBeInTheDocument();
+    expect(panel().queryByText(/Travel|Gather|Fight a wolf/)).not.toBeInTheDocument();
     expect(menu().getByRole('link', { name: 'Job board', current: 'page' })).toBeInTheDocument();
     expect(panel().getByRole('link', { name: '← Job board' })).toHaveAttribute('href', '/camp/millbrook/job-board');
   });

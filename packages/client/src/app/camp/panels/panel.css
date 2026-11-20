@@ -44,7 +44,6 @@ h3 {
   column-gap: var(--space-md);
 }
 
-.stages,
 .credits {
   margin: 0 0 var(--space-md);
   padding-left: var(--space-2xl);

@@ -116,28 +116,57 @@ const button = (name: string) => screen.getByRole('button', { name });
 const abilities = (hero: string) => within(screen.getByRole('group', { name: `${hero} next action` }));
 /** A hero's item in the party, which holds what it will do next. */
 const heroItem = (hero: string) => within(itemHolding('Party', 'group', `${hero} next action`));
-const stage = (text: string | RegExp) => screen.getByText(text);
+/** Why the ability buttons wait while the party travels: what the page says of where the party is, since it lists no stages (Issue-339). */
+const ON_THE_ROAD = 'On the road: abilities are for a fight or a gather.';
+const onTheRoad = () => screen.getByText(ON_THE_ROAD);
+/** The villager's chop, which can be used once the party is among the trees. */
+const chop = () => abilities('Wren').getByRole('button', { name: 'Chop' });
+/** The live region that says what the party carries: in the page from the start, and empty while it carries nothing. */
+const carryingLine = () => screen.getByRole('status');
+/** What the party carries, as the page says it, or null while it carries nothing. */
+const carrying = () => carryingLine().textContent || null;
 
 describe('Adventure', () => {
   beforeEach(() => { localStorage.clear(); });
 
-  it("shows the job, the stage under way and each hero's abilities, usable only in a fight or a gather", async () => {
+  it("shows the job and each hero's abilities, usable only in a fight or a gather, and lists none of the job's stages", async () => {
     const { run } = await renderAdventure(fakeGame());
     expect(screen.getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
-    expect(stage('Stage 1 of 4: Travel')).toBeInTheDocument();
+    expect(screen.queryByText(/^Stage \d/)).not.toBeInTheDocument();
     expect(textsOf(abilities('Wren').getAllByRole('button'))).toEqual(['Strike', 'Chop', 'Mine', 'Move up']);
     expect(textsOf(abilities('Wat').getAllByRole('button'))).toEqual(['Guard', 'Strike']);
-    expect(abilities('Wren').getByRole('button', { name: 'Chop' })).toBeDisabled();
+    expect(chop()).toBeDisabled();
     // The reason is beside the disabled buttons, and each hero's group is described by it.
-    const wait = 'On the road: abilities are for a fight or a gather.';
-    expect(screen.getByText(wait)).toBeInTheDocument();
+    const wait = ON_THE_ROAD;
+    expect(onTheRoad()).toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Wren next action' })).toHaveAccessibleDescription(wait);
 
     await run(4100);
-    expect(stage('Stage 2 of 4: Gather timber from 2 trees')).toBeInTheDocument();
-    expect(abilities('Wren').getByRole('button', { name: 'Chop' })).toBeEnabled();
+    expect(chop()).toBeEnabled();
+    expect(screen.queryByText(/^Stage \d/)).not.toBeInTheDocument();
     expect(screen.queryByText(wait)).not.toBeInTheDocument();
     expect(screen.getByRole('group', { name: 'Wren next action' })).not.toHaveAccessibleDescription();
+  });
+
+  it('says what the party carries the moment an enemy falls, before the stage ends, and nothing until then (Issue-339)', async () => {
+    const { run } = await renderAdventure(fakeGame());
+    // The line is there before anything drops, so that the first drop is a change a screen reader speaks.
+    expect(carryingLine()).toBeInTheDocument();
+    expect(carrying()).toBeNull();
+    await run(4100);
+    expect(carrying()).toBeNull();
+    const amountAfter = async (before: string | null) => {
+      for (let second = 0; second < 60 && carrying() === before; second++) await run(1000);
+      return Number(/^Carrying (\d+) timber$/.exec(carrying() ?? '')?.[1]);
+    };
+    // The first tree of two: its drop at a villager's woodcutting, with the second still standing and the stage under way.
+    const first = await amountAfter(null);
+    expect(first).toBeGreaterThanOrEqual(30);
+    expect(first).toBeLessThanOrEqual(36);
+    expect(chop()).toBeEnabled();
+    const both = await amountAfter(`Carrying ${first} timber`);
+    expect(both - first).toBeGreaterThanOrEqual(30);
+    expect(both - first).toBeLessThanOrEqual(36);
   });
 
   it("queues a forced action until the hero's turn uses it, and logs it then", async () => {
@@ -169,12 +198,12 @@ describe('Adventure', () => {
     const { run, user } = await renderAdventure(fakeGame());
     await user.click(button('Pause'));
     await run(1000);
-    expect(stage('Stage 1 of 4: Travel')).toBeInTheDocument();
+    expect(onTheRoad()).toBeInTheDocument();
     await user.click(button('Resume'));
     await user.click(button('4×'));
     await waitFor(() => { expect(button('4×')).toHaveAttribute('aria-pressed', 'true'); });
     await run(1100);
-    expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+    expect(chop()).toBeEnabled();
   });
 
   it('orders a retreat, which stays selected, and the run ends with it in the log', async () => {
@@ -197,7 +226,7 @@ describe('Adventure', () => {
     expect(scene.fed).toEqual([]);
     scene.release();
     await run(4100);
-    expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+    expect(chop()).toBeEnabled();
     expect(scene.fed.filter((e) => e.kind === 'battle-start')).toHaveLength(1);
     // The fight's clock waits for the trees and their road to come on: nothing more happens until then.
     const fed = scene.fed.length;
@@ -264,7 +293,7 @@ describe('Adventure', () => {
     const { run } = await renderAdventure(fakeGame(), scene);
     scene.release();
     await run(4100);
-    expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+    expect(chop()).toBeEnabled();
     const fed = scene.fed.length;
     // Everyone on, the clock runs at once: the minute asked for with the entry was never held.
     scene.release();
@@ -298,7 +327,7 @@ describe('Adventure', () => {
     expect(screen.getByText('Picked up where you left off.')).toBeInTheDocument();
     // Picked up, everyone stands where they were: nobody runs on.
     expect(scene.resets.map((r) => r.enter)).toEqual([false]);
-    expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+    expect(chop()).toBeEnabled();
   });
 
   it('begins a run only once the scene has the art of the party and of everyone the job may set against it', async () => {
@@ -316,11 +345,11 @@ describe('Adventure', () => {
     await run(5000);
     expect(scene.resets).toEqual([]);
     expect(scene.frames).toBe(0);
-    expect(stage('Stage 1 of 4: Travel')).toBeInTheDocument();
+    expect(onTheRoad()).toBeInTheDocument();
     await scene.artArrives();
     await run(4100);
     expect(scene.resets).toMatchObject([{ field: { stage: 0 }, enter: true }]);
-    expect(stage(/^Stage 2 of 4/)).toBeInTheDocument();
+    expect(chop()).toBeEnabled();
   });
 
   it('holds a resumed run the same way, where nobody runs on', async () => {

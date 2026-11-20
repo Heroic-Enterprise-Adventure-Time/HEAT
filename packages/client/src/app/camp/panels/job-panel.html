@@ -3,21 +3,16 @@
   <h2 id="panel-title">{{ job.name }}</h2>
   <p>{{ job.description }}</p>
 
-  <h3 id="stages-title">Stages</h3>
-  <ol class="stages" aria-labelledby="stages-title">
-    @for (stage of job.stages; track $index) {
-      <li>{{ words(stage) }}</li>
-    }
-  </ol>
-
   <h3 id="reward-title">Reward</h3>
   <ul class="credits" aria-labelledby="reward-title">
-    @for (credit of reward(); track credit.material) {
+    @for (credit of pay(); track credit.material) {
       <li>
         {{ credit.words }}. {{ game.camp()?.name }} holds {{ credit.balance }}, with room for {{ credit.room }} more.
       </li>
+    } @empty {
+      <li>{{ noPay }}.</li>
     }
-    <li>{{ job.xp }} XP to each hero who comes back.</li>
+    <li>{{ bonus() }}</li>
   </ul>
   <p class="retreat">{{ retreat() }}</p>
 

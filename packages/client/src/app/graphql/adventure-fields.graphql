@@ -22,9 +22,9 @@ fragment AdventureFields on Adventure {
         damage
         maxHealth
         speed
-        gather {
-          material
-          rating
+        traits {
+          level
+          trait
         }
       }
     }

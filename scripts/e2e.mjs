@@ -283,7 +283,7 @@ const start = await graphql(token, startMutation, { requestId: startId, heroIds:
 check(!start.errors && success(start, "startAdventure", "adventure")?.id, `startAdventure set out on the timber job: ${JSON.stringify(start.data)} (${start.ms} ms)`);
 const { id, seed } = success(start, "startAdventure", "adventure");
 
-const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gather { material rating } } } } } } }`);
+const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage traits { trait level } } } } } } }`);
 const adventure = open.data?.me?.openAdventure;
 check(!open.errors && adventure?.id === id && adventure.seed === seed && adventure.job?.id === job, `me shows the open adventure: ${adventure?.job?.name} at ${adventure?.location} (${open.ms} ms)`);
 check(adventure.snapshot?.jobId === adventure.job.id && adventure.snapshot.heroes.length === 1 && adventure.snapshot.heroes[0].heroId === party.id && adventure.snapshot.heroes[0].unitType === "VILLAGER", `the snapshot holds the villager and the job: ${JSON.stringify(adventure.snapshot?.heroes)}`);
@@ -307,13 +307,13 @@ check(stale.extensions?.outdated === true, `a request carrying another version i
 // Submit with no overrides (Issue-114): the hub replays the run, stores the
 // timeline and settles. Its result must be the engine's own replay of the
 // snapshot and seed it issued, and the camp must hold what it credited.
-// The snapshot's unit types and materials are the schema's enum values; the engine replays it by its own.
+// The snapshot's unit types and gathering traits are the schema's enum values; the engine replays it by its own.
 const engineSnapshot = (snapshot) => ({
   ...snapshot,
   heroes: snapshot.heroes.map((h) => ({
     ...h,
     unitType: h.unitType.toLowerCase(),
-    stats: { ...h.stats, gather: h.stats.gather.map((g) => ({ ...g, material: g.material.toLowerCase() })) },
+    stats: { ...h.stats, traits: h.stats.traits.map((t) => ({ ...t, trait: t.trait.toLowerCase() })) },
   })),
 });
 const expected = replay(engineSnapshot(adventure.snapshot), seed, []).result;
@@ -325,7 +325,7 @@ check(result.outcome === "COMPLETE" && expected.outcome === "complete", `the hub
 
 const byMaterial = (a, b) => a.material.localeCompare(b.material);
 const sorted = (rewards) => JSON.stringify([...rewards].sort(byMaterial));
-check(sorted(engineRewards(result.rewards)) === sorted(expected.rewards), `the rewards are the job's pay and the cargo: ${sorted(result.rewards)}`);
+check(sorted(engineRewards(result.rewards)) === sorted(expected.rewards), `the rewards are the job's pay and what its trees dropped: ${sorted(result.rewards)}`);
 // The test user of dev keeps its warehouse between merges, so what the cap
 // turns away is part of the check rather than a failure.
 const added = (material) => [...result.credited, ...result.lost].filter((r) => r.material === material).reduce((n, r) => n + r.amount, 0);
@@ -430,10 +430,10 @@ if (mineLevel(campBefore) === 0 && (timberBefore < 60 || clothBefore < 3)) {
 
 // The mine's first job (Issue-133): "Ore from the hill" is posted by the
 // mine, so it is refused while the camp has none; once the mine is built,
-// which is the second run on a new stack, the villager brings home 40 ore,
+// which is the second run on a new stack, the villager brings home 40 ore or more,
 // which pays for a fighter, retired at once so the hall never fills.
 const oreJob = "ore-from-the-hill";
-const snapshotFields = `snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gather { material rating } } } }`;
+const snapshotFields = `snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage traits { trait level } } } }`;
 const oreStartMutation = `mutation($requestId: UUID!, $heroIds: [ID!]!) { startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "${oreJob}", heroIds: $heroIds }) { ${startFields} ... on StartAdventureSuccess { adventure { id seed ${snapshotFields} } } } }`;
 const atMine = campIn((await graphql(token, facilitiesQuery)).data?.me);
 const miner = (await graphql(token, heroQuery)).data?.me?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");

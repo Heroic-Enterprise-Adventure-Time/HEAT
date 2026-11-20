@@ -716,7 +716,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
             clips.push(strike + followMs(art.actHold, art.act.textures.length, ACT_MS));
             delay = strike;
             // A projectile flies at whoever took the hit, as long as decision 0052 timed it: what the warmup left after the wind-up.
-            const struck = event.effects.find((effect) => effect.kind === 'damage' || effect.kind === 'harvest');
+            const struck = event.effects.find((effect) => effect.kind === 'damage');
             const target = units.get(struck?.targetId ?? event.targetIds[0] ?? '');
             // Declared before the scene was reset, as on a resume, its warmup was not seen: the ability's own stands in.
             const warmup = actor.warmup ?? (Object.hasOwn(ABILITIES, event.abilityId) ? ABILITIES[event.abilityId as AbilityId].warmupMs : 0);
@@ -726,7 +726,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           if (actor) actor.warmup = null;
           clips.push(delay);
           for (const effect of event.effects) {
-            if (effect.kind === 'damage' || effect.kind === 'harvest') {
+            if (effect.kind === 'damage') {
               const target = units.get(effect.targetId);
               if (target) {
                 // Two blows on one unit in a frame: it falls as the later of them lands.

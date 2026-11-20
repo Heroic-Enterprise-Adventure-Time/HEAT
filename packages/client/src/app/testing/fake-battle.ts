@@ -57,7 +57,7 @@ export function fakeBattleScene(holding = false, awaitingArt = false) {
   return scene;
 }
 
-/** Whether a frame's events land a blow, a hit, a harvest or a guard: what the scene begins a hit or an effect for, and asks the clock to wait for. */
+/** Whether a frame's events land a blow, a hit or a guard: what the scene begins a hit or an effect for, and asks the clock to wait for. */
 export const landsBlow = (events: readonly AdventureEvent[]) =>
   events.some((event) => event.kind === 'action-resolved' && event.effects.some((effect) => effect.kind !== 'move'));
 

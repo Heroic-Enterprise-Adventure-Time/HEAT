@@ -102,6 +102,8 @@ describe("Determinism within one version", () => {
   it("gives the same result at any frame rate, and fast-forwarded", () => {
     const snap = snapshot(TIMBER, party);
     const reference = replay(snap, "frames", []);
+    // The drops are in the timeline, so a replay is checked on them too.
+    expect(reference.timeline.events.filter((e) => e.kind === "drop")).toHaveLength(2);
     for (const frameMs of [1, 7, 16, 33, 250, 5000, 60_000]) {
       expect(playLive(snap, "frames", [], frameMs)).toEqual(reference);
     }
