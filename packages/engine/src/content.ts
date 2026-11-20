@@ -435,13 +435,15 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
  * A unit type's gathering traits are in its stats (decision 0058): the
  * villager cuts wood and mines at level 1, the lumberjack cuts wood at level
  * 2 and the miner mines at level 2, each with a villager's body (Issue-287),
- * and a combat unit carries none. A specialist carries its own trait alone
- * to start with; that is where the first unit types start and not a rule,
- * and a unit type added later may carry several (the owner, 2026-11-20). One
- * carrier standing is enough for a party, and a hit gathers nothing, so a
- * fighter costs a resource run nothing. A ranger stands at the back and
- * shoots whatever is closest, monsters before nodes like any unit, and a
- * node when nothing else is left (decision 0052).
+ * the ranger skins at level 1 (Issue-340), and the fighter carries none. The
+ * villager cannot skin, so hide is the first drop a party gets nothing of
+ * without its carrier. A specialist carries its own trait alone to start
+ * with; that is where the first unit types start and not a rule, and a unit
+ * type added later may carry several (the owner, 2026-11-20). One carrier
+ * standing is enough for a party, and a hit gathers nothing, so a fighter
+ * costs a resource run nothing. A ranger stands at the back and shoots
+ * whatever is closest, monsters before nodes like any unit, and a node when
+ * nothing else is left (decision 0052).
  */
 export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
   villager: {
@@ -466,15 +468,17 @@ export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> =
   },
   ranger: {
     homeLine: "far",
-    stats: { maxHealth: 26, speed: 10, damage: 6, traits: [] },
+    stats: { maxHealth: 26, speed: 10, damage: 6, traits: [{ trait: "skinning", level: 1 }] },
     actions: ["shoot"],
   },
 };
 
 /**
- * The monsters, each with the XP it gives the heroes who survive (decision
- * 0058). None drops anything yet: the wolf's hide comes with skinning
- * (Issue-340).
+ * The monsters, each with the XP it gives the heroes who survive and what it
+ * drops (decision 0058). The wolf's hide is the first drop that is not a
+ * staple (Issue-340): one, half the time, to a party that skins at level 1,
+ * and one or two, always, at level 2, which no unit type has yet. No job's
+ * description mentions it: not every drop is told.
  */
 export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
   wolf: {
@@ -482,7 +486,11 @@ export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
     homeLine: "front",
     stats: { maxHealth: 24, speed: 12, damage: 3, traits: [] },
     actions: ["bite", "move-up"],
-    drops: [],
+    drops: [{
+      material: "hide",
+      trait: "skinning",
+      levels: [{ chancePercent: 50, min: 1, max: 1 }, { chancePercent: 100, min: 1, max: 2 }],
+    }],
     xp: 5,
   },
   bandit: {

@@ -219,6 +219,7 @@ The gathering traits, the engine's `GatheringTrait`, each named for its craft: w
 """
 enum GatheringTrait {
   MINING
+  SKINNING
   WOODCUTTING
 }
 
@@ -366,6 +367,7 @@ type JoinGameSuccess {
 """The resources, the engine's `Material`: there is no currency."""
 enum Material {
   CLOTH
+  HIDE
   ORE
   TIMBER
 }

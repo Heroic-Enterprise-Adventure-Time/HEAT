@@ -385,7 +385,7 @@ describe("Drops (decision 0058)", () => {
     }
   });
 
-  it("do not count a carrier that is down: the wolf takes the villager, the ranger fells the tree, and nothing drops", () => {
+  it("do not count a carrier that is down: the wolf takes the villager, the ranger fells the tree, and no timber drops", () => {
     // A wolf that only scratches, so the ranger outlives it; the villager, at one health, does not.
     const content = contentWith({ monsters: { wolf: { stats: { ...MONSTERS.wolf.stats, damage: 1 } } } });
     for (const seed of seeds.slice(0, 50)) {
@@ -395,8 +395,9 @@ describe("Drops (decision 0058)", () => {
       expect(outcome.result, seed).toBe("win");
       expect(downs.indexOf("villager-1"), seed).toBeLessThan(downs.indexOf("tree-1"));
       expect(downs.indexOf("villager-1"), seed).toBeGreaterThanOrEqual(0);
-      expect(outcome.drops, seed).toEqual({});
-      expect(ofKind(outcome.timeline.events, "drop"), seed).toEqual([]);
+      // What the ranger can gather, the wolf's hide, is all that may have dropped (Issue-340).
+      expect(outcome.drops.timber, seed).toBeUndefined();
+      expect(ofKind(outcome.timeline.events, "drop").filter((e) => e.material !== "hide"), seed).toEqual([]);
     }
   });
 
@@ -424,7 +425,7 @@ describe("Drops (decision 0058)", () => {
 });
 
 describe("rollDrops", () => {
-  const hide: Drop = { material: "cloth", trait: "mining", levels: [{ chancePercent: 50, min: 1, max: 1 }, { chancePercent: 100, min: 1, max: 2 }] };
+  const hide: Drop = must(MONSTERS.wolf.drops[0], "the wolf's drop");
   const timber = must(RESOURCE_NODES.tree.drops[0], "the tree's drop");
   const at = (levels: Partial<Record<GatheringTrait, number>>) => (trait: GatheringTrait) => levels[trait] ?? 0;
 
@@ -434,11 +435,16 @@ describe("rollDrops", () => {
     expect(rollDrops("s", "tree-1", [], at({ woodcutting: 1 }))).toEqual([]);
   });
 
-  it("rolls a drop by chance about as often as its row says, and always at a row that says always", () => {
-    const fell = (level: number): number => seeds.filter((seed) => rollDrops(seed, "wolf-1", [hide], at({ mining: level })).length > 0).length;
+  it("rolls a drop by chance about as often as its row says, and always at a row that says always: the wolf's hide, one half the time at skinning 1 and one or two at level 2 (Issue-340)", () => {
+    const rolled = (level: number): number[] => seeds.map((seed) => rollDrops(seed, "wolf-1", [hide], at({ skinning: level }))[0]?.amount ?? 0);
+    const fell = (level: number): number => rolled(level).filter((amount) => amount > 0).length;
+    expect(fell(0)).toBe(0);
     expect(fell(1)).toBeGreaterThan(seeds.length * 0.4);
     expect(fell(1)).toBeLessThan(seeds.length * 0.6);
+    expect(new Set(rolled(1))).toEqual(new Set([0, 1]));
+    // No unit type skins at level 2 yet, so the row is read here and nowhere in a battle.
     expect(fell(2)).toBe(seeds.length);
+    expect(new Set(rolled(2))).toEqual(new Set([1, 2]));
   });
 
   it("makes one roll for an enemy whatever the level: a higher level reads the same roll against a better row", () => {
@@ -456,9 +462,65 @@ describe("rollDrops", () => {
 
   it("rolls each drop of an enemy the same whether or not the drops before it are gathered", () => {
     for (const seed of seeds) {
-      const both = rollDrops(seed, "tree-1", [hide, timber], at({ woodcutting: 1, mining: 2 }));
+      const both = rollDrops(seed, "tree-1", [hide, timber], at({ woodcutting: 1, skinning: 2 }));
       const second = rollDrops(seed, "tree-1", [hide, timber], at({ woodcutting: 1 }));
       expect(second, seed).toEqual(both.filter((d) => d.material === "timber"));
+    }
+  });
+});
+
+describe("The wolf's hide (Issue-340)", () => {
+  const drop = must(MONSTERS.wolf.drops[0], "the wolf's drop");
+  /** One wolf, met by this party on this seed. */
+  const met = (party: readonly PartyMember[], seed: string, content?: BattleContent): BattleOutcome => resolveBattle(setup(party, [opponent("wolf-1", "wolf")], seed), content);
+  /** What the wolf's own roll gives a party that skins at level 1, whoever is in it. */
+  const rolled = (seed: string): number => rollDrops(seed, "wolf-1", [drop], () => 1)[0]?.amount ?? 0;
+
+  it("falls to a party with a ranger standing: one hide on about half the seeds, as an event after the wolf's fall", () => {
+    const outcomes = seeds.map((seed) => ({ seed, outcome: met([hero("fighter-1", "fighter"), hero("ranger-1", "ranger")], seed) }));
+    for (const { seed, outcome } of outcomes) {
+      expect(outcome.result, seed).toBe("win");
+      expect(outcome.drops, seed).toEqual(rolled(seed) > 0 ? { hide: 1 } : {});
+      const events = outcome.timeline.events;
+      const drops = ofKind(events, "drop");
+      expect(drops, seed).toHaveLength(rolled(seed));
+      const [first] = drops;
+      if (first) {
+        expect(first, seed).toMatchObject({ unitId: "wolf-1", material: "hide", amount: 1 });
+        expect(events.indexOf(first), seed).toBe(events.findIndex((e) => e.kind === "unit-down" && e.unitId === "wolf-1") + 1);
+      }
+    }
+    const withHide = outcomes.filter((o) => o.outcome.drops.hide).length;
+    expect(withHide).toBeGreaterThan(seeds.length * 0.4);
+    expect(withHide).toBeLessThan(seeds.length * 0.6);
+  });
+
+  it("does not fall to a party that cannot skin, whatever the wolf rolled: a fighter beside a villager, a lumberjack and a miner", () => {
+    for (const seed of seeds) {
+      const outcome = met([hero("fighter-1", "fighter"), hero("villager-1", "villager"), hero("lumberjack-1", "lumberjack"), hero("miner-1", "miner")], seed);
+      expect(outcome.result, seed).toBe("win");
+      expect(outcome.drops, seed).toEqual({});
+      expect(ofKind(outcome.timeline.events, "drop"), seed).toEqual([]);
+    }
+    expect(seeds.some((seed) => rolled(seed) > 0)).toBe(true);
+  });
+
+  it("does not fall with the ranger down: the wolf takes the ranger, the villager takes the wolf, and nothing drops", () => {
+    // The villager starts behind the ranger, so the wolf meets the ranger first; and the wolf only
+    // scratches, so that the villager outlives it on every seed and the ranger, at one health, does not.
+    const content = contentWith({
+      heroes: { villager: { homeLine: "back" } },
+      monsters: { wolf: { stats: { ...MONSTERS.wolf.stats, damage: 1 } } },
+    });
+    for (const seed of seeds) {
+      const outcome = met([hero("ranger-1", "ranger", 1), hero("villager-1", "villager")], seed, content);
+      expect(outcome.result, seed).toBe("win");
+      expect(ofKind(outcome.timeline.events, "unit-down").map((e) => e.unitId), seed).toEqual(["ranger-1", "wolf-1"]);
+      expect(outcome.drops, seed).toEqual({});
+      expect(ofKind(outcome.timeline.events, "drop"), seed).toEqual([]);
+      // The same fight with the ranger at full health, which the scratches do not bring down, gives what the wolf rolled.
+      const standing = met([hero("ranger-1", "ranger"), hero("villager-1", "villager")], seed, content);
+      expect(standing.drops, seed).toEqual(rolled(seed) > 0 ? { hide: 1 } : {});
     }
   });
 });
