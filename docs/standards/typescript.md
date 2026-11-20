@@ -66,6 +66,10 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 23. **What a build writes for the page is checked on both sides by one list.** A name the page asks a build's output for, such as a clip a scene reads from a sprite set's sheet, or a set's kind, is one exported list that the build checks its output against and the page reads. Neither side spells it on its own. The sprite sets' is `packages/client/src/app/sprite-sets.ts`: `SET_CLIPS`, the clips of each kind of set, and `PACKED_AREAS`, the kind each area under `art/` holds. The art build imports it as it is, Node stripping its types, so the file keeps to what stripping leaves working, and refuses a set without one of the clips; the page's `loadSpriteSet` takes a clip's name and a set's path only as the list types them, so a scene that asks for a clip the build does not check does not compile. Rule 18 is the same rule inside a package; this one reaches from a build script to the TypeScript it feeds. From the review of PR-334 (Issue-205), where the clips were spelled in `pack-art.mjs` and again where the scenes asked for them.
 
+### What a test helper takes from the source
+
+24. **A value a shared test helper must agree with in the source is exported from the source and imported by the helper, never copied into it.** A limit the page applies, such as the longest frame the battle view takes, `MAX_FRAME_MS` in `battle-view.ts`, which the specs' frame loop and `runToBlow` in `testing/fake-battle.ts` read, is one constant: a copy in the helper would go on driving the page in frames the browser no longer gives, with nothing failing. Rule 19 says where a helper lives; this says where its numbers come from. A candidate rule from the review of PR-338 (Issue-335), accepted by the owner on 2026-11-20.
+
 ## Held back
 
 Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.

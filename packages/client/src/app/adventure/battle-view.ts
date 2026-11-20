@@ -12,8 +12,8 @@ import { Play } from './play';
 /** Calls `onFrame` with the wall-clock milliseconds since the last frame until stopped; a test provides one it drives by hand. */
 export type FrameLoop = (onFrame: (elapsedMs: number) => void) => () => void;
 
-/** The longest step one frame may take, so a tab coming back from the background does not leap ahead. */
-const MAX_FRAME_MS = 250;
+/** The longest step one frame may take, so a tab coming back from the background does not leap ahead. Exported for the specs' frame loop, which gives the page the frames the browser would (typescript.md, rule 24). */
+export const MAX_FRAME_MS = 250;
 
 export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.adventure.frames', {
   providedIn: 'root',
@@ -43,8 +43,9 @@ export const BATTLE_SCENE_FACTORY = new InjectionToken<BattleSceneFactory>('heat
  * beside it, below it on a narrow screen, holding what the page projects
  * into it, its heading `panel-title`. It loads the scene and drives it from
  * the frame loop with the `Play` its page provides: each frame the run moves
- * on, and the scene animates what happened and moves on by the same time.
- * Without a scene, as where WebGL is missing, the run plays with the
+ * on, and the scene animates what happened and moves on by the same time;
+ * what the scene answers for the clips it began is how long the run then
+ * waits (Issue-335), while the scene plays on. Without a scene, as where WebGL is missing, the run plays with the
  * controls alone. The page starts a run once `ready` is set, and hands
  * over the run's start with `reset`, with who the run may set against the
  * party: the scene loads the art of that whole cast first, and until it has,
@@ -140,7 +141,8 @@ export class BattleView {
     const events = this.play.tick(ms);
     const field = this.play.field();
     if (!this.scene || !field) return;
-    if (events.length > 0) this.scene.feed(events, field);
-    this.scene.frame(this.play.paused() ? 0 : ms * this.play.speed(), this.play.simTime(), field);
+    // The scene knows how long the clips these events began last, and the play waits for its share of them.
+    if (events.length > 0) this.play.hold(this.scene.feed(events, field));
+    this.scene.frame(this.play.paused() ? 0 : ms * this.play.speed(), field);
   }
 }

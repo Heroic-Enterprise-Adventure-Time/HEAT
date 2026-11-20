@@ -3,6 +3,7 @@ import { inject, Injectable, signal } from '@angular/core';
 import { type AdventureEvent, type AdventureSnapshot, type AdventureTimeline, must, type PartyOrder } from '@heat/engine';
 
 import { type AdventureView, Game } from '../game';
+import { spendHold } from './battle/clip-hold';
 import { applyEvent, emptyField, type Field, isEntry } from './field';
 import { AdventureRun, forgetRun, loadRun, type Run, saveRun, TimelineRun } from './run';
 
@@ -25,6 +26,16 @@ const SAVE_EVERY_MS = 1000;
  * clock waits while the scene brings everyone on, when `holdEntries` is set
  * by a page that has a scene, until `entered` is called (the owner's call on
  * Issue-15: the rush in is flavor, and the fight's clock starts after it).
+ *
+ * When an action resolves the clock waits again, for as long as the scene
+ * asks with `hold`: while the action is animated, so that one is seen from
+ * its first frame to its last before the next (Issue-335, decision 0057).
+ * That wait runs down in presentation
+ * time, the wall clock times the speed, and not at all while paused. Both
+ * waits are the page's: the engine's clock, its events and the log know
+ * nothing of them, so a run and its replay wait alike and verify as before.
+ * The run's last action is waited for too: the log is submitted, and the
+ * result shown, once that wait is over.
  */
 @Injectable()
 export class Play {
@@ -34,6 +45,10 @@ export class Play {
   private live: AdventureRun | null = null;
   private savedAt = 0;
   private savedEntries = 0;
+  /** What is left of the wait for the clips the last events began, in presentation milliseconds. */
+  private held = 0;
+  /** The run is over and not yet submitted: it waits for its last action to be shown. */
+  private ending = false;
 
   /** Whether an entry holds the clock until the scene says everyone is on. */
   holdEntries = false;
@@ -92,8 +107,16 @@ export class Play {
   /** Moves the run on by `wallMs` of wall-clock time at the chosen speed, and answers the events that happened. */
   tick(wallMs: number): readonly AdventureEvent[] {
     const run = this.run;
-    if (!run || run.complete || this.paused() || this.entering()) return [];
-    const events = run.advanceTo(run.simTime + Math.round(wallMs * this.speed()));
+    if (!run || this.paused() || this.entering() || (run.complete && !this.ending)) return [];
+    const { held, left } = spendHold(this.held, wallMs * this.speed());
+    this.held = held;
+    if (held > 0) return [];
+    if (this.ending) {
+      this.ending = false;
+      void this.finish();
+      return [];
+    }
+    const events = run.advanceTo(run.simTime + Math.round(left));
     if (events.length > 0) {
       this.field.update((field) => events.reduce(applyEvent, must(field, 'the field while events play')));
       this.settleQueue(events);
@@ -102,7 +125,8 @@ export class Play {
     this.simTime.set(run.simTime);
     if (this.live) {
       this.save(false);
-      if (this.live.complete) void this.finish();
+      // Over: the frames that follow wait for what the scene asks for its last action, then submit.
+      if (this.live.complete) this.ending = true;
     }
     return events;
   }
@@ -110,6 +134,14 @@ export class Play {
   /** The scene has brought everyone on: the clock runs again. */
   entered(): void {
     this.entering.set(false);
+  }
+
+  /**
+   * Holds the clock for `ms` of presentation time, while the clips the events just answered play. The longer of this
+   * and a wait still running; nothing at an entry, whose own wait takes its place, the scene clearing the stage as it does.
+   */
+  hold(ms: number): void {
+    if (!this.entering()) this.held = Math.max(this.held, ms);
   }
 
   togglePause(): void {
@@ -144,6 +176,8 @@ export class Play {
     this.run = run;
     this.replaying.set(replaying);
     this.queued.set(new Map());
+    this.held = 0;
+    this.ending = false;
     this.field.set(run.events.reduce(applyEvent, start));
     this.simTime.set(run.simTime);
     this.entering.set(this.holdEntries && run.events.some(isEntry) && !this.resumed());

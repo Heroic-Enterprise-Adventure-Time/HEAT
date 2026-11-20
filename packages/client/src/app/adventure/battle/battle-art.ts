@@ -58,7 +58,7 @@ async function propArt(path: SetPath<'prop'>): Promise<UnitArt> {
 /** A weapon's swing, drawn beside its wielder while it acts (rules 32 and 33). */
 export interface WeaponArt {
   readonly swing: readonly Texture[];
-  /** The swing's frame held until the action resolves, in step with the act's own. */
+  /** The swing's hold frame, in step with the act's own: the blow, or for a bow the string at rest after the release, which is when its arrow leaves. */
   readonly holdFrame: number;
   /** Each frame's grip, the pixel in the wielder's hand, from the provenance: PixelLab draws the swing turning about the canvas, not the hand. */
   readonly grips: readonly { readonly x: number; readonly y: number }[];
