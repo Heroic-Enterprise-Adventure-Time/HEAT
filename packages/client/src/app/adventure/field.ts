@@ -31,8 +31,8 @@ export interface Field {
   readonly party: readonly FieldUnit[];
   /** The other side of the stage under way; empty outside a fight or a gather. */
   readonly opponents: readonly FieldUnit[];
-  /** What the party carries so far. */
-  readonly cargo: readonly { readonly material: string; readonly amount: number }[];
+  /** What has dropped to the party so far, counted up as each enemy falls (decision 0058). */
+  readonly drops: readonly { readonly material: string; readonly amount: number }[];
   readonly order: 'press-on' | 'retreat';
   readonly outcome: 'complete' | 'retreat' | 'defeat' | null;
 }
@@ -55,7 +55,7 @@ export function emptyField(party: readonly { readonly heroId: string; readonly n
       maxHealth: h.stats.maxHealth,
     })),
     opponents: [],
-    cargo: [],
+    drops: [],
     order: 'press-on',
     outcome: null,
   };
@@ -73,6 +73,12 @@ function update(units: readonly FieldUnit[], unitId: string, change: Partial<Fie
 
 function updateBoth(field: Field, unitId: string, change: Partial<FieldUnit>): Field {
   return { ...field, party: update(field.party, unitId, change), opponents: update(field.opponents, unitId, change) };
+}
+
+/** What the party carries with one more drop: added to its resource's line, or a line of its own after the others. */
+function withDrop(drops: Field['drops'], drop: { readonly material: string; readonly amount: number }): Field['drops'] {
+  if (!drops.some((d) => d.material === drop.material)) return [...drops, { material: drop.material, amount: drop.amount }];
+  return drops.map((d) => (d.material === drop.material ? { ...d, amount: d.amount + drop.amount } : d));
 }
 
 /** The field after one event. */
@@ -103,7 +109,7 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
     case 'action-resolved': {
       let next = field;
       for (const effect of event.effects) {
-        if (effect.kind === 'damage' || effect.kind === 'harvest') next = updateBoth(next, effect.targetId, { health: effect.newHealth });
+        if (effect.kind === 'damage') next = updateBoth(next, effect.targetId, { health: effect.newHealth });
         else if (effect.kind === 'move') next = updateBoth(next, effect.unitId, { line: effect.to });
       }
       return next;
@@ -112,6 +118,8 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
       return event.moves.reduce((next, move) => updateBoth(next, move.unitId, { line: move.to }), field);
     case 'unit-down':
       return updateBoth(field, event.unitId, { health: 0 });
+    case 'drop':
+      return { ...field, drops: withDrop(field.drops, event) };
     case 'battle-end':
       return { ...field, timeLimitMs: null };
     case 'stage-end':
@@ -119,7 +127,8 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
         ...field,
         timeLimitMs: null,
         party: event.health.reduce((party, h) => update(party, h.heroId, { health: h.health }), field.party),
-        cargo: event.cargo,
+        // The engine's own count, which the drops so far have already reached.
+        drops: event.drops,
       };
     case 'order':
       return { ...field, order: event.order };

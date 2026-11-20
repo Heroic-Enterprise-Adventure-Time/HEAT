@@ -2,15 +2,14 @@ import { LowerCasePipe } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { upperFirst } from 'es-toolkit';
 
-import { FACILITIES, type FacilityKind, MAX_PARTY, type Stage } from '@heat/engine';
+import { FACILITIES, type FacilityKind, MAX_PARTY } from '@heat/engine';
 
 import { replayLine } from '../../adventure/replay-words';
 import { Game, type StartRefusal } from '../../game';
 import { Refusal, refusalWords } from '../../hub';
 import { CampState } from '../camp-state';
-import { credits, creditWords, jobAt, retreatWords, stageWords } from './job-words';
+import { bonusWords, jobAt, NO_PAY, retreatWords, rewardWords } from './job-words';
 import { ReplayList } from './replay-list';
 
 /**
@@ -32,9 +31,12 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
  * A job's detail under the poster that lists it, the job board,
  * `/camp/<location>/job-board/jobs/<id>`, or a facility the camp has built,
  * such as `/camp/<location>/mine/jobs/<id>`, so the menu keeps the poster
- * marked (Issue-115, refined by Issue-109; Issue-133): its stages in order; what it credits, each beside the camp's
- * balance and the room left under the warehouse's cap ("Resources"); its
- * retreat penalty in words; then the party pick, one to four of the camp's
+ * marked (Issue-115, refined by Issue-109; Issue-133): its description, which is all the page tells of what the job
+ * holds; its pay, each resource beside the camp's balance and the room left
+ * under the warehouse's cap ("Resources"), and its bonus XP; what a retreat
+ * keeps, in words; and never its stages nor what its enemies drop, so the
+ * room is shown for the pay alone (decision 0058; the owner, 2026-11-20,
+ * Issue-339, on the stages); then the party pick, one to four of the camp's
  * living heroes in no order, since a unit type's home line places it; and
  * Depart, which starts it and goes to `/adventure`. A refusal is shown in
  * place, under Depart. Last, the job's replays, anyone's and every outcome,
@@ -70,15 +72,19 @@ export class JobPanel {
     if (!poster || (poster !== 'job-board' && (this.camp.facility(poster)?.level ?? 0) < 1)) return undefined;
     return jobAt(this.game.location(), poster, this.params()?.get('job'));
   });
-  protected readonly reward = computed(() => {
-    const job = this.job();
+  /** What a job with no pay says in its place, from the same words as the board's list. */
+  protected readonly noPay = NO_PAY;
+  /** The job's pay, each resource of it beside what the camp holds and the room the warehouse has left for it. */
+  protected readonly pay = computed(() => {
     const camp = this.game.camp();
-    if (!job) return [];
-    return credits(job).map((credit) => {
-      const balance = camp?.holdings.find((h) => h.material === credit.material)?.balance ?? 0;
-      const words = creditWords(credit);
-      return { material: credit.material, words: upperFirst(words), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
+    return (this.job()?.pay ?? []).map((reward) => {
+      const balance = camp?.holdings.find((h) => h.material === reward.material)?.balance ?? 0;
+      return { material: reward.material, words: rewardWords(reward), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
     });
+  });
+  protected readonly bonus = computed(() => {
+    const job = this.job();
+    return job ? bonusWords(job) : '';
   });
   private readonly replays = resource({ params: () => this.job()?.id, loader: ({ params }) => this.game.replaysOf(params) });
   protected readonly replayLines = computed(() =>
@@ -100,10 +106,6 @@ export class JobPanel {
   /** Whether the party is setting out, while the hub answers. */
   protected readonly pending = signal(false);
   protected readonly refusal = signal<string | null>(null);
-
-  protected words(stage: Stage): string {
-    return stageWords(stage);
-  }
 
   protected toggle(id: string): void {
     const next = new Set(this.picked());

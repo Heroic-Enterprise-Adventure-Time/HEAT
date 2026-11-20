@@ -22,7 +22,7 @@ const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCach
  */
 const wireHero = (hero: HeroView) => ({ __typename: 'Hero', ...hero, unitType: constantCase(hero.unitType) });
 const wireSeen = (hero: SeenHeroView) => ({ __typename: 'SeenHero', ...hero, unitType: constantCase(hero.unitType) });
-const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number; rating?: number }[]) =>
+const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number }[]) =>
   amounts.map((a) => ({ __typename: typename, ...a, material: constantCase(a.material) }));
 const wireAdventure = (a: AdventureView) => ({
   __typename: 'Adventure',
@@ -31,7 +31,7 @@ const wireAdventure = (a: AdventureView) => ({
   snapshot: {
     __typename: 'Snapshot',
     ...a.snapshot,
-    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, gather: wireAmounts('GatherRating', h.stats.gather) } })),
+    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, traits: h.stats.traits.map((t) => ({ __typename: 'TraitLevel', ...t, trait: constantCase(t.trait) })) } })),
   },
 });
 const wirePlayer = (p: PlayerView) => ({

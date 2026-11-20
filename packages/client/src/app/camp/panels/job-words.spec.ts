@@ -1,6 +1,6 @@
 import { JOBS } from '@heat/engine';
 
-import { credits, creditWords, jobAt, jobsAt, retreatWords, stageWords, yieldWords } from './job-words';
+import { boardWords, bonusWords, jobAt, jobsAt, payWords, retreatWords, rewardWords } from './job-words';
 
 const sticks = JOBS['pick-up-sticks'];
 const wolves = JOBS['wolves-on-the-mill-road'];
@@ -18,40 +18,27 @@ describe('job words', () => {
     expect(jobAt('millbrook', 'job-board', 'nothing')).toBeUndefined();
   });
 
-  it('says each stage in order, without its time limit', () => {
-    expect(wolves.stages.map(stageWords)).toEqual(['Travel', 'Fight 2 wolves', 'Arrive']);
-    expect(timber.stages.map(stageWords)).toEqual(['Travel', 'Gather timber from 2 trees', 'Fight a wolf', 'Arrive']);
-    expect(ore.stages.map(stageWords)).toEqual(['Travel', 'Gather ore from 2 ore veins', 'Fight a wolf', 'Arrive']);
-    // The first mixed stage (Issue-286): its nodes and its monsters in one line.
-    expect(JOBS['goblins-in-the-old-workings'].stages.map(stageWords)).toEqual(['Travel', 'Gather ore from 3 ore veins, and fight 2 goblin rock throwers', 'Arrive']);
+  it("says a job's pay, each resource of it, or that it pays nothing", () => {
+    expect(rewardWords({ amount: 3, material: 'cloth' })).toBe('3 cloth');
+    expect(payWords(wolves)).toBe('10 cloth');
+    expect(payWords({ ...wolves, pay: [{ material: 'cloth', amount: 10 }, { material: 'ore', amount: 5 }] })).toBe('10 cloth and 5 ore');
+    expect(payWords(sticks)).toBe('No pay');
   });
 
-  it('says a stage of nodes and monsters together as both, whichever kind it is', () => {
-    const opponents = [{ type: 'tree', count: 2 }, { type: 'ore-vein', count: 1 }, { type: 'wolf', count: 1 }] as const;
-    for (const kind of ['gather', 'fight'] as const) {
-      expect(stageWords({ kind, opponents, timeLimitMs: 60_000 })).toBe('Gather timber and ore from 2 trees and an ore vein, and fight a wolf');
-    }
+  it('says a job on the board by its pay and its bonus XP, and never by what it drops (decision 0058)', () => {
+    expect(boardWords(sticks)).toBe('No pay, 2 bonus XP');
+    expect(boardWords(timber)).toBe('3 cloth, 4 bonus XP');
+    expect(boardWords(wolves)).toBe('10 cloth, 10 bonus XP');
+    expect(boardWords(ore)).toBe('No pay, 4 bonus XP');
+    for (const job of Object.values(JOBS)) expect(boardWords(job)).not.toMatch(/timber|ore\b|up to/);
   });
 
-  it("says what a job credits, its pay and the most its nodes give, by material", () => {
-    expect(credits(wolves)).toEqual([{ material: 'cloth', pay: 10, cargo: 0 }]);
-    expect(credits(timber)).toEqual([
-      { material: 'cloth', pay: 3, cargo: 0 },
-      { material: 'timber', pay: 0, cargo: 90 },
-    ]);
-    expect(credits(timber).map(creditWords)).toEqual(['3 cloth', 'up to 90 timber']);
-    expect(creditWords({ material: 'timber', pay: 5, cargo: 60 })).toBe('5 and up to 60 timber');
-    expect(yieldWords(wolves)).toBe('10 cloth');
-    expect(yieldWords(sticks)).toBe('up to 45 timber');
-    expect(yieldWords(timber)).toBe('3 cloth and up to 90 timber');
-    expect(yieldWords({ ...wolves, pay: [] })).toBe('nothing to bring home');
+  it("says a job's bonus as what arriving pays each hero", () => {
+    expect(bonusWords(timber)).toBe('Bonus: 4 XP to each hero who arrives.');
   });
 
-  it("says a job's retreat penalty in words, naming the cargo only where there is some", () => {
-    expect(retreatWords(wolves)).toBe('A retreat forfeits the pay and earns half the XP.');
-    expect(retreatWords(timber)).toBe('A retreat forfeits the pay, keeps the timber gathered, and earns half the XP.');
-    expect(retreatWords({ ...timber, retreat: { keepsPay: true, keepsCargo: false, xpPercent: 0 } })).toBe(
-      'A retreat keeps the pay, abandons the timber gathered, and earns no XP.',
-    );
+  it('says the one retreat rule, naming the pay only where the job has some', () => {
+    expect(retreatWords(wolves)).toBe('A retreat keeps what dropped and the XP earned, and loses the pay and the bonus.');
+    expect(retreatWords(sticks)).toBe('A retreat keeps what dropped and the XP earned, and loses the bonus.');
   });
 });

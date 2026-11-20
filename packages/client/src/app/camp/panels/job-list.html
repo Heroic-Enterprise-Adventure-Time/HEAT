@@ -3,7 +3,7 @@
     @for (job of jobs(); track job.id) {
       <li>
         <a class="link" [routerLink]="['jobs', job.id]">{{ job.name }}</a>
-        <span>{{ brings(job) }}</span>
+        <span>{{ pays(job) }}</span>
       </li>
     }
   </ul>

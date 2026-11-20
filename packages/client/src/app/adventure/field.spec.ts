@@ -1,4 +1,4 @@
-import { emptyField, type Field, secondsLeft, waitingWords } from './field';
+import { applyEvent, emptyField, type Field, secondsLeft, waitingWords } from './field';
 
 const field = (timeLimitMs: number | null, stageStart = 4000): Field => ({
   ...emptyField([]),
@@ -41,5 +41,26 @@ describe('waitingWords', () => {
   it('says the adventure is over once it has an outcome, whatever the stage', () => {
     expect(waitingWords({ ...field(60_000), outcome: 'defeat' })).toBe('The adventure is over.');
     expect(waitingWords({ ...field(null), stageKind: 'travel', outcome: 'retreat' })).toBe('The adventure is over.');
+  });
+});
+
+describe('what the party carries', () => {
+  const drop = (material: 'timber' | 'ore', amount: number) => ({ kind: 'drop', timestamp: 5000, unitId: 's1-tree-1', material, amount }) as const;
+
+  it('counts a drop the moment it falls, each resource on its own line, in the order they first dropped (decision 0058)', () => {
+    const one = applyEvent(field(60_000), drop('timber', 34));
+    expect(one.drops).toEqual([{ material: 'timber', amount: 34 }]);
+    const more = [drop('ore', 22), drop('timber', 31)].reduce(applyEvent, one);
+    expect(more.drops).toEqual([{ material: 'timber', amount: 65 }, { material: 'ore', amount: 22 }]);
+  });
+
+  it("takes the engine's own count at a stage's end", () => {
+    const carried = applyEvent(field(60_000), drop('timber', 34));
+    const ended = applyEvent(carried, { kind: 'stage-end', timestamp: 9000, stage: 1, ended: 'win', health: [], drops: [{ material: 'timber', amount: 34 }] });
+    expect(ended.drops).toEqual([{ material: 'timber', amount: 34 }]);
+  });
+
+  it('carries nothing before anything has dropped', () => {
+    expect(emptyField([]).drops).toEqual([]);
   });
 });

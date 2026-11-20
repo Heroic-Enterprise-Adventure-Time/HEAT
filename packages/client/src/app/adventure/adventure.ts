@@ -1,9 +1,9 @@
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { ABILITIES, type AbilityId, isPlayableTimeline, type JobId, JOBS, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
+import { ABILITIES, type AbilityId, isPlayableTimeline, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
-import { stageWords } from '../camp/panels/job-words';
+import { rewardWords } from '../camp/panels/job-words';
 import { Game } from '../game';
 import { BattleView } from './battle-view';
 import { jobCast, timelineCast } from './cast';
@@ -49,22 +49,19 @@ export class Adventure {
     const at = (this.game.settled()?.adventure ?? this.game.adventure())?.location ?? '';
     return location(at)?.name ?? at;
   });
-  /** The stage under way in words, "Stage 2 of 3: Fight 2 wolves". */
-  protected readonly stageName = computed(() => {
-    const field = this.play.field();
-    const jobId = this.game.adventure()?.snapshot.jobId;
-    const job = jobId && Object.hasOwn(JOBS, jobId) ? JOBS[jobId as JobId] : undefined;
-    const stage = field && job?.stages[field.stage];
-    return field && job && stage ? `Stage ${field.stage + 1} of ${job.stages.length}: ${stageWords(stage)}` : null;
-  });
   protected readonly countdown = computed(() => {
     const field = this.play.field();
     return field ? secondsLeft(field, this.play.simTime()) : null;
   });
-  /** What the party carries in words, "5 timber, 3 ore", or null when it carries nothing. */
-  protected readonly cargo = computed(() => {
-    const cargo = this.play.field()?.cargo ?? [];
-    return cargo.length > 0 ? cargo.map((load) => `${load.amount} ${load.material}`).join(', ') : null;
+  /**
+   * What has dropped to the party in words, "34 timber, 22 ore", or null when
+   * nothing has: it counts up the moment an enemy falls, which is how the page
+   * shows a drop (the owner, 2026-11-20, Issue-339; the scene's own picture of
+   * one is Issue-344).
+   */
+  protected readonly carrying = computed(() => {
+    const drops = this.play.field()?.drops ?? [];
+    return drops.length > 0 ? drops.map(rewardWords).join(', ') : null;
   });
   /** Whether a hero can be told what to do: in a fight or a gather, before the end. */
   protected readonly inBattle = computed(() => {

@@ -65,9 +65,6 @@
     }
   } @else if (game.adventure(); as adventure) {
     <h2 id="panel-title">{{ adventure.job.name }}</h2>
-    @if (stageName(); as stage) {
-      <p class="stage-name">{{ stage }}</p>
-    }
     @if (countdown(); as seconds) {
       <p class="countdown" role="timer">Turning back in {{ seconds }}</p>
     }
@@ -128,8 +125,8 @@
         </button>
       </div>
 
-      @if (cargo(); as cargo) {
-        <p class="cargo">Carrying {{ cargo }}</p>
+      @if (carrying(); as carrying) {
+        <p class="carrying" role="status">Carrying {{ carrying }}</p>
       }
     }
 
