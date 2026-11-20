@@ -1,6 +1,6 @@
 import type { AdventureEvent } from '@heat/engine';
 
-import type { FrameLoop } from '../adventure/battle-view';
+import { type FrameLoop, MAX_FRAME_MS } from '../adventure/battle-view';
 import type { BattleSceneCallbacks } from '../adventure/battle/battle-scene';
 import type { CastMember } from '../adventure/cast';
 import { type Field, isEntry } from '../adventure/field';
@@ -57,9 +57,6 @@ export function fakeBattleScene(holding = false, awaitingArt = false) {
   return scene;
 }
 
-/** The longest frame the fake loop runs, the page's own limit (`MAX_FRAME_MS` in `battle-view.ts`). */
-const FRAME_MS = 250;
-
 /** Whether a frame's events land a blow, a hit, a harvest or a guard: what the scene begins a hit or an effect for, and asks the clock to wait for. */
 export const landsBlow = (events: readonly AdventureEvent[]) =>
   events.some((event) => event.kind === 'action-resolved' && event.effects.some((effect) => effect.kind !== 'move'));
@@ -72,13 +69,13 @@ export const landsBlow = (events: readonly AdventureEvent[]) =>
 export async function runToBlow(run: (ms: number) => Promise<void>, scene: { readonly fed: readonly AdventureEvent[] }): Promise<number> {
   const from = scene.fed.length;
   for (let frame = 0; frame < 100; frame++) {
-    await run(FRAME_MS);
+    await run(MAX_FRAME_MS);
     if (landsBlow(scene.fed.slice(from))) return scene.fed.length;
   }
   throw new Error('no blow landed in 100 frames');
 }
 
-/** A frame loop the test drives by hand: `advance` runs `ms` of wall-clock time in frames of at most 250 ms, as the browser would. */
+/** A frame loop the test drives by hand: `advance` runs `ms` of wall-clock time in frames of at most the page's own limit, as the browser would. */
 export function fakeFrameLoop() {
   let onFrame: (ms: number) => void = () => undefined;
   const loop: FrameLoop = (given) => {
@@ -88,7 +85,7 @@ export function fakeFrameLoop() {
   return {
     loop,
     advance: (ms: number) => {
-      for (let left = ms; left > 0; left -= FRAME_MS) onFrame(Math.min(FRAME_MS, left));
+      for (let left = ms; left > 0; left -= MAX_FRAME_MS) onFrame(Math.min(MAX_FRAME_MS, left));
     },
   };
 }

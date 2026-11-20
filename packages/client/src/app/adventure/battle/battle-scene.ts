@@ -2,6 +2,7 @@ import { clamp, range, uniq } from 'es-toolkit';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
 
 import {
+  ABILITIES,
   ABILITY_EFFECTS,
   type AbilityId,
   type AdventureEvent,
@@ -42,7 +43,7 @@ import { clipHold } from './clip-hold';
  * the start and walks in place while the road scrolls by on a travel; at a
  * fight or a gather the other side rushes on from the right as the road
  * scrolls with it, and only then does the clock run (the owner's call on
- * Issue-15). What is left of a stage scrolls away on the next travel. A
+ * Issue-15). What is left of a stage scrolls away on the next travel.
  * Everything it animates plays on the presentation clock, the wall clock
  * times the speed, and nothing a unit is doing stops when the adventure's
  * clock does: the scene says how long that clock should wait for what an
@@ -73,9 +74,9 @@ export interface BattleSceneHandle {
   reset(field: Field, heroSets: ReadonlyMap<string, string>, enter: boolean): void;
   /**
    * Animates the events just happened; a fight or a gather beginning brings
-   * the other side on. Answers how long the clock should wait for the clips
-   * they began, a hit, an effect and a fall, in presentation time: nothing
-   * where they began none.
+   * the other side on. Answers how long the clock should wait for what
+   * they began, an action's swing, a projectile's flight, a hit, an effect
+   * and a fall, in presentation time: nothing where they began none.
    */
   feed(events: readonly AdventureEvent[], field: Field): number;
   /** Moves on by `ms` of presentation time, the wall clock times the speed. */
@@ -515,6 +516,18 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     for (const unitView of units.values()) if (!present.has(unitView.unit.unitId)) unitView.behind = true;
   };
 
+  /**
+   * Keeps a unit's bar where it was until the blow, or the projectile, now
+   * on its way has landed. Where one is already awaited, the bar keeps the
+   * health it showed and waits for the later of the two; a blow that lands
+   * at once takes its own damage off what the bar is showing.
+   */
+  const holdBar = (target: UnitView, before: number, delay: number, amount: number) => {
+    const held = target.barHeld && target.clock < target.barHeld.until ? target.barHeld : null;
+    if (delay > 0) target.barHeld = { health: held?.health ?? before, until: Math.max(held?.until ?? 0, target.clock + delay) };
+    else if (held) target.barHeld = { health: Math.max(0, held.health - amount), until: held.until };
+  };
+
   const drawBar = (unitView: UnitView) => {
     const { unit } = unitView;
     if (unitView.barHeld && unitView.clock >= unitView.barHeld.until) unitView.barHeld = null;
@@ -705,7 +718,9 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
             // A projectile flies at whoever took the hit, as long as decision 0052 timed it: what the warmup left after the wind-up.
             const struck = event.effects.find((effect) => effect.kind === 'damage' || effect.kind === 'harvest');
             const target = units.get(struck?.targetId ?? event.targetIds[0] ?? '');
-            const flight = flightMs(actor.warmup ?? 0, strike);
+            // Declared before the scene was reset, as on a resume, its warmup was not seen: the ability's own stands in.
+            const warmup = actor.warmup ?? (Object.hasOwn(ABILITIES, event.abilityId) ? ABILITIES[event.abilityId as AbilityId].warmupMs : 0);
+            const flight = flightMs(warmup, strike);
             if (set && target && target !== actor && flight > 0 && addProjectile(set, actor, target, actor.act, flight)) delay += flight;
           } else removeProjectile(event.unitId);
           if (actor) actor.warmup = null;
@@ -714,8 +729,9 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
             if (effect.kind === 'damage' || effect.kind === 'harvest') {
               const target = units.get(effect.targetId);
               if (target) {
-                landing.set(effect.targetId, delay);
-                if (delay > 0) target.barHeld = { health: healthBefore.get(effect.targetId) ?? target.unit.health, until: target.clock + delay };
+                // Two blows on one unit in a frame: it falls as the later of them lands.
+                landing.set(effect.targetId, Math.max(landing.get(effect.targetId) ?? 0, delay));
+                holdBar(target, healthBefore.get(effect.targetId) ?? target.unit.health, delay, effect.amount);
                 if (effect.newHealth > 0) {
                   target.hitAt = target.clock + delay;
                   if (target.art) clips.push(delay + target.art.hit.textures.length * HIT_MS);

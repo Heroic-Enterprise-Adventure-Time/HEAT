@@ -12,8 +12,8 @@ import { Play } from './play';
 /** Calls `onFrame` with the wall-clock milliseconds since the last frame until stopped; a test provides one it drives by hand. */
 export type FrameLoop = (onFrame: (elapsedMs: number) => void) => () => void;
 
-/** The longest step one frame may take, so a tab coming back from the background does not leap ahead. */
-const MAX_FRAME_MS = 250;
+/** The longest step one frame may take, so a tab coming back from the background does not leap ahead. Exported for the specs' frame loop, which gives the page the frames the browser would (typescript.md, rule 24). */
+export const MAX_FRAME_MS = 250;
 
 export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.adventure.frames', {
   providedIn: 'root',
