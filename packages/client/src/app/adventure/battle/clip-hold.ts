@@ -1,8 +1,8 @@
 /**
  * The arithmetic of the play clock's hold for a battle's clips (game.md,
  * "The battle"; Issue-335), apart from the renderer so that it is tested
- * without one. The rest of a swing after its blow, a projectile's flight,
- * the hit, the ability's effect and a fall each play on the presentation
+ * without one. An action's swing, a projectile's flight, the hit, the
+ * ability's effect and a fall each play on the presentation
  * clock, the wall clock times the speed, and the adventure's clock waits
  * for a share of the longest that one frame's events start, the whole of it
  * by the scene's `HOLD_SHARE`, so that one action is animated to its end

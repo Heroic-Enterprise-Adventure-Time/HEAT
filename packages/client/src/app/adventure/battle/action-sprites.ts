@@ -6,7 +6,7 @@
  * effect shows a while after it began, and where, and where a projectile is
  * between the hand that let it go and whatever it lands on.
  */
-import { maxBy, range, sum } from 'es-toolkit';
+import { range, sum } from 'es-toolkit';
 import * as z from 'zod/mini';
 
 /** PixelLab's game pack manifest, as much of it as the battle reads: the whole effect, without the sprite, or its projectile and its impact where a clip has a role; checked where it is fetched (angular.md, rule 4). */
@@ -111,17 +111,17 @@ export function effectMs(layout: EffectLayout): number {
 }
 
 /**
- * The frame of an act, or of the weapon swung with it, `ms` after its
- * action was declared: the frames before `ready`, then `ready`, where it
- * waits for the action to resolve. The actor and its weapon each keep their
- * own ready frame, so both get there and wait together. `lead` gives a
+ * The frame of an act, or of the weapon swung with it, `ms` after it began
+ * to play, which is as its action resolved: the frames before `hold`, then
+ * `hold`, the blow or the release, where it waits until the act and the
+ * weapon are both at theirs, so that they strike together. `lead` gives a
  * frame its own length, for a weapon whose motion is not even, such as a
  * bow's quick release (rule 33); a frame it does not name lasts `frameMs`.
- * Null for a ready frame the clip does not have.
+ * Null for a hold frame the clip does not have.
  */
-export function leadFrame(ms: number, ready: number, count: number, frameMs: number, lead: readonly number[] = []): number | null {
+export function leadFrame(ms: number, hold: number, count: number, frameMs: number, lead: readonly number[] = []): number | null {
   let index = 0;
-  for (let left = ms; index < ready; index++) {
+  for (let left = ms; index < hold; index++) {
     left -= lead[index] ?? frameMs;
     if (left < 0) break;
   }
@@ -129,44 +129,25 @@ export function leadFrame(ms: number, ready: number, count: number, frameMs: num
 }
 
 /**
- * The frame of an act, or of the weapon swung with it, `ms` after its
- * action resolved: the frames after `ready`, each for its own length; past
- * the last, null. The scene gives both this and `leadFrame` presentation
- * time, so that nothing a unit is doing stops while the adventure's clock
- * waits for an action to be animated (Issue-335, decision 0057).
+ * The frame of an act, or of the weapon swung with it, `ms` after the blow
+ * or the release: the frames after `hold`, one every `frameMs`; past the
+ * last, null. The scene gives this and `leadFrame` presentation time, so
+ * that an action is animated from its first frame to its last while the
+ * adventure's clock waits for it (Issue-335, decision 0057).
  */
-export function followFrame(ms: number, ready: number, count: number, frameMs: number, lead: readonly number[] = []): number | null {
-  let left = ms;
-  for (let index = ready + 1; index < count; index++) {
-    left -= lead[index] ?? frameMs;
-    if (left < 0) return index;
-  }
-  return null;
+export function followFrame(ms: number, hold: number, count: number, frameMs: number): number | null {
+  const index = hold + 1 + Math.floor(ms / frameMs);
+  return index < count ? index : null;
 }
 
-/** The lengths of the frames from `from` up to, not including, `to`; nothing where there are none. */
-function framesMs(from: number, to: number, frameMs: number, lead: readonly number[]): number {
-  return sum(range(Math.min(from, to), to).map((i) => lead[i] ?? frameMs));
+/** How long the frames after `hold` last: what is left of an act, or of its weapon's swing, after the blow or the release. */
+export function followMs(hold: number, count: number, frameMs: number): number {
+  return Math.max(0, count - hold - 1) * frameMs;
 }
 
-/** How long the frames after `ready` last: what is left of an act, or of its weapon's swing, once its action has resolved. */
-export function followMs(ready: number, count: number, frameMs: number, lead: readonly number[] = []): number {
-  return framesMs(ready + 1, count, frameMs, lead);
-}
-
-/** How long the frames before `hold` last, played from the first. */
+/** How long the frames before `hold` last: how long after an act begins its blow lands, or its projectile leaves the hand or the string. */
 export function releaseMs(hold: number, frameMs: number, lead: readonly number[] = []): number {
-  return framesMs(0, hold, frameMs, lead);
-}
-
-/**
- * How long after its action resolves a weapon that waited on `ready`
- * reaches its hold frame, which is when a projectile leaves it: the frames
- * between the two, a bow's release. Nothing for one that waits on its hold
- * frame, as a hand about to throw does.
- */
-export function releaseAfter(ready: number, hold: number, frameMs: number, lead: readonly number[] = []): number {
-  return framesMs(ready + 1, hold, frameMs, lead);
+  return sum(range(hold).map((i) => lead[i] ?? frameMs));
 }
 
 interface Point {
@@ -175,19 +156,9 @@ interface Point {
 }
 
 /**
- * The frame a bow waits on while its action warms up: the one before its
- * hold where the string is furthest back from the grip, the full draw, read
- * from the nocks its provenance records (rule 33). The first of them where
- * two are as far.
- */
-export function drawnFrame(grips: readonly Point[], nocks: readonly Point[], hold: number): number {
-  const pull = (i: number) => Math.abs((nocks[i]?.x ?? 0) - (grips[i]?.x ?? 0));
-  return maxBy(range(hold), pull) ?? 0;
-}
-
-/**
- * How long a projectile flies: what was left of its action's warmup after
- * the wind-up, the length decision 0052 gave it, now played after the
+ * How long a projectile flies: what is left of its action's warmup after
+ * the wind-up, so that a shot's wind-up and flight together last as long as
+ * the engine warms it up, as decision 0052 timed it, now played as the
  * action resolves (decision 0057). Nothing for an action that warms up for
  * less than its wind-up takes.
  */
@@ -232,7 +203,7 @@ export function heldPoint(from: Thrower, index: number | null): { x: number; y: 
 }
 
 /**
- * Where an arrow's sprite goes before it is let go (rule 35): its tail on
+ * Where an arrow's sprite goes while the bow is drawn (rule 35): its tail on
  * the nock of the bow's frame `index`, its first frame showing; null for a
  * unit with no bow, which shows nothing in its hand. The point is the
  * sprite's tail at its mid height, whole pixels, for a sprite mirrored when

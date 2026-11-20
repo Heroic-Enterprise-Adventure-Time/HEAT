@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import { must } from '@heat/engine';
 
 import {
-  drawnFrame,
   effectFrameAt,
   effectLayout,
   type EffectManifest,
@@ -17,7 +16,6 @@ import {
   leadFrame,
   nockedAt,
   projectileLayout,
-  releaseAfter,
   releaseMs,
   type Thrower,
 } from './action-sprites';
@@ -82,47 +80,46 @@ describe('effectFrameAt', () => {
   });
 });
 
-describe('an act up to its ready frame', () => {
-  it('plays the frames before it from the declaration, then waits on it for as long as the action takes to resolve', () => {
+describe('an act up to its blow', () => {
+  it('plays the frames before its hold frame from the moment it begins, then waits on it', () => {
     expect(leadFrame(0, 2, 5, 90)).toBe(0);
     expect(leadFrame(90, 2, 5, 90)).toBe(1);
     expect(leadFrame(180, 2, 5, 90)).toBe(2);
     expect(leadFrame(299, 2, 5, 90)).toBe(2);
-    expect(leadFrame(60_000, 2, 5, 90)).toBe(2);
   });
 
-  it('keeps an actor and its weapon on their own ready frames through the same act', () => {
-    // A three-frame act that waits on 1 and a five-frame swing that waits on 2 are both at their blow while the action warms up.
-    expect(leadFrame(250, 1, 3, 90)).toBe(1);
-    expect(leadFrame(250, 2, 5, 90)).toBe(2);
+  it('keeps an actor and its weapon on their own hold frames until both are there', () => {
+    // A three-frame act held on 1 reaches its blow at 90 ms and a five-frame swing held on 2 at 180 ms: the act waits for the swing.
+    expect(releaseMs(1, 90)).toBe(90);
+    expect(releaseMs(2, 90)).toBe(180);
+    expect(leadFrame(100, 1, 3, 90)).toBe(1);
+    expect(leadFrame(100, 2, 5, 90)).toBe(1);
+    expect(leadFrame(180, 1, 3, 90)).toBe(1);
+    expect(leadFrame(180, 2, 5, 90)).toBe(2);
   });
 
-  it('shows nothing for a ready frame the clip does not have', () => {
+  it('shows nothing for a hold frame the clip does not have', () => {
     expect(leadFrame(500, 3, 3, 90)).toBeNull();
   });
 });
 
-describe('an act after its action resolves', () => {
-  it('plays the frames after its ready frame from that moment, one a frame length, and is then over', () => {
+describe('an act after its blow', () => {
+  it('plays the frames after its hold frame from that moment, one a frame length, and is then over', () => {
     expect(followFrame(0, 2, 5, 90)).toBe(3);
     expect(followFrame(89, 2, 5, 90)).toBe(3);
     expect(followFrame(90, 2, 5, 90)).toBe(4);
     expect(followFrame(180, 2, 5, 90)).toBeNull();
   });
 
-  it('lasts as long as those frames, which is what the clock waits for', () => {
+  it('lasts as long as those frames, which the clock waits for with the frames before the blow', () => {
     expect(followMs(2, 5, 90)).toBe(180);
     expect(followFrame(followMs(2, 5, 90) - 1, 2, 5, 90)).toBe(4);
     expect(followFrame(followMs(2, 5, 90), 2, 5, 90)).toBeNull();
   });
 
-  it('is nothing for an act that ends on its ready frame', () => {
+  it('is nothing for an act that ends on its hold frame', () => {
     expect(followMs(4, 5, 90)).toBe(0);
     expect(followFrame(0, 4, 5, 90)).toBeNull();
-  });
-
-  it('skips the wait of an action that resolves as it is declared: the frame after the ready one shows at once', () => {
-    expect(followFrame(0, 1, 3, 90)).toBe(2);
   });
 });
 
@@ -184,39 +181,18 @@ describe('an effect with a projectile', () => {
 describe('a bow, whose frames differ in length', () => {
   // The bow as its provenance records it: four frames of draw, two quick ones of release, and the hold on the seventh, at rest.
   const lead = [90, 90, 90, 90, 45, 45];
-  const grips = [{ x: 23, y: 14 }, { x: 22, y: 14 }, { x: 22, y: 14 }, { x: 23, y: 14 }, { x: 24, y: 14 }, { x: 23, y: 14 }, { x: 23, y: 14 }];
-  const nocks = [{ x: 13, y: 14 }, { x: 9, y: 14 }, { x: 7, y: 14 }, { x: 5, y: 14 }, { x: 7, y: 14 }, { x: 10, y: 15 }, { x: 13, y: 14 }];
 
-  it('waits at its full draw, the frame before the hold where the string is furthest back', () => {
-    expect(drawnFrame(grips, nocks, 6)).toBe(3);
-    // A weapon with nothing before its hold waits on its first frame.
-    expect(drawnFrame(grips, nocks, 0)).toBe(0);
+  it('plays each frame before the hold for its own length, and comes to rest on it', () => {
+    expect(leadFrame(359, 6, 7, 90, lead)).toBe(3);
+    expect(leadFrame(360, 6, 7, 90, lead)).toBe(4);
+    expect(leadFrame(405, 6, 7, 90, lead)).toBe(5);
+    expect(leadFrame(450, 6, 7, 90, lead)).toBe(6);
+    expect(leadFrame(699, 6, 7, 90, lead)).toBe(6);
+    // Nothing after the hold frame: the bow is put away as its wielder's act ends.
+    expect(followFrame(0, 6, 7, 90)).toBeNull();
   });
 
-  it("draws to it at the act's pace and waits there while the action warms up", () => {
-    expect(leadFrame(269, 3, 7, 90, lead)).toBe(2);
-    expect(leadFrame(270, 3, 7, 90, lead)).toBe(3);
-    expect(leadFrame(700, 3, 7, 90, lead)).toBe(3);
-  });
-
-  it('looses when the action resolves, each frame of the release for its own length, and comes to rest', () => {
-    expect(followFrame(0, 3, 7, 90, lead)).toBe(4);
-    expect(followFrame(44, 3, 7, 90, lead)).toBe(4);
-    expect(followFrame(45, 3, 7, 90, lead)).toBe(5);
-    expect(followFrame(90, 3, 7, 90, lead)).toBe(6);
-    expect(followFrame(179, 3, 7, 90, lead)).toBe(6);
-    expect(followFrame(180, 3, 7, 90, lead)).toBeNull();
-    expect(followMs(3, 7, 90, lead)).toBe(180);
-  });
-
-  it('lets the arrow go as it reaches its hold frame, the release after the resolve', () => {
-    expect(releaseAfter(3, 6, 90, lead)).toBe(90);
-    expect(followFrame(releaseAfter(3, 6, 90, lead), 3, 7, 90, lead)).toBe(6);
-    // A hand about to throw waits on its hold frame, and lets go as the action resolves.
-    expect(releaseAfter(3, 3, 90)).toBe(0);
-  });
-
-  it('takes as long to wind up as the frames before its hold', () => {
+  it('lets the arrow go as it reaches its hold frame, after the frames before it', () => {
     expect(releaseMs(6, 90, lead)).toBe(450);
     expect(releaseMs(3, 90)).toBe(270);
     expect(releaseMs(0, 90)).toBe(0);

@@ -1,6 +1,6 @@
 # 0052: Ranged units: an attack that reaches every line, a shot that hits a node last, and a projectile let go at the hold frame
 
-- **Status:** Decided; the numbers are working assumptions in the engine's static content. When a projectile is let go and lands, "let go at the hold frame and lands as the action resolves", is superseded by 0057 (Issue-335): its release and flight play as the action resolves, for the same length.
+- **Status:** Decided; the numbers are working assumptions in the engine's static content. When a projectile is let go and lands, "let go at the hold frame and lands as the action resolves", and whom it flies at, "whoever the action was declared at", are superseded by 0057 (Issue-335): the wind-up and the flight play as the action resolves, for the same lengths, at whoever took the hit.
 - **Date:** 2026-11-11
 - **Settles:** Issue-286: what a ranged unit is, on each side; whether a ranged attack ever hits a resource node; where a ranger is recruited and for what; the first job with a mixed stage; and when a projectile leaves and lands, which the asset rules said two ways. The picture was the owner's in the step 3 design session (Issue-282); the numbers and the timing were agreed at the start of the Issue-286 session.
 
