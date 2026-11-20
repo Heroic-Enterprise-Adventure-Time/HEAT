@@ -183,11 +183,28 @@
           "caravan-hub"
         ]
       }
+    },
+    "hide": {
+      "file": "hide.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "thirdPack",
+      "candidate": 0,
+      "pixellab": {
+        "objectId": "d3f09edd-4cdb-4d9f-8765-3aeeadaef5e2",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "hide"
+        ]
+      }
     }
   },
   "rejectedTags": "The 59 candidates not kept stay in the review object 251e2a4f-72ff-46d8-bef1-42d423985479, tagged heat, ui-icon and rejected.",
-  "chosenBy": "The owner, 2026-10-20, from a numbered sheet of the 64 candidates at 3×, taking the agent's recommendation for each slot (Issue-89). The second pack's three (mine 2, lumber camp 6, caravan hub 10) are the agent's picks, 2026-10-20, for the owner to review on PR-92.",
-  "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20.",
+  "chosenBy": "The owner, 2026-10-20, from a numbered sheet of the 64 candidates at 3×, taking the agent's recommendation for each slot (Issue-89). The second pack's three (mine 2, lumber camp 6, caravan hub 10) are the agent's picks, 2026-10-20, for the owner to review on PR-92. The third pack's one (hide 0) is the owner's pick, 2026-11-20, from a numbered sheet of the 64 candidates at 3×, taking the agent's recommendation (Issue-340).",
+  "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20. hide.png is byte-identical to its download from /mcp/objects/<id>/download, to its rotation's file and to its candidate frame in the review object, 2026-11-20.",
   "secondPack": {
     "tool": "create_1_direction_object",
     "via": "MCP",
@@ -231,5 +248,47 @@
     "candidates": 64,
     "generations": 10,
     "note": "Ideas for later facilities were rolled in the same pack; the ones not kept stay in the review object, tagged rejected, and can be promoted when their facility is added."
+  },
+  "thirdPack": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-20",
+    "reviewObjectId": "68098ce5-1ff2-4019-920d-cb8eb3f76920",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 03",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "hide icon: tan animal hide stretched flat, legs splayed",
+        "hide icon: rolled bundle of brown fur pelts tied with cord",
+        "hide icon: grey wolf pelt laid flat",
+        "hide icon: folded brown leather hide",
+        "hide icon: animal skin stretched on a wooden drying frame",
+        "hide icon: stack of folded fur pelts",
+        "timber icon: stack of three cut logs",
+        "timber icon: single log with a pale cut end",
+        "timber icon: bundle of wooden planks tied with rope",
+        "timber icon: two crossed logs",
+        "timber icon: pile of split firewood",
+        "ore icon: lump of grey rock with rust-brown ore flecks",
+        "ore icon: pile of three ore chunks",
+        "ore icon: grey stone with glinting metal veins",
+        "ore icon: rough iron ore nugget",
+        "ore icon: small heap of dark ore rocks",
+        "cloth icon: folded bolt of woven cloth",
+        "cloth icon: roll of beige fabric",
+        "cloth icon: stack of folded linen",
+        "cloth icon: bolt of cloth with a loose end",
+        "cloth icon: bundle of cloth tied with string"
+      ]
+    },
+    "candidates": 64,
+    "candidatesNote": "Indices 0 to 20 follow itemDescriptions; 21 to 63 were drawn by the service from the description alone.",
+    "generations": 10,
+    "note": "The first resource icons (Issue-340). Ideas for timber, ore and cloth were rolled in the same pack, so that the resources' icons share one roll's style: the 63 candidates not kept stay in the review object, tagged heat, ui-icon and rejected, with their indices as rolled, and the scene's picture of a drop promotes its picks from there (Issue-344). No page draws hide.png yet."
   }
 }
