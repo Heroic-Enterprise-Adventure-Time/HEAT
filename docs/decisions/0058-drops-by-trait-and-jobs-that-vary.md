@@ -3,13 +3,15 @@
 - **Status:** Decided; the numbers are working assumptions. Not built: Issue-339 builds the traits, the drops and the XP, Issue-340 the first new pair, hide and skinning, and Issue-341 the jobs that vary. Until each is merged the engine does what decisions 0030, 0031 and 0051 say.
 - **Date:** 2026-11-20
 - **Settles:** Issue-336: how resources are gathered, what an adventure yields and what a retreat keeps, and how one job's adventures differ. The owner's direction of 2026-11-19 and calls of 2026-11-20, made in the Issue-336 session.
-- **Amends:** 0051: the gather rating, a node's difficulty and maximum yield, the per-hit harvest and the waste are replaced; a node as an obstacle with health, one list of opponents and a stage that ends when all of it is down stand. 0030, "Stages and time limits" and "Settlement": a stage's entries vary, the XP is the enemies' and a bonus, and a retreat's penalty is one rule for every job. 0031: the first job may meet a wolf, and the hauls are ranges; the costs and the one run per step stand.
+- **Amends:** 0051: the gather rating, a node's difficulty and maximum yield, the per-hit harvest and the waste are replaced; a node as an obstacle with health, one list of opponents and a stage that ends when all of it is down stand. 0030, "Stages and time limits" and "Settlement": a stage's entries vary, the XP is the enemies' and a bonus, and a retreat's penalty is one rule for every job. 0031: the first job may meet a wolf, and the hauls are ranges; the costs and the one run per step stand. 0052: a shot at a node no longer wastes what it takes; a shot that hits a node only when nothing else is in reach stands.
 
 ## Decision
 
 **A drop needs a gathering trait.** An enemy, a monster or a resource node, lists zero or more drops. Each drop names a resource and the trait that gathers it: a tree gives timber to a party that can cut wood, a wolf a hide to a party that can skin. A trait has a level, a whole number from 1.
 
 **Who hit what does not matter.** When an enemy goes down, the highest level of the drop's trait among the heroes standing in that stage is read, and the drop is rolled for that level. A hero that is down does not count, so the carrier is worth protecting. With no carrier there is no drop. This replaces decision 0051's rule, where every hit harvested by the unit's gather rating against the node's difficulty and a hit with no rating wasted the node: a fighter is no longer wasted on a resource run, and one carrier of a trait is enough for a party. The owner's call: the puzzle is to cover every drop that may show up, a woodcutter for the trees and a skinner for the wolves, with a party that still survives the fight.
+
+**A unit aims as it did, without the rating.** A regular attack is aimed at a monster first and at a node only when nothing else is in reach, and chop and mine are aimed at the nodes of their kind, the one with the least health left first. Decision 0051's order among nodes, those a unit could harvest before those it would waste, goes with the rating. A ranger still shoots a node last (decision 0052), and its shot wastes nothing, because nothing is harvested by a hit.
 
 **The traits are named for the craft,** `woodcutting`, `mining` and `skinning`, not for a unit type, so that a lumberjack has woodcutting 2 and the API's two sets do not share their members.
 
@@ -19,11 +21,11 @@
 
 **The roll is the enemy's own.** Each enemy's drops are rolled from a generator seeded by the adventure's seed, the stage and the enemy. No draw of the battle moves it and no override reaches it, so a modified client that tries override sequences against its seed (`docs/architecture/adventure-loop.md`, "What verification proves") can change which trait is standing when an enemy falls, which is the game, and not the roll.
 
-**Not every drop is told.** A job's description says what its author chooses: "Pick up sticks" says that timber is collected and that a hero who can cut wood is needed; other jobs may say much less, and the rest is the player's to find. The job board and a job's page say the description, the stages by kind, the pay and the bonus XP, and no yield; the result says what dropped and what the warehouse's cap lost. What is hidden is hidden from the page only. The drop tables are static content in the engine package, which the browser runs and the public repository shows, and the owner's call is that nothing more is owed: a player who wants to know will ask another player sooner than read the source.
+**Not every drop is told.** A job's description says what its author chooses: "Pick up sticks" says that timber is collected and that a hero who can cut wood is needed; other jobs may say much less, and the rest is the player's to find. The job board and a job's page say the description, the stages by kind, the pay and the bonus XP, and no yield; the result says what dropped and what the warehouse's cap lost. A job's page shows the camp's balance and the warehouse's room for the pay alone: the room for a drop would name the drop, and the warehouse's panel is where the room for everything is shown (the owner, 2026-11-20). What is hidden is hidden from the page only. The drop tables are static content in the engine package, which the browser runs and the public repository shows, and the owner's call is that nothing more is owed: a player who wants to know will ask another player sooner than read the source.
 
 **Many resources and many traits are the direction,** added a little at a time. The mechanism is built with the two traits the game already has in another form, and then with one new pair, hide and skinning on the wolf. Nothing costs hide yet, which the owner accepted for the first pair.
 
-**Enemies give XP.** Each enemy, a node included, has XP. A hero that survives earns the XP of every enemy that went down, in full and not shared out, and on arrival the job's bonus. The job's XP of decision 0030 is split between its enemies and its bonus so that each job gives what it gave.
+**Enemies give XP.** Each enemy, a node included, has XP. A hero that survives earns the XP of every enemy that went down, in full and not shared out, and on arrival the job's bonus. The job's XP of decision 0030 is split between its bonus and the enemies that always appear, so that a job with no variance gives what it gave. An enemy that appears by chance adds its own XP: "Pick up sticks" gives 5 as it did, and 10 when its wolf appears.
 
 **A retreat keeps the drops and the enemies' XP, and loses the pay and the bonus.** A party that is all down keeps nothing, as before. The retreat penalty each job stated, whether the pay and the cargo were kept and what share of the XP, becomes this one rule; a job's own penalty returns with caravans, whose cargo is not a drop (Issue-292).
 
@@ -53,7 +55,7 @@
 | Ore from the hill | 11 | 4 | 15 |
 | Goblins in the old workings | 19 | 6 | 25 |
 
-At their worst rolls a villager's "Pick up sticks" brings 30 timber against the villager's 20, villagers' timber run 60 against the mine's 60, and villagers' ore run 40 against the fighter's 40. At their best a lumberjack's timber run brings 100 and a miner's goblins job 96, inside a level-1 warehouse's 100.
+At their worst rolls a villager's "Pick up sticks" brings 30 timber against the villager's 20, villagers' timber run 60 against the mine's 60, and villagers' ore run 40 against the fighter's 40. At their best a lumberjack's timber run brings 100 and a miner's goblins job 96, inside a level-1 warehouse's 100. That holds for the stages as they are today, with fixed counts: when Issue-341 gives an entry a range for its count, it checks the job's largest roll against the warehouse, or the owner accepts what the cap would lose.
 
 "Pick up sticks" gains a wolf one time in ten (Issue-341). A lone villager completes today's timber job, which ends in a wolf, on every one of 1,000 seeds (decision 0051), so the first job should stay one a free villager cannot fail; Issue-341 checks it over seeds, and if it fails on any the wolf leaves the first job.
 
@@ -74,6 +76,8 @@ At their worst rolls a villager's "Pick up sticks" brings 30 timber against the 
 **Telling the player a drop was missed,** such as "the wolf left something behind". The owner wants secrets to be found. It can be added for one job as a line of its description.
 
 **Protecting the drop tables,** by holding them in the hub. The browser runs the engine (decision 0001), so the hub would have to roll the drops itself and the client could not show a run's yield as it happens. The owner's call is that the secrecy is the page's alone.
+
+**A job that lists the drops it tells,** with the warehouse's room shown for those on its page. It keeps the warning that the warehouse is nearly full for a told drop, at the cost of one more field on every job that has to agree with its description. The owner's call is the pay alone.
 
 **Sharing an enemy's XP among the survivors.** The job's XP goes to each survivor in full today, and a shared XP would make a larger party level more slowly for the same work, a second cost on top of the risk it already takes.
 
