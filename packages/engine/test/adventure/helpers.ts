@@ -14,6 +14,7 @@ import {
   type Material,
   MONSTERS,
   must,
+  replay,
   RESOURCE_NODES,
   type ResourceType,
   type SnapshotHero,
@@ -79,6 +80,11 @@ export function ofKind<K extends AdventureEvent["kind"]>(events: readonly Advent
 /** How many seeds a job is played over to say what a party brings home from it, and the seeds. */
 export const SEEDS = 500;
 export const seeds = range(SEEDS).map((i) => `seed-${i}`);
+
+/** The job played by this party on every seed with nothing overridden: each seed and its result. */
+export function played(jobId: string, heroes: readonly SnapshotHero[]): { readonly seed: string; readonly result: AdventureResult }[] {
+  return seeds.map((seed) => ({ seed, result: replay(snapshot(jobId, heroes), seed, []).result }));
+}
 
 export const STICKS = "pick-up-sticks";
 export const WOLVES = "wolves-on-the-mill-road";

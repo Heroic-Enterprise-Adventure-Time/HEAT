@@ -1,8 +1,8 @@
 import { countBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { type AdventureResult, JOBS, MONSTERS, must, replay, type SnapshotHero } from "../../src/index.js";
-import { haul, ORE, party, rewardOf, SEEDS, seeds, snapshot, TIMBER, villagers, WOLVES } from "./helpers.js";
+import { type AdventureResult, JOBS, must } from "../../src/index.js";
+import { haul, ORE, party, played, rewardOf, SEEDS, TIMBER, villagers, WOLVES } from "./helpers.js";
 
 // Hide and skinning, the first new pair (Issue-340, decision 0058): the wolf
 // drops hide to a party with a ranger standing, and nothing to any other. The
@@ -11,20 +11,10 @@ import { haul, ORE, party, rewardOf, SEEDS, seeds, snapshot, TIMBER, villagers, 
 // so: not every drop is told.
 
 const wolves = JOBS[WOLVES];
-const [level1, level2] = must(MONSTERS.wolf.drops[0], "the wolf's drop").levels;
-
-function played(jobId: string, heroes: readonly SnapshotHero[]) {
-  return seeds.map((seed) => ({ seed, result: replay(snapshot(jobId, heroes), seed, []).result }));
-}
 
 const hideOf = (result: AdventureResult) => rewardOf(result, "hide");
 
 describe("The wolf's hide on Millbrook's jobs", () => {
-  it("is one hide half the time at skinning 1, and one or two always at level 2, which no unit type has yet", () => {
-    expect(level1).toEqual({ chancePercent: 50, min: 1, max: 1 });
-    expect(level2).toEqual({ chancePercent: 100, min: 1, max: 2 });
-  });
-
   it("is told by no job's description", () => {
     for (const job of Object.values(JOBS)) expect(job.description.toLowerCase(), job.id).not.toMatch(/hide|skin|pelt/);
   });

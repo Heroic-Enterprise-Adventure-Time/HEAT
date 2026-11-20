@@ -73,8 +73,9 @@ async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): P
   return heroes;
 }
 
-async function start(p: string, heroes: Hero[], issuedBy = version, jobId: string = wolves.id) {
-  return startAdventure(repo, p, issuedBy, randomUUID(), at, jobId, heroes.map((h) => h.id));
+/** Starts the job for the party; with `seed`, on that seed and not one the hub draws (graphql.md, rule 25). */
+async function start(p: string, heroes: Hero[], issuedBy = version, jobId: string = wolves.id, seed?: string) {
+  return startAdventure(repo, p, issuedBy, randomUUID(), at, jobId, heroes.map((h) => h.id), undefined, seed === undefined ? undefined : () => seed);
 }
 
 async function balanceOf(p: string, material: string) {
@@ -418,24 +419,18 @@ describe("what dropped (decision 0058)", () => {
   });
 
   it("credits the wolf's hide to a party with a ranger, a holding and a ledger entry of its own beside the cloth, and none to a party without one (Issue-340)", async () => {
-    // The hub issues the seed, and a wolf drops hide half the time: adventures are started, each for a
-    // player of its own, until the engine says one brings hide home. Two wolves a run, so one in four
-    // brings none, and thirty in a row is not expected in the life of the project.
-    const hideOf = (rewards: readonly { material: string; amount: number }[]) => rewards.find((r) => r.material === "hide")?.amount ?? 0;
-    const withRanger = async () => {
-      for (let attempt = 0; attempt < 30; attempt++) {
-        const p = player();
-        const heroes = await putParty(p, ["fighter", "ranger"]);
-        const started = await start(p, heroes);
-        const expected = replay(started.snapshot, started.seed, []).result;
-        if (hideOf(expected.rewards) > 0) return { p, heroes, started, expected };
-      }
-      throw new Error("no seed in thirty brought hide home");
-    };
-    const { p, heroes, started, expected } = await withRanger();
+    // A wolf drops hide half the time, so the test passes a seed on which both of this job's wolves do:
+    // the roll is the wolf's own, from the seed, the stage and its id, whoever the heroes are.
+    const seed = "hide";
+    const p = player();
+    const heroes = await putParty(p, ["fighter", "ranger"]);
+    const started = await start(p, heroes, version, wolves.id, seed);
+    expect(started.seed).toBe(seed);
     expect(started.snapshot.heroes.map((h) => h.stats.traits)).toEqual([[], [{ trait: "skinning", level: 1 }]]);
+    const expected = replay(started.snapshot, started.seed, []).result;
     expect(expected.outcome).toBe("complete");
-    const hide = hideOf(expected.rewards);
+    const hide = must(expected.rewards.find((r) => r.material === "hide"), "the hide").amount;
+    expect(hide).toBe(2);
 
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(settled.result?.rewards).toEqual([...wolves.pay, { material: "hide", amount: hide }]);
@@ -447,10 +442,10 @@ describe("what dropped (decision 0058)", () => {
     expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
     for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(WOLVES_XP);
 
-    // The same job with a villager in the ranger's place: the wolves fall, and no hide is credited.
+    // The same job on the same seed with a villager in the ranger's place: the wolves fall, and no hide is credited.
     const q = player();
     const others = await putParty(q, ["fighter", "villager"]);
-    const without = await start(q, others);
+    const without = await start(q, others, version, wolves.id, seed);
     expect(replay(without.snapshot, without.seed, []).result.outcome).toBe("complete");
     const paid = await submitAdventure(repo, new MemoryTimelines(), q, version, without.adventureId, []);
     expect(paid.result?.credited).toEqual(wolves.pay);

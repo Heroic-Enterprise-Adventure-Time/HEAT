@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { type AdventureResult, JOBS, jobsPostedBy, location, replay, type SnapshotHero, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { GOBLINS, haul, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { type AdventureResult, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
+import { GOBLINS, haul, ORE, party, played, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The first mixed stage (Issue-286, decision 0052): three ore veins hold the
 // front line and two goblin rock throwers stand behind them. Its numbers are
@@ -13,10 +13,6 @@ const stage = goblins.stages[1];
 if (stage?.kind !== "gather") throw new Error("The goblins job gathers second");
 /** What a party with a villager standing brings home from the three veins: each vein's drop at mining 1. */
 const VILLAGERS_ORE = haul("ore-vein", 1, 3);
-
-function played(heroes: readonly SnapshotHero[]) {
-  return seeds.map((seed) => ({ seed, result: replay(snapshot(GOBLINS, heroes), seed, []).result }));
-}
 
 const oreOf = (result: AdventureResult) => rewardOf(result, "ore");
 
@@ -32,13 +28,13 @@ describe("Goblins in the old workings", () => {
 
   for (const count of [1, 2, 3]) {
     it(`defeats ${count} villager(s) on every one of ${SEEDS} seeds`, () => {
-      for (const { seed, result } of played(villagers(count))) expect(result.outcome, seed).toBe("defeat");
+      for (const { seed, result } of played(GOBLINS, villagers(count))) expect(result.outcome, seed).toBe("defeat");
     });
   }
 
   it(`is completed by four villagers on every one of ${SEEDS} seeds with 60 to 72 ore, at the cost of a villager on most`, () => {
     expect(VILLAGERS_ORE).toEqual({ min: 60, max: 72 });
-    const runs = played(villagers(4));
+    const runs = played(GOBLINS, villagers(4));
     for (const { seed, result } of runs) {
       expect(result.outcome, seed).toBe("complete");
       expect(oreOf(result), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
@@ -48,11 +44,11 @@ describe("Goblins in the old workings", () => {
   });
 
   it(`defeats a fighter with one villager on every one of ${SEEDS} seeds: neither reaches the goblins in time`, () => {
-    for (const { seed, result } of played(party("fighter", "villager"))) expect(result.outcome, seed).toBe("defeat");
+    for (const { seed, result } of played(GOBLINS, party("fighter", "villager"))) expect(result.outcome, seed).toBe("defeat");
   });
 
   it(`is completed by a ranger with two villagers on every one of ${SEEDS} seeds with no death, for 25 XP and all the ore villagers bring: the ranger's shots at a vein cost nothing (decision 0058)`, () => {
-    for (const { seed, result } of played(party("ranger", "villager", "villager"))) {
+    for (const { seed, result } of played(GOBLINS, party("ranger", "villager", "villager"))) {
       expect(result.outcome, seed).toBe("complete");
       expect(result.dead, seed).toEqual([]);
       expect(oreOf(result), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
@@ -62,7 +58,7 @@ describe("Goblins in the old workings", () => {
   });
 
   it(`is completed by a ranger with a fighter and a villager on every one of ${SEEDS} seeds with no death, for the same ore: one miner standing is enough`, () => {
-    for (const { seed, result } of played(party("ranger", "fighter", "villager"))) {
+    for (const { seed, result } of played(GOBLINS, party("ranger", "fighter", "villager"))) {
       expect(result.outcome, seed).toBe("complete");
       expect(result.dead, seed).toEqual([]);
       expect(oreOf(result), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
@@ -71,7 +67,7 @@ describe("Goblins in the old workings", () => {
   });
 
   it(`leaves a ranger whose one villager fell with no ore from the veins that came down after: the carrier is worth protecting, on ${SEEDS} seeds`, () => {
-    const runs = played(party("ranger", "villager"));
+    const runs = played(GOBLINS, party("ranger", "villager"));
     const lost = runs.filter((r) => r.result.dead.includes("villager-2"));
     expect(lost.length).toBeGreaterThan(0);
     for (const { seed, result } of runs) {
