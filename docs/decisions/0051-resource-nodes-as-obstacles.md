@@ -1,6 +1,6 @@
 # 0051: Resource nodes as obstacles: health, a difficulty and a maximum yield, harvested by a gather rating per resource
 
-- **Status:** Decided; the numbers are working assumptions in the engine's static content.
+- **Status:** Decided; the numbers are working assumptions in the engine's static content. The gather rating, a node's difficulty and maximum yield, the per-hit harvest and the waste are replaced by 0058 (Issue-336, 2026-11-20), which Issue-339 builds; until it is merged the engine does what this record says. A node as an obstacle, one list of opponents and a stage that ends when all of it is down stand.
 - **Date:** 2026-11-10
 - **Settles:** Issue-283: how a resource node is fought and harvested, before any more gathering jobs are added, so that a better gatherer is worth bringing on a resource run. The shape was agreed with the owner in the step 3 design session (Issue-282); the arithmetic and the numbers in the Issue-283 session.
 - **Amends:** 0030, "Stages and time limits": a fight or a gather lists nodes and monsters together and ends when all of them are down; and the timeline's schema version, which the first cut left to be decided when it first moved. 0031, "Checked with the engine": the gather jobs' hauls and the table below replace its rows for them; its costs stand.
