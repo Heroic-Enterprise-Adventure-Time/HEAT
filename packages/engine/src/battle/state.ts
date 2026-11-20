@@ -5,11 +5,11 @@
  * Kept: the declared action in warmup, the per-unit state with its charge
  * timer, the action context and the selection. Left behind (decision 0030):
  * status effects, resource pools and per-ability cooldowns. New: the guard a
- * unit holds, and the unit's own stats and action list.
+ * unit holds, the unit's own stats and action list, and what an enemy yields.
  */
 
 import type { AbilityDefinition } from "./ability.js";
-import type { Line, ResourceNodeProfile, Side, UnitKind, UnitStats } from "./unit.js";
+import type { Drop, Line, Side, UnitKind, UnitStats } from "./unit.js";
 
 /** A declared action in its warmup. */
 export interface DeclaredAction {
@@ -32,10 +32,10 @@ export interface UnitState {
   readonly stats: UnitStats;
   /** The unit's action list, resolved to abilities, in priority order. */
   readonly actions: readonly AbilityDefinition[];
-  /** A resource node's profile; absent on every other unit. */
-  readonly node?: ResourceNodeProfile;
-  /** What a node's hits have earned toward its yield (`harvested`); 0 on every other unit. */
-  credit: number;
+  /** What an enemy may drop when it goes down, a monster's or a resource node's; none on a hero. */
+  readonly drops: readonly Drop[];
+  /** The XP an enemy gives; 0 on a hero. */
+  readonly xp: number;
   /** False for a unit that never takes a turn, a resource node. */
   readonly acts: boolean;
   health: number;

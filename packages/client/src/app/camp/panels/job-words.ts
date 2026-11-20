@@ -1,6 +1,12 @@
-import { uniq } from 'es-toolkit';
+import { type FacilityKind, type Job, jobsPostedBy } from '@heat/engine';
 
-import { type FacilityKind, isResourceType, type Job, jobsPostedBy, MONSTERS, type MonsterType, RESOURCE_NODES, type ResourceType, type Stage } from '@heat/engine';
+/**
+ * A job in the player's words. The page tells a job by its description, its
+ * pay and its bonus XP, and nothing of its stages or of what its enemies
+ * drop: the description says as much or as little as its author chose, and
+ * the rest is the player's to find (decision 0058; the owner, 2026-11-20,
+ * Issue-339, on the stages).
+ */
 
 /** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133). */
 export function jobsAt(location: string, poster: FacilityKind): Job[] {
@@ -11,108 +17,34 @@ export function jobAt(location: string, poster: FacilityKind, id: string | null 
   return jobsAt(location, poster).find((job) => job.id === id);
 }
 
-/** "a wolf", "an ore vein", "2 wolves", "3 trees", "2 ore veins". */
-function count(n: number, name: string): string {
-  const one = name.toLowerCase();
-  if (n === 1) return `${/^[aeiou]/.test(one) ? 'an' : 'a'} ${one}`;
-  return `${n} ${one.endsWith('f') ? `${one.slice(0, -1)}ves` : `${one}s`}`;
+/** What a job says in place of its pay when whoever posted it pays nothing. */
+export const NO_PAY = 'No pay';
+
+/** One resource of a job's pay, "3 cloth". */
+export function rewardWords(reward: { readonly amount: number; readonly material: string }): string {
+  return `${reward.amount} ${reward.material}`;
+}
+
+/** A job's pay in words, "3 cloth", "10 cloth and 5 ore", or "No pay". */
+export function payWords(job: Job): string {
+  return job.pay.length === 0 ? NO_PAY : job.pay.map(rewardWords).join(' and ');
+}
+
+/** A job on its poster's list, by its pay and its bonus: "3 cloth, 4 bonus XP", "No pay, 2 bonus XP". */
+export function boardWords(job: Job): string {
+  return `${payWords(job)}, ${job.bonusXp} bonus XP`;
+}
+
+/** A job's bonus on its own page: "Bonus: 4 XP to each hero who arrives." */
+export function bonusWords(job: Job): string {
+  return `Bonus: ${job.bonusXp} XP to each hero who arrives.`;
 }
 
 /**
- * What stands on the other side of a stage, its resource nodes apart from its
- * monsters, each by type and count; none for a stage with no other side. Two
- * passes and not one `partition`, which cannot tell the compiler that what is
- * left of one object type is the monsters.
+ * What a retreat keeps, the one rule for every job (decision 0058): what
+ * dropped and the XP of what the party put down, and neither the pay nor the
+ * bonus. The pay is named only where the job has some.
  */
-function otherSide(stage: Stage): { nodes: { type: ResourceType; count: number }[]; monsters: { type: MonsterType; count: number }[] } {
-  const opponents = stage.kind === 'fight' || stage.kind === 'gather' ? stage.opponents : [];
-  return {
-    nodes: opponents.flatMap(({ type, count: n }) => (isResourceType(type) ? [{ type, count: n }] : [])),
-    monsters: opponents.flatMap(({ type, count: n }) => (isResourceType(type) ? [] : [{ type, count: n }])),
-  };
-}
-
-/** The materials a stage yields, from its nodes, in order and once each. */
-function gathered(stage: Stage): string[] {
-  return uniq(otherSide(stage).nodes.map((n) => RESOURCE_NODES[n.type].material));
-}
-
-/**
- * One stage in the player's words, from what stands on its other side: the
- * nodes are gathered from and the monsters fought, together where a stage has
- * both (decision 0051). A stage's time limit is not said: it is a deadlock
- * kill switch, counted down only in its last ten seconds (decision 0030).
- */
-export function stageWords(stage: Stage): string {
-  switch (stage.kind) {
-    case 'travel':
-      return 'Travel';
-    case 'fight':
-    case 'gather': {
-      const { nodes, monsters: fought } = otherSide(stage);
-      const sources = nodes.map((n) => count(n.count, RESOURCE_NODES[n.type].name));
-      const monsters = fought.map((m) => count(m.count, MONSTERS[m.type].name));
-      const gather = sources.length > 0 ? `Gather ${gathered(stage).join(' and ')} from ${sources.join(' and ')}` : null;
-      if (monsters.length === 0) return gather ?? 'Fight';
-      return gather ? `${gather}, and fight ${monsters.join(' and ')}` : `Fight ${monsters.join(' and ')}`;
-    }
-    case 'arrive':
-      return 'Arrive';
-  }
-}
-
-/** What a job credits to the camp on arrival: its pay, and the most it can gather, each by material. */
-export interface Credit {
-  readonly material: string;
-  readonly pay: number;
-  /**
-   * The most the job's nodes give, their maximums together, or 0 if the job
-   * gathers none of it. What a party brings home of it is by its gather
-   * ratings (decision 0051).
-   */
-  readonly cargo: number;
-}
-
-export function credits(job: Job): Credit[] {
-  const byMaterial = new Map<string, { pay: number; cargo: number }>();
-  const entry = (material: string) => {
-    const found = byMaterial.get(material);
-    if (found) return found;
-    const fresh = { pay: 0, cargo: 0 };
-    byMaterial.set(material, fresh);
-    return fresh;
-  };
-  for (const reward of job.pay) entry(reward.material).pay += reward.amount;
-  for (const stage of job.stages) {
-    for (const node of otherSide(stage).nodes) entry(RESOURCE_NODES[node.type].material).cargo += node.count * RESOURCE_NODES[node.type].maxYield;
-  }
-  return [...byMaterial].map(([material, c]) => ({ material, ...c }));
-}
-
-/** "10 cloth", "up to 90 timber", "5 and up to 90 timber". */
-export function creditWords(credit: Credit): string {
-  const parts: string[] = [];
-  if (credit.pay > 0) parts.push(`${credit.pay}`);
-  if (credit.cargo > 0) parts.push(`up to ${credit.cargo}`);
-  return `${parts.join(' and ')} ${credit.material}`;
-}
-
-/**
- * What a job brings home, its pay and its cargo, for the board's list:
- * "10 cloth", "up to 45 timber", "3 cloth and up to 90 timber". A job with
- * no pay still brings home what it gathers (decision 0031).
- */
-export function yieldWords(job: Job): string {
-  const words = credits(job).map(creditWords);
-  return words.length === 0 ? 'nothing to bring home' : words.join(' and ');
-}
-
-/** A job's retreat penalty in words: "A retreat forfeits the pay, keeps the timber gathered, and earns half the XP." */
 export function retreatWords(job: Job): string {
-  const pay = job.retreat.keepsPay ? 'keeps the pay' : 'forfeits the pay';
-  const cargo = uniq(job.stages.flatMap(gathered));
-  const carried = cargo.length > 0 ? `${job.retreat.keepsCargo ? 'keeps' : 'abandons'} the ${cargo.join(' and ')} gathered` : null;
-  const xp = job.retreat.xpPercent;
-  const earns = xp === 100 ? 'earns the full XP' : xp === 50 ? 'earns half the XP' : xp === 0 ? 'earns no XP' : `earns ${xp}% of the XP`;
-  return `A retreat ${carried ? `${pay}, ${carried}, and ${earns}` : `${pay} and ${earns}`}.`;
+  return `A retreat keeps what dropped and the XP earned, and loses ${job.pay.length > 0 ? 'the pay and the bonus' : 'the bonus'}.`;
 }

@@ -1,6 +1,6 @@
 # 0031: The first progression: a first job a villager cannot fail, and one run per step
 
-- **Status:** Decided; the numbers are working assumptions in the engine's static content. The gather jobs' hauls, the timber job's trees and the table's rows for them are replaced by 0051 (Issue-283, 2026-11-10); the costs and the one run per step stand. Amended by 0058 on 2026-11-20 (Issue-336), not built until Issue-339 and Issue-341 are merged: the hauls become ranges whose worst roll still pays each step, and "Pick up sticks" may meet a wolf, if a lone villager still completes it on every seed tried.
+- **Status:** Decided; the numbers are working assumptions in the engine's static content. The gather jobs' hauls, the timber job's trees and the table's rows for them are replaced by 0051 (Issue-283, 2026-11-10); the costs and the one run per step stand. Amended by 0058 on 2026-11-20 (Issue-336): the hauls are ranges whose worst roll still pays each step, built by Issue-339 and checked over 500 seeds per party; and "Pick up sticks" may meet a wolf, if a lone villager still completes it on every seed tried, not built until Issue-341 is merged.
 - **Date:** 2026-10-22
 - **Settles:** Issue-126: the first job a new player can take, and the costs from there to a fighter, which Issue-82 (paid recruitment), Issue-93 (building facilities) and Issue-133 (the mine's first job) build to.
 

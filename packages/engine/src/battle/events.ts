@@ -6,8 +6,8 @@
  * a unit going down, and the resolved effects. Left behind (decision 0030):
  * status-effect and resource-pool events, behavior swaps, interrupts and
  * presentation cues, and the per-unit "front-line-shift" moves, which are one
- * `line-collapsed` event here. New: `harvest` and `guard` effects, and the
- * `timeout` and `retreat` results. The outcome carries no wall-clock time.
+ * `line-collapsed` event here. New: the `guard` effect, the `drop` event, and
+ * the `timeout` and `retreat` results. The outcome carries no wall-clock time.
  */
 
 import type { Material } from "../index.js";
@@ -40,22 +40,13 @@ export interface ActionDeclaredEvent {
 }
 
 export type ResolvedEffect =
-  /** `guarding` names the ally the hit was aimed at, when a guard took it. */
+  /** A hit on a unit or on a resource node. `guarding` names the ally the hit was aimed at, when a guard took it. */
   | {
       readonly kind: "damage";
       readonly targetId: string;
       readonly amount: number;
       readonly newHealth: number;
       readonly guarding?: string;
-    }
-  /** A hit on a resource node: `amount` is the damage to its health, `yield` the material that hit harvested (decision 0051). */
-  | {
-      readonly kind: "harvest";
-      readonly targetId: string;
-      readonly material: Material;
-      readonly amount: number;
-      readonly yield: number;
-      readonly newHealth: number;
     }
   | { readonly kind: "guard"; readonly targetId: string; readonly until: number }
   | { readonly kind: "move"; readonly unitId: string; readonly from: Line; readonly to: Line };
@@ -84,6 +75,20 @@ export interface UnitDownEvent {
   readonly unitId: string;
 }
 
+/**
+ * Something dropped from the enemy that just went down, `unitId`, and the
+ * party has it: one event for each drop that fell, after the enemy's
+ * `unit-down`. A drop nobody standing could gather leaves no event (decision
+ * 0058).
+ */
+export interface DropEvent {
+  readonly kind: "drop";
+  readonly timestamp: number;
+  readonly unitId: string;
+  readonly material: Material;
+  readonly amount: number;
+}
+
 /** A side's front line emptied and every living unit on it moved up one line. */
 export interface LineCollapsedEvent {
   readonly kind: "line-collapsed";
@@ -105,6 +110,7 @@ export type BattleEvent =
   | ActionResolvedEvent
   | ActionOverriddenEvent
   | UnitDownEvent
+  | DropEvent
   | LineCollapsedEvent
   | BattleEndEvent;
 
@@ -112,9 +118,11 @@ export type BattleEvent =
  * Bumped when the events' shape or meaning changes (docs/architecture/adventure-loop.md).
  * 2: a `harvest` effect's `amount` is damage and its `yield` is by gather
  * rating, and a battle's opponents may be nodes and monsters together
- * (decision 0051).
+ * (decision 0051). 3: the `harvest` effect is gone, a hit on a node being a
+ * `damage` effect, and a fallen enemy's drops are `drop` events (decision
+ * 0058).
  */
-export const BATTLE_TIMELINE_SCHEMA_VERSION = 2;
+export const BATTLE_TIMELINE_SCHEMA_VERSION = 3;
 
 export interface BattleTimeline {
   readonly schemaVersion: number;
@@ -131,7 +139,9 @@ export interface BattleOutcome {
   readonly endedAtMs: number;
   /** Every unit as it ended, in the order of the setup. */
   readonly units: readonly { readonly unitId: string; readonly health: number; readonly alive: boolean }[];
-  /** Material yielded by every harvest, by material. */
-  readonly gathered: Readonly<Partial<Record<Material, number>>>;
+  /** What dropped from the enemies that went down, summed by material. */
+  readonly drops: Readonly<Partial<Record<Material, number>>>;
+  /** The XP of every enemy that went down. */
+  readonly xp: number;
   readonly timeline: BattleTimeline;
 }

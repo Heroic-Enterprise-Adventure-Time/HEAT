@@ -10,8 +10,7 @@
  * own: damage, gather, guard and move up.
  */
 
-import type { Material } from "../index.js";
-import type { Line } from "./unit.js";
+import type { GatheringTrait, Line } from "./unit.js";
 
 export type AbilityTag = "melee-attack" | "ranged-attack" | "physical" | "slashing" | "piercing" | "gather" | "support" | "movement";
 
@@ -43,18 +42,17 @@ export type Targeting =
  * What an ability does when it resolves.
  *
  * - `damage`: the actor's damage to a unit or a resource node.
- * - `gather`: the actor's damage to a resource node of this material, and to
- *   nothing else: a strike with its own look.
- *
- * Either way a node's yield is by the actor's gather rating for its material
- * (decision 0051), and a node the actor has no rating for is hit only when
- * nothing else is usable (resolution.ts).
+ * - `gather`: the actor's damage to a resource node of its kind, one with a
+ *   drop this trait gathers, and to nothing else: a strike with its own look.
+ *   The trait names which nodes the ability is aimed at, never who may use
+ *   it: no hit gathers anything, and a node's drops go by the party's level
+ *   in the trait when the node goes down (decision 0058).
  * - `guard`: until it expires, hits aimed at the ally land on the actor.
  * - `move-up`: the actor steps up one line.
  */
 export type AbilityEffect =
   | { readonly kind: "damage" }
-  | { readonly kind: "gather"; readonly material: Material }
+  | { readonly kind: "gather"; readonly trait: GatheringTrait }
   | { readonly kind: "guard"; readonly durationMs: number }
   | { readonly kind: "move-up" };
 

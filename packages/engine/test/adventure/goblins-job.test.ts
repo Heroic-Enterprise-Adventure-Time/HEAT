@@ -1,17 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import { type AdventureResult, JOBS, jobsPostedBy, location, replay, RESOURCE_NODES, type SnapshotHero, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { GOBLINS, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { type AdventureResult, JOBS, jobsPostedBy, location, replay, type SnapshotHero, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
+import { GOBLINS, haul, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The first mixed stage (Issue-286, decision 0052): three ore veins hold the
 // front line and two goblin rock throwers stand behind them. Its numbers are
-// checked over seeds with a ranger and without one.
+// checked over seeds with a ranger and without one, with the hauls of
+// decision 0058.
 
 const goblins = JOBS[GOBLINS];
 const stage = goblins.stages[1];
 if (stage?.kind !== "gather") throw new Error("The goblins job gathers second");
-/** What villagers alone bring home from the three veins: a rating of 2 against 3, two thirds of each vein's 30. */
-const VILLAGERS_ORE = 60;
+/** What a party with a villager standing brings home from the three veins: each vein's drop at mining 1. */
+const VILLAGERS_ORE = haul("ore-vein", 1, 3);
 
 function played(heroes: readonly SnapshotHero[]) {
   return seeds.map((seed) => ({ seed, result: replay(snapshot(GOBLINS, heroes), seed, []).result }));
@@ -25,9 +26,8 @@ describe("Goblins in the old workings", () => {
     expect(goblins.stages.map((s) => s.kind)).toEqual(["travel", "gather", "arrive"]);
     expect(stage.opponents).toEqual([{ type: "ore-vein", count: 3 }, { type: "goblin-rock-thrower", count: 2 }]);
     expect(goblins.pay).toEqual([]);
-    expect(goblins.xp).toBe(25);
-    // Its ceiling fits a level-1 warehouse.
-    expect(3 * RESOURCE_NODES["ore-vein"].maxYield).toBeLessThanOrEqual(WAREHOUSE_CAPACITY[0] ?? 0);
+    // A miner's best roll fits a level-1 warehouse.
+    expect(haul("ore-vein", 2, 3).max).toBeLessThanOrEqual(WAREHOUSE_CAPACITY[0] ?? 0);
   });
 
   for (const count of [1, 2, 3]) {
@@ -36,11 +36,13 @@ describe("Goblins in the old workings", () => {
     });
   }
 
-  it(`is completed by four villagers on every one of ${SEEDS} seeds with all ${VILLAGERS_ORE} ore, at the cost of a villager on most`, () => {
+  it(`is completed by four villagers on every one of ${SEEDS} seeds with 60 to 72 ore, at the cost of a villager on most`, () => {
+    expect(VILLAGERS_ORE).toEqual({ min: 60, max: 72 });
     const runs = played(villagers(4));
     for (const { seed, result } of runs) {
       expect(result.outcome, seed).toBe("complete");
-      expect(oreOf(result), seed).toBe(VILLAGERS_ORE);
+      expect(oreOf(result), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
+      expect(oreOf(result), seed).toBeLessThanOrEqual(VILLAGERS_ORE.max);
     }
     expect(runs.filter((r) => r.result.dead.length > 0).length).toBeGreaterThan(SEEDS / 2);
   });
@@ -49,21 +51,33 @@ describe("Goblins in the old workings", () => {
     for (const { seed, result } of played(party("fighter", "villager"))) expect(result.outcome, seed).toBe("defeat");
   });
 
-  it(`is completed by a ranger with two villagers on every one of ${SEEDS} seeds with no death, for less ore than villagers alone: the ranger's last shots waste the veins`, () => {
+  it(`is completed by a ranger with two villagers on every one of ${SEEDS} seeds with no death, for 25 XP and all the ore villagers bring: the ranger's shots at a vein cost nothing (decision 0058)`, () => {
     for (const { seed, result } of played(party("ranger", "villager", "villager"))) {
       expect(result.outcome, seed).toBe("complete");
       expect(result.dead, seed).toEqual([]);
-      expect(oreOf(result), seed).toBeGreaterThanOrEqual(30);
-      expect(oreOf(result), seed).toBeLessThan(VILLAGERS_ORE);
-      expect(result.xp.every((x) => x.xp === goblins.xp), seed).toBe(true);
+      expect(oreOf(result), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
+      expect(oreOf(result), seed).toBeLessThanOrEqual(VILLAGERS_ORE.max);
+      expect(result.xp.every((x) => x.xp === 25), seed).toBe(true);
     }
   });
 
-  it(`is completed by a ranger with a fighter and a villager on every one of ${SEEDS} seeds with no death`, () => {
+  it(`is completed by a ranger with a fighter and a villager on every one of ${SEEDS} seeds with no death, for the same ore: one miner standing is enough`, () => {
     for (const { seed, result } of played(party("ranger", "fighter", "villager"))) {
       expect(result.outcome, seed).toBe("complete");
       expect(result.dead, seed).toEqual([]);
-      expect(oreOf(result), seed).toBeGreaterThan(0);
+      expect(oreOf(result), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
+      expect(oreOf(result), seed).toBeLessThanOrEqual(VILLAGERS_ORE.max);
+    }
+  });
+
+  it(`leaves a ranger whose one villager fell with no ore from the veins that came down after: the carrier is worth protecting, on ${SEEDS} seeds`, () => {
+    const runs = played(party("ranger", "villager"));
+    const lost = runs.filter((r) => r.result.dead.includes("villager-2"));
+    expect(lost.length).toBeGreaterThan(0);
+    for (const { seed, result } of runs) {
+      expect(result.outcome, seed).toBe("complete");
+      if (result.dead.includes("villager-2")) expect(oreOf(result), seed).toBeLessThan(VILLAGERS_ORE.min);
+      else expect(oreOf(result), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
     }
   });
 

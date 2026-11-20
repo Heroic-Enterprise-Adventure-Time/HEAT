@@ -13,6 +13,7 @@ import {
   buildRefusal,
   FACILITY_KINDS,
   type FacilityKind,
+  GATHERING_TRAITS,
   hallCapacity,
   location,
   MATERIALS,
@@ -57,6 +58,7 @@ import {
   TimelineDocument,
   type AdventureOutcome as WireAdventureOutcome,
   type FacilityKind as WireFacilityKind,
+  type GatheringTrait as WireGatheringTrait,
   type Material as WireMaterial,
   type StageEnding as WireStageEnding,
   type StageKind as WireStageKind,
@@ -71,12 +73,12 @@ import { Session } from './session';
  * `graphql/generated/`): the same shape, with the engine's closed sets read
  * back from the schema's UPPER_CASE enum values into the engine's own
  * (`VILLAGER` is `villager`; docs/standards/graphql.md, rule 4). A unit
- * type, a material, a stage's kind and its ending are `string`, because a
+ * type, a material, a gathering trait, a stage's kind and its ending are `string`, because a
  * value this client's engine lacks passes through (`engineValues`); a
  * facility kind and an outcome keep the engine's type, which the pages
  * switch on. Nothing past this file sees a wire value.
  */
-type Engine<T> = T extends WireUnitType | WireMaterial | WireStageKind | WireStageEnding
+type Engine<T> = T extends WireUnitType | WireMaterial | WireGatheringTrait | WireStageKind | WireStageEnding
   ? string
   : T extends WireFacilityKind
     ? FacilityKind
@@ -161,6 +163,7 @@ function wireNames<E extends string>(values: readonly E[]): (value: E) => Consta
 
 const unitType = engineValues(UNIT_TYPES);
 const material = engineValues(MATERIALS);
+const gatheringTrait = engineValues(GATHERING_TRAITS);
 const facilityKind = engineValues(FACILITY_KINDS);
 const outcome = engineValues(ADVENTURE_OUTCOMES);
 const stageKind = engineValues(STAGE_KINDS);
@@ -190,7 +193,7 @@ function adventureFromWire(adventure: AdventureFieldsFragment): AdventureView {
     ...adventure,
     snapshot: {
       ...adventure.snapshot,
-      heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType), stats: { ...h.stats, gather: materials(h.stats.gather) } })),
+      heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType), stats: { ...h.stats, traits: h.stats.traits.map((t) => ({ ...t, trait: gatheringTrait(t.trait) })) } })),
     },
   };
 }

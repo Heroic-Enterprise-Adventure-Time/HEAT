@@ -62,8 +62,8 @@ async function gql(query: string, variables: Record<string, unknown> = {}, playe
 }
 
 /** A request Apollo refuses before executing it, which it answers with a 400 and the reason in `errors`. */
-async function invalid(query: string, variables: Record<string, unknown>, playerId: string): Promise<Reply<unknown>> {
-  const res = await handler(event(query, variables, playerId), {} as LambdaContext);
+async function invalid(query: string, variables: Record<string, unknown>, playerId: string, headers: Record<string, string> = {}): Promise<Reply<unknown>> {
+  const res = await handler(event(query, variables, playerId, headers), {} as LambdaContext);
   expect(res.statusCode).toBe(400);
   return JSON.parse(res.body ?? "{}") as Reply<unknown>;
 }
@@ -315,7 +315,7 @@ describe("the adventure loop through the graph", () => {
     const { id: adventureId, seed } = must(start.data?.startAdventure.adventure, "the start's adventure");
 
     const me = await gql(
-      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gather { material rating } } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
+      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage traits { trait level } } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
       {}, p,
     );
     expect(me.errors).toBeUndefined();
@@ -325,7 +325,7 @@ describe("the adventure loop through the graph", () => {
       job: { id: "wolves-on-the-mill-road", name: "Wolves on the mill road", location: "millbrook" },
       snapshot: {
         version, jobId: "wolves-on-the-mill-road",
-        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "TIMBER", rating: 2 }, { material: "ORE", rating: 2 }] } }],
+        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "WOODCUTTING", level: 1 }, { trait: "MINING", level: 1 }] } }],
       },
     });
 
@@ -480,5 +480,18 @@ describe("the deploy's version", () => {
     const refused = await gql(START, { requestId: randomUUID(), heroIds: [] }, p, { "heat-version": "0".repeat(40) });
     expect(refused.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
     expect(refused.extensions?.["outdated"]).toBe(true);
+  });
+
+  it("flags outdated on a document refused at validation, which is how a tab loaded before a field was dropped hears of the deploy", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(JOIN, {}, p);
+    // `gather` was UnitStats' field until Issue-339; a client of that deploy still asks for it.
+    const dropped = `{ me { openAdventure { snapshot { heroes { stats { gather { material rating } } } } } } }`;
+    const stale = await invalid(dropped, {}, p, { "heat-version": "0".repeat(40) });
+    expect(stale.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+    expect(stale.extensions?.["outdated"]).toBe(true);
+    // The deploy's own client is refused the same document and is not told to reload.
+    const current = await invalid(dropped, {}, p, { "heat-version": must(process.env["HEAT_VERSION"], "HEAT_VERSION") });
+    expect(current.extensions?.["outdated"]).toBeUndefined();
   });
 });

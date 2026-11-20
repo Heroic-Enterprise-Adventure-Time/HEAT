@@ -3,11 +3,11 @@
  *
  * Adapted from BattleScript Online, bso-game-shared/src/domain/entity.ts and
  * encounter.ts. Kept: the four lines (columns there), the unit kinds with a
- * resource kind among them, the participant snapshot. New: a node's
- * difficulty and maximum yield, and a unit's gather ratings. Left behind (decision
- * 0030): the grid's rows, equipment, traits, skill trees, behavior sets,
- * quests and appearance. A line holds any number of units, with no order
- * within it; a unit starts on its type's home line.
+ * resource kind among them, the participant snapshot. New: a unit's
+ * gathering traits, and an enemy's drops and XP (decision 0058). Left behind
+ * (decision 0030): the grid's rows, equipment, BattleScript's traits, skill
+ * trees, behavior sets, quests and appearance. A line holds any number of
+ * units, with no order within it; a unit starts on its type's home line.
  */
 
 import type { Material, MonsterType, ResourceType, UnitType } from "../index.js";
@@ -34,29 +34,62 @@ export type Side = "party" | "opponents";
 export type UnitKind = "hero" | "monster" | "resource";
 
 /**
- * A unit's gather rating for one material: how well it harvests a node of
- * it. A hit's yield is by the rating against the node's difficulty, whatever
- * the ability (decision 0051).
+ * The gathering traits, named for the craft and not for a unit type (decision
+ * 0058). The list declares the union (typescript.md, rule 18).
  */
-export interface GatherRating {
-  readonly material: Material;
-  readonly rating: number;
-}
+export const GATHERING_TRAITS = ["woodcutting", "mining"] as const;
+export type GatheringTrait = (typeof GATHERING_TRAITS)[number];
 
-/** A unit's ratings, one entry a material at most; a material with no entry is 0. A list, as a cost is, so the hub's snapshot is the engine's field for field. */
-export type GatherRatings = readonly GatherRating[];
+/**
+ * One gathering trait a unit carries, at a level, a whole number from 1. A
+ * party gathers a drop by the highest level of the drop's trait among its
+ * heroes standing; who hit what does not matter (decision 0058).
+ */
+export interface TraitLevel {
+  readonly trait: GatheringTrait;
+  readonly level: number;
+}
 
 export interface UnitStats {
   readonly maxHealth: number;
   /** Turns per ten seconds; the charge timer is `chargeMs(speed)`. */
   readonly speed: number;
   readonly damage: number;
-  readonly gather: GatherRatings;
+  /**
+   * The unit's gathering traits, one entry a trait at most and any number of
+   * them; a trait with no entry is not carried. A list, as a cost is, so the
+   * hub's snapshot is the engine's field for field.
+   */
+  readonly traits: readonly TraitLevel[];
 }
 
-/** The unit's gather rating for a material, 0 where its stats name none. */
-export function gatherRating(stats: UnitStats, material: Material): number {
-  return stats.gather.find((g) => g.material === material)?.rating ?? 0;
+/** The unit's level in a trait, 0 where its stats name none. */
+export function traitLevel(stats: UnitStats, trait: GatheringTrait): number {
+  return stats.traits.find((t) => t.trait === trait)?.level ?? 0;
+}
+
+/** What a drop gives at one level of its trait: how often, in whole percent, and the least and the most. */
+export interface DropRow {
+  readonly chancePercent: number;
+  readonly min: number;
+  readonly max: number;
+}
+
+/**
+ * Something an enemy may drop when it goes down: a resource, the trait that
+ * gathers it, and a row for each level of the trait, index 0 for level 1.
+ * There is no formula between the levels: a drop that needs level 3 has no
+ * chance in its first two rows (decision 0058).
+ */
+export interface Drop {
+  readonly material: Material;
+  readonly trait: GatheringTrait;
+  readonly levels: readonly DropRow[];
+}
+
+/** The row a level reads: its own, the last row for a level above it, and none for a party that does not carry the trait. */
+export function dropRow(drop: Drop, level: number): DropRow | undefined {
+  return level < 1 ? undefined : drop.levels[Math.min(level, drop.levels.length) - 1];
 }
 
 /** A unit type's or a monster's place in a battle: home line, stats and its one action list. */
@@ -67,36 +100,28 @@ export interface CombatProfile {
   readonly actions: readonly string[];
 }
 
-export interface MonsterProfile extends CombatProfile {
+/** What every enemy has, a monster and a resource node alike, for the party that puts it down (decision 0058). */
+export interface EnemyYield {
+  /** What it may drop when it goes down; none for an enemy that drops nothing. */
+  readonly drops: readonly Drop[];
+  /** The XP it gives each hero that survives the adventure. */
+  readonly xp: number;
+}
+
+export interface MonsterProfile extends CombatProfile, EnemyYield {
   readonly name: string;
 }
 
 /**
  * A resource node: an obstacle that holds its line like a monster and never
- * acts. Every hit does its damage to the node's health; what the party
- * harvests is by `harvested` (decision 0051).
+ * acts (decision 0051). A hit does its damage to the node's health and
+ * gathers nothing; what the node gives is its drops, when it goes down
+ * (decision 0058).
  */
-export interface ResourceNodeProfile {
+export interface ResourceNodeProfile extends EnemyYield {
   readonly name: string;
   readonly homeLine: Line;
-  readonly material: Material;
   readonly health: number;
-  /** The gather rating that harvests the node in full; a lower one harvests its share, a higher one no more. */
-  readonly difficulty: number;
-  /** The most material the node gives, to hits that meet its difficulty all the way down. */
-  readonly maxYield: number;
-}
-
-/**
- * The material harvested from a node so far, from the credit its hits have
- * earned: each hit adds the damage it did times its unit's gather rating, the
- * rating capped at the node's difficulty. Whole numbers, rounded down on the
- * running total, so hits that meet the difficulty all the way down harvest
- * exactly the maximum, and a hit with a zero rating wastes its share of the
- * node for good.
- */
-export function harvested(node: ResourceNodeProfile, credit: number): number {
-  return Math.floor((credit * node.maxYield) / (node.health * node.difficulty));
 }
 
 /** The static content a battle reads; `BATTLE_CONTENT` in content.ts is the game's. */

@@ -3,12 +3,13 @@ import { RouterLink } from '@angular/router';
 
 import type { Job } from '@heat/engine';
 
-import { yieldWords } from './job-words';
+import { boardWords } from './job-words';
 
 /**
  * The jobs a poster lists, the job board or a facility the camp has built
- * (Issue-115, Issue-133): each with what it brings home, linked to its
- * detail under the poster's panel, `<panel>/jobs/<id>`.
+ * (Issue-115, Issue-133): each with its pay and its bonus XP, and nothing of
+ * what it drops (decision 0058), linked to its detail under the poster's
+ * panel, `<panel>/jobs/<id>`.
  */
 @Component({
   selector: 'heat-job-list',
@@ -18,5 +19,5 @@ import { yieldWords } from './job-words';
 })
 export class JobList {
   readonly jobs = input.required<readonly Job[]>();
-  protected readonly brings = yieldWords;
+  protected readonly pays = boardWords;
 }

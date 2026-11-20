@@ -6,7 +6,7 @@ import {
   ADVENTURE_OUTCOMES,
   type AdventureSnapshot,
   FACILITY_KINDS,
-  type GatherRating,
+  GATHERING_TRAITS,
   hallCapacity,
   type Job,
   jobOf,
@@ -19,6 +19,7 @@ import {
   STAGE_ENDINGS,
   STAGE_KINDS,
   type StageResult,
+  type TraitLevel,
   UNIT_TYPES,
   type UnitStats,
   warehouseCapacity,
@@ -85,6 +86,7 @@ function enumOf<T extends string>(name: string, description: string, values: rea
 
 const UnitTypeRef = enumOf("UnitType", "The unit types, the engine's `UnitType`: what a hero is and what the hall recruits.", UNIT_TYPES);
 const MaterialRef = enumOf("Material", "The resources, the engine's `Material`: there is no currency.", MATERIALS);
+const GatheringTraitRef = enumOf("GatheringTrait", "The gathering traits, the engine's `GatheringTrait`, each named for its craft: what a party must carry for an enemy's drop to fall to it.", GATHERING_TRAITS);
 const FacilityKindRef = enumOf("FacilityKind", "A camp's own facilities, the engine's `FacilityKind`, those every camp has and those it may build.", FACILITY_KINDS);
 const AdventureOutcomeRef = enumOf(
   "AdventureOutcome",
@@ -195,11 +197,11 @@ const JobRef = builder.objectRef<Job>("Job").implement({
   }),
 });
 
-const GatherRatingRef = builder.objectRef<GatherRating>("GatherRating").implement({
-  description: "How well a unit harvests the resource nodes of one material, the engine's `GatherRating`.",
+const TraitLevelRef = builder.objectRef<TraitLevel>("TraitLevel").implement({
+  description: "One gathering trait a unit carries and its level in it, the engine's `TraitLevel`.",
   fields: (t) => ({
-    material: t.expose("material", { type: MaterialRef }),
-    rating: t.exposeInt("rating", { description: "Set against a node's difficulty: a hit's yield is its share of the node's maximum, and a rating above the difficulty yields no more." }),
+    trait: t.expose("trait", { type: GatheringTraitRef }),
+    level: t.exposeInt("level", { description: "A whole number from 1. When an enemy goes down, the highest level of its drop's trait among the heroes standing says how much of the drop falls." }),
   }),
 });
 
@@ -209,9 +211,9 @@ const UnitStatsRef = builder.objectRef<UnitStats>("UnitStats").implement({
     maxHealth: t.exposeInt("maxHealth"),
     speed: t.exposeInt("speed", { description: "Turns per ten seconds." }),
     damage: t.exposeInt("damage"),
-    gather: t.expose("gather", {
-      type: [GatherRatingRef],
-      description: "The unit's gather rating for each material it harvests; a material with no entry is 0, and a hit on a node of it yields nothing.",
+    traits: t.expose("traits", {
+      type: [TraitLevelRef],
+      description: "The unit's gathering traits, one entry a trait at most; a trait with no entry is not carried, and a party with no carrier of a drop's trait gets none of that drop.",
     }),
   }),
 });

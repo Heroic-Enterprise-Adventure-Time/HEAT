@@ -129,7 +129,7 @@ describe("an item from before ElectroDB", () => {
 
   it("reads a settled adventure back whole, nested fields no entity declares included", async () => {
     const adventureId = randomUUID();
-    const snapshot = { version: "v", jobId: "sticks", heroes: [{ heroId: "h", name: "Old", stats: { gather: [] }, notDeclared: { deep: [1, null] } }] };
+    const snapshot = { version: "v", jobId: "sticks", heroes: [{ heroId: "h", name: "Old", stats: { traits: [] }, notDeclared: { deep: [1, null] } }] };
     const result = { outcome: "won", endedAtMs: 12, reachedStage: 0, stages: [{ stage: 0, kind: "battle", ended: "cleared", startedAtMs: 0, endedAtMs: 12 }], rewards: [{ material: "timber", amount: 3 }], credited: [], lost: [], heroes: [] };
     const record = {
       adventureId, playerId: "p", seed: "s", location: at, jobId: "sticks", snapshot, version: "v", startedAt: "2026-10-21T12:00:00.000Z",
@@ -139,21 +139,27 @@ describe("an item from before ElectroDB", () => {
     expect(await repo.getAdventure(adventureId)).toEqual(record);
   });
 
-  it("reads a snapshot from before the gather ratings with each hero's unit type's ratings of today, and one that has ratings as it is (Issue-283)", async () => {
+  it("reads a snapshot from before the gathering traits with each hero's unit type's traits of today, and one that has traits as it is (Issue-339)", async () => {
     const adventureId = randomUUID();
     const hero = { heroId: "h", unitType: "villager", name: "Old", spriteSet: "villager-01", level: 1 };
     const wolf = { heroId: "w", unitType: "wolf", name: "Odd", spriteSet: "wolf-01", level: 1 };
-    const own = { heroId: "o", unitType: "villager", name: "New", spriteSet: "villager-01", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "ore", rating: 1 }] } };
-    // As the deploy before wrote them: one `gathering` stat and no ratings.
-    const old = { maxHealth: 30, speed: 8, damage: 4, gathering: 4 };
+    const own = { heroId: "o", unitType: "villager", name: "New", spriteSet: "villager-01", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "mining", level: 3 }] } };
+    // As the deploy before wrote them, with the gather ratings of decision 0051, and as the one before that did, with one `gathering` stat.
+    const old = { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] };
+    const older = { maxHealth: 30, speed: 8, damage: 4, gathering: 4 };
     const record = {
       adventureId, playerId: "p", seed: "s", location: at, jobId: "sticks", version: "v", startedAt: "2026-11-09T12:00:00.000Z", status: "OPEN",
-      snapshot: { version: "v", jobId: "sticks", heroes: [{ ...hero, stats: old }, { ...wolf, stats: old }, own] },
+      snapshot: { version: "v", jobId: "sticks", heroes: [{ ...hero, stats: old }, { ...hero, heroId: "g", stats: older }, { ...wolf, stats: old }, own] },
     };
     await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
-    const { gather } = must(UNIT_PROFILES.villager, "the villager's profile").stats;
-    expect(gather).not.toEqual([]);
-    expect((await repo.getAdventure(adventureId))?.snapshot.heroes).toEqual([{ ...hero, stats: { ...old, gather } }, { ...wolf, stats: { ...old, gather: [] } }, own]);
+    const { traits } = must(UNIT_PROFILES.villager, "the villager's profile").stats;
+    expect(traits).not.toEqual([]);
+    expect((await repo.getAdventure(adventureId))?.snapshot.heroes).toEqual([
+      { ...hero, stats: { ...old, traits } },
+      { ...hero, heroId: "g", stats: { ...older, traits } },
+      { ...wolf, stats: { ...old, traits: [] } },
+      own,
+    ]);
   });
 
   it("reads a record from before Issue-113, which has no snapshot, as it is", async () => {

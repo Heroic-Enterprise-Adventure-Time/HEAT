@@ -3,6 +3,7 @@
  * (architecture overview, "Engine provenance"; decision 0030).
  */
 export * from "./ability.js";
+export * from "./drops.js";
 export * from "./engine.js";
 export * from "./events.js";
 export * from "./override.js";

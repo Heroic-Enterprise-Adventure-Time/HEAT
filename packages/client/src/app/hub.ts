@@ -2,7 +2,8 @@ import { inject, Service, signal } from '@angular/core';
 import { ApolloLink, CombinedGraphQLErrors, ServerError } from '@apollo/client';
 import { SetContextLink } from '@apollo/client/link/context';
 import { HttpLink } from 'apollo-angular/http';
-import { map } from 'rxjs';
+import { tap } from 'rxjs';
+import * as z from 'zod/mini';
 
 import { Config } from './config';
 import { Session } from './session';
@@ -68,6 +69,18 @@ export function apiError(e: unknown): ApiError {
 /** The request header that carries the client's version; the hub's `VERSION_HEADER`. */
 export const VERSION_HEADER = 'heat-version';
 
+/** A refused request's body, as far as the chain reads it: the hub's flag that this client is not the deploy's. */
+const FlaggedOutdated = z.object({ extensions: z.object({ outdated: z.literal(true) }) });
+
+/** Whether the body of a response the hub refused carries the `outdated` flag; a body that is not the hub's JSON, a gateway's page, carries none. */
+function flagsOutdated(bodyText: string): boolean {
+  try {
+    return FlaggedOutdated.safeParse(JSON.parse(bodyText)).success;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Which deploy a request goes to: the current one at the stack's GraphQL
  * path, or the one before at `/previous` in front of it, which verifies the
@@ -84,7 +97,10 @@ export const PREVIOUS: Route = 'previous';
  * the previous deploy's, with the signed-in player's access token and the
  * version the client loaded from `config.json`; and a response flagged
  * `outdated`, errors included, means a newer deploy is live (decision 0030),
- * which `Updates` acts on.
+ * which `Updates` acts on. A refused request is read for the flag too: a
+ * document that asks for a field a newer schema has dropped is refused at
+ * validation with HTTP 400, and that refusal is how a tab loaded before the
+ * deploy first hears of it (the review of PR-345, Issue-339).
  */
 @Service()
 export class Hub {
@@ -106,9 +122,14 @@ export class Hub {
     });
     const outdated = new ApolloLink((operation, forward) =>
       forward(operation).pipe(
-        map((result) => {
-          if (result.extensions?.['outdated'] === true) this.outdated.set(true);
-          return result;
+        tap({
+          next: (result) => {
+            if (result.extensions?.['outdated'] === true) this.outdated.set(true);
+          },
+          // A request the hub refuses before running it is answered with HTTP 400, which reaches the chain as an error and not as a result.
+          error: (e: unknown) => {
+            if (ServerError.is(e) && flagsOutdated(e.bodyText)) this.outdated.set(true);
+          },
         }),
       ),
     );

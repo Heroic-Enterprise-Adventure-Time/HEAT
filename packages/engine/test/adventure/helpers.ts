@@ -1,6 +1,6 @@
 /** Builders for the adventure tests. */
 
-import { range } from "es-toolkit";
+import { range, sum } from "es-toolkit";
 
 import {
   ADVENTURE_CONTENT,
@@ -8,8 +8,14 @@ import {
   type AdventureEvent,
   type AdventureResult,
   type AdventureSnapshot,
+  dropRow,
+  isResourceType,
   type Job,
   type Material,
+  MONSTERS,
+  must,
+  RESOURCE_NODES,
+  type ResourceType,
   type SnapshotHero,
   UNIT_PROFILES,
   type UnitStats,
@@ -35,6 +41,26 @@ export function villagers(count: number): SnapshotHero[] {
 /** How much of a material a result brings home; none is 0. */
 export function rewardOf(result: AdventureResult, material: Material): number {
   return result.rewards.find((r) => r.material === material)?.amount ?? 0;
+}
+
+/**
+ * The least and the most that `count` of a resource node drop for a party
+ * whose highest level in the node's trait is `level`, from the content's rows
+ * (decision 0058).
+ */
+export function haul(type: ResourceType, level: number, count = 1): { readonly min: number; readonly max: number } {
+  const drop = must(RESOURCE_NODES[type].drops[0], `the drop of a ${type}`);
+  const row = must(dropRow(drop, level), `its row at level ${level}`);
+  return { min: row.min * count, max: row.max * count };
+}
+
+/** The XP of the enemies a job always sets against a party, every stage's together. */
+export function enemiesXp(job: Job): number {
+  return sum(
+    job.stages.flatMap((stage) =>
+      stage.kind === "fight" || stage.kind === "gather" ? stage.opponents.map((o) => o.count * (isResourceType(o.type) ? RESOURCE_NODES[o.type].xp : MONSTERS[o.type].xp)) : [],
+    ),
+  );
 }
 
 export function snapshot(jobId: string, heroes: readonly SnapshotHero[]): AdventureSnapshot {
