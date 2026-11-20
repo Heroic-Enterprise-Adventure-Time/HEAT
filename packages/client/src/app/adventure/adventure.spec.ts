@@ -121,8 +121,10 @@ const ON_THE_ROAD = 'On the road: abilities are for a fight or a gather.';
 const onTheRoad = () => screen.getByText(ON_THE_ROAD);
 /** The villager's chop, which can be used once the party is among the trees. */
 const chop = () => abilities('Wren').getByRole('button', { name: 'Chop' });
+/** The live region that says what the party carries: in the page from the start, and empty while it carries nothing. */
+const carryingLine = () => screen.getByRole('status');
 /** What the party carries, as the page says it, or null while it carries nothing. */
-const carrying = () => screen.queryByText(/^Carrying /)?.textContent ?? null;
+const carrying = () => carryingLine().textContent || null;
 
 describe('Adventure', () => {
   beforeEach(() => { localStorage.clear(); });
@@ -148,6 +150,9 @@ describe('Adventure', () => {
 
   it('says what the party carries the moment an enemy falls, before the stage ends, and nothing until then (Issue-339)', async () => {
     const { run } = await renderAdventure(fakeGame());
+    // The line is there before anything drops, so that the first drop is a change a screen reader speaks.
+    expect(carryingLine()).toBeInTheDocument();
+    expect(carrying()).toBeNull();
     await run(4100);
     expect(carrying()).toBeNull();
     const amountAfter = async (before: string | null) => {

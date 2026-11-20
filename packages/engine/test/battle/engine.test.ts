@@ -28,28 +28,10 @@ import {
   rollDrops,
   type UnitState,
 } from "../../src/index.js";
-import { contentWith, hero, ofKind, opponent, runAll, setup } from "./helpers.js";
+import { contentWith, hero, ofKind, opponent, runAll, setup, unitState } from "./helpers.js";
 
-function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = {}): UnitState {
-  return {
-    unitId,
-    kind: "hero",
-    type: "villager",
-    side: "party",
-    stats: { maxHealth: 30, speed: 10, damage: 4, traits: [{ trait: "woodcutting", level: 1 }, { trait: "mining", level: 1 }] },
-    actions: [],
-    acts: true,
-    health: 30,
-    line: "front",
-    chargeTimer,
-    currentAction: null,
-    guard: null,
-    drops: [],
-    xp: 0,
-    alive: true,
-    ...extra,
-  };
-}
+/** A unit by the charge timer it holds, which is all `findNextUnit` reads beside whether it lives and acts. */
+const state = (unitId: string, chargeTimer: number, extra: Partial<UnitState> = {}): UnitState => unitState(unitId, { chargeTimer, ...extra });
 
 describe("findNextUnit same-tick ordering", () => {
   it("picks the smallest charge timer", () => {

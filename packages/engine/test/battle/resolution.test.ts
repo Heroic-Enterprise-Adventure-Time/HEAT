@@ -18,30 +18,12 @@ import {
   selectAction,
   type Side,
   targetCandidates,
-  type UnitKind,
   type UnitState,
 } from "../../src/index.js";
+import { unitState } from "./helpers.js";
 
-function unit(unitId: string, side: Side, line: Line, extra: Partial<UnitState> & { kind?: UnitKind } = {}): UnitState {
-  return {
-    unitId,
-    kind: "hero",
-    type: "villager",
-    side,
-    stats: { maxHealth: 30, speed: 10, damage: 4, traits: [{ trait: "woodcutting", level: 1 }, { trait: "mining", level: 1 }] },
-    actions: [],
-    acts: true,
-    health: 30,
-    line,
-    chargeTimer: 1000,
-    currentAction: null,
-    guard: null,
-    drops: [],
-    xp: 0,
-    alive: true,
-    ...extra,
-  };
-}
+/** A unit by where it stands, which is what selection reads first. */
+const unit = (unitId: string, side: Side, line: Line, extra: Partial<UnitState> = {}): UnitState => unitState(unitId, { side, line, ...extra });
 
 const wolf = (id: string, line: Line, health = 24): UnitState => unit(id, "opponents", line, { kind: "monster", type: "wolf", health });
 const tree = (id: string): UnitState =>

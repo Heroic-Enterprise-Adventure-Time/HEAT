@@ -54,14 +54,17 @@ export class Adventure {
     return field ? secondsLeft(field, this.play.simTime()) : null;
   });
   /**
-   * What has dropped to the party in words, "34 timber, 22 ore", or null when
-   * nothing has: it counts up the moment an enemy falls, which is how the page
-   * shows a drop (the owner, 2026-11-20, Issue-339; the scene's own picture of
-   * one is Issue-344).
+   * What has dropped to the party in words, "Carrying 34 timber, 22 ore", or
+   * nothing while nothing has: it counts up the moment an enemy falls, which
+   * is how the page shows a drop (the owner, 2026-11-20, Issue-339; the
+   * scene's own picture of one is Issue-344). Its element is a live region
+   * that is in the page from the start and empty until then, because one that
+   * arrives already holding its words is not reliably spoken (the review of
+   * PR-345).
    */
   protected readonly carrying = computed(() => {
     const drops = this.play.field()?.drops ?? [];
-    return drops.length > 0 ? drops.map(rewardWords).join(', ') : null;
+    return drops.length > 0 ? `Carrying ${drops.map(rewardWords).join(', ')}` : '';
   });
   /** Whether a hero can be told what to do: in a fight or a gather, before the end. */
   protected readonly inBattle = computed(() => {

@@ -60,6 +60,14 @@ describe('what the party carries', () => {
     expect(ended.drops).toEqual([{ material: 'timber', amount: 34 }]);
   });
 
+  it('carries nothing once the party is all down, and keeps what it carries on a retreat or an arrival', () => {
+    const carried = applyEvent(field(60_000), drop('timber', 34));
+    const ended = (outcome: 'complete' | 'retreat' | 'defeat') => applyEvent(carried, { kind: 'adventure-end', timestamp: 9000, outcome }).drops;
+    expect(ended('defeat')).toEqual([]);
+    expect(ended('retreat')).toEqual([{ material: 'timber', amount: 34 }]);
+    expect(ended('complete')).toEqual([{ material: 'timber', amount: 34 }]);
+  });
+
   it('carries nothing before anything has dropped', () => {
     expect(emptyField([]).drops).toEqual([]);
   });

@@ -133,7 +133,8 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
     case 'order':
       return { ...field, order: event.order };
     case 'adventure-end':
-      return { ...field, outcome: event.outcome };
+      // A party that is all down keeps nothing, so it carries nothing from here (decision 0058).
+      return { ...field, outcome: event.outcome, drops: event.outcome === 'defeat' ? [] : field.drops };
     default:
       return field;
   }

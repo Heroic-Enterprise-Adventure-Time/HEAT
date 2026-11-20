@@ -125,9 +125,7 @@
         </button>
       </div>
 
-      @if (carrying(); as carrying) {
-        <p class="carrying" role="status">Carrying {{ carrying }}</p>
-      }
+      <p class="carrying" role="status">{{ carrying() }}</p>
     }
 
     @if (play.submit().state === 'submitting') {
