@@ -4,21 +4,28 @@
  * deaths, timeline metadata, the front line, and the time limit, which ends
  * as `timeout` here. Status effects, resources, cooldowns, traits and skill
  * trees are left behind (decision 0030). Line collapse as one event, move up,
- * guard and resource nodes are new.
+ * guard, resource nodes, drops and enemy XP are new.
  */
 
-import { sum } from "es-toolkit";
+import { range, sortBy, zip } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import {
   BATTLE_TIMELINE_SCHEMA_VERSION,
+  type BattleContent,
+  type BattleOutcome,
   chargeMs,
   CombatEngine,
+  type Drop,
+  type DropRow,
   findNextUnit,
-  harvested,
+  type GatheringTrait,
+  MONSTERS,
   must,
+  type PartyMember,
   resolveBattle,
   RESOURCE_NODES,
+  rollDrops,
   type UnitState,
 } from "../../src/index.js";
 import { contentWith, hero, ofKind, opponent, runAll, setup } from "./helpers.js";
@@ -29,7 +36,7 @@ function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = 
     kind: "hero",
     type: "villager",
     side: "party",
-    stats: { maxHealth: 30, speed: 10, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] },
+    stats: { maxHealth: 30, speed: 10, damage: 4, traits: [{ trait: "woodcutting", level: 1 }, { trait: "mining", level: 1 }] },
     actions: [],
     acts: true,
     health: 30,
@@ -37,7 +44,8 @@ function state(unitId: string, chargeTimer: number, extra: Partial<UnitState> = 
     chargeTimer,
     currentAction: null,
     guard: null,
-    credit: 0,
+    drops: [],
+    xp: 0,
     alive: true,
     ...extra,
   };
@@ -289,71 +297,20 @@ describe("Resource nodes", () => {
     expect(ofKind(events, "turn-start").some((e) => e.unitId === "tree-1")).toBe(false);
   });
 
-  it("take a hit's whole damage, and yield by the hitter's rating against their difficulty", () => {
-    // A villager's 2 against a tree's 3: two thirds of its 45.
+  it("take a hit as any unit does, and give nothing for it", () => {
     const outcome = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
-    expect(outcome.result).toBe("win");
-    expect(outcome.gathered).toEqual({ timber: 30 });
-    const harvests = ofKind(outcome.timeline.events, "action-resolved").flatMap((e) => e.effects);
-    expect(harvests[0]).toEqual({ kind: "harvest", targetId: "tree-1", material: "timber", amount: 4, yield: 3, newHealth: 36 });
+    const hits = ofKind(outcome.timeline.events, "action-resolved");
+    expect(must(hits[0], "the first hit").effects).toEqual([{ kind: "damage", targetId: "tree-1", amount: 4, newHealth: 36 }]);
+    const down = must(ofKind(outcome.timeline.events, "unit-down")[0], "the tree's fall");
+    expect(ofKind(outcome.timeline.events, "drop").every((e) => e.timestamp === down.timestamp)).toBe(true);
   });
 
-  it("give exactly their maximum to a rating at their difficulty, and no more to one above it", () => {
-    const { difficulty, maxYield } = RESOURCE_NODES.tree;
-    for (const rating of [difficulty, difficulty + 4]) {
-      const outcome = resolveBattle(setup([hero("villager-1", "villager", undefined, [{ material: "timber", rating }])], [opponent("tree-1", "tree")]));
-      expect(outcome.gathered, String(rating)).toEqual({ timber: maxYield });
-    }
-  });
-
-  it("give nothing to a rating of zero, and fall all the same", () => {
-    const outcome = resolveBattle(setup([hero("fighter-1", "fighter")], [opponent("tree-1", "tree")]));
-    expect(outcome.result).toBe("win");
-    expect(outcome.gathered).toEqual({ timber: 0 });
-    const harvests = ofKind(outcome.timeline.events, "action-resolved").flatMap((e) => e.effects);
-    expect(harvests[0]).toEqual({ kind: "harvest", targetId: "tree-1", material: "timber", amount: 6, yield: 0, newHealth: 34 });
-    expect(ofKind(outcome.timeline.events, "unit-down").map((e) => e.unitId)).toEqual(["tree-1"]);
-  });
-
-  it("lose for good what a zero-rating hit took: the fighter beside a villager wastes the tree", () => {
-    const alone = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
-    const outcome = resolveBattle(setup([hero("fighter-1", "fighter"), hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
-    const hits = ofKind(outcome.timeline.events, "action-resolved").flatMap((e) => e.effects.flatMap((f) => (f.kind === "harvest" ? [{ by: e.unitId, ...f }] : [])));
-    const villagerDamage = sum(hits.filter((h) => h.by === "villager-1").map((h) => h.amount));
-    expect(hits.some((h) => h.by === "fighter-1" && h.amount > 0 && h.yield === 0)).toBe(true);
-    // What the villager's own hits earned, and nothing for the rest of the tree's health.
-    expect(outcome.gathered.timber).toBe(harvested(RESOURCE_NODES.tree, villagerDamage * 2));
-    expect(outcome.gathered.timber).toBeLessThan(alone.gathered.timber ?? 0);
-    expect(outcome.result).toBe("win");
-  });
-
-  it("round down on the running total, never on each hit", () => {
-    const node = { ...RESOURCE_NODES.tree, health: 40, difficulty: 3, maxYield: 10 };
-    // A villager's hit earns 4 x 2 of the 120 that would be the whole 10: two thirds of one.
-    expect(harvested(node, 8)).toBe(0);
-    expect(harvested(node, 16)).toBe(1);
-    expect(harvested(node, 40 * 2)).toBe(6);
-    expect(harvested(node, 40 * 3)).toBe(10);
-    expect(harvested(node, 0)).toBe(0);
-  });
-
-  it("are gathered only by the ability for their material", () => {
+  it("are worked only by the ability of their kind", () => {
     const outcome = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree"), opponent("vein-1", "ore-vein")]));
-    expect(outcome.gathered).toEqual({ timber: 30, ore: 20 });
     const resolved = ofKind(outcome.timeline.events, "action-resolved");
     expect(resolved.filter((e) => e.abilityId === "chop").every((e) => e.targetIds[0] === "tree-1")).toBe(true);
     expect(resolved.filter((e) => e.abilityId === "mine").every((e) => e.targetIds[0] === "vein-1")).toBe(true);
-  });
-
-  it("yield the same to a strike as to a chop: the rating is the unit's, not the ability's", () => {
-    const engine = new CombatEngine(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")]));
-    while (!engine.isComplete()) {
-      engine.submitOverride("villager-1", { kind: "force-action", abilityId: "strike" });
-      engine.step();
-    }
-    const outcome = engine.getOutcome();
-    expect(ofKind(outcome.timeline.events, "action-resolved").some((e) => e.abilityId === "strike")).toBe(true);
-    expect(outcome.gathered).toEqual({ timber: 30 });
+    expect(resolved.some((e) => e.abilityId === "chop") && resolved.some((e) => e.abilityId === "mine")).toBe(true);
   });
 
   it("stand with monsters in one battle, which ends only when all of them are down", () => {
@@ -361,8 +318,8 @@ describe("Resource nodes", () => {
     expect(outcome.result).toBe("win");
     const downs = ofKind(outcome.timeline.events, "unit-down").map((e) => e.unitId);
     expect(downs).toEqual(expect.arrayContaining(["wolf-1", "tree-1"]));
-    expect(outcome.timeline.events.at(-2)).toMatchObject({ kind: "unit-down" });
-    expect(outcome.gathered).toEqual({ timber: 30 });
+    // The tree falls last: its fall, what it dropped, and the end.
+    expect(outcome.timeline.events.slice(-3).map((e) => e.kind)).toEqual(["unit-down", "drop", "battle-end"]);
   });
 
   it("wait until the monsters are down", () => {
@@ -371,5 +328,172 @@ describe("Resource nodes", () => {
     expect(wolfDown).toBeDefined();
     const firstChop = ofKind(events, "action-declared").find((e) => e.abilityId === "chop");
     expect(firstChop?.timestamp).toBeGreaterThanOrEqual(wolfDown?.timestamp ?? Infinity);
+  });
+});
+
+/** The seeds a drop is checked over. */
+const seeds = range(200).map((i) => `seed-${i}`);
+const [timberAt1, timberAt2] = must(RESOURCE_NODES.tree.drops[0], "the tree's drop").levels;
+const level1 = must(timberAt1, "the tree's row at woodcutting 1");
+const level2 = must(timberAt2, "the tree's row at woodcutting 2");
+
+/** One tree, felled by this party on this seed. */
+function fell(party: readonly PartyMember[], seed: string, content?: BattleContent): BattleOutcome {
+  return resolveBattle(setup(party, [opponent("tree-1", "tree")], seed), content);
+}
+
+describe("Drops (decision 0058)", () => {
+  it("fall when the enemy goes down, as one event after its fall, and are the battle's drops", () => {
+    const outcome = fell([hero("villager-1", "villager")], "seed-1");
+    const events = outcome.timeline.events;
+    const down = events.findIndex((e) => e.kind === "unit-down" && e.unitId === "tree-1");
+    const drop = must(ofKind(events, "drop")[0], "the drop");
+    expect(events[down + 1]).toBe(drop);
+    expect(drop).toEqual({ kind: "drop", timestamp: must(events[down], "the fall").timestamp, unitId: "tree-1", material: "timber", amount: outcome.drops.timber });
+    expect(ofKind(events, "drop")).toHaveLength(1);
+  });
+
+  it("are read at level 1 for a villager: 30 to 36 timber a tree, always, and every amount of the range on some seed", () => {
+    const amounts = seeds.map((seed) => fell([hero("villager-1", "villager")], seed).drops.timber ?? 0);
+    expect(Math.min(...amounts)).toBe(level1.min);
+    expect(Math.max(...amounts)).toBe(level1.max);
+    expect(new Set(amounts).size).toBe(level1.max - level1.min + 1);
+  });
+
+  it("are read at level 2 for a lumberjack: 42 to 50 timber a tree, always", () => {
+    const amounts = seeds.map((seed) => fell([hero("lumberjack-1", "lumberjack")], seed).drops.timber ?? 0);
+    expect(Math.min(...amounts)).toBe(level2.min);
+    expect(Math.max(...amounts)).toBe(level2.max);
+  });
+
+  it("read the last row for a level above it", () => {
+    for (const seed of seeds.slice(0, 50)) {
+      const master = fell([hero("villager-1", "villager", undefined, [{ trait: "woodcutting", level: 5 }])], seed);
+      const lumberjack = fell([hero("villager-1", "villager", undefined, [{ trait: "woodcutting", level: 2 }])], seed);
+      expect(master.drops, seed).toEqual(lumberjack.drops);
+    }
+  });
+
+  it("go by the highest level among the heroes standing, not by who hit: a lumberjack beside a villager and a fighter is level 2", () => {
+    for (const seed of seeds.slice(0, 50)) {
+      const mixed = fell([hero("fighter-1", "fighter"), hero("villager-1", "villager"), hero("lumberjack-1", "lumberjack")], seed);
+      const hitters = new Set(ofKind(mixed.timeline.events, "action-resolved").map((e) => e.unitId));
+      expect(hitters.size, seed).toBeGreaterThan(1);
+      expect(mixed.drops.timber, seed).toBeGreaterThanOrEqual(level2.min);
+      // One enemy on one seed rolls the same whoever felled it.
+      expect(mixed.drops, seed).toEqual(fell([hero("lumberjack-1", "lumberjack")], seed).drops);
+    }
+  });
+
+  it("need a carrier: a fighter alone fells the tree and nothing drops", () => {
+    for (const seed of seeds.slice(0, 50)) {
+      const outcome = fell([hero("fighter-1", "fighter")], seed);
+      expect(outcome.result, seed).toBe("win");
+      expect(outcome.drops, seed).toEqual({});
+      expect(ofKind(outcome.timeline.events, "drop"), seed).toEqual([]);
+      expect(ofKind(outcome.timeline.events, "unit-down").map((e) => e.unitId), seed).toEqual(["tree-1"]);
+    }
+  });
+
+  it("need only one carrier: a fighter's hits cost a villager's tree nothing", () => {
+    for (const seed of seeds.slice(0, 50)) {
+      const together = fell([hero("fighter-1", "fighter"), hero("villager-1", "villager")], seed);
+      expect(ofKind(together.timeline.events, "action-resolved").some((e) => e.unitId === "fighter-1" && e.targetIds[0] === "tree-1"), seed).toBe(true);
+      expect(together.drops, seed).toEqual(fell([hero("villager-1", "villager")], seed).drops);
+    }
+  });
+
+  it("do not count a carrier that is down: the wolf takes the villager, the ranger fells the tree, and nothing drops", () => {
+    // A wolf that only scratches, so the ranger outlives it; the villager, at one health, does not.
+    const content = contentWith({ monsters: { wolf: { stats: { ...MONSTERS.wolf.stats, damage: 1 } } } });
+    for (const seed of seeds.slice(0, 50)) {
+      const party = [hero("ranger-1", "ranger"), hero("villager-1", "villager", 1)];
+      const outcome = resolveBattle(setup(party, [opponent("wolf-1", "wolf"), opponent("tree-1", "tree")], seed), content);
+      const downs = ofKind(outcome.timeline.events, "unit-down").map((e) => e.unitId);
+      expect(outcome.result, seed).toBe("win");
+      expect(downs.indexOf("villager-1"), seed).toBeLessThan(downs.indexOf("tree-1"));
+      expect(downs.indexOf("villager-1"), seed).toBeGreaterThanOrEqual(0);
+      expect(outcome.drops, seed).toEqual({});
+      expect(ofKind(outcome.timeline.events, "drop"), seed).toEqual([]);
+    }
+  });
+
+  it("are the same for a seed whatever is forced: strikes in place of chops change the fight and not the roll", () => {
+    for (const seed of seeds.slice(0, 50)) {
+      const engine = new CombatEngine(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree")], seed));
+      while (!engine.isComplete()) {
+        engine.submitOverride("villager-1", { kind: "force-action", abilityId: "strike" });
+        engine.step();
+      }
+      const forced = engine.getOutcome();
+      expect(forced.timeline.overrideLog.length, seed).toBeGreaterThan(0);
+      expect(forced.drops, seed).toEqual(fell([hero("villager-1", "villager")], seed).drops);
+    }
+  });
+
+  it("give each tree of a stage a roll of its own", () => {
+    const differing = seeds.filter((seed) => {
+      const events = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree"), opponent("tree-2", "tree")], seed)).timeline.events;
+      const [first, second] = ofKind(events, "drop");
+      return must(first, "the first drop").amount !== must(second, "the second drop").amount;
+    });
+    expect(differing.length).toBeGreaterThan(seeds.length / 2);
+  });
+});
+
+describe("rollDrops", () => {
+  const hide: Drop = { material: "cloth", trait: "mining", levels: [{ chancePercent: 50, min: 1, max: 1 }, { chancePercent: 100, min: 1, max: 2 }] };
+  const timber = must(RESOURCE_NODES.tree.drops[0], "the tree's drop");
+  const at = (levels: Partial<Record<GatheringTrait, number>>) => (trait: GatheringTrait) => levels[trait] ?? 0;
+
+  it("answers the same for the same seed, enemy and levels, and nothing for a trait at level 0", () => {
+    expect(rollDrops("s", "tree-1", [timber], at({ woodcutting: 1 }))).toEqual(rollDrops("s", "tree-1", [timber], at({ woodcutting: 1 })));
+    expect(rollDrops("s", "tree-1", [timber], at({ mining: 3 }))).toEqual([]);
+    expect(rollDrops("s", "tree-1", [], at({ woodcutting: 1 }))).toEqual([]);
+  });
+
+  it("rolls a drop by chance about as often as its row says, and always at a row that says always", () => {
+    const fell = (level: number): number => seeds.filter((seed) => rollDrops(seed, "wolf-1", [hide], at({ mining: level })).length > 0).length;
+    expect(fell(1)).toBeGreaterThan(seeds.length * 0.4);
+    expect(fell(1)).toBeLessThan(seeds.length * 0.6);
+    expect(fell(2)).toBe(seeds.length);
+  });
+
+  it("makes one roll for an enemy whatever the level: a higher level reads the same roll against a better row", () => {
+    const rolls = seeds.map((seed) => ({
+      low: rollDrops(seed, "tree-1", [timber], at({ woodcutting: 1 }))[0]?.amount ?? 0,
+      high: rollDrops(seed, "tree-1", [timber], at({ woodcutting: 2 }))[0]?.amount ?? 0,
+    }));
+    // The same share of each row's range, so the seeds stand in one order at both levels:
+    // a seed that rolls more than another at level 1 never rolls less than it at level 2.
+    const byLow = sortBy(rolls, ["low", "high"]);
+    for (const [a, b] of zip(byLow.slice(0, -1), byLow.slice(1))) expect(b.high, `${a.low} then ${b.low}`).toBeGreaterThanOrEqual(a.high);
+    const share = (amount: number, row: DropRow): number => (amount - row.min) / (row.max - row.min + 1);
+    for (const { low, high } of rolls) expect(Math.abs(share(low, level1) - share(high, level2))).toBeLessThan(1 / (level1.max - level1.min + 1));
+  });
+
+  it("rolls each drop of an enemy the same whether or not the drops before it are gathered", () => {
+    for (const seed of seeds) {
+      const both = rollDrops(seed, "tree-1", [hide, timber], at({ woodcutting: 1, mining: 2 }));
+      const second = rollDrops(seed, "tree-1", [hide, timber], at({ woodcutting: 1 }));
+      expect(second, seed).toEqual(both.filter((d) => d.material === "timber"));
+    }
+  });
+});
+
+describe("Enemy XP (decision 0058)", () => {
+  it("is the XP of every enemy that went down, a node included, with or without a carrier", () => {
+    const party = [hero("villager-1", "villager"), hero("villager-2", "villager")];
+    const outcome = resolveBattle(setup(party, [opponent("wolf-1", "wolf"), opponent("tree-1", "tree")]));
+    expect(outcome.xp).toBe(MONSTERS.wolf.xp + RESOURCE_NODES.tree.xp);
+    expect(fell([hero("fighter-1", "fighter")], "seed-1").xp).toBe(RESOURCE_NODES.tree.xp);
+  });
+
+  it("counts only what went down: a battle that runs out of time gives nothing for what still stands", () => {
+    const outcome = resolveBattle(setup([hero("villager-1", "villager")], [opponent("tree-1", "tree"), opponent("tree-2", "tree")], "seed-1", 8000));
+    expect(outcome.result).toBe("timeout");
+    expect(ofKind(outcome.timeline.events, "unit-down")).toEqual([]);
+    expect(outcome.xp).toBe(0);
+    expect(outcome.drops).toEqual({});
   });
 });

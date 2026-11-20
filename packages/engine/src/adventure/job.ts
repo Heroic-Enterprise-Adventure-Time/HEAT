@@ -3,9 +3,9 @@
  *
  * New in HEAT (architecture overview, "Engine provenance"): BattleScript
  * Online had single encounters and no outer loop. A job is an ordered list of
- * stages run on one timeline, with health and cargo carried between them
- * (game.md, "The battle"; decision 0030). The jobs themselves are in
- * content.ts.
+ * stages run on one timeline, with health, what dropped and the enemies' XP
+ * carried between them (game.md, "The battle"; decisions 0030 and 0058). The
+ * jobs themselves are in content.ts.
  */
 
 import type { BattleContent } from "../battle/index.js";
@@ -45,17 +45,16 @@ export const STAGE_KINDS = ["travel", "fight", "gather", "arrive"] as const sati
 // Every kind of Stage is in the list: a stage added to the union without its kind here fails here (typescript.md, rule 18).
 const _everyStageKindListed: [Exclude<StageKind, (typeof STAGE_KINDS)[number]>] extends [never] ? true : never = true;
 
-/** What a retreat keeps of a job's yield: its own penalty (game.md, "The battle"). */
-export interface RetreatPenalty {
-  readonly keepsPay: boolean;
-  readonly keepsCargo: boolean;
-  /** The share of the job's XP each surviving hero still earns. */
-  readonly xpPercent: number;
-}
-
+/**
+ * A job. What a retreat keeps is one rule for every job, the drops and the
+ * enemies' XP and neither the pay nor the bonus, so a job states no penalty
+ * of its own; one returns with caravans, whose cargo is not a drop (decision
+ * 0058; Issue-292).
+ */
 export interface Job {
   readonly id: string;
   readonly name: string;
+  /** What the job's author chooses to tell: the page says this, the pay and the bonus, and nothing of the stages or the drops (decision 0058). */
   readonly description: string;
   /** The location that posts it. */
   readonly location: string;
@@ -67,9 +66,8 @@ export interface Job {
   readonly stages: readonly Stage[];
   /** The reward from whoever posted the job, paid on arrival. */
   readonly pay: readonly Reward[];
-  /** XP to each surviving hero on arrival. */
-  readonly xp: number;
-  readonly retreat: RetreatPenalty;
+  /** XP to each surviving hero on arrival, on top of the XP of the enemies that went down. */
+  readonly bonusXp: number;
 }
 
 /**

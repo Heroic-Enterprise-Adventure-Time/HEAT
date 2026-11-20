@@ -58,14 +58,22 @@ describe("A goblin behind a vein", () => {
     for (const shot of shots.filter((e) => e.timestamp < goblinDown.timestamp)) expect(shot.targetIds).toEqual(["goblin-1"]);
   });
 
-  it("leaves the ranger the vein once the goblin is down, and its shots waste what they take (the owner's call)", () => {
+  it("leaves the ranger the vein once the goblin is down, and with no miner standing nothing drops from it", () => {
     const events = runAll(new CombatEngine(setup([hero("ranger-1", "ranger")], opponents)));
-    const harvests = ofKind(events, "action-resolved")
-      .filter((e) => e.unitId === "ranger-1")
-      .flatMap((e) => e.effects.filter((f) => f.kind === "harvest"));
-    expect(harvests.length).toBeGreaterThan(0);
-    expect(harvests.every((f) => f.yield === 0)).toBe(true);
+    const shotsAtVein = ofKind(events, "action-resolved").filter((e) => e.unitId === "ranger-1" && e.targetIds[0] === "vein-1");
+    expect(shotsAtVein.length).toBeGreaterThan(0);
+    expect(ofKind(events, "drop")).toEqual([]);
     expect(must(ofKind(events, "battle-end")[0], "the end").result).toBe("win");
+  });
+
+  it("costs a villager's vein nothing when a ranger's shots help bring it down (decision 0058)", () => {
+    const party = [hero("ranger-1", "ranger"), hero("villager-1", "villager")];
+    const events = runAll(new CombatEngine(setup(party, opponents)));
+    const row = must(must(RESOURCE_NODES["ore-vein"].drops[0], "the vein's drop").levels[0], "its row at mining 1");
+    const drop = must(ofKind(events, "drop")[0], "the vein's drop");
+    expect(drop).toMatchObject({ unitId: "vein-1", material: "ore" });
+    expect(drop.amount).toBeGreaterThanOrEqual(row.min);
+    expect(drop.amount).toBeLessThanOrEqual(row.max);
   });
 });
 
@@ -87,10 +95,8 @@ describe("A goblin's throw", () => {
     expect(resolved.effects).toEqual([{ kind: "damage", targetId: "ranger-1", amount: MONSTERS["goblin-rock-thrower"].stats.damage, newHealth: expect.any(Number) as number }]);
   });
 
-  it("gives neither ranged unit a gather rating", () => {
-    for (const node of Object.values(RESOURCE_NODES)) {
-      expect(must(UNIT_PROFILES.ranger, "the ranger").stats.gather.find((g) => g.material === node.material)).toBeUndefined();
-    }
-    expect(MONSTERS["goblin-rock-thrower"].stats.gather).toEqual([]);
+  it("gives neither ranged unit a gathering trait", () => {
+    expect(must(UNIT_PROFILES.ranger, "the ranger").stats.traits).toEqual([]);
+    expect(MONSTERS["goblin-rock-thrower"].stats.traits).toEqual([]);
   });
 });

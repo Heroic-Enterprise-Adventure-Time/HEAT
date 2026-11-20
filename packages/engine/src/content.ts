@@ -348,7 +348,8 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
  * one tree before starting the next (Issue-15). Chop and mine are a strike
  * at a node with their own look: the same damage and the same warmup, so
  * that forcing a strike at a tree gains nothing over chopping it (decision
- * 0051). A ranged attack reaches every line from every line, which is what
+ * 0051). Each is aimed at the nodes of its kind, those with a drop its trait
+ * gathers, whoever swings: no hit gathers anything (decision 0058). A ranged attack reaches every line from every line, which is what
  * makes it the answer to a monster standing behind resource nodes; its
  * warmup is longer than a blow's, and as long as the wind-up and the
  * projectile's flight the page shows as it resolves (decisions 0052 and 0057).
@@ -392,7 +393,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
     warmupMs: 300,
-    effect: { kind: "gather", material: "timber" },
+    effect: { kind: "gather", trait: "woodcutting" },
   },
   mine: {
     abilityId: "mine",
@@ -400,7 +401,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
     warmupMs: 300,
-    effect: { kind: "gather", material: "ore" },
+    effect: { kind: "gather", trait: "mining" },
   },
   shoot: {
     abilityId: "shoot",
@@ -431,77 +432,110 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
 /**
  * Each unit type's home line, base stats and one action list, the first
  * usable action winning. A unit type without one cannot join a battle yet.
- * A villager's gather ratings are low in both timber and ore, below a
- * node's difficulty, so it brings home a share of each; a specialized
- * gatherer meets the difficulty in one of them, and a combat unit has no
- * rating, so its hits waste a node (decision 0051). The miner and the
- * lumberjack have a villager's body and meet the difficulty in their own
- * material, harvesting a node in full; in the other they rate 1, not 0, so
- * that on a stage of nodes alone they still bring home a third of a node
- * rather than wasting it as a fighter does (Issue-287). A ranger stands at
- * the back and shoots whatever is closest, monsters before nodes like any
- * unit; with nothing else left it shoots a node and wastes its share of it
- * (the owner's call on Issue-286).
+ * A unit type's gathering traits are in its stats (decision 0058): the
+ * villager cuts wood and mines at level 1, the lumberjack cuts wood at level
+ * 2 and the miner mines at level 2, each with a villager's body (Issue-287),
+ * and a combat unit carries none. A specialist carries its own trait alone
+ * to start with; that is where the first unit types start and not a rule,
+ * and a unit type added later may carry several (the owner, 2026-11-20). One
+ * carrier standing is enough for a party, and a hit gathers nothing, so a
+ * fighter costs a resource run nothing. A ranger stands at the back and
+ * shoots whatever is closest, monsters before nodes like any unit, and a
+ * node when nothing else is left (decision 0052).
  */
 export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
   villager: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] },
+    stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "woodcutting", level: 1 }, { trait: "mining", level: 1 }] },
     actions: ["strike", "chop", "mine", "move-up"],
   },
   miner: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 1 }, { material: "ore", rating: 3 }] },
+    stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "mining", level: 2 }] },
     actions: ["mine", "chop", "strike", "move-up"],
   },
   lumberjack: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 3 }, { material: "ore", rating: 1 }] },
+    stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "woodcutting", level: 2 }] },
     actions: ["chop", "mine", "strike", "move-up"],
   },
   fighter: {
     homeLine: "front",
-    stats: { maxHealth: 50, speed: 10, damage: 6, gather: [] },
+    stats: { maxHealth: 50, speed: 10, damage: 6, traits: [] },
     actions: ["guard", "strike"],
   },
   ranger: {
     homeLine: "far",
-    stats: { maxHealth: 26, speed: 10, damage: 6, gather: [] },
+    stats: { maxHealth: 26, speed: 10, damage: 6, traits: [] },
     actions: ["shoot"],
   },
 };
 
+/**
+ * The monsters, each with the XP it gives the heroes who survive (decision
+ * 0058). None drops anything yet: the wolf's hide comes with skinning
+ * (Issue-340).
+ */
 export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
   wolf: {
     name: "Wolf",
     homeLine: "front",
-    stats: { maxHealth: 24, speed: 12, damage: 3, gather: [] },
+    stats: { maxHealth: 24, speed: 12, damage: 3, traits: [] },
     actions: ["bite", "move-up"],
+    drops: [],
+    xp: 5,
   },
   bandit: {
     name: "Bandit",
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 9, damage: 5, gather: [] },
+    stats: { maxHealth: 30, speed: 9, damage: 5, traits: [] },
     actions: ["strike-weakest", "move-up"],
+    drops: [],
+    xp: 6,
   },
   // Fragile and hard-hitting, on a line melee cannot reach while anything
   // stands in front of it (decision 0052).
   "goblin-rock-thrower": {
     name: "Goblin rock thrower",
     homeLine: "far",
-    stats: { maxHealth: 12, speed: 8, damage: 5, gather: [] },
+    stats: { maxHealth: 12, speed: 8, damage: 5, traits: [] },
     actions: ["throw-rock"],
+    drops: [],
+    xp: 5,
   },
 };
 
 /**
- * The resource nodes: health, the gather rating that harvests one in full,
- * and the most it gives (decision 0051). A villager, at 2 against 3, brings
- * home two thirds: 30 timber a tree, 20 ore a vein.
+ * The resource nodes: health, XP, and what each drops when it goes down, a
+ * row for each level of the drop's trait (decision 0058). A staple drops
+ * always, within a range, so that each step of the first progression is
+ * still paid by one run of the job before it at its worst roll (decision
+ * 0031): 30 timber a tree and 20 ore a vein at level 1, a villager's, as
+ * under decision 0051.
  */
 export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>> = {
-  tree: { name: "Tree", homeLine: "front", material: "timber", health: 40, difficulty: 3, maxYield: 45 },
-  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", health: 40, difficulty: 3, maxYield: 30 },
+  tree: {
+    name: "Tree",
+    homeLine: "front",
+    health: 40,
+    xp: 3,
+    drops: [{
+      material: "timber",
+      trait: "woodcutting",
+      levels: [{ chancePercent: 100, min: 30, max: 36 }, { chancePercent: 100, min: 42, max: 50 }],
+    }],
+  },
+  "ore-vein": {
+    name: "Ore vein",
+    homeLine: "front",
+    health: 40,
+    xp: 3,
+    drops: [{
+      material: "ore",
+      trait: "mining",
+      levels: [{ chancePercent: 100, min: 20, max: 24 }, { chancePercent: 100, min: 28, max: 32 }],
+    }],
+  },
 };
 
 /** The content a battle reads by default. */
@@ -520,10 +554,12 @@ export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on
  * The jobs, by id, in the order their poster lists them, easiest first
  * (game.md, "The battle"; decision 0031). A job that names a facility is
  * posted by it, not by the job board (Issue-133). A stage ends when
- * everything on the other side is down, so its nodes' maximums are the most
- * a job brings home, and what the party's gather ratings make of them is
- * what it does (decision 0051). A retreat forfeits the pay; from a gathering
- * job it keeps what was gathered. A retreat earns half the XP.
+ * everything on the other side is down (decision 0051), and what a job
+ * brings home is what its enemies drop for the traits the party carries
+ * (decision 0058). Each job's bonus XP is what brings its XP, with the
+ * enemies that always appear, to what decision 0030 gave it: 5, 15, 20, 15
+ * and 25. A job's description is all the page tells of it beside its pay
+ * and its bonus, so it says what its author chooses to tell.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
   // A lone villager cannot fail it: no monster, and its time limit is beyond
@@ -531,7 +567,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   "pick-up-sticks": {
     id: "pick-up-sticks",
     name: "Pick up sticks",
-    description: "One old tree by the village green needs felling. Bring the wood home; nothing out there bites.",
+    description: "One old tree by the village green needs felling. Bring a hero who can cut wood and the timber is yours; nothing out there bites.",
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
@@ -539,8 +575,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [],
-    xp: 5,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 2,
   },
   "timber-from-the-near-woods": {
     id: "timber-from-the-near-woods",
@@ -554,8 +589,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 3 }],
-    xp: 15,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 4,
   },
   // A lone villager dies here on every seed; a fighter with a villager, or
   // three villagers, clear it (decision 0031).
@@ -570,8 +604,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 10 }],
-    xp: 20,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 10,
   },
   // The mine's first job, which pays for a fighter (decision 0031). It
   // mirrors the timber job; a lone villager completes it on every seed tried.
@@ -588,8 +621,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [],
-    xp: 15,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 4,
   },
   // The first mixed stage (Issue-286, decision 0052): the veins hold the
   // front line and the goblins throw from behind them, out of melee's reach
@@ -607,8 +639,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [],
-    xp: 25,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 6,
   },
 };
 

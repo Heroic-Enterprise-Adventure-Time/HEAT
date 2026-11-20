@@ -1,48 +1,52 @@
 import { describe, expect, it } from "vitest";
 
-import { gatherRating, type JobId, JOBS, location, type Material, must, replay, RESOURCE_NODES, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "../../src/index.js";
-import { GOBLINS, ORE, party, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, villagers } from "./helpers.js";
+import { type JobId, JOBS, location, type Material, must, replay, type ResourceType, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "../../src/index.js";
+import { GOBLINS, haul, ORE, party, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, villagers } from "./helpers.js";
 
-// The miner and the lumberjack (Issue-287): each meets a node's difficulty in
-// its own material, so it harvests the node in full where a villager, at 2
-// against 3, brings home two thirds; in the other material it rates 1 and
-// brings home a third (decision 0051's formula).
+// The miner and the lumberjack (Issue-287, as decision 0058 has them): each
+// carries its own trait alone, at level 2, where a villager carries both at
+// level 1. So a specialist's own node drops by its second row, and a node of
+// the other kind drops it nothing.
 
-/** What a lone hero of each type brings home from each gather job, on every seed. */
-const HAULS: readonly { job: JobId; unitType: UnitType; material: Material; amount: number }[] = [
-  { job: STICKS, unitType: "villager", material: "timber", amount: 30 },
-  { job: STICKS, unitType: "lumberjack", material: "timber", amount: 45 },
-  { job: STICKS, unitType: "miner", material: "timber", amount: 15 },
-  { job: TIMBER, unitType: "villager", material: "timber", amount: 60 },
-  { job: TIMBER, unitType: "lumberjack", material: "timber", amount: 90 },
-  { job: TIMBER, unitType: "miner", material: "timber", amount: 30 },
-  { job: ORE, unitType: "villager", material: "ore", amount: 40 },
-  { job: ORE, unitType: "miner", material: "ore", amount: 60 },
-  { job: ORE, unitType: "lumberjack", material: "ore", amount: 20 },
+/** What a lone hero of each type brings home from each gather job: the nodes, and the level of their trait it carries, 0 for none. */
+const HAULS: readonly { job: JobId; unitType: UnitType; material: Material; node: ResourceType; count: number; level: number }[] = [
+  { job: STICKS, unitType: "villager", material: "timber", node: "tree", count: 1, level: 1 },
+  { job: STICKS, unitType: "lumberjack", material: "timber", node: "tree", count: 1, level: 2 },
+  { job: STICKS, unitType: "miner", material: "timber", node: "tree", count: 1, level: 0 },
+  { job: TIMBER, unitType: "villager", material: "timber", node: "tree", count: 2, level: 1 },
+  { job: TIMBER, unitType: "lumberjack", material: "timber", node: "tree", count: 2, level: 2 },
+  { job: TIMBER, unitType: "miner", material: "timber", node: "tree", count: 2, level: 0 },
+  { job: ORE, unitType: "villager", material: "ore", node: "ore-vein", count: 2, level: 1 },
+  { job: ORE, unitType: "miner", material: "ore", node: "ore-vein", count: 2, level: 2 },
+  { job: ORE, unitType: "lumberjack", material: "ore", node: "ore-vein", count: 2, level: 0 },
 ];
 
 describe("The miner and the lumberjack", () => {
-  it("have a villager's body and meet the difficulty in their own material alone", () => {
+  it("have a villager's body and carry their own trait alone, at level 2", () => {
     const villager = must(UNIT_PROFILES.villager, "the villager");
-    for (const [unitType, own] of [["miner", "ore"], ["lumberjack", "timber"]] as const) {
+    for (const [unitType, own] of [["miner", "mining"], ["lumberjack", "woodcutting"]] as const) {
       const profile = must(UNIT_PROFILES[unitType], `the ${unitType}`);
       expect(profile.homeLine).toBe(villager.homeLine);
-      expect({ ...profile.stats, gather: [] }).toEqual({ ...villager.stats, gather: [] });
-      for (const node of Object.values(RESOURCE_NODES)) {
-        const rating = gatherRating(profile.stats, node.material);
-        if (node.material === own) expect(rating).toBe(node.difficulty);
-        else expect(rating).toBe(1);
-      }
+      expect({ ...profile.stats, traits: [] }).toEqual({ ...villager.stats, traits: [] });
+      expect(profile.stats.traits).toEqual([{ trait: own, level: 2 }]);
     }
   });
 
-  for (const { job, unitType, material, amount } of HAULS) {
-    it(`a lone ${unitType} completes "${JOBS[job].name}" on every one of ${SEEDS} seeds with ${amount} ${material} and no death`, () => {
+  it("bring home at level 2 what the first numbers say: 84 to 100 timber from the timber job, 56 to 64 ore from the ore job", () => {
+    expect(haul("tree", 2, 2)).toEqual({ min: 84, max: 100 });
+    expect(haul("ore-vein", 2, 2)).toEqual({ min: 56, max: 64 });
+  });
+
+  for (const { job, unitType, material, node, count, level } of HAULS) {
+    const range = level > 0 ? haul(node, level, count) : { min: 0, max: 0 };
+    const words = level > 0 ? `${range.min} to ${range.max} ${material}` : `no ${material}, which it cannot gather`;
+    it(`a lone ${unitType} completes "${JOBS[job].name}" on every one of ${SEEDS} seeds with ${words} and no death`, () => {
       for (const seed of seeds) {
         const { result } = replay(snapshot(job, party(unitType)), seed, []);
         expect(result.outcome, seed).toBe("complete");
         expect(result.dead, seed).toEqual([]);
-        expect(rewardOf(result, material), seed).toBe(amount);
+        expect(rewardOf(result, material), seed).toBeGreaterThanOrEqual(range.min);
+        expect(rewardOf(result, material), seed).toBeLessThanOrEqual(range.max);
       }
     });
   }

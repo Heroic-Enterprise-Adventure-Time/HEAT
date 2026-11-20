@@ -14,9 +14,10 @@
  * limit is the caller's and ends the battle as `timeout`, not a draw; when a
  * side's front line empties every unit on it moves up one line as one event,
  * also at the start; a guard redirects hits; resource nodes are units that
- * never act, hit like any other and harvested by the hitter's gather rating
- * (decision 0051); and the adventure can end a battle as a retreat
- * (Issue-112).
+ * never act and are hit like any other (decision 0051); an enemy that goes
+ * down gives its XP and drops what the heroes standing can gather, rolled by
+ * a generator of its own (decision 0058); and the adventure can end a battle
+ * as a retreat (Issue-112).
  *
  * Nothing here reads a clock. The caller decides when to step: a live client
  * paced by wall-clock time, or the hub replaying an override log as fast as it
@@ -26,6 +27,7 @@
 import { BATTLE_CONTENT } from "../content.js";
 import type { Material } from "../index.js";
 import type { AbilityDefinition } from "./ability.js";
+import { rollDrops } from "./drops.js";
 import {
   BATTLE_TIMELINE_SCHEMA_VERSION,
   type BattleEvent,
@@ -40,12 +42,11 @@ import type { ActionContext, ActionSelection, DeclaredAction, UnitState } from "
 import {
   type BattleContent,
   type BattleSetup,
-  gatherRating,
-  harvested,
+  type GatheringTrait,
   lineAhead,
   type ParticipantSnapshot,
-  type ResourceNodeProfile,
   type Side,
+  traitLevel,
 } from "./unit.js";
 
 /** The charge time of a unit, in whole milliseconds: speed is turns per ten seconds. */
@@ -108,7 +109,8 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
       chargeTimer: firstCharge(member.stats.speed),
       currentAction: null,
       guard: null,
-      credit: 0,
+      drops: [],
+      xp: 0,
       alive: true,
     });
   }
@@ -130,7 +132,8 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
         chargeTimer: firstCharge(monster.stats.speed),
         currentAction: null,
         guard: null,
-        credit: 0,
+        drops: monster.drops,
+        xp: monster.xp,
         alive: true,
       });
     } else if (node) {
@@ -139,16 +142,16 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
         kind: "resource",
         type: opponent.type,
         side: "opponents",
-        stats: { maxHealth: node.health, speed: 0, damage: 0, gather: [] },
+        stats: { maxHealth: node.health, speed: 0, damage: 0, traits: [] },
         actions: [],
-        node,
         acts: false,
         health: node.health,
         line: node.homeLine,
         chargeTimer: 0,
         currentAction: null,
         guard: null,
-        credit: 0,
+        drops: node.drops,
+        xp: node.xp,
         alive: true,
       });
     } else {
@@ -176,7 +179,8 @@ export class CombatEngine {
   private readonly states: UnitState[];
   private readonly byId: ReadonlyMap<string, UnitState>;
   private readonly participants: readonly ParticipantSnapshot[];
-  private readonly gathered: Partial<Record<Material, number>> = {};
+  private readonly dropped: Partial<Record<Material, number>> = {};
+  private xp = 0;
   private clock = 0;
 
   // Lifecycle flags for the stepping API.
@@ -285,7 +289,8 @@ export class CombatEngine {
       result: this.finalResult,
       endedAtMs: this.clock,
       units: this.states.map((s) => ({ unitId: s.unitId, health: s.health, alive: s.alive })),
-      gathered: { ...this.gathered },
+      drops: { ...this.dropped },
+      xp: this.xp,
       timeline: {
         schemaVersion: BATTLE_TIMELINE_SCHEMA_VERSION,
         seed: this.setup.seed,
@@ -433,28 +438,22 @@ export class CombatEngine {
       if (!target) continue;
       const effect = ability.effect;
       switch (effect.kind) {
+        // A gather ability was aimed at a node of its kind (resolution.ts) and lands as a strike does.
         case "damage":
+        case "gather": {
           if (!target.alive) break;
-          if (target.node) {
-            effects.push(this.harvest(state, target, target.node));
-          } else {
-            const guardian = this.guardianOf(target);
-            const hit = guardian ?? target;
-            hit.health = Math.max(0, hit.health - state.stats.damage);
-            effects.push({
-              kind: "damage",
-              targetId: hit.unitId,
-              amount: state.stats.damage,
-              newHealth: hit.health,
-              ...(guardian ? { guarding: target.unitId } : {}),
-            });
-          }
+          const guardian = this.guardianOf(target);
+          const hit = guardian ?? target;
+          hit.health = Math.max(0, hit.health - state.stats.damage);
+          effects.push({
+            kind: "damage",
+            targetId: hit.unitId,
+            amount: state.stats.damage,
+            newHealth: hit.health,
+            ...(guardian ? { guarding: target.unitId } : {}),
+          });
           break;
-        case "gather":
-          if (target.alive && target.node?.material === effect.material) {
-            effects.push(this.harvest(state, target, target.node));
-          }
-          break;
+        }
         case "guard":
           if (target.alive) {
             state.guard = { allyId: target.unitId, until: this.clock + effect.durationMs };
@@ -485,23 +484,6 @@ export class CombatEngine {
     this.collapseLines();
   }
 
-  /**
-   * A hit on a resource node: the actor's damage to the node's health, and
-   * the material that hit harvests, by the actor's gather rating against the
-   * node's difficulty (`harvested`). A rating of zero yields nothing, and the
-   * health it took is lost to the party.
-   */
-  private harvest(actor: UnitState, target: UnitState, node: ResourceNodeProfile): ResolvedEffect {
-    const { material } = node;
-    const amount = Math.min(actor.stats.damage, target.health);
-    const before = harvested(node, target.credit);
-    target.credit += amount * Math.min(gatherRating(actor.stats, material), node.difficulty);
-    const gained = harvested(node, target.credit) - before;
-    target.health -= amount;
-    this.gathered[material] = (this.gathered[material] ?? 0) + gained;
-    return { kind: "harvest", targetId: target.unitId, material, amount, yield: gained, newHealth: target.health };
-  }
-
   /** The living unit holding an unexpired guard over this one, the first by id if several do. */
   private guardianOf(unit: UnitState): UnitState | undefined {
     let best: UnitState | undefined;
@@ -514,11 +496,28 @@ export class CombatEngine {
   }
 
   private checkDowns(): void {
-    for (const s of this.states) {
-      if (s.alive && s.health <= 0) {
-        s.alive = false;
-        this.events.push({ kind: "unit-down", timestamp: this.clock, unitId: s.unitId });
-      }
+    const fallen = this.states.filter((s) => s.alive && s.health <= 0);
+    // Everyone who fell is down before anything drops, so a hero that fell with an enemy does not gather from it.
+    for (const s of fallen) s.alive = false;
+    for (const s of fallen) {
+      this.events.push({ kind: "unit-down", timestamp: this.clock, unitId: s.unitId });
+      if (s.side === "opponents") this.yieldOf(s);
+    }
+  }
+
+  /**
+   * What an enemy that just went down gives: its XP, and its drops, each
+   * read at the highest level of its trait among the heroes standing. Who
+   * hit it does not matter, a hero that is down does not count, and a trait
+   * nobody standing carries drops nothing (decision 0058).
+   */
+  private yieldOf(enemy: UnitState): void {
+    this.xp += enemy.xp;
+    const standing = this.states.filter((s) => s.side === "party" && s.alive);
+    const levelOf = (trait: GatheringTrait): number => Math.max(0, ...standing.map((s) => traitLevel(s.stats, trait)));
+    for (const { material, amount } of rollDrops(this.setup.seed, enemy.unitId, enemy.drops, levelOf)) {
+      this.dropped[material] = (this.dropped[material] ?? 0) + amount;
+      this.events.push({ kind: "drop", timestamp: this.clock, unitId: enemy.unitId, material, amount });
     }
   }
 

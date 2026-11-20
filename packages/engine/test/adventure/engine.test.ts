@@ -1,25 +1,33 @@
+import { sumBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import {
   ADVENTURE_CONTENT,
   ADVENTURE_TIMELINE_SCHEMA_VERSION,
   AdventureEngine,
+  type AdventureEvent,
   type AdventureLogEntry,
   type Job,
   JOBS,
   levelForXp,
+  MONSTERS,
   replay,
+  RESOURCE_NODES,
 } from "../../src/index.js";
-import { contentWithJob, hero, ofKind, rewardOf, snapshot, TIMBER, WOLVES } from "./helpers.js";
+import { contentWithJob, enemiesXp, haul, hero, ofKind, rewardOf, snapshot, TIMBER, WOLVES } from "./helpers.js";
 
 const retreatAt = (acceptedAtSimTime: number): AdventureLogEntry => ({ kind: "party", acceptedAtSimTime, order: "retreat" });
 const pressOnAt = (acceptedAtSimTime: number): AdventureLogEntry => ({ kind: "party", acceptedAtSimTime, order: "press-on" });
 
 const pair = [hero("fighter-1", "fighter"), hero("villager-1", "villager")];
 const villagers = [hero("villager-1", "villager"), hero("villager-2", "villager")];
+const strikeAt = (acceptedAtSimTime: number, unitId: string): AdventureLogEntry => ({ kind: "unit", acceptedAtSimTime, unitId, override: { kind: "force-action", abilityId: "strike" } });
+/** What each enemy of these tests gives a hero that survives (decision 0058). */
+const WOLF_XP = MONSTERS.wolf.xp;
+const TREE_XP = RESOURCE_NODES.tree.xp;
 
 describe("A job run to the end", () => {
-  it("runs the wolves job's stages in order on one clock and pays the job's reward and XP", () => {
+  it("runs the wolves job's stages in order on one clock and pays the job's reward, and to each hero the wolves' XP and the bonus", () => {
     const { timeline, result } = replay(snapshot(WOLVES, pair), "a", []);
     expect(result.outcome).toBe("complete");
     expect(result.stages.map((s) => [s.kind, s.ended])).toEqual([
@@ -31,12 +39,15 @@ describe("A job run to the end", () => {
     expect(result.stages[1]?.startedAtMs).toBe(4000);
     expect(result.reachedStage).toBe(2);
     expect(result.rewards).toEqual(JOBS[WOLVES].pay);
+    // Each survivor earns both wolves' XP in full, not a share of it, and the bonus for arriving.
+    const earned = 2 * WOLF_XP + JOBS[WOLVES].bonusXp;
+    expect(earned).toBe(20);
     expect(result.xp).toEqual([
-      { heroId: "fighter-1", xp: JOBS[WOLVES].xp },
-      { heroId: "villager-1", xp: JOBS[WOLVES].xp },
+      { heroId: "fighter-1", xp: earned },
+      { heroId: "villager-1", xp: earned },
     ]);
     expect(result.dead).toEqual([]);
-    expect(levelForXp(JOBS[WOLVES].xp)).toBe(2);
+    expect(levelForXp(earned)).toBe(2);
 
     const times = timeline.events.map((e) => e.timestamp);
     expect(times).toEqual([...times].sort((x, y) => x - y));
@@ -44,24 +55,31 @@ describe("A job run to the end", () => {
     expect(timeline.events.at(-1)).toEqual({ kind: "adventure-end", timestamp: result.endedAtMs, outcome: "complete" });
   });
 
-  it("gathers until every node is down, carries the cargo through the fight and pays it with the job's pay", () => {
+  it("gathers until every node is down, carries what dropped through the fight and pays it with the job's pay", () => {
     const { timeline, result } = replay(snapshot(TIMBER, villagers), "a", []);
     expect(result.outcome).toBe("complete");
     expect(result.stages.map((s) => s.ended)).toEqual(["done", "win", "win", "done"]);
-    // Two villagers, two trees: two thirds of each tree's 45.
-    expect(result.rewards).toEqual([{ material: "timber", amount: 60 }, ...JOBS[TIMBER].pay]);
-    expect(result.xp.every((x) => x.xp === JOBS[TIMBER].xp)).toBe(true);
+    // Two trees, each dropping at woodcutting 1, a villager's level.
+    const timber = rewardOf(result, "timber");
+    expect(timber).toBeGreaterThanOrEqual(haul("tree", 1, 2).min);
+    expect(timber).toBeLessThanOrEqual(haul("tree", 1, 2).max);
+    expect(result.rewards).toEqual([{ material: "timber", amount: timber }, ...JOBS[TIMBER].pay]);
+    expect(result.xp.map((x) => x.xp)).toEqual([15, 15]);
+    expect(enemiesXp(JOBS[TIMBER]) + JOBS[TIMBER].bonusXp).toBe(15);
 
     // The gather ends on the last tree, not on a load.
     const trees = ofKind(timeline.events, "unit-down").filter((e) => e.unitId.includes("tree"));
     expect(trees).toHaveLength(2);
     expect(trees.at(-1)?.timestamp).toBe(result.stages[1]?.endedAtMs);
-    // The cargo is carried into the fight.
-    expect(ofKind(timeline.events, "stage-end").map((e) => e.cargo)).toEqual([
+    // What dropped is the two trees' drops, and it is carried into the fight.
+    const drops = ofKind(timeline.events, "drop");
+    expect(drops.map((e) => e.unitId).sort()).toEqual(["s1-tree-1", "s1-tree-2"]);
+    expect(sumBy(drops, (e) => e.amount)).toBe(timber);
+    expect(ofKind(timeline.events, "stage-end").map((e) => e.drops)).toEqual([
       [],
-      [{ material: "timber", amount: 60 }],
-      [{ material: "timber", amount: 60 }],
-      [{ material: "timber", amount: 60 }],
+      [{ material: "timber", amount: timber }],
+      [{ material: "timber", amount: timber }],
+      [{ material: "timber", amount: timber }],
     ]);
   });
 
@@ -76,7 +94,9 @@ describe("A job run to the end", () => {
     expect(result.stages.map((s) => [s.kind, s.ended])).toEqual([["gather", "win"], ["arrive", "done"]]);
     expect(ofKind(timeline.events, "battle-start")[0]?.participants.filter((p) => p.side === "opponents").map((p) => p.kind).sort()).toEqual(["monster", "resource"]);
     expect(ofKind(timeline.events, "unit-down").map((e) => e.unitId).sort()).toEqual(["s0-tree-1", "s0-wolf-1"]);
-    expect(result.rewards).toEqual([{ material: "timber", amount: 30 }, ...job.pay]);
+    expect(result.rewards).toEqual([{ material: "timber", amount: rewardOf(result, "timber") }, ...job.pay]);
+    expect(rewardOf(result, "timber")).toBeGreaterThanOrEqual(haul("tree", 1).min);
+    expect(result.xp.map((x) => x.xp)).toEqual([TREE_XP + WOLF_XP + job.bonusXp, TREE_XP + WOLF_XP + job.bonusXp]);
   });
 
   it("gives every unit its own id when a stage names a type twice", () => {
@@ -115,14 +135,16 @@ describe("A job run to the end", () => {
     const { timeline, result } = replay(snapshot(job.id, party), "a", [], contentWithJob(job));
     expect(result.outcome).toBe("complete");
     expect(result.dead).toEqual(["fighter-1"]);
-    expect(result.xp.map((x) => x.heroId)).toEqual(["villager-1", "villager-2"]);
+    // The survivors earn the XP of every enemy that went down, the wolves the fighter fell to included, and the bonus.
+    const earned = 2 * WOLF_XP + TREE_XP + job.bonusXp;
+    expect(result.xp).toEqual([{ heroId: "villager-1", xp: earned }, { heroId: "villager-2", xp: earned }]);
     const lastFight = ofKind(timeline.events, "battle-start")[1];
     expect(lastFight?.participants.map((p) => p.unitId)).not.toContain("fighter-1");
   });
 });
 
 describe("Retreat", () => {
-  it("is attempted every so often in a fight with a rising chance, and forfeits the wolves job's pay", () => {
+  it("is attempted every so often in a fight with a rising chance, and loses the wolves job's pay and its bonus", () => {
     const { timeline, result } = replay(snapshot(WOLVES, pair), "a", [retreatAt(5000)]);
     const attempts = ofKind(timeline.events, "retreat-attempt");
     const { intervalMs, firstChancePercent, risePercent } = ADVENTURE_CONTENT.retreat;
@@ -140,7 +162,10 @@ describe("Retreat", () => {
     expect(ofKind(timeline.events, "battle-end").at(-1)).toMatchObject({ result: "retreat", timestamp: result.endedAtMs });
     expect(result.reachedStage).toBe(1);
     expect(result.rewards).toEqual([]);
-    expect(result.xp.every((x) => x.xp === JOBS[WOLVES].xp / 2)).toBe(true);
+    // What the party keeps is the XP of the wolves it put down before it got away, and no bonus.
+    const wolvesDown = ofKind(timeline.events, "unit-down").filter((e) => e.unitId.includes("wolf")).length;
+    expect(wolvesDown).toBeLessThan(2);
+    expect(result.xp.map((x) => x.xp)).toEqual(result.xp.map(() => wolvesDown * WOLF_XP));
   });
 
   it("succeeds for certain once the chance reaches 100", () => {
@@ -160,12 +185,29 @@ describe("Retreat", () => {
     expect(result.reachedStage).toBe(0);
   });
 
-  it("from the lumber run keeps what was gathered and forfeits the pay", () => {
-    const gatherEnd = replay(snapshot(TIMBER, villagers), "a", []).result.stages[1]?.endedAtMs ?? 0;
-    const { result } = replay(snapshot(TIMBER, villagers), "a", [retreatAt(gatherEnd + 1)]);
+  it("from the lumber run keeps the drops and the enemies' XP, and loses the pay and the bonus (decision 0058)", () => {
+    const whole = replay(snapshot(TIMBER, villagers), "a", []).result;
+    const gatherEnd = whole.stages[1]?.endedAtMs ?? 0;
+    const { timeline, result } = replay(snapshot(TIMBER, villagers), "a", [retreatAt(gatherEnd + 1)]);
     expect(result.outcome).toBe("retreat");
     expect(result.stages.at(-1)?.kind).toBe("fight");
-    expect(result.rewards).toEqual([{ material: "timber", amount: 60 }]);
+    // The trees' drops, the same as the whole run's on this seed, and no cloth.
+    expect(result.rewards).toEqual([{ material: "timber", amount: rewardOf(whole, "timber") }]);
+    const wolfDown = ofKind(timeline.events, "unit-down").some((e) => e.unitId.includes("wolf"));
+    const kept = 2 * TREE_XP + (wolfDown ? WOLF_XP : 0);
+    expect(result.xp).toEqual([{ heroId: "villager-1", xp: kept }, { heroId: "villager-2", xp: kept }]);
+    expect(kept).toBeLessThan(15);
+  });
+
+  it("ordered among the trees is certain when the last of them falls, and the party leaves with their timber and their XP", () => {
+    const whole = replay(snapshot(TIMBER, villagers), "a", []).result;
+    // Past the last attempt that could fail, so the retreat is the one a completed stage makes certain.
+    const order = (whole.stages[1]?.endedAtMs ?? 0) - 100;
+    const { result } = replay(snapshot(TIMBER, villagers), "a", [retreatAt(order)]);
+    expect(result.outcome).toBe("retreat");
+    expect(result.stages.at(-1)).toMatchObject({ kind: "gather", ended: "win" });
+    expect(result.rewards).toEqual([{ material: "timber", amount: rewardOf(whole, "timber") }]);
+    expect(result.xp.map((x) => x.xp)).toEqual([2 * TREE_XP, 2 * TREE_XP]);
   });
 
   it("is called off by press on", () => {
@@ -183,23 +225,36 @@ describe("Retreat", () => {
   });
 });
 
+/** Long enough for two villagers to fell one tree of two, and not the other. */
+const LIMIT_MS = 12_000;
+
 describe("A stage's time limit", () => {
-  it("ends the adventure as a retreat with the job's penalty", () => {
+  it("ends the adventure as a retreat, which keeps what had dropped and the XP of what had fallen, and nothing for the tree still standing", () => {
     const timber = JOBS[TIMBER];
     const job: Job = {
       ...timber,
       id: "short-woods",
-      stages: timber.stages.map((s) => (s.kind === "gather" ? { ...s, timeLimitMs: 3000 } : s)),
+      stages: timber.stages.map((s) => (s.kind === "gather" ? { ...s, timeLimitMs: LIMIT_MS } : s)),
     };
     const { timeline, result } = replay(snapshot(job.id, villagers), "a", [], contentWithJob(job));
     expect(result.outcome).toBe("retreat");
-    expect(result.stages.at(-1)).toMatchObject({ kind: "gather", ended: "timeout", endedAtMs: 4000 + 3000 });
-    const timber_ = rewardOf(result, "timber");
-    expect(timber_).toBeGreaterThan(0);
-    expect(timber_).toBeLessThan(60);
-    expect(result.rewards.some((r) => r.material === "cloth")).toBe(false);
-    expect(result.xp.every((x) => x.xp === Math.floor((timber.xp * timber.retreat.xpPercent) / 100))).toBe(true);
+    expect(result.stages.at(-1)).toMatchObject({ kind: "gather", ended: "timeout", endedAtMs: 4000 + LIMIT_MS });
+    expect(ofKind(timeline.events, "unit-down")).toHaveLength(1);
+    const kept = rewardOf(result, "timber");
+    expect(kept).toBeGreaterThanOrEqual(haul("tree", 1).min);
+    expect(kept).toBeLessThanOrEqual(haul("tree", 1).max);
+    expect(result.rewards).toEqual([{ material: "timber", amount: kept }]);
+    expect(result.xp.map((x) => x.xp)).toEqual([TREE_XP, TREE_XP]);
     expect(ofKind(timeline.events, "battle-end")[0]?.result).toBe("timeout");
+  });
+
+  it("reached before anything falls leaves the party with nothing: no hit gathers", () => {
+    const timber = JOBS[TIMBER];
+    const job: Job = { ...timber, id: "shorter-woods", stages: timber.stages.map((s) => (s.kind === "gather" ? { ...s, timeLimitMs: 3000 } : s)) };
+    const { result } = replay(snapshot(job.id, villagers), "a", [], contentWithJob(job));
+    expect(result.outcome).toBe("retreat");
+    expect(result.rewards).toEqual([]);
+    expect(result.xp.map((x) => x.xp)).toEqual([0, 0]);
   });
 });
 
@@ -211,6 +266,40 @@ describe("Defeat", () => {
     expect(result.rewards).toEqual([]);
     expect(result.xp).toEqual([]);
     expect(result.dead).toEqual(["villager-1"]);
+  });
+
+  it("keeps nothing of what had dropped either: a villager fells the tree, falls to the wolves, and no timber comes home", () => {
+    const job: Job = {
+      ...JOBS[WOLVES],
+      id: "woods-then-wolves",
+      stages: [{ kind: "gather", opponents: [{ type: "tree", count: 1 }], timeLimitMs: 60_000 }, { kind: "fight", opponents: [{ type: "wolf", count: 2 }], timeLimitMs: 60_000 }, { kind: "arrive" }],
+    };
+    const { timeline, result } = replay(snapshot(job.id, [hero("villager-1", "villager")]), "a", [], contentWithJob(job));
+    expect(ofKind(timeline.events, "stage-end")[0]?.drops).toEqual([{ material: "timber", amount: ofKind(timeline.events, "drop")[0]?.amount }]);
+    expect(result.outcome).toBe("defeat");
+    expect(result.rewards).toEqual([]);
+    expect(result.xp).toEqual([]);
+  });
+});
+
+describe("An enemy's roll", () => {
+  it("is not moved by an override: forced strikes change the fight's events and leave every drop what it was (decision 0058)", () => {
+    for (const seed of ["a", "b", "c", "d", "e"]) {
+      const plain = replay(snapshot(TIMBER, villagers), seed, []);
+      const log = [4100, 5600, 7100, 8600, 10_100, 14_000, 18_000].flatMap((at) => [strikeAt(at, "villager-1"), strikeAt(at + 200, "villager-2")]);
+      const forced = replay(snapshot(TIMBER, villagers), seed, log);
+      expect(forced.timeline.overrideLog.length, seed).toBeGreaterThan(0);
+      expect(forced.timeline.events, seed).not.toEqual(plain.timeline.events);
+      const drops = (events: readonly AdventureEvent[]) => ofKind(events, "drop").map((e) => `${e.unitId} ${e.material} ${e.amount}`).sort();
+      expect(drops(forced.timeline.events), seed).toEqual(drops(plain.timeline.events));
+      expect(forced.result.rewards, seed).toEqual(plain.result.rewards);
+    }
+  });
+
+  it("differs from seed to seed, and from one tree of a stage to the other", () => {
+    const amounts = ["a", "b", "c", "d", "e", "f", "g", "h"].map((seed) => ofKind(replay(snapshot(TIMBER, villagers), seed, []).timeline.events, "drop").map((e) => e.amount));
+    expect(new Set(amounts.map((a) => a.join(","))).size).toBeGreaterThan(1);
+    expect(amounts.some(([first, second]) => first !== second)).toBe(true);
   });
 });
 
