@@ -6,7 +6,7 @@
  * effect shows a while after it began, and where, and where a projectile is
  * between the hand that let it go and whatever it lands on.
  */
-import { range, sum } from 'es-toolkit';
+import { maxBy, range, sum } from 'es-toolkit';
 import * as z from 'zod/mini';
 
 /** PixelLab's game pack manifest, as much of it as the battle reads: the whole effect, without the sprite, or its projectile and its impact where a clip has a role; checked where it is fetched (angular.md, rule 4). */
@@ -112,69 +112,61 @@ export function effectMs(layout: EffectLayout): number {
 
 /**
  * The frame of an act, or of the weapon swung with it, `ms` after its
- * action resolved: the frames after `hold`, the follow-through, one every
- * `frameMs`; past the last, null. The scene gives it presentation time, so
- * that the swing of the action under way finishes while the adventure's
- * clock waits for it (Issue-335).
+ * action was declared: the frames before `ready`, then `ready`, where it
+ * waits for the action to resolve. The actor and its weapon each keep their
+ * own ready frame, so both get there and wait together. `lead` gives a
+ * frame its own length, for a weapon whose motion is not even, such as a
+ * bow's quick release (rule 33); a frame it does not name lasts `frameMs`.
+ * Null for a ready frame the clip does not have.
  */
-export function followFrame(ms: number, hold: number, count: number, frameMs: number): number | null {
-  const index = hold + 1 + Math.floor(ms / frameMs);
-  return index < count ? index : null;
-}
-
-/** How long the follow-through of an act, or of its weapon's swing, lasts: the frames after `hold`. */
-export function followMs(hold: number, count: number, frameMs: number): number {
-  return Math.max(0, count - hold - 1) * frameMs;
-}
-
-/**
- * The frame of an act, or of the weapon swung with it, at `simTime`: the
- * frames up to `hold` from the declaration, `hold` until the action
- * resolves, then the rest; past the last, null. The actor and its weapon
- * each keep their own hold frame, so both reach the blow and stay there
- * together. `lead` gives the frames before the hold their own lengths,
- * for a weapon whose motion is not even, such as a bow's quick release
- * (rule 33); a frame it does not name lasts `frameMs`.
- */
-export function heldFrame(
-  simTime: number,
-  act: { readonly from: number; readonly resolve: number },
-  hold: number,
-  count: number,
-  frameMs: number,
-  lead: readonly number[] = [],
-): number | null {
-  if (simTime >= act.resolve) return followFrame(simTime - act.resolve, hold, count, frameMs);
+export function leadFrame(ms: number, ready: number, count: number, frameMs: number, lead: readonly number[] = []): number | null {
   let index = 0;
-  for (let left = simTime - act.from; index < hold; index++) {
+  for (let left = ms; index < ready; index++) {
     left -= lead[index] ?? frameMs;
     if (left < 0) break;
   }
   return index < count ? index : null;
 }
 
-/** How long after an action is declared its hold frame begins: when a projectile leaves the hand or the string. */
+/**
+ * The frame of an act, or of the weapon swung with it, `ms` after its
+ * action resolved: the frames after `ready`, each for its own length; past
+ * the last, null. The scene gives both this and `leadFrame` presentation
+ * time, so that nothing a unit is doing stops while the adventure's clock
+ * waits for an action to be animated (Issue-335, decision 0057).
+ */
+export function followFrame(ms: number, ready: number, count: number, frameMs: number, lead: readonly number[] = []): number | null {
+  let left = ms;
+  for (let index = ready + 1; index < count; index++) {
+    left -= lead[index] ?? frameMs;
+    if (left < 0) return index;
+  }
+  return null;
+}
+
+/** The lengths of the frames from `from` up to, not including, `to`; nothing where there are none. */
+function framesMs(from: number, to: number, frameMs: number, lead: readonly number[]): number {
+  return sum(range(Math.min(from, to), to).map((i) => lead[i] ?? frameMs));
+}
+
+/** How long the frames after `ready` last: what is left of an act, or of its weapon's swing, once its action has resolved. */
+export function followMs(ready: number, count: number, frameMs: number, lead: readonly number[] = []): number {
+  return framesMs(ready + 1, count, frameMs, lead);
+}
+
+/** How long the frames before `hold` last, played from the first. */
 export function releaseMs(hold: number, frameMs: number, lead: readonly number[] = []): number {
-  return sum(range(hold).map((i) => lead[i] ?? frameMs));
+  return framesMs(0, hold, frameMs, lead);
 }
 
 /**
- * How far along its flight a projectile is at `simTime`, from 0 as it is
- * let go to 1 as it lands: it leaves `release` after the action is
- * declared and lands as the action resolves, so its flight is what is left
- * of the warmup (rule 35). Null before it is let go and once it has landed.
- * An action that resolves before its release has no flight to show.
+ * How long after its action resolves a weapon that waited on `ready`
+ * reaches its hold frame, which is when a projectile leaves it: the frames
+ * between the two, a bow's release. Nothing for one that waits on its hold
+ * frame, as a hand about to throw does.
  */
-export function flightAt(simTime: number, act: { readonly from: number; readonly resolve: number }, release: number): number | null {
-  const start = act.from + release;
-  if (simTime < start || simTime >= act.resolve) return null;
-  return (simTime - start) / (act.resolve - start);
-}
-
-/** Where a projectile is, `progress` along the straight line between two points, lifted by its arc. */
-export function flightPoint(from: { readonly x: number; readonly y: number }, to: { readonly x: number; readonly y: number }, progress: number, arc: number): { x: number; y: number } {
-  const lift = 4 * arc * Math.abs(to.x - from.x) * progress * (1 - progress);
-  return { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress - lift };
+export function releaseAfter(ready: number, hold: number, frameMs: number, lead: readonly number[] = []): number {
+  return framesMs(ready + 1, hold, frameMs, lead);
 }
 
 interface Point {
@@ -182,62 +174,95 @@ interface Point {
   readonly y: number;
 }
 
-/** Whoever lets a projectile go: where it stands, which way it faces, and what its hand and its weapon do through the act. */
+/**
+ * The frame a bow waits on while its action warms up: the one before its
+ * hold where the string is furthest back from the grip, the full draw, read
+ * from the nocks its provenance records (rule 33). The first of them where
+ * two are as far.
+ */
+export function drawnFrame(grips: readonly Point[], nocks: readonly Point[], hold: number): number {
+  const pull = (i: number) => Math.abs((nocks[i]?.x ?? 0) - (grips[i]?.x ?? 0));
+  return maxBy(range(hold), pull) ?? 0;
+}
+
+/**
+ * How long a projectile flies: what was left of its action's warmup after
+ * the wind-up, the length decision 0052 gave it, now played after the
+ * action resolves (decision 0057). Nothing for an action that warms up for
+ * less than its wind-up takes.
+ */
+export function flightMs(warmup: number, windup: number): number {
+  return Math.max(0, warmup - windup);
+}
+
+/** Where a projectile is, `progress` along the straight line between two points, lifted by its arc. */
+export function flightPoint(from: Point, to: Point, progress: number, arc: number): { x: number; y: number } {
+  const lift = 4 * arc * Math.abs(to.x - from.x) * progress * (1 - progress);
+  return { x: from.x + (to.x - from.x) * progress, y: from.y + (to.y - from.y) * progress - lift };
+}
+
+/** Whoever lets a projectile go: where it stands, which way it faces, and where its hand and its bow's string are. */
 export interface Thrower {
   readonly feet: Point;
   /** 1 for the party, facing east; -1 for the other side, drawn mirrored. */
   readonly facing: 1 | -1;
   /** The leading hand from the feet, facing east. */
   readonly hand: Point;
-  /** The act's hold frame, for a unit that throws with its hand. */
-  readonly actHold: number;
   /** The weapon in hand, or null for none: a bow carries its nocks, where the arrow sits while it is drawn. */
   readonly weapon: {
-    readonly holdFrame: number;
-    readonly frames: number;
-    readonly frameMs: readonly number[];
     readonly grips: readonly Point[];
     readonly nocks: readonly Point[] | null;
   } | null;
 }
 
 /**
- * Where a projectile's sprite goes at `simTime`, and which of its frames
- * shows (rules 33 and 35): before its release, on the nock of a bow, its
- * tail on the string; from the release, the moment the weapon or, for a
- * unit with none, the act reaches its hold frame, along its flight to where
- * the workbench landed it on the target, its middle on the path; null
- * before the release for a unit with no bow, and once it has landed. The
- * point is the sprite's tail at its mid height, whole pixels, for a sprite
- * mirrored when `facing` is -1.
+ * Where a projectile is held at the weapon's frame `index`: on the nock of
+ * a bow, half a pixel down so that it rounds onto the string, or in the
+ * hand itself where there is no bow, no nock on that frame, or no frame.
  */
-export function projectileAt(
-  simTime: number,
-  act: { readonly from: number; readonly resolve: number },
-  frameMs: number,
-  from: Thrower,
+export function heldPoint(from: Thrower, index: number | null): { x: number; y: number; onString: boolean } {
+  const nock = index === null ? undefined : from.weapon?.nocks?.[index];
+  const grip = index === null ? undefined : from.weapon?.grips[index];
+  const onString = nock !== undefined && grip !== undefined;
+  return {
+    x: from.feet.x + from.facing * (from.hand.x + (onString ? nock.x - grip.x : 0)),
+    y: from.feet.y + from.hand.y + (onString ? nock.y - grip.y + 0.5 : 0),
+    onString,
+  };
+}
+
+/**
+ * Where an arrow's sprite goes before it is let go (rule 35): its tail on
+ * the nock of the bow's frame `index`, its first frame showing; null for a
+ * unit with no bow, which shows nothing in its hand. The point is the
+ * sprite's tail at its mid height, whole pixels, for a sprite mirrored when
+ * `facing` is -1.
+ */
+export function nockedAt(from: Thrower, index: number | null): { x: number; y: number; frame: number } | null {
+  const held = heldPoint(from, index);
+  return held.onString ? { x: Math.round(held.x), y: Math.round(held.y), frame: 0 } : null;
+}
+
+/**
+ * Where a projectile's sprite goes `ms` after it was let go from `start`,
+ * and which of its frames shows (rule 35): along its flight to where the
+ * workbench landed it on the target, its middle on the path, for `flight`
+ * milliseconds; null before it leaves and once it has landed. The point is
+ * the sprite's tail at its mid height, whole pixels, for a sprite mirrored
+ * when `facing` is -1.
+ */
+export function flyingAt(
+  ms: number,
+  flight: number,
+  start: Point,
+  facing: 1 | -1,
   target: Point,
   layout: ProjectileLayout,
 ): { x: number; y: number; frame: number } | null {
-  const { weapon, facing } = from;
-  const release = weapon ? releaseMs(weapon.holdFrame, frameMs, weapon.frameMs) : releaseMs(from.actHold, frameMs);
-  const index = weapon ? heldFrame(simTime, act, weapon.holdFrame, weapon.frames, frameMs, weapon.frameMs) : null;
-  const nock = index === null ? undefined : weapon?.nocks?.[index];
-  const grip = index === null ? undefined : weapon?.grips[index];
-  const onString = nock !== undefined && grip !== undefined;
-  // Where it is let go from: the nock of the bow in hand, or the hand itself.
-  const hand = {
-    x: from.feet.x + facing * (from.hand.x + (onString ? nock.x - grip.x : 0)),
-    y: from.feet.y + from.hand.y + (onString ? nock.y - grip.y + 0.5 : 0),
-  };
-  const progress = flightAt(simTime, act, release);
-  if (progress === null) {
-    if (simTime >= act.from + release || !onString) return null;
-    return { x: Math.round(hand.x), y: Math.round(hand.y), frame: 0 };
-  }
+  if (ms < 0 || ms >= flight) return null;
   const to = { x: target.x + facing * layout.landing.x, y: target.y + layout.landing.y };
-  const at = flightPoint(hand, to, progress, layout.arc);
-  const frame = Math.floor((simTime - act.from - release) / layout.frameMs) % layout.frames.length;
+  const at = flightPoint(start, to, ms / flight, layout.arc);
+  const frame = Math.floor(ms / layout.frameMs) % layout.frames.length;
   const width = layout.frames[frame]?.width ?? 0;
   return { x: Math.round(at.x - (facing * width) / 2), y: Math.round(at.y), frame };
 }

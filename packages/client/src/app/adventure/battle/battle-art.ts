@@ -2,7 +2,7 @@ import { Assets, Rectangle, Texture } from 'pixi.js';
 
 import { loadSpriteSet, type SetPath } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
-import { effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileLayout, projectileLayout, type Rect } from './action-sprites';
+import { drawnFrame, effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileLayout, projectileLayout, type Rect } from './action-sprites';
 
 /**
  * A battle unit's pictures, from its sprite set's sheet (`sprite-sheet.ts`;
@@ -58,8 +58,10 @@ async function propArt(path: SetPath<'prop'>): Promise<UnitArt> {
 /** A weapon's swing, drawn beside its wielder while it acts (rules 32 and 33). */
 export interface WeaponArt {
   readonly swing: readonly Texture[];
-  /** The swing's frame held until the action resolves, in step with the act's own. */
+  /** The swing's hold frame, as its provenance records it: the blow, or for a bow the string at rest after the release, which is when its arrow leaves. */
   readonly holdFrame: number;
+  /** The frame the swing waits on until the action resolves, in step with the act's own: its hold frame, or for a bow its full draw (decision 0057). */
+  readonly readyFrame: number;
   /** Each frame's grip, the pixel in the wielder's hand, from the provenance: PixelLab draws the swing turning about the canvas, not the hand. */
   readonly grips: readonly { readonly x: number; readonly y: number }[];
   /** How long each frame before the hold lasts, where the provenance says; a frame it does not name lasts as long as the act's. */
@@ -80,7 +82,9 @@ export async function loadWeaponArt(set: string): Promise<WeaponArt> {
   const sheet = await loadSpriteSet(`weapons/${set}`, 'weapon');
   const { holdFrame, grips, frameMs, nocks } = sheet.set.swing;
   const pixels = (list: readonly (readonly [number, number])[]) => list.map(([x, y]) => ({ x, y }));
-  return { swing: sheet.clip('swing'), holdFrame, grips: pixels(grips), frameMs, nocks: nocks ? pixels(nocks) : null };
+  const strung = nocks ? pixels(nocks) : null;
+  const readyFrame = strung ? drawnFrame(pixels(grips), strung, holdFrame) : holdFrame;
+  return { swing: sheet.clip('swing'), holdFrame, readyFrame, grips: pixels(grips), frameMs, nocks: strung };
 }
 
 /**

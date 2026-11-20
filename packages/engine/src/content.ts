@@ -350,7 +350,8 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
  * that forcing a strike at a tree gains nothing over chopping it (decision
  * 0051). A ranged attack reaches every line from every line, which is what
  * makes it the answer to a monster standing behind resource nodes; its
- * warmup is its wind-up and its projectile's flight together (decision 0052).
+ * warmup is longer than a blow's, and the page shows its wind-up through
+ * it and its projectile's flight as it resolves (decisions 0052 and 0057).
  */
 export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
   strike: {

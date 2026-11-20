@@ -143,6 +143,6 @@ export class BattleView {
     if (!this.scene || !field) return;
     // The scene knows how long the clips these events began last, and the play waits for its share of them.
     if (events.length > 0) this.play.hold(this.scene.feed(events, field));
-    this.scene.frame(this.play.paused() ? 0 : ms * this.play.speed(), this.play.simTime(), field);
+    this.scene.frame(this.play.paused() ? 0 : ms * this.play.speed(), field);
   }
 }

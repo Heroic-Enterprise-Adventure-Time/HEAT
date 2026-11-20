@@ -20,7 +20,7 @@ import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/gro
 import { fetchJson } from '../../static-json';
 import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
-import { effectFrameAt, effectMs, followFrame, followMs, heldFrame, projectileAt } from './action-sprites';
+import { effectFrameAt, effectMs, flightMs, flyingAt, followFrame, followMs, heldPoint, leadFrame, nockedAt, releaseAfter, releaseMs } from './action-sprites';
 import { artSettled } from './art-loads';
 import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
@@ -32,23 +32,24 @@ import { clipHold } from './clip-hold';
  * device pixels that fits, the ground running on to fill the box.
  *
  * It draws from the field, where everyone stands and how they are, and
- * animates from the events: an action's act, held on its hold frame until
- * it resolves, with its weapon beside it, swung in step and held on its own
- * hold frame; a projectile, where the ability's effect has one, let go at
- * the hold frame and landing as the action resolves; the ability's effect on
- * whatever the action lands on; a hit; a fall, held; a step up a line or a
- * collapse as a walk.
+ * animates from the events: an action's act, played to its ready frame and
+ * waiting there until the action resolves, with its weapon beside it, swung
+ * in step and waiting on its own; then, as the action resolves, the rest of
+ * the swing, a projectile, where the ability's effect has one, let go and
+ * flown to its target, and where it lands the ability's effect, a hit and a
+ * fall, held; a step up a line or a collapse as a walk.
  * The progression reads left to right: the party runs on from the left at
  * the start and walks in place while the road scrolls by on a travel; at a
  * fight or a gather the other side rushes on from the right as the road
  * scrolls with it, and only then does the clock run (the owner's call on
  * Issue-15). What is left of a stage scrolls away on the next travel. A
- * hit, an effect, a fall and the rest of a swing after its blow play on the
- * presentation clock, and the scene says how long the adventure's clock
- * should wait for the ones just begun (`HOLD_SHARE`, Issue-335), so that an
- * action is animated to its end before the next thing happens. An act up to
- * its blow, and a projectile, are drawn from the adventure's clock: a unit
- * warming up, and an arrow in the air, wait with it. The
+ * Everything it animates plays on the presentation clock, the wall clock
+ * times the speed, and nothing a unit is doing stops when the adventure's
+ * clock does: the scene says how long that clock should wait for what an
+ * action just began (`HOLD_SHARE`, Issue-335, decision 0057), so that one
+ * action is animated to its end, the shot, its flight and its strike
+ * together, before the next thing happens. A unit whose action has not
+ * resolved yet waits on its ready frame, a bow at its full draw. The
  * scene knows nothing of the engine or the hub; the page feeds it, and
  * before a run it hands over the run's cast, whose art is loaded before the
  * run is shown (`prepare`, Issue-205).
@@ -76,8 +77,8 @@ export interface BattleSceneHandle {
    * where they began none.
    */
   feed(events: readonly AdventureEvent[], field: Field): number;
-  /** Moves on by `ms` of presentation time, the wall clock times the speed, with the clock at `simTime`. */
-  frame(ms: number, simTime: number, field: Field): void;
+  /** Moves on by `ms` of presentation time, the wall clock times the speed. */
+  frame(ms: number, field: Field): void;
   destroy(): void;
 }
 
@@ -91,7 +92,7 @@ const RUSH_SPEED = 320;
 /** The party's run on at the start is no scroll, and goes at four times the pace, so that it is over quickly (the owner's call). */
 const RUN_ON_SPEED = 4 * RUSH_SPEED;
 const STEP_SPEED = 90;
-/** Milliseconds a frame: on the adventure's clock for an act; on the presentation clock for a hit, a fall, a walk and the stance. */
+/** Milliseconds a frame, on the presentation clock. */
 const ACT_MS = 90;
 const HIT_MS = 70;
 const DOWN_MS = 100;
@@ -100,7 +101,7 @@ const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
 /**
  * The share of an action's animation that the adventure's clock waits for,
- * the rest of the swing, the hit, the effect and a fall (Issue-335): 0 for
+ * the rest of the swing, a flight, the hit, the effect and a fall (Issue-335): 0 for
  * no wait, 1 for the whole of it, which is the owner's call of 2026-11-20,
  * one action animated at a time. Of the longest clip one frame's events
  * begin, in presentation time, so the wait shortens at 2× and 4× as the
@@ -139,12 +140,15 @@ interface UnitView {
   readonly weaponSprite: Sprite;
   readonly bar: Graphics;
   barShown: string;
+  /** The health its bar shows until a projectile on its way has landed, where the field already has the hit. */
+  barHeld: { readonly health: number; readonly until: number } | null;
   x: number;
   y: number;
-  act: { readonly from: number; readonly resolve: number } | null;
-  /** When its action resolved, on the unit's presentation clock: the rest of its swing plays from here, while the adventure's clock waits. Null up to the blow. */
+  /** The action it has declared: when, on the unit's presentation clock, and how long the engine warms it up for, which times a projectile's flight. */
+  act: { readonly from: number; readonly warmup: number } | null;
+  /** When its action resolved, on the unit's presentation clock: the rest of its swing plays from here, while the adventure's clock waits. Null until then. */
   followAt: number | null;
-  /** When a hit or a fall began, on the unit's presentation clock, so that one still plays once the adventure's clock has stopped. */
+  /** When a hit or a fall begins, on the unit's presentation clock: at once for a blow, and as it lands for a projectile, so still to come while one flies. */
   hitAt: number | null;
   downAt: number | null;
   /** On the presentation clock, for the walk and the stance. */
@@ -166,15 +170,22 @@ interface EffectView {
 
 /**
  * An action's projectile, from its declaration to its landing: on the
- * string while a bow is drawn, then in flight from the actor to the target
- * (assets.md, rules 33 and 35). On the adventure's clock, as the act is.
+ * string while a bow is drawn and waits, then, once the action resolves,
+ * let go and in flight from the actor to the target (assets.md, rules 33
+ * and 35; decision 0057). On the presentation clock, as everything is.
  */
 interface ProjectileView {
   readonly art: NonNullable<EffectArt['projectile']>;
   readonly actor: UnitView;
   readonly target: UnitView;
-  readonly act: { readonly from: number; readonly resolve: number };
+  readonly act: NonNullable<UnitView['act']>;
   readonly sprite: Sprite;
+  /**
+   * Set as the action resolves: when that was, how long after it the
+   * projectile is let go, a bow's release, how long it then flies, and where
+   * from. Null while the action warms up.
+   */
+  launch: { readonly at: number; readonly release: number; readonly flight: number; readonly from: { readonly x: number; readonly y: number } } | null;
 }
 
 /** Where a unit's sprite set is under `/art`: a hero's own set, anyone else's by its type; null where there is none. */
@@ -334,6 +345,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       weaponSprite,
       bar,
       barShown: '',
+      barHeld: null,
       x: 0,
       y: 0,
       act: null,
@@ -362,12 +374,16 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     effect.sprite.destroy();
   };
 
-  /** Starts an ability's effect on the unit its action landed on, and answers how long it lasts: nothing for one whose art is not in hand yet. */
-  const addEffect = (set: string, target: UnitView, mirrored: boolean): number => {
+  /**
+   * Starts an ability's effect on the unit its action landed on, `delay`
+   * from now where a projectile has still to reach it, and answers how long
+   * it lasts: nothing for one whose art is not in hand yet.
+   */
+  const addEffect = (set: string, target: UnitView, mirrored: boolean, delay: number): number => {
     const sprite = new Sprite();
     sprite.visible = false;
     things.addChild(sprite);
-    const effect: EffectView = { art: effectArt.get(set) ?? null, target, mirrored, at: shown, sprite };
+    const effect: EffectView = { art: effectArt.get(set) ?? null, target, mirrored, at: shown + delay, sprite };
     effects.push(effect);
     if (effect.art) return effectMs(effect.art.layout);
     void effectArtOf(set).then((art) => {
@@ -382,45 +398,94 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   };
 
   /** Readies an ability's projectile for the action just declared; an effect with none, a swing or a bite, makes nothing. */
-  const addProjectile = (set: string, actor: UnitView, target: UnitView, act: { readonly from: number; readonly resolve: number }) => {
+  const addProjectile = (set: string, actor: UnitView, target: UnitView, act: NonNullable<UnitView['act']>) => {
     const { unitId } = actor.unit;
     removeProjectile(unitId);
-    void loadEffectArt(set).then((art) => {
+    const ready = (art: EffectArt) => {
       // Loaded after the action it was for: nothing to show.
-      if (destroyed || !art.projectile || actor.act !== act || units.get(unitId) !== actor) return;
+      if (destroyed || !art.projectile || actor.act !== act || actor.followAt !== null || units.get(unitId) !== actor) return;
       removeProjectile(unitId);
       const sprite = new Sprite();
       sprite.visible = false;
       sprite.anchor.set(0, 0.5);
       things.addChild(sprite);
-      projectiles.set(unitId, { art: art.projectile, actor, target, act, sprite });
-    });
+      projectiles.set(unitId, { art: art.projectile, actor, target, act, sprite, launch: null });
+    };
+    // In hand for a run that was prepared, so that the projectile is there when its action resolves in the same frame.
+    const art = effectArt.get(set);
+    if (art) ready(art);
+    else void effectArtOf(set).then(ready);
+  };
+
+  /** A unit has fallen once its fall has begun: one a projectile is still flying at stands until it lands. */
+  const fallen = (unitView: UnitView) => unitView.downAt !== null && unitView.clock >= unitView.downAt;
+
+  /** Whoever lets a projectile go, for the arithmetic of where it is held and let go from. */
+  const thrower = (actor: UnitView) => ({ feet: actor, facing: actor.opponent ? -1 : 1, hand: HAND, weapon: actor.weapon }) as const;
+
+  /**
+   * Lets an action's projectile go as the action resolves, and answers how
+   * long it is until it lands, which is when what it does to its target
+   * begins: a bow's release, then the flight, as long as decision 0052 made
+   * it. Nothing, and no projectile, where there is none to fly, its art or
+   * its thrower's is not in hand, or the warmup left it no flight.
+   */
+  const launch = (actor: UnitView): number => {
+    const { unitId } = actor.unit;
+    const projectile = projectiles.get(unitId);
+    const { act, art, weapon } = actor;
+    if (projectile && act && projectile.act === act && art && (weapon || !actor.armed)) {
+      const release = weapon ? releaseAfter(weapon.readyFrame, weapon.holdFrame, ACT_MS, weapon.frameMs) : 0;
+      const windup = weapon ? releaseMs(weapon.holdFrame, ACT_MS, weapon.frameMs) : releaseMs(art.actHold, ACT_MS);
+      const flight = flightMs(act.warmup, windup);
+      if (flight > 0) {
+        const { x, y } = heldPoint(thrower(actor), weapon ? weapon.holdFrame : null);
+        projectile.launch = { at: shown, release, flight, from: { x, y } };
+        return release + flight;
+      }
+    }
+    removeProjectile(unitId);
+    return 0;
   };
 
   /**
-   * Shows each projectile where `projectileAt` puts it at `simTime`: on the
-   * bow's string, then along its flight; landed, gone. One whose target fell
-   * while it flew is dropped, and so is one whose actor fell or was left
-   * behind with the stage.
+   * Shows each projectile: on the bow's string while its action warms up
+   * and through the release, then along its flight; landed, gone. One whose
+   * target fell or was left behind with the stage is dropped, and so is one
+   * not yet let go whose actor fell or began something else.
    */
-  const drawProjectiles = (simTime: number) => {
+  const drawProjectiles = () => {
     for (const [unitId, projectile] of [...projectiles]) {
       const { art, actor, target, act, sprite } = projectile;
-      const gone = (unit: UnitView) => unit.downAt !== null || unit.behind || units.get(unit.unit.unitId) !== unit;
-      if (actor.act !== act || gone(actor) || gone(target)) {
+      const left = (unit: UnitView) => unit.behind || units.get(unit.unit.unitId) !== unit;
+      if (left(actor) || left(target) || fallen(target) || (!projectile.launch && (actor.act !== act || fallen(actor)))) {
         removeProjectile(unitId);
         continue;
       }
       sprite.visible = false;
-      // The release is read from the actor's art and its weapon's: until both are loaded there is no telling when it is.
-      if (!actor.art || (actor.armed && !actor.weapon)) continue;
-      const { weapon } = actor;
-      const facing = actor.opponent ? -1 : 1;
-      const from = { feet: actor, facing, hand: HAND, actHold: actor.art.actHold, weapon: weapon && { ...weapon, frames: weapon.swing.length } } as const;
-      const at = projectileAt(simTime, act, ACT_MS, from, target, art.layout);
-      if (!at) continue;
+      const from = thrower(actor);
+      const since = projectile.launch ? shown - projectile.launch.at : null;
+      let at: { x: number; y: number; frame: number } | null;
+      if (projectile.launch && since !== null && since >= projectile.launch.release) {
+        at = flyingAt(since - projectile.launch.release, projectile.launch.flight, projectile.launch.from, from.facing, target, art.layout);
+        // Landed: what it does to its target begins now.
+        if (!at) {
+          removeProjectile(unitId);
+          continue;
+        }
+      } else {
+        // On the string, at the frame the bow shows: drawn and waiting, or in its release.
+        const { weapon } = actor;
+        if (!weapon) continue;
+        const index =
+          since === null
+            ? leadFrame(actor.clock - act.from, weapon.readyFrame, weapon.swing.length, ACT_MS, weapon.frameMs)
+            : followFrame(since, weapon.readyFrame, weapon.swing.length, ACT_MS, weapon.frameMs);
+        at = nockedAt(from, index);
+        if (!at) continue;
+      }
       sprite.texture = must(art.frames[at.frame], `frame ${at.frame} of the projectile`);
-      sprite.scale.set(facing, 1);
+      sprite.scale.set(from.facing, 1);
       sprite.position.set(at.x, at.y);
       sprite.zIndex = Math.max(actor.y, target.y) + 0.45;
       sprite.visible = true;
@@ -476,14 +541,17 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
 
   const drawBar = (unitView: UnitView) => {
     const { unit } = unitView;
-    const shown = unit.kind === 'resource' || unit.health <= 0 || unitView.behind ? '' : `${unit.health}/${unit.maxHealth}`;
+    if (unitView.barHeld && unitView.clock >= unitView.barHeld.until) unitView.barHeld = null;
+    // The field has a hit as soon as its action resolves; the bar shows it as the projectile lands.
+    const health = unitView.barHeld?.health ?? unit.health;
+    const shown = unit.kind === 'resource' || health <= 0 || unitView.behind ? '' : `${health}/${unit.maxHealth}`;
     unitView.bar.position.set(Math.round(unitView.x) - 7, Math.round(unitView.y) + 2);
     unitView.bar.zIndex = unitView.y + 0.5;
     if (shown === unitView.barShown) return;
     unitView.barShown = shown;
     unitView.bar.clear();
     if (!shown) return;
-    const share = unit.health / unit.maxHealth;
+    const share = health / unit.maxHealth;
     const fill = Math.max(1, Math.round(14 * share));
     unitView.bar.rect(0, 0, 14, 2).fill(0x140d08);
     unitView.bar.rect(0, 0, fill, 2).fill(share > 0.5 ? 0x6fbf4a : share > 0.25 ? 0xd9a441 : 0xc0392b);
@@ -514,15 +582,16 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   };
 
   /**
-   * The frame of a unit's act, or of its weapon's swing: up to the blow on
-   * the adventure's clock, as the warmup is, and from the moment its action
-   * resolved on the unit's presentation clock, so that the swing under way
-   * finishes while the adventure's clock waits for it. Null outside an act.
+   * The frame of a unit's act, or of its weapon's swing, on the unit's
+   * presentation clock: up to its ready frame from the declaration, waiting
+   * there, and the rest from the moment its action resolved, so that
+   * nothing it is doing stops while the adventure's clock waits for an
+   * action. Null outside an act.
    */
-  const actFrame = (unitView: UnitView, simTime: number, hold: number, count: number, lead?: readonly number[]) => {
+  const actFrame = (unitView: UnitView, ready: number, count: number, lead?: readonly number[]) => {
     const { act, followAt } = unitView;
     if (!act) return null;
-    return followAt === null ? heldFrame(simTime, act, hold, count, ACT_MS, lead) : followFrame(unitView.clock - followAt, hold, count, ACT_MS);
+    return followAt === null ? leadFrame(unitView.clock - act.from, ready, count, ACT_MS, lead) : followFrame(unitView.clock - followAt, ready, count, ACT_MS, lead);
   };
 
   const endAct = (unitView: UnitView) => {
@@ -531,9 +600,9 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   };
 
   /** The weapon in hand at the act's frame, its grip on the hand, or none outside an act. */
-  const drawWeapon = (unitView: UnitView, simTime: number) => {
+  const drawWeapon = (unitView: UnitView) => {
     const { weapon, weaponSprite } = unitView;
-    const index = weapon && unitView.downAt === null ? actFrame(unitView, simTime, weapon.holdFrame, weapon.swing.length, weapon.frameMs) : null;
+    const index = weapon && !fallen(unitView) ? actFrame(unitView, weapon.readyFrame, weapon.swing.length, weapon.frameMs) : null;
     weaponSprite.visible = index !== null;
     if (index === null || !weapon) return;
     const grip = must(weapon.grips[index], `grip ${index} of the weapon`);
@@ -541,11 +610,11 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     weaponSprite.position.set(HAND.x - grip.x, HAND.y - grip.y);
   };
 
-  const draw = (unitView: UnitView, simTime: number, moving: boolean, rushing: boolean, mirrored: boolean) => {
+  const draw = (unitView: UnitView, moving: boolean, rushing: boolean, mirrored: boolean) => {
     const art = unitView.art;
-    drawWeapon(unitView, simTime);
+    drawWeapon(unitView);
     if (!art) return;
-    if (unitView.downAt !== null) {
+    if (unitView.downAt !== null && fallen(unitView)) {
       const last = art.down.textures.length - 1;
       const since = unitView.clock - unitView.downAt;
       const index = Math.min(last, Math.floor(since / DOWN_MS));
@@ -557,7 +626,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       return;
     }
     if (unitView.act) {
-      const index = actFrame(unitView, simTime, art.actHold, art.act.textures.length);
+      const index = actFrame(unitView, art.actHold, art.act.textures.length);
       if (index !== null) {
         show(unitView, art.act, index, mirrored);
         return;
@@ -565,7 +634,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       endAct(unitView);
       unitView.weaponSprite.visible = false;
     }
-    if (unitView.hitAt !== null) {
+    if (unitView.hitAt !== null && unitView.clock >= unitView.hitAt) {
       const index = Math.floor((unitView.clock - unitView.hitAt) / HIT_MS);
       if (index < art.hit.textures.length) {
         show(unitView, art.hit, index, mirrored);
@@ -626,6 +695,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           }
         }
       }
+      // Each unit's health before these events, for a bar that waits for a projectile to land.
+      const healthBefore = new Map([...units].map(([id, unitView]) => [id, unitView.unit.health]));
       sync(field);
       if (beginning) {
         const at = targets(field);
@@ -640,11 +711,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       }
       // How long each clip these events begin lasts, for the clock's wait: a unit whose art is not in hand yet shows none, and waits for none.
       const clips: number[] = [];
+      // How long until the projectile on its way to each unit lands, for a fall these same events bring.
+      const landing = new Map<string, number>();
       for (const event of events) {
         if (event.kind === 'action-declared' && event.abilityId !== 'move-up') {
           const unitView = units.get(event.unitId);
           if (unitView) {
-            unitView.act = { from: event.timestamp, resolve: event.resolveTimestamp };
+            unitView.act = { from: unitView.clock, warmup: event.resolveTimestamp - event.timestamp };
             unitView.followAt = null;
             const set = ABILITY_EFFECTS[event.abilityId as AbilityId];
             const target = units.get(event.targetIds[0] ?? '');
@@ -653,39 +726,55 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         } else if (event.kind === 'action-resolved') {
           const set = ABILITY_EFFECTS[event.abilityId as AbilityId];
           const actor = units.get(event.unitId);
-          removeProjectile(event.unitId);
-          // The blow has landed: the rest of the swing plays from now, and is waited for with what it began.
+          // The action happens now: the rest of the swing plays, and a projectile is let go. What the action does
+          // to whoever it reached begins as it lands, at once for a blow, and all of it is waited for.
+          let delay = 0;
           if (actor?.act && event.abilityId !== 'move-up') {
+            delay = launch(actor);
             actor.followAt = actor.clock;
             if (actor.art) clips.push(followMs(actor.art.actHold, actor.art.act.textures.length, ACT_MS));
-          }
+          } else removeProjectile(event.unitId);
+          clips.push(delay);
           for (const effect of event.effects) {
             if (effect.kind === 'damage' || effect.kind === 'harvest') {
               const target = units.get(effect.targetId);
-              if (target && effect.newHealth > 0) {
-                target.hitAt = target.clock;
-                if (target.art) clips.push(target.art.hit.textures.length * HIT_MS);
+              if (target) {
+                landing.set(effect.targetId, delay);
+                if (delay > 0) target.barHeld = { health: healthBefore.get(effect.targetId) ?? target.unit.health, until: target.clock + delay };
+                if (effect.newHealth > 0) {
+                  target.hitAt = target.clock + delay;
+                  if (target.art) clips.push(delay + target.art.hit.textures.length * HIT_MS);
+                }
               }
             }
             // The effect lands on whoever the action reached: a guard that took a hit, not the ally it covered.
             if (set && effect.kind !== 'move') {
               const target = units.get(effect.targetId);
-              if (target) clips.push(addEffect(set, target, actor?.opponent ?? false));
+              if (target) clips.push(delay + addEffect(set, target, actor?.opponent ?? false, delay));
             }
           }
         } else if (event.kind === 'unit-down') {
           const unitView = units.get(event.unitId);
           if (unitView) {
-            unitView.downAt = unitView.clock;
+            const delay = landing.get(event.unitId) ?? 0;
+            unitView.downAt = unitView.clock + delay;
             // The fall alone: the while it lies and its fading are not waited for.
-            if (unitView.art) clips.push(unitView.art.down.textures.length * DOWN_MS);
+            if (unitView.art) clips.push(delay + unitView.art.down.textures.length * DOWN_MS);
+          }
+        } else if (event.kind === 'battle-end') {
+          // An action declared and never resolved, the fight over first, has nothing left to wait for.
+          for (const unitView of units.values()) {
+            if (unitView.act && unitView.followAt === null) {
+              endAct(unitView);
+              removeProjectile(unitView.unit.unitId);
+            }
           }
         }
       }
       return clipHold(clips, HOLD_SHARE);
     },
 
-    frame(ms, simTime, field) {
+    frame(ms, field) {
       shown += ms;
       const at = targets(field);
       const travelling = entering === null && field.outcome === null && field.stageKind === 'travel';
@@ -706,14 +795,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         unitView.clock += ms;
         // Once the adventure is over its clock stands still, so an act not yet at its blow would never get there; one past it finishes.
         if (field.outcome !== null && unitView.followAt === null) endAct(unitView);
-        const standing = unitView.downAt === null && unitView.unit.health > 0;
+        // Upright: alive, or struck down by a projectile that has not landed yet.
+        const standing = !fallen(unitView) && (unitView.unit.health > 0 || unitView.downAt !== null);
         if (unitView.behind) {
           unitView.x -= rolled;
           if (unitView.x < -view.stageX - 48) {
             removeUnit(unitView.unit.unitId);
             continue;
           }
-          draw(unitView, simTime, false, false, unitView.opponent);
+          draw(unitView, false, false, unitView.opponent);
           drawBar(unitView);
           continue;
         }
@@ -754,11 +844,11 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
             rushing = true;
           }
         }
-        draw(unitView, simTime, moving, rushing, mirrored);
+        draw(unitView, moving, rushing, mirrored);
         drawBar(unitView);
       }
 
-      drawProjectiles(simTime);
+      drawProjectiles();
       drawEffects();
 
       if ((entering === 'party' && partyOn) || (entering === 'opponents' && offset <= 0)) {
