@@ -111,6 +111,23 @@ export function effectMs(layout: EffectLayout): number {
 }
 
 /**
+ * The frame of an act, or of the weapon swung with it, `ms` after its
+ * action resolved: the frames after `hold`, the follow-through, one every
+ * `frameMs`; past the last, null. The scene gives it presentation time, so
+ * that the swing of the action under way finishes while the adventure's
+ * clock waits for it (Issue-335).
+ */
+export function followFrame(ms: number, hold: number, count: number, frameMs: number): number | null {
+  const index = hold + 1 + Math.floor(ms / frameMs);
+  return index < count ? index : null;
+}
+
+/** How long the follow-through of an act, or of its weapon's swing, lasts: the frames after `hold`. */
+export function followMs(hold: number, count: number, frameMs: number): number {
+  return Math.max(0, count - hold - 1) * frameMs;
+}
+
+/**
  * The frame of an act, or of the weapon swung with it, at `simTime`: the
  * frames up to `hold` from the declaration, `hold` until the action
  * resolves, then the rest; past the last, null. The actor and its weapon
@@ -127,10 +144,7 @@ export function heldFrame(
   frameMs: number,
   lead: readonly number[] = [],
 ): number | null {
-  if (simTime >= act.resolve) {
-    const index = hold + 1 + Math.floor((simTime - act.resolve) / frameMs);
-    return index < count ? index : null;
-  }
+  if (simTime >= act.resolve) return followFrame(simTime - act.resolve, hold, count, frameMs);
   let index = 0;
   for (let left = simTime - act.from; index < hold; index++) {
     left -= lead[index] ?? frameMs;

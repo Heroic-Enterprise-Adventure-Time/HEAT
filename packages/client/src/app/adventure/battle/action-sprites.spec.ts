@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { must } from '@heat/engine';
 
-import { effectFrameAt, effectLayout, type EffectManifest, effectMs, flightAt, flightPoint, heldFrame, projectileAt, projectileLayout, releaseMs, type Thrower } from './action-sprites';
+import { effectFrameAt, effectLayout, type EffectManifest, effectMs, flightAt, flightPoint, followFrame, followMs, heldFrame, projectileAt, projectileLayout, releaseMs, type Thrower } from './action-sprites';
 
 const manifest: EffectManifest = {
   frame_ms: 71,
@@ -88,6 +88,31 @@ describe('heldFrame', () => {
 
   it('skips the hold of an action that resolves as it is declared', () => {
     expect(heldFrame(1000, { from: 1000, resolve: 1000 }, 1, 3, 90)).toBe(2);
+  });
+});
+
+describe('the follow-through of an act', () => {
+  it('plays the frames after the hold from the moment the action resolved, one a frame length, and is then over', () => {
+    expect(followFrame(0, 2, 5, 90)).toBe(3);
+    expect(followFrame(89, 2, 5, 90)).toBe(3);
+    expect(followFrame(90, 2, 5, 90)).toBe(4);
+    expect(followFrame(180, 2, 5, 90)).toBeNull();
+  });
+
+  it('lasts as long as those frames, which is what the clock waits for', () => {
+    expect(followMs(2, 5, 90)).toBe(180);
+    expect(followFrame(followMs(2, 5, 90) - 1, 2, 5, 90)).toBe(4);
+    expect(followFrame(followMs(2, 5, 90), 2, 5, 90)).toBeNull();
+  });
+
+  it('is nothing for an act that ends on its hold frame', () => {
+    expect(followMs(4, 5, 90)).toBe(0);
+    expect(followFrame(0, 4, 5, 90)).toBeNull();
+  });
+
+  it("is the same frames an act shows after its resolve on the adventure's clock", () => {
+    const act = { from: 1000, resolve: 1300 };
+    for (const ms of [0, 45, 90, 179, 180]) expect(followFrame(ms, 2, 5, 90)).toBe(heldFrame(1300 + ms, act, 2, 5, 90));
   });
 });
 

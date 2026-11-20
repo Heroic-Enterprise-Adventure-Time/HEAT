@@ -1,10 +1,12 @@
 /**
  * The arithmetic of the play clock's hold for a battle's clips (game.md,
  * "The battle"; Issue-335), apart from the renderer so that it is tested
- * without one. A blow's hit, an ability's effect and a fall each play on the
- * presentation clock, the wall clock times the speed, and the adventure's
- * clock waits for a share of the longest that one frame's events start, so
- * that one blow reads before the next lands. The hold is the page's alone:
+ * without one. The rest of a swing after its blow, the hit, the ability's
+ * effect and a fall each play on the presentation clock, the wall clock
+ * times the speed, and the adventure's clock waits for a share of the
+ * longest that one frame's events start, the whole of it by the scene's
+ * `HOLD_SHARE`, so that one action is animated to its end before the next
+ * thing happens. The hold is the page's alone:
  * the engine, its events and the timeline know nothing of it, so a run, its
  * verification and its replay are what they were.
  */

@@ -20,7 +20,7 @@ import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/gro
 import { fetchJson } from '../../static-json';
 import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
-import { effectFrameAt, effectMs, heldFrame, projectileAt } from './action-sprites';
+import { effectFrameAt, effectMs, followFrame, followMs, heldFrame, projectileAt } from './action-sprites';
 import { artSettled } from './art-loads';
 import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
@@ -43,10 +43,12 @@ import { clipHold } from './clip-hold';
  * fight or a gather the other side rushes on from the right as the road
  * scrolls with it, and only then does the clock run (the owner's call on
  * Issue-15). What is left of a stage scrolls away on the next travel. A
- * hit, an effect and a fall play on the presentation clock, and the scene
- * says how long the adventure's clock should wait for the ones just begun
- * (`HOLD_SHARE`, Issue-335); an act, its weapon and a projectile are drawn
- * from the adventure's clock, so they stand still through that wait. The
+ * hit, an effect, a fall and the rest of a swing after its blow play on the
+ * presentation clock, and the scene says how long the adventure's clock
+ * should wait for the ones just begun (`HOLD_SHARE`, Issue-335), so that an
+ * action is animated to its end before the next thing happens. An act up to
+ * its blow, and a projectile, are drawn from the adventure's clock: a unit
+ * warming up, and an arrow in the air, wait with it. The
  * scene knows nothing of the engine or the hub; the page feeds it, and
  * before a run it hands over the run's cast, whose art is loaded before the
  * run is shown (`prepare`, Issue-205).
@@ -97,13 +99,14 @@ const WALK_MS = 100;
 const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
 /**
- * The share of a hit, an effect or a fall that the adventure's clock waits
- * for, so that one blow reads before the next lands (Issue-335): 0 for no
- * wait, 1 for the whole clip. Of the longest clip one frame's events begin,
- * in presentation time, so the wait shortens at 2× and 4× as the clips do.
- * A taste, set by looking; it changes nothing the engine decides.
+ * The share of an action's animation that the adventure's clock waits for,
+ * the rest of the swing, the hit, the effect and a fall (Issue-335): 0 for
+ * no wait, 1 for the whole of it, which is the owner's call of 2026-11-20,
+ * one action animated at a time. Of the longest clip one frame's events
+ * begin, in presentation time, so the wait shortens at 2× and 4× as the
+ * clips do. A taste, set by looking; it changes nothing the engine decides.
  */
-const HOLD_SHARE = 0.5;
+const HOLD_SHARE = 1;
 /** The longest a run waits for its art before it begins, on the wall clock: past it the run begins, and a picture shows when it arrives. */
 const ART_WAIT_MS = 8000;
 /** A fallen monster or a felled tree lies this long after its fall, then fades over the next. */
@@ -139,6 +142,8 @@ interface UnitView {
   x: number;
   y: number;
   act: { readonly from: number; readonly resolve: number } | null;
+  /** When its action resolved, on the unit's presentation clock: the rest of its swing plays from here, while the adventure's clock waits. Null up to the blow. */
+  followAt: number | null;
   /** When a hit or a fall began, on the unit's presentation clock, so that one still plays once the adventure's clock has stopped. */
   hitAt: number | null;
   downAt: number | null;
@@ -332,6 +337,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       x: 0,
       y: 0,
       act: null,
+      followAt: null,
       hitAt: null,
       downAt: null,
       clock: 0,
@@ -507,10 +513,27 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     picture.pivot.set(texture.width / 2, frames.foot + 1 - cut);
   };
 
+  /**
+   * The frame of a unit's act, or of its weapon's swing: up to the blow on
+   * the adventure's clock, as the warmup is, and from the moment its action
+   * resolved on the unit's presentation clock, so that the swing under way
+   * finishes while the adventure's clock waits for it. Null outside an act.
+   */
+  const actFrame = (unitView: UnitView, simTime: number, hold: number, count: number, lead?: readonly number[]) => {
+    const { act, followAt } = unitView;
+    if (!act) return null;
+    return followAt === null ? heldFrame(simTime, act, hold, count, ACT_MS, lead) : followFrame(unitView.clock - followAt, hold, count, ACT_MS);
+  };
+
+  const endAct = (unitView: UnitView) => {
+    unitView.act = null;
+    unitView.followAt = null;
+  };
+
   /** The weapon in hand at the act's frame, its grip on the hand, or none outside an act. */
   const drawWeapon = (unitView: UnitView, simTime: number) => {
-    const { weapon, weaponSprite, act } = unitView;
-    const index = weapon && act && unitView.downAt === null ? heldFrame(simTime, act, weapon.holdFrame, weapon.swing.length, ACT_MS, weapon.frameMs) : null;
+    const { weapon, weaponSprite } = unitView;
+    const index = weapon && unitView.downAt === null ? actFrame(unitView, simTime, weapon.holdFrame, weapon.swing.length, weapon.frameMs) : null;
     weaponSprite.visible = index !== null;
     if (index === null || !weapon) return;
     const grip = must(weapon.grips[index], `grip ${index} of the weapon`);
@@ -533,14 +556,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       }
       return;
     }
-    const act = unitView.act;
-    if (act) {
-      const index = heldFrame(simTime, act, art.actHold, art.act.textures.length, ACT_MS);
+    if (unitView.act) {
+      const index = actFrame(unitView, simTime, art.actHold, art.act.textures.length);
       if (index !== null) {
         show(unitView, art.act, index, mirrored);
         return;
       }
-      unitView.act = null;
+      endAct(unitView);
       unitView.weaponSprite.visible = false;
     }
     if (unitView.hitAt !== null) {
@@ -599,7 +621,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         for (const unitView of units.values()) {
           if (unitView.opponent) unitView.behind = true;
           else {
-            unitView.act = null;
+            endAct(unitView);
             unitView.hitAt = null;
           }
         }
@@ -623,6 +645,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           const unitView = units.get(event.unitId);
           if (unitView) {
             unitView.act = { from: event.timestamp, resolve: event.resolveTimestamp };
+            unitView.followAt = null;
             const set = ABILITY_EFFECTS[event.abilityId as AbilityId];
             const target = units.get(event.targetIds[0] ?? '');
             if (set && target && target !== unitView) addProjectile(set, unitView, target, unitView.act);
@@ -631,6 +654,11 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           const set = ABILITY_EFFECTS[event.abilityId as AbilityId];
           const actor = units.get(event.unitId);
           removeProjectile(event.unitId);
+          // The blow has landed: the rest of the swing plays from now, and is waited for with what it began.
+          if (actor?.act && event.abilityId !== 'move-up') {
+            actor.followAt = actor.clock;
+            if (actor.art) clips.push(followMs(actor.art.actHold, actor.art.act.textures.length, ACT_MS));
+          }
           for (const effect of event.effects) {
             if (effect.kind === 'damage' || effect.kind === 'harvest') {
               const target = units.get(effect.targetId);
@@ -676,8 +704,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       let partyOn = true;
       for (const unitView of [...units.values()]) {
         unitView.clock += ms;
-        // Once the adventure is over its clock stands still, so an act still showing would never finish.
-        if (field.outcome !== null) unitView.act = null;
+        // Once the adventure is over its clock stands still, so an act not yet at its blow would never get there; one past it finishes.
+        if (field.outcome !== null && unitView.followAt === null) endAct(unitView);
         const standing = unitView.downAt === null && unitView.unit.health > 0;
         if (unitView.behind) {
           unitView.x -= rolled;

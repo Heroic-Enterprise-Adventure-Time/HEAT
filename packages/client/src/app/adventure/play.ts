@@ -27,9 +27,9 @@ const SAVE_EVERY_MS = 1000;
  * by a page that has a scene, until `entered` is called (the owner's call on
  * Issue-15: the rush in is flavor, and the fight's clock starts after it).
  *
- * After a blow or a fall the clock waits again, for as long as the scene
- * asks with `hold`: a share of the clips the events began, so that one reads
- * before the next lands (Issue-335). That wait runs down in presentation
+ * When an action resolves the clock waits again, for as long as the scene
+ * asks with `hold`: while the action is animated, so that one is seen to
+ * its end before the next (Issue-335). That wait runs down in presentation
  * time, the wall clock times the speed, and not at all while paused. Both
  * waits are the page's: the engine's clock, its events and the log know
  * nothing of them, so a run and its replay wait alike and verify as before.
