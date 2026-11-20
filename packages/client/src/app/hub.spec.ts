@@ -74,6 +74,36 @@ describe('Hub', () => {
     expect(hub.outdated()).toBe(true);
   });
 
+  it('records the flag on a request the hub refused before running it, answered with HTTP 400: a document a newer schema no longer accepts', async () => {
+    const { hub, client, http } = setup();
+    const work = client.query({ query: MeDocument, fetchPolicy: 'network-only' });
+    await vi.waitFor(() => {
+      http
+        .expectOne('/graphql')
+        .flush(
+          { errors: [{ message: 'Cannot query field "gather" on type "UnitStats".', extensions: { code: 'GRAPHQL_VALIDATION_FAILED' } }], extensions: { outdated: true } },
+          { status: 400, statusText: 'Bad Request' },
+        );
+    });
+    const failed = await work.then(
+      () => null,
+      (e: unknown) => apiError(e),
+    );
+    expect(failed).toEqual(new ApiError('the hub answered 400', null));
+    expect(hub.outdated()).toBe(true);
+  });
+
+  it('records no flag on a refused request whose body carries none, or is not the hub\'s', async () => {
+    for (const body of [{ errors: [{ message: 'Cannot query field "gather" on type "UnitStats".' }] }, '<html>Bad Gateway</html>']) {
+      TestBed.resetTestingModule();
+      const { hub, client, http } = setup();
+      const work = client.query({ query: MeDocument, fetchPolicy: 'network-only' });
+      await vi.waitFor(() => { http.expectOne('/graphql').flush(body, { status: typeof body === 'string' ? 502 : 400, statusText: 'Refused' }); });
+      await work.catch(() => null);
+      expect(hub.outdated()).toBe(false);
+    }
+  });
+
   it("sends a request routed to the previous deploy to /previous in front of the stack's path", async () => {
     const { client, http } = setup();
     await answer(client.query({ query: MeDocument, fetchPolicy: 'network-only', context: { route: PREVIOUS } }), http, '/previous/graphql', { data: { me: null } });

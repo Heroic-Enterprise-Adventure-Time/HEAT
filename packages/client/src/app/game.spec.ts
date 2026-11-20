@@ -346,6 +346,25 @@ describe('Game', () => {
     expect(game.heroesHere().map((h) => h.status)).toEqual(['ALIVE']);
   });
 
+  it('keeps the player it holds when a later read of it fails, and says why: a tab the hub has refused can still be told it is outdated', async () => {
+    const { controller, game, run, hub } = setup(playerWith([]));
+    await run();
+    const work = game.recruit('villager');
+    for (let i = 0; i < 50; i++) {
+      TestBed.tick();
+      for (const operation of controller.match(() => true)) {
+        const call = callOf(operation);
+        if (call.op === 'Me') operation.networkError(new Error('the hub answered 400'));
+        else operation.flush({ data: hub.answer(call) });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await work;
+    expect(game.error()).toBe('the hub answered 400');
+    // The player as last read, before the recruit: the page keeps what it showed.
+    expect(game.player()).toMatchObject({ id: 'p1', heroes: [] });
+  });
+
   it('says why the player could not be read when the join fails, and loads nothing', async () => {
     const { controller, game } = setup(playerWith([]));
     TestBed.tick();
