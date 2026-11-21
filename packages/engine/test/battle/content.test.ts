@@ -57,17 +57,22 @@ describe("The battle's content", () => {
     }
   });
 
-  it("has the first traits: the villager cuts wood and mines at level 1, a specialist carries its own trait alone at level 2, and a combat unit and a monster carry none (decision 0058)", () => {
+  it("has the first traits: the villager cuts wood and mines at level 1 and cannot skin, a specialist carries its own trait alone at level 2, the ranger skins at level 1, and the fighter and a monster carry none (decision 0058, Issue-340)", () => {
     expect(must(UNIT_PROFILES.villager, "the villager").stats.traits).toEqual([{ trait: "woodcutting", level: 1 }, { trait: "mining", level: 1 }]);
     expect(must(UNIT_PROFILES.lumberjack, "the lumberjack").stats.traits).toEqual([{ trait: "woodcutting", level: 2 }]);
     expect(must(UNIT_PROFILES.miner, "the miner").stats.traits).toEqual([{ trait: "mining", level: 2 }]);
-    for (const profile of [must(UNIT_PROFILES.fighter, "the fighter"), must(UNIT_PROFILES.ranger, "the ranger"), ...Object.values(MONSTERS)]) expect(profile.stats.traits).toEqual([]);
+    expect(must(UNIT_PROFILES.ranger, "the ranger").stats.traits).toEqual([{ trait: "skinning", level: 1 }]);
+    for (const profile of [must(UNIT_PROFILES.fighter, "the fighter"), ...Object.values(MONSTERS)]) expect(profile.stats.traits).toEqual([]);
+    // Hide is the first drop a party gets nothing of without its carrier: the ranger is the only one.
+    const skinners = Object.entries(UNIT_PROFILES).filter(([, profile]) => profile.stats.traits.some((t) => t.trait === "skinning")).map(([type]) => type);
+    expect(skinners).toEqual(["ranger"]);
   });
 
-  it("has the first drops and XP (decision 0058): a tree's timber by woodcutting, a vein's ore by mining, each always, and no drop from a monster yet", () => {
+  it("has the first drops and XP (decision 0058): a tree's timber by woodcutting, a vein's ore by mining, each always, and a wolf's hide by skinning, one half the time and one or two always at level 2 (Issue-340)", () => {
     expect(RESOURCE_NODES.tree).toMatchObject({ xp: 3, drops: [{ material: "timber", trait: "woodcutting", levels: [{ chancePercent: 100, min: 30, max: 36 }, { chancePercent: 100, min: 42, max: 50 }] }] });
     expect(RESOURCE_NODES["ore-vein"]).toMatchObject({ xp: 3, drops: [{ material: "ore", trait: "mining", levels: [{ chancePercent: 100, min: 20, max: 24 }, { chancePercent: 100, min: 28, max: 32 }] }] });
-    expect(mapValues(MONSTERS, (m) => [m.xp, m.drops])).toEqual({ wolf: [5, []], bandit: [6, []], "goblin-rock-thrower": [5, []] });
+    const hide = { material: "hide", trait: "skinning", levels: [{ chancePercent: 50, min: 1, max: 1 }, { chancePercent: 100, min: 1, max: 2 }] };
+    expect(mapValues(MONSTERS, (m) => [m.xp, m.drops])).toEqual({ wolf: [5, [hide]], bandit: [6, []], "goblin-rock-thrower": [5, []] });
   });
 
   it("aims chop at the nodes woodcutting gathers from and mine at the nodes mining does", () => {

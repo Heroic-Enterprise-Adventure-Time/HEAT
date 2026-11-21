@@ -43,6 +43,7 @@ export type FacilityKind =
 /** The gathering traits, the engine's `GatheringTrait`, each named for its craft: what a party must carry for an enemy's drop to fall to it. */
 export type GatheringTrait =
   | 'MINING'
+  | 'SKINNING'
   | 'WOODCUTTING';
 
 /** Alive or dead at the camp, or retired for good. */
@@ -54,6 +55,7 @@ export type HeroStatus =
 /** The resources, the engine's `Material`: there is no currency. */
 export type Material =
   | 'CLOTH'
+  | 'HIDE'
   | 'ORE'
   | 'TIMBER';
 

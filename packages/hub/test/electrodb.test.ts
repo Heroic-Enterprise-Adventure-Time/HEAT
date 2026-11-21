@@ -139,17 +139,21 @@ describe("an item from before ElectroDB", () => {
     expect(await repo.getAdventure(adventureId)).toEqual(record);
   });
 
-  it("reads a snapshot from before the gathering traits with each hero's unit type's traits of today, and one that has traits as it is (Issue-339)", async () => {
+  it("reads a snapshot from before the gathering traits with each hero's unit type's traits of today, a trait added since among them, and one that has traits as it is (Issue-339, Issue-340)", async () => {
     const adventureId = randomUUID();
     const hero = { heroId: "h", unitType: "villager", name: "Old", spriteSet: "villager-01", level: 1 };
     const wolf = { heroId: "w", unitType: "wolf", name: "Odd", spriteSet: "wolf-01", level: 1 };
+    // A ranger of that deploy rated nothing. It is read as skinning, a trait its deploy never had: the page
+    // that resumes its run counts hide the issuing deploy does not credit, which the owner accepted for the
+    // one release that crosses both changes (the review of PR-346; adventure-loop.md, the item built by Issue-340).
+    const ranger = { heroId: "r", unitType: "ranger", name: "Shot", spriteSet: "ranger-01", level: 1, stats: { maxHealth: 26, speed: 10, damage: 6, gather: [] } };
     const own = { heroId: "o", unitType: "villager", name: "New", spriteSet: "villager-01", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "mining", level: 3 }] } };
     // As the deploy before wrote them, with the gather ratings of decision 0051, and as the one before that did, with one `gathering` stat.
     const old = { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] };
     const older = { maxHealth: 30, speed: 8, damage: 4, gathering: 4 };
     const record = {
       adventureId, playerId: "p", seed: "s", location: at, jobId: "sticks", version: "v", startedAt: "2026-11-09T12:00:00.000Z", status: "OPEN",
-      snapshot: { version: "v", jobId: "sticks", heroes: [{ ...hero, stats: old }, { ...hero, heroId: "g", stats: older }, { ...wolf, stats: old }, own] },
+      snapshot: { version: "v", jobId: "sticks", heroes: [{ ...hero, stats: old }, { ...hero, heroId: "g", stats: older }, { ...wolf, stats: old }, ranger, own] },
     };
     await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
     const { traits } = must(UNIT_PROFILES.villager, "the villager's profile").stats;
@@ -158,6 +162,7 @@ describe("an item from before ElectroDB", () => {
       { ...hero, stats: { ...old, traits } },
       { ...hero, heroId: "g", stats: { ...older, traits } },
       { ...wolf, stats: { ...old, traits: [] } },
+      { ...ranger, stats: { ...ranger.stats, traits: [{ trait: "skinning", level: 1 }] } },
       own,
     ]);
   });

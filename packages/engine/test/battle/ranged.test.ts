@@ -95,8 +95,8 @@ describe("A goblin's throw", () => {
     expect(resolved.effects).toEqual([{ kind: "damage", targetId: "ranger-1", amount: MONSTERS["goblin-rock-thrower"].stats.damage, newHealth: expect.any(Number) as number }]);
   });
 
-  it("gives neither ranged unit a gathering trait", () => {
-    expect(must(UNIT_PROFILES.ranger, "the ranger").stats.traits).toEqual([]);
+  it("gives the ranger skinning alone, so its shot at a node gathers nothing, and the goblin no gathering trait", () => {
+    expect(must(UNIT_PROFILES.ranger, "the ranger").stats.traits).toEqual([{ trait: "skinning", level: 1 }]);
     expect(MONSTERS["goblin-rock-thrower"].stats.traits).toEqual([]);
   });
 });

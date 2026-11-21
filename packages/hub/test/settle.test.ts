@@ -73,8 +73,9 @@ async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): P
   return heroes;
 }
 
-async function start(p: string, heroes: Hero[], issuedBy = version, jobId: string = wolves.id) {
-  return startAdventure(repo, p, issuedBy, randomUUID(), at, jobId, heroes.map((h) => h.id));
+/** Starts the job for the party; with `seed`, on that seed and not one the hub draws (graphql.md, rule 25). */
+async function start(p: string, heroes: Hero[], issuedBy = version, jobId: string = wolves.id, seed?: string) {
+  return startAdventure(repo, p, issuedBy, randomUUID(), at, jobId, heroes.map((h) => h.id), undefined, seed === undefined ? undefined : () => seed);
 }
 
 async function balanceOf(p: string, material: string) {
@@ -415,6 +416,41 @@ describe("what dropped (decision 0058)", () => {
     expect(await balanceOf(p, "timber")).toBeUndefined();
     expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#timber"))).toBeUndefined();
     expect((await repo.getHero(p, must(heroes[0], "the fighter").id))?.xp).toBe(15);
+  });
+
+  it("credits the wolf's hide to a party with a ranger, a holding and a ledger entry of its own beside the cloth, and none to a party without one (Issue-340)", async () => {
+    // A wolf drops hide half the time, so the test passes a seed on which both of this job's wolves do:
+    // the roll is the wolf's own, from the seed, the stage and its id, whoever the heroes are.
+    const seed = "hide";
+    const p = player();
+    const heroes = await putParty(p, ["fighter", "ranger"]);
+    const started = await start(p, heroes, version, wolves.id, seed);
+    expect(started.seed).toBe(seed);
+    expect(started.snapshot.heroes.map((h) => h.stats.traits)).toEqual([[], [{ trait: "skinning", level: 1 }]]);
+    const expected = replay(started.snapshot, started.seed, []).result;
+    expect(expected.outcome).toBe("complete");
+    const hide = must(expected.rewards.find((r) => r.material === "hide"), "the hide").amount;
+    expect(hide).toBe(2);
+
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
+    expect(settled.result?.rewards).toEqual([...wolves.pay, { material: "hide", amount: hide }]);
+    expect(settled.result?.credited).toEqual(settled.result?.rewards);
+    expect(settled.result?.lost).toEqual([]);
+    expect(await balanceOf(p, "hide")).toBe(hide);
+    expect(await balanceOf(p, "cloth")).toBe(10);
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#hide"))).toMatchObject({ delta: hide, lost: 0 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
+    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(WOLVES_XP);
+
+    // The same job on the same seed with a villager in the ranger's place: the wolves fall, and no hide is credited.
+    const q = player();
+    const others = await putParty(q, ["fighter", "villager"]);
+    const without = await start(q, others, version, wolves.id, seed);
+    expect(replay(without.snapshot, without.seed, []).result.outcome).toBe("complete");
+    const paid = await submitAdventure(repo, new MemoryTimelines(), q, version, without.adventureId, []);
+    expect(paid.result?.credited).toEqual(wolves.pay);
+    expect(await balanceOf(q, "hide")).toBeUndefined();
+    expect(await storedItem(db, tables.player, playerKeys.ledger(q, without.adventureId, "credit#hide"))).toBeUndefined();
   });
 
   it("is capped by the warehouse like the pay, each resource on its own balance", async () => {

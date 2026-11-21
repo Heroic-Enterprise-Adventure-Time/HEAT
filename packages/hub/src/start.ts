@@ -31,7 +31,10 @@ import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHe
  * which becomes the adventure's id; the hub checks them, issues the seed and
  * the frozen snapshot of the party, stamped with the deploy's version, and
  * opens the player's one adventure. A repeat answers the adventure the
- * request started, as it is (graphql.md, rule 7).
+ * request started, as it is (graphql.md, rule 7). The seed is drawn by
+ * `issueSeed`, the cryptographic source unless a test passes the seed it
+ * means (graphql.md, rules 10 and 25): no caller outside a test passes one,
+ * and nothing of a request reaches it.
  *
  * The rules are checked twice, as recruiting's are: here, against what was
  * read, to give the player a reason; and in the transaction's conditions,
@@ -120,10 +123,11 @@ export function startAdventure(
   jobId: string,
   heroIds: readonly string[],
   now = new Date(),
+  issueSeed: () => string = randomUUID,
 ): Promise<AdventureRecord> {
   return retryingConflicts("start", "the party changed while starting; no adventure was started", async () => {
     try {
-      return await startOnce(repo, playerId, version, requestId, locationId, jobId, heroIds, now);
+      return await startOnce(repo, playerId, version, requestId, locationId, jobId, heroIds, now, issueSeed);
     } catch (e) {
       // A refusal is final only once the work is read as not done after it
       // (graphql.md, rule 9). A repeat of a start that committed, the
@@ -147,6 +151,7 @@ async function startOnce(
   jobId: string,
   heroIds: readonly string[],
   now: Date,
+  issueSeed: () => string,
 ): Promise<AdventureRecord> {
   const open = await repo.openAdventure(playerId);
   if (open) refuseOpen(open.adventureId);
@@ -195,7 +200,7 @@ async function startOnce(
   try {
     return await repo.startAdventure(playerId, {
       adventureId: requestId,
-      seed: randomUUID(),
+      seed: issueSeed(),
       location: at.id,
       jobId: job.id,
       snapshot,

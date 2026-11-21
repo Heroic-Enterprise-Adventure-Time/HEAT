@@ -37,7 +37,7 @@ export type UnitKind = "hero" | "monster" | "resource";
  * The gathering traits, named for the craft and not for a unit type (decision
  * 0058). The list declares the union (typescript.md, rule 18).
  */
-export const GATHERING_TRAITS = ["woodcutting", "mining"] as const;
+export const GATHERING_TRAITS = ["woodcutting", "mining", "skinning"] as const;
 export type GatheringTrait = (typeof GATHERING_TRAITS)[number];
 
 /**

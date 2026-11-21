@@ -309,7 +309,12 @@ function toHero(i: MayLack<Stored<"hero">, "level" | "xp" | "picks" | "status">)
  * while its adventure is open across that deploy, and for good once settled,
  * since a settled adventure answers its snapshot. Its heroes take their unit
  * type's traits of today, as they took its ratings (Issue-283), so a client
- * that resumes the run shows it gathering. The deploy that issued it
+ * that resumes the run shows it gathering. Today's traits include any added
+ * since: such a snapshot's ranger is read as skinning (Issue-340), so the
+ * page counts hide that the issuing deploy, which had no hide, never
+ * credits, as it shows timber by the drop's rule and is credited by the
+ * harvest's. Accepted for the one release that crosses both changes (the
+ * owner, 2026-11-20, the review of PR-346). The deploy that issued it
  * verifies it, from the record as that deploy reads it (decision 0030), so
  * what this adds is never what a result is computed from.
  */
