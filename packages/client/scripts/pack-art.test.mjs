@@ -2,6 +2,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { range } from "es-toolkit";
+
 import { SET_CLIPS } from "../src/app/sprite-sets.ts";
 import { clipsOf, glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
 
@@ -187,8 +189,8 @@ const OUTLINE = [20, 13, 8, 255];
 const fontAtlas = () => atlas([["####"], ["#"], [".##.", ".#.#", ".##."], ["..#.", "..#.", "..#."]]);
 /** A glyph frame as text: `#` its ink, `o` its outline, `.` nothing. */
 const drawn = (frame) =>
-  Array.from({ length: frame.height }, (_, y) =>
-    Array.from({ length: frame.width }, (_, x) => {
+  range(frame.height).map((y) =>
+    range(frame.width).map((x) => {
       const at = pixel(frame, x, y);
       return at[3] === 0 ? "." : at[0] === INK[0] ? "#" : "o";
     }).join(""),
