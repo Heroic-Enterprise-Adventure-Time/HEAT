@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { SET_CLIPS } from "../src/app/sprite-sets.ts";
-import { clipsOf, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
+import { clipsOf, glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
 
 /** A picture of one colour per frame, opaque on the rows from `top` to `bottom` and transparent elsewhere. */
 function picture(name, width, height, top, bottom, shade = 200) {
@@ -167,6 +167,78 @@ test("pictureName carries a hash of the file, so a picture made again is a new n
   assert.match(first, /^level-1\.[0-9a-f]{12}\.png$/);
   assert.equal(pictureName("level-1", Buffer.from([1, 2, 3])), first);
   assert.notEqual(pictureName("level-1", Buffer.from([1, 2, 4])), first);
+});
+
+/** A font's atlas of 4 px cells, two a row, for the characters "ab01": black where a cell's rows say `#`, as the service draws one. */
+const fontLayout = { glyphPx: 4, columns: 2, characters: "ab01" };
+function atlas(cells) {
+  const image = { name: "atlas", width: 8, height: 8, data: Buffer.alloc(8 * 8 * 4) };
+  cells.forEach((rows, cell) => {
+    rows.forEach((row, y) => {
+      [...row].forEach((mark, x) => {
+        if (mark === "#") image.data.set([0, 0, 0, 255], (((cell >> 1) * 4 + y) * 8 + (cell % 2) * 4 + x) * 4);
+      });
+    });
+  });
+  return image;
+}
+const INK = [230, 214, 184, 255];
+const OUTLINE = [20, 13, 8, 255];
+const fontAtlas = () => atlas([["####"], ["#"], [".##.", ".#.#", ".##."], ["..#.", "..#.", "..#."]]);
+/** A glyph frame as text: `#` its ink, `o` its outline, `.` nothing. */
+const drawn = (frame) =>
+  Array.from({ length: frame.height }, (_, y) =>
+    Array.from({ length: frame.width }, (_, x) => {
+      const at = pixel(frame, x, y);
+      return at[3] === 0 ? "." : at[0] === INK[0] ? "#" : "o";
+    }).join(""),
+  );
+
+test("glyphFrames cuts each glyph asked for to the columns it fills, in the ink, with a pixel of outline around it", () => {
+  const [zero, one] = glyphFrames({ set: "fonts/test", atlas: fontAtlas(), layout: fontLayout, glyphs: ["0", "1"], ink: INK, outline: OUTLINE });
+  assert.equal(zero.name, "0");
+  assert.deepEqual(drawn(zero), ["oooo.", "o##oo", "o#o#o", "o##oo", "oooo.", "....."]);
+  assert.equal(one.name, "1");
+  assert.deepEqual(drawn(one), ["ooo", "o#o", "o#o", "o#o", "ooo", "..."]);
+  assert.deepEqual(pixel(zero, 1, 1), INK);
+  assert.deepEqual(pixel(zero, 0, 0), OUTLINE);
+});
+
+test("glyphFrames makes every glyph as tall as a cell and its outline, so a row of them shares its rows", () => {
+  const frames = glyphFrames({ set: "fonts/test", atlas: fontAtlas(), layout: fontLayout, glyphs: ["a", "b", "0", "1"], ink: INK, outline: OUTLINE });
+  assert.deepEqual(frames.map((frame) => frame.height), [6, 6, 6, 6]);
+  assert.deepEqual(frames.map((frame) => frame.width), [6, 3, 5, 3]);
+});
+
+test("glyphFrames never reaches into the cell beside a glyph", () => {
+  // The cell left of "b" is full to its edge, and none of it is in b's frame or its outline.
+  const [b] = glyphFrames({ set: "fonts/test", atlas: fontAtlas(), layout: fontLayout, glyphs: ["b"], ink: INK, outline: OUTLINE });
+  assert.deepEqual(drawn(b), ["ooo", "o#o", "ooo", "...", "...", "..."]);
+});
+
+test("glyphFrames refuses a glyph the atlas does not hold, or holds empty, naming the set", () => {
+  const given = { set: "fonts/test", atlas: fontAtlas(), layout: fontLayout, ink: INK, outline: OUTLINE };
+  assert.throws(() => glyphFrames({ ...given, glyphs: ["7"] }), /^Error: fonts\/test: its atlas has no 7$/);
+  assert.throws(() => glyphFrames({ ...given, atlas: atlas([["#"], ["#"], [], ["#"]]), glyphs: ["0"] }), /^Error: fonts\/test: its 0 is empty$/);
+});
+
+test("glyphFrames refuses an atlas that is not the size its provenance says, or a provenance that says none", () => {
+  const given = { set: "fonts/test", atlas: fontAtlas(), glyphs: ["0"], ink: INK, outline: OUTLINE };
+  assert.throws(() => glyphFrames({ ...given, layout: { ...fontLayout, columns: 4 } }), /^Error: fonts\/test: its atlas is 8 by 8, and its provenance says 16 by 4$/);
+  assert.throws(() => glyphFrames({ ...given, layout: undefined }), /^Error: fonts\/test: its provenance gives the atlas no glyphPx, columns and characters$/);
+});
+
+test("packSet packs a font's glyphs, each a clip of one frame named for its character", () => {
+  const layout = { glyphPx: 4, columns: 4, characters: SET_CLIPS.font.join("") };
+  const image = { name: "atlas", width: 16, height: 12, data: Buffer.alloc(16 * 12 * 4) };
+  // One pixel in every cell is enough of a glyph.
+  SET_CLIPS.font.forEach((_, cell) => image.data.set([0, 0, 0, 255], (((cell >> 2) * 4 + 1) * 16 + (cell % 4) * 4 + 1) * 4));
+  const frames = glyphFrames({ set: "fonts/test", atlas: image, layout, glyphs: SET_CLIPS.font, ink: INK, outline: OUTLINE });
+  const { json } = packSet({ set: "fonts/test", kind: "font", frames, provenance: { atlas: layout } });
+  assert.deepEqual(Object.keys(json.animations), [...SET_CLIPS.font]);
+  assert.deepEqual(json.animations["7"], ["7"]);
+  assert.deepEqual(json.frames["7"].sourceSize, { w: 3, h: 6 });
+  assert.deepEqual(json.set, { kind: "font", feet: Object.fromEntries(SET_CLIPS.font.map((glyph) => [glyph, 3])) });
 });
 
 test("packSet asks a set for the clips the page's own list names for its kind", () => {

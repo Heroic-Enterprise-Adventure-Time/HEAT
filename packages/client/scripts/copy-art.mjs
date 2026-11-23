@@ -8,7 +8,10 @@
 // A sprite set, under art/heroes, art/monsters, art/props and art/weapons, is
 // packed into one sheet, its image named for its pixels and sheet.json naming
 // it (pack-art.mjs; Issue-205): its frames and its provenance are not
-// published. art/effects, art/ground and art/icons are copied as they are.
+// published. A font under art/fonts is packed the same way, its frames the
+// glyphs a scene draws, cut from its atlas and given the page's own light and
+// ink from src/styles.css (Issue-344). art/effects, art/ground and art/icons
+// are copied as they are.
 // A facility's pictures are copied under names that carry a hash of the
 // file, and beside them goes pictures.json: for each picture, that name and the
 // row it stands on (docs/process/assets.md, rule 18), measured here so that
@@ -21,12 +24,20 @@ import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-import { PACKED_AREAS } from "../src/app/sprite-sets.ts";
-import { opaqueRows, packSet, pictureName } from "./pack-art.mjs";
+import { PACKED_AREAS, SET_CLIPS } from "../src/app/sprite-sets.ts";
+import { glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
 
 const from = fileURLToPath(new URL("../../../art/", import.meta.url));
 const to = fileURLToPath(new URL("../generated/art/", import.meta.url));
 const COPIED_AREAS = ["effects", "ground", "icons"];
+
+/** A colour of the page's palette as RGBA, read from the stylesheet's tokens so that the build holds no copy of one (angular.md, rule 17). */
+const styles = readFileSync(fileURLToPath(new URL("../src/styles.css", import.meta.url)), "utf8");
+function token(name) {
+  const hex = new RegExp(`${name}:\\s*#([0-9a-f]{6});`, "i").exec(styles)?.[1];
+  if (!hex) throw new Error(`src/styles.css has no colour ${name}`);
+  return [0, 2, 4].map((at) => Number.parseInt(hex.slice(at, at + 2), 16)).concat(255);
+}
 
 /** A picture's pixels as RGBA, whatever the PNG's own colour type. */
 async function pixels(file) {
@@ -43,8 +54,11 @@ let sheets = 0;
 for (const [area, kind] of Object.entries(PACKED_AREAS)) {
   for (const name of directories(join(from, area))) {
     const dir = join(from, area, name);
-    const frames = await Promise.all(pictures(dir).map(pixels));
     const provenance = JSON.parse(readFileSync(join(dir, "provenance.json"), "utf8"));
+    // A font's frames are its glyphs, cut from its atlas; any other set's are its pictures.
+    const frames = kind === "font"
+      ? glyphFrames({ set: `${area}/${name}`, atlas: await pixels(join(dir, "atlas.png")), layout: provenance.atlas, glyphs: SET_CLIPS.font, ink: token("--light"), outline: token("--ink") })
+      : await Promise.all(pictures(dir).map(pixels));
     const { image, json } = packSet({ set: `${area}/${name}`, kind, frames, provenance });
     const out = join(to, area, name);
     mkdirSync(out, { recursive: true });

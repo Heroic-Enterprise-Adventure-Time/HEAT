@@ -17,6 +17,12 @@ export const SET_CLIPS = {
   figure: ['still-south', 'still-east', 'still-north', 'still-west', 'walk-south', 'walk-east', 'walk-north', 'stance-east', 'act-east', 'hit-east', 'down-east'],
   prop: ['standing', 'hit', 'down'],
   weapon: ['swing'],
+  /**
+   * A font: the glyphs a scene draws as sprites, each a clip of one frame
+   * named for its character, which the build cuts from the font's atlas
+   * (assets.md, rule 37). The battle's amounts need the digits and no more.
+   */
+  font: ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
 } as const;
 
 export type SetKind = keyof typeof SET_CLIPS;
@@ -24,5 +30,5 @@ export type SetKind = keyof typeof SET_CLIPS;
 export type SetClip<Kind extends SetKind> = (typeof SET_CLIPS)[Kind][number];
 
 /** The areas under `art/` whose sets are packed, each served under `/art/<area>/<set>`, and the kind of set it holds. */
-export const PACKED_AREAS = { heroes: 'figure', monsters: 'figure', props: 'prop', weapons: 'weapon' } as const satisfies Record<string, SetKind>;
+export const PACKED_AREAS = { heroes: 'figure', monsters: 'figure', props: 'prop', weapons: 'weapon', fonts: 'font' } as const satisfies Record<string, SetKind>;
 export type PackedArea = keyof typeof PACKED_AREAS;

@@ -15,7 +15,7 @@
 // fails the build here, not the page (docs/standards/typescript.md, rule 23).
 import { createHash } from "node:crypto";
 
-import { sortBy } from "es-toolkit";
+import { range, sortBy } from "es-toolkit";
 import { MaxRectsPacker } from "maxrects-packer";
 
 import { SET_CLIPS } from "../src/app/sprite-sets.ts";
@@ -61,6 +61,51 @@ export function clipsOf(set, frames) {
   return clips;
 }
 
+/** The eight pixels around one, for an outline that closes a glyph's corners. */
+const AROUND = [[-1, -1], [0, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [0, 1], [1, 1]];
+
+/**
+ * A font's glyphs as frames, cut from its atlas (assets.md, rule 37): the
+ * atlas is the service's own, one cell for each character in the order its
+ * provenance records, black on transparent, and a scene draws a glyph as a
+ * sprite. Each glyph asked for becomes a frame named for its character: its
+ * cell cut to the columns it fills, filled with `ink`, with one pixel of
+ * `outline` around it, so that it reads on any ground. Every frame is as
+ * tall as a cell and its outline, so the glyphs of a row share their rows.
+ * A glyph the atlas does not hold, or holds empty, is refused.
+ */
+export function glyphFrames({ set, atlas, layout, glyphs, ink, outline }) {
+  const { glyphPx, columns, characters } = layout ?? {};
+  if (!Number.isInteger(glyphPx) || !Number.isInteger(columns) || typeof characters !== "string") throw new Error(`${set}: its provenance gives the atlas no glyphPx, columns and characters`);
+  const rows = Math.ceil(characters.length / columns);
+  if (atlas.width !== columns * glyphPx || atlas.height !== rows * glyphPx) {
+    throw new Error(`${set}: its atlas is ${atlas.width} by ${atlas.height}, and its provenance says ${columns * glyphPx} by ${rows * glyphPx}`);
+  }
+  return glyphs.map((glyph) => {
+    const cell = characters.indexOf(glyph);
+    if (cell < 0) throw new Error(`${set}: its atlas has no ${glyph}`);
+    const cellX = (cell % columns) * glyphPx;
+    const cellY = Math.floor(cell / columns) * glyphPx;
+    const filled = (x, y) => x >= 0 && y >= 0 && x < glyphPx && y < glyphPx && atlas.data[((cellY + y) * atlas.width + cellX + x) * 4 + 3] > 0;
+    const used = range(glyphPx).filter((x) => range(glyphPx).some((y) => filled(x, y)));
+    if (used.length === 0) throw new Error(`${set}: its ${glyph} is empty`);
+    const left = used[0];
+    const width = used.at(-1) - left + 3;
+    const height = glyphPx + 2;
+    const data = Buffer.alloc(width * height * 4);
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        // The frame's pixel in the cell: one pixel of outline on every side.
+        const gx = left + x - 1;
+        const gy = y - 1;
+        if (filled(gx, gy)) data.set(ink, (y * width + x) * 4);
+        else if (AROUND.some(([dx, dy]) => filled(gx + dx, gy + dy))) data.set(outline, (y * width + x) * 4);
+      }
+    }
+    return { name: glyph, width, height, data };
+  });
+}
+
 /** Refuses a clip whose frames are not as many as the set's provenance says, so a frame left out of a commit fails the build. */
 function checkCounts(set, kind, clips, provenance) {
   for (const [name, animation] of Object.entries(provenance.animations ?? {})) {
@@ -78,6 +123,8 @@ function checkCounts(set, kind, clips, provenance) {
 function playOf(set, kind, clips, provenance) {
   const animations = provenance.animations ?? {};
   if (kind === "figure") return { actHold: animations.act?.holdFrame ?? 0 };
+  // A font plays nothing: a scene reads its glyphs' pictures and no more.
+  if (kind === "font") return {};
   if (kind === "prop") {
     // A down marked fadeAboveEnd fades the rows above its last frame's picture (rule 30).
     const last = clips.get("down")?.at(-1);
