@@ -33,13 +33,16 @@
 # new build is a new set of names; the page, the favicon and config.json
 # are re-read within a minute, which is how a new build reaches the browser
 # with no invalidation. The favicon is art (art/icons/favicon.png) but sits
-# at a fixed address, /favicon.png, because browsers ask for it by name.
+# at a fixed address, /favicon.png, because browsers ask for it by name, and
+# the build writes it there alone.
 # Those three are excluded from the sync of the long-lived and written on
 # their own. So is what the art build writes under a name that stays from
 # build to build (Issue-205): every sprite set's atlas,
 # art/<area>/<set>/sheet.json, which names the sheet's image, itself named
-# for its pixels and kept for the year; and art/facilities/pictures.json, which
-# names each facility picture the same way, beside the row it stands on.
+# for its pixels and kept for the year; art/facilities/pictures.json, which
+# names each facility picture the same way, beside the row it stands on; and
+# art/icons/pictures.json, which names each icon the same way (the review of
+# PR-348).
 #
 # The order: everything long-lived first, with nothing deleted; then the
 # short-lived files, each of which names long-lived ones, the atlases their
@@ -76,13 +79,13 @@ long="public, max-age=31536000, immutable"
 
 # What is written on its own, and so neither uploaded nor deleted by the syncs of the long-lived.
 set -- --exclude index.html --exclude favicon.png --exclude config.json \
-  --exclude "art/*/sheet.json" --exclude art/facilities/pictures.json
+  --exclude "art/*/sheet.json" --exclude "art/*/pictures.json"
 
 aws s3 sync "$build_dir" "s3://$bucket" --only-show-errors "$@" --cache-control "$long"
 
-# The atlases and the facilities' pictures' names alone: everything else under art/ went with the sync above.
+# The atlases and the indexes of the facilities' pictures and of the icons alone: everything else under art/ went with the sync above.
 aws s3 sync "$build_dir/art" "s3://$bucket/art" --delete --only-show-errors \
-  --exclude "*" --include "*/sheet.json" --include facilities/pictures.json \
+  --exclude "*" --include "*/sheet.json" --include "*/pictures.json" \
   --cache-control "$short" --content-type "application/json"
 
 aws s3 cp "$build_dir/index.html" "s3://$bucket/index.html" --only-show-errors \

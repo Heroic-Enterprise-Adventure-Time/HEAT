@@ -9,6 +9,7 @@ import { type AdventureView, Game, type HeroView, type RecentAdventureView, type
 import { Refusal } from '../../hub';
 import { Session } from '../../session';
 import { fakeCampScene } from '../../testing/fake-camp-scene';
+import { fakeIcons } from '../../testing/fake-icons';
 import { fakeSession, PLAYER } from '../../testing/fake-session';
 import { testLayoutSizes } from '../../testing/layout-sizes';
 import { itemHolding, listItems, menu, panel, panelBox } from '../../testing/page';
@@ -143,6 +144,7 @@ function renderJobs(game: ReturnType<typeof fakeGame>, url: string) {
     { provide: FRAME_LOOP, useValue: () => () => undefined },
     { provide: BATTLE_SCENE_FACTORY, useValue: async () => Promise.reject(new Error('no WebGL in jsdom')) },
     { provide: CAMP_SCENE_FACTORY, useValue: fakeCampScene },
+    fakeIcons,
     testLayoutSizes,
   ]);
 }
@@ -262,7 +264,7 @@ describe('Job board', () => {
     expect(panel().getByRole('link', { name: 'Wolves on the mill road' })).toHaveAttribute('href', '/adventure');
     const entry = menu().getByRole('link', { name: 'Adventure' });
     expect(entry).toHaveAttribute('href', '/adventure');
-    expect(within(entry).getByRole('presentation')).toHaveAttribute('src', 'art/icons/adventure.png');
+    expect(within(entry).getByRole('presentation')).toHaveAttribute('src', '/art/icons/adventure.test.png');
   });
 
   it('has no adventure entry in the menu while none is open', async () => {

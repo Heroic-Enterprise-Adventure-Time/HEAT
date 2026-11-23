@@ -2,6 +2,7 @@ import { Assets, Rectangle, Texture } from 'pixi.js';
 
 import { must } from '@heat/engine';
 
+import { fetchIconNames, iconAddress, type IconNames } from '../../icon-names';
 import { SET_CLIPS } from '../../sprite-sets';
 import { loadSpriteSet, type SetPath } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
@@ -117,13 +118,23 @@ export function loadEffectArt(set: string): Promise<EffectArt> {
   return art;
 }
 
+/** The icons' index, read once for the scene: a load that fails is dropped, so the next battle asks again. */
+let iconNames: Promise<IconNames> | null = null;
+
 /**
  * A resource's icon, which the scene draws where an enemy dropped some
- * (assets.md, rules 25 to 27): `<material>.png` under `/art/icons`, named
- * for the resource as the engine names it.
+ * (assets.md, rules 25 to 27): the icon named for the resource as the
+ * engine names it, at the address the icons' index gives it (`icon-names.ts`).
  */
-export function loadIconArt(material: string): Promise<Texture> {
-  return Assets.load<Texture>(`/art/icons/${material}.png`);
+export async function loadIconArt(material: string): Promise<Texture> {
+  if (!iconNames) {
+    const names = fetchIconNames();
+    iconNames = names;
+    names.catch(() => { if (iconNames === names) iconNames = null; });
+  }
+  const address = iconAddress(await iconNames, material);
+  if (!address) throw new Error(`the icons' index has no ${material}`);
+  return Assets.load<Texture>(address);
 }
 
 /** A font's glyphs, each by its character: `<set>` under `/art/fonts` (rule 37). */

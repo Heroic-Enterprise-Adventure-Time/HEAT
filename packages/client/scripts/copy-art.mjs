@@ -10,8 +10,15 @@
 // it (pack-art.mjs; Issue-205): its frames and its provenance are not
 // published. A font under art/fonts is packed the same way, its frames the
 // glyphs a scene draws, cut from its atlas and given the page's own light and
-// ink from src/styles.css (Issue-344). art/effects, art/ground and art/icons
-// are copied as they are.
+// ink from src/styles.css (Issue-344). art/effects and art/ground are copied
+// as they are.
+// An icon is copied under a name that carries a hash of its file, and beside
+// the icons goes pictures.json, that name for each icon: everything under
+// /art is published to be kept for a year, so an icon made again has to be a
+// new name, and the page and the battle scene read the name from the index
+// (src/app/icon-names.ts; the review of PR-348). The favicon is the page's
+// own file at its root, published to be read again within a minute, so it
+// keeps its name and goes to generated/favicon, which angular.json serves.
 // A facility's pictures are copied under names that carry a hash of the
 // file, and beside them goes pictures.json: for each picture, that name and the
 // row it stands on (docs/process/assets.md, rule 18), measured here so that
@@ -26,18 +33,14 @@ import sharp from "sharp";
 
 import { PACKED_AREAS, SET_CLIPS } from "../src/app/sprite-sets.ts";
 import { glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
+import { colourToken } from "./style-tokens.mjs";
 
 const from = fileURLToPath(new URL("../../../art/", import.meta.url));
 const to = fileURLToPath(new URL("../generated/art/", import.meta.url));
-const COPIED_AREAS = ["effects", "ground", "icons"];
-
-/** A colour of the page's palette as RGBA, read from the stylesheet's tokens so that the build holds no copy of one (angular.md, rule 17). */
-const styles = readFileSync(fileURLToPath(new URL("../src/styles.css", import.meta.url)), "utf8");
-function token(name) {
-  const hex = new RegExp(`${name}:\\s*#([0-9a-f]{6});`, "i").exec(styles)?.[1];
-  if (!hex) throw new Error(`src/styles.css has no colour ${name}`);
-  return [0, 2, 4].map((at) => Number.parseInt(hex.slice(at, at + 2), 16)).concat(255);
-}
+const favicon = fileURLToPath(new URL("../generated/favicon/", import.meta.url));
+const COPIED_AREAS = ["effects", "ground"];
+/** The icon that is the page's favicon, and no icon of the page's index. */
+const FAVICON = "favicon";
 
 /** A picture's pixels as RGBA, whatever the PNG's own colour type. */
 async function pixels(file) {
@@ -57,7 +60,7 @@ for (const [area, kind] of Object.entries(PACKED_AREAS)) {
     const provenance = JSON.parse(readFileSync(join(dir, "provenance.json"), "utf8"));
     // A font's frames are its glyphs, cut from its atlas; any other set's are its pictures.
     const frames = kind === "font"
-      ? glyphFrames({ set: `${area}/${name}`, atlas: await pixels(join(dir, "atlas.png")), layout: provenance.atlas, glyphs: SET_CLIPS.font, ink: token("--light"), outline: token("--ink") })
+      ? glyphFrames({ set: `${area}/${name}`, atlas: await pixels(join(dir, "atlas.png")), layout: provenance.atlas, glyphs: SET_CLIPS.font, ink: colourToken("--light"), outline: colourToken("--ink") })
       : await Promise.all(pictures(dir).map(pixels));
     const { image, json } = packSet({ set: `${area}/${name}`, kind, frames, provenance });
     const out = join(to, area, name);
@@ -87,4 +90,20 @@ for (const kind of directories(join(from, "facilities"))) {
 }
 writeFileSync(join(to, "facilities", "pictures.json"), JSON.stringify(facilityPictures));
 
-console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")} and copied art/${[...COPIED_AREAS, "facilities"].join(", art/")} into packages/client/generated/art`);
+const iconNames = {};
+mkdirSync(join(to, "icons"), { recursive: true });
+rmSync(favicon, { recursive: true, force: true });
+mkdirSync(favicon, { recursive: true });
+for (const file of pictures(join(from, "icons"))) {
+  const name = basename(file, ".png");
+  if (name === FAVICON) {
+    cpSync(file, join(favicon, "favicon.png"));
+    continue;
+  }
+  const image = pictureName(name, readFileSync(file));
+  cpSync(file, join(to, "icons", image));
+  iconNames[name] = image;
+}
+writeFileSync(join(to, "icons", "pictures.json"), JSON.stringify(iconNames));
+
+console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")} and copied art/${[...COPIED_AREAS, "facilities", "icons"].join(", art/")} into packages/client/generated/art`);

@@ -29,13 +29,16 @@ import { parseArgs } from "node:util";
 
 import sharp from "sharp";
 
+import { colourToken } from "../packages/client/scripts/style-tokens.mjs";
+
 const art = (path) => fileURLToPath(new URL(`../art/${path}`, import.meta.url));
 /** An icon's canvas (rule 25). */
 const ICON = 32;
-/** The battle scene's ground, which a drop's icon is read against, and the page's light and ink for the numbers. */
+/** The scenes' ground, `#4f7f2a` where each scene makes its canvas, which a drop's icon is read against: it is no token of the stylesheet. */
 const GROUND = [79, 127, 42, 255];
-const LIGHT = [230, 214, 184, 255];
-const INK = [20, 13, 8, 255];
+/** The page's light and ink, for the numbers and the sheet behind them, from the stylesheet's tokens (assets.md, rule 39). */
+const LIGHT = colourToken("--light");
+const INK = colourToken("--ink");
 const COLUMNS = 9;
 const GAP = 4;
 /** The numbers are the scene's own font, twice its size (rule 37). */
@@ -71,11 +74,13 @@ async function pixels(bytes) {
 
 /** "1-5,7,9-12" as its numbers, in order. */
 function indicesOf(text) {
-  return text.split(",").flatMap((part) => {
+  const indices = [];
+  for (const part of text.split(",")) {
     const [from, to = from] = part.split("-").map(Number);
     if (!Number.isInteger(from) || !Number.isInteger(to) || to < from) throw new Error(`--indices: ${part} is not a number or a range`);
-    return Array.from({ length: to - from + 1 }, (_, at) => from + at);
-  });
+    for (let index = from; index <= to; index++) indices.push(index);
+  }
+  return indices;
 }
 
 /** Copies `source` onto `sheet` at `scale`, a square of device pixels for each of its pixels, its transparent pixels left as the sheet has them; in `colour` where one is given. */

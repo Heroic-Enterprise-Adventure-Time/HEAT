@@ -11,13 +11,17 @@
         [routerLink]="['/camp', location(), facility.kind]"
         [attr.title]="labels() ? null : facility.name"
       >
-        <img alt="" [ngSrc]="`art/icons/${facility.kind}.png`" [width]="iconPx()" [height]="iconPx()" />
+        @if (icons.src(facility.kind); as icon) {
+          <img alt="" [ngSrc]="icon" [width]="iconPx()" [height]="iconPx()" />
+        }
         <span class="label">{{ facility.name }}</span>
       </a>
     }
     @if (game.adventure()) {
       <a class="entry" routerLink="/adventure" [attr.title]="labels() ? null : 'Adventure'">
-        <img ngSrc="art/icons/adventure.png" alt="" [width]="iconPx()" [height]="iconPx()" />
+        @if (icons.src('adventure'); as icon) {
+          <img alt="" [ngSrc]="icon" [width]="iconPx()" [height]="iconPx()" />
+        }
         <span class="label">Adventure</span>
       </a>
     }
