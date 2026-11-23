@@ -349,7 +349,9 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
  * at a node with their own look: the same damage and the same warmup, so
  * that forcing a strike at a tree gains nothing over chopping it (decision
  * 0051). Each is aimed at the nodes of its kind, those with a drop its trait
- * gathers, whoever swings: no hit gathers anything (decision 0058). A ranged attack reaches every line from every line, which is what
+ * gathers, whoever swings: no hit gathers anything (decision 0058). A node
+ * is worked only when no monster is in the ability's reach, so nobody chops
+ * with a wolf at its throat (Issue-341; battle/resolution.ts). A ranged attack reaches every line from every line, which is what
  * makes it the answer to a monster standing behind resource nodes; its
  * warmup is longer than a blow's, and as long as the wind-up and the
  * projectile's flight the page shows as it resolves (decisions 0052 and 0057).

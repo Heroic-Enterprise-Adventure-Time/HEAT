@@ -16,6 +16,7 @@ import {
   RESOURCE_NODES,
   SeededRng,
   selectAction,
+  selectForced,
   type Side,
   targetCandidates,
   type UnitState,
@@ -86,6 +87,17 @@ describe("isAbilityUsable", () => {
     expect(isAbilityUsable(ABILITIES.chop, context(actor, [vein("o")]))).toBe(false);
     expect(isAbilityUsable(ABILITIES.mine, context(actor, [vein("o")]))).toBe(true);
     expect(isAbilityUsable(ABILITIES.chop, context(actor, [wolf("w", "front")]))).toBe(false);
+  });
+
+  it("works a node only when no monster is in the ability's reach, in either pass (Issue-341)", () => {
+    const actor = unit("v", "party", "front");
+    const bitten = context(actor, [tree("t"), wolf("w", "front")]);
+    expect(targetCandidates(ABILITIES.chop, bitten, "units")).toEqual([]);
+    expect(targetCandidates(ABILITIES.chop, bitten, "resources")).toEqual([]);
+    expect(isAbilityUsable(ABILITIES.chop, bitten)).toBe(false);
+    // A wolf on a line the chop does not reach is not in the way, and neither is one that is down.
+    expect(isAbilityUsable(ABILITIES.chop, context(actor, [tree("t"), wolf("w", "near")]))).toBe(true);
+    expect(isAbilityUsable(ABILITIES.chop, context(actor, [tree("t"), { ...wolf("w", "front"), alive: false }]))).toBe(true);
   });
 
   it("lets a regular attack reach a resource node, in the second pass only", () => {
@@ -169,6 +181,24 @@ describe("selectAction", () => {
       const last = selectAction(list, context(actor, [vein("o")]), new SeededRng("s"));
       expect([last?.ability.abilityId, last?.target.unitId]).toEqual(["mine", "o"]);
     }
+  });
+
+  it("has a specialist strike a monster in reach before it works a node, its list chopping first or not (Issue-341)", () => {
+    const list = [ABILITIES.chop, ABILITIES.mine, ABILITIES.strike, ABILITIES["move-up"]];
+    const actor = unit("l", "party", "front");
+    const bitten = selectAction(list, context(actor, [tree("t"), wolf("w", "front")]), new SeededRng("s"));
+    expect([bitten?.ability.abilityId, bitten?.target.unitId]).toEqual(["strike", "w"]);
+    const after = selectAction(list, context(actor, [tree("t")]), new SeededRng("s"));
+    expect([after?.ability.abilityId, after?.target.unitId]).toEqual(["chop", "t"]);
+    // A goblin behind the veins is out of a mine's reach, so the vein is worked as before.
+    const behind = selectAction(list, context(actor, [vein("o"), wolf("g", "far")]), new SeededRng("s"));
+    expect([behind?.ability.abilityId, behind?.target.unitId]).toEqual(["mine", "o"]);
+  });
+
+  it("drops a forced chop while a monster is in its reach, and takes it once the monster is gone (Issue-341)", () => {
+    const actor = unit("v", "party", "front");
+    expect(selectForced(ABILITIES.chop, context(actor, [tree("t"), wolf("w", "front")]), new SeededRng("s"))).toBeUndefined();
+    expect(selectForced(ABILITIES.chop, context(actor, [tree("t")]), new SeededRng("s"))?.target.unitId).toBe("t");
   });
 
   it("returns undefined when nothing is usable", () => {
