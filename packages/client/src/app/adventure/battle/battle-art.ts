@@ -1,5 +1,8 @@
 import { Assets, Rectangle, Texture } from 'pixi.js';
 
+import { must } from '@heat/engine';
+
+import { SET_CLIPS } from '../../sprite-sets';
 import { loadSpriteSet, type SetPath } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
 import { effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileLayout, projectileLayout, type Rect } from './action-sprites';
@@ -11,7 +14,8 @@ import { effectLayout, type EffectLayout, EffectManifestSchema, type ProjectileL
  * as a tree by its standing picture, its hit and its down. Each animation
  * stands on the foot row of its first frame, so a figure keeps its ground
  * whatever the canvas. Beside them, an action's two sprites: a weapon's
- * swing and an ability's effect (rules 32 to 35).
+ * swing and an ability's effect (rules 32 to 35), and a drop's: a
+ * resource's icon and the digits of its amount (rules 27 and 37).
  */
 
 export interface Frames {
@@ -111,6 +115,21 @@ export function loadEffectArt(set: string): Promise<EffectArt> {
     art.catch(() => { effects.delete(set); });
   }
   return art;
+}
+
+/**
+ * A resource's icon, which the scene draws where an enemy dropped some
+ * (assets.md, rules 25 to 27): `<material>.png` under `/art/icons`, named
+ * for the resource as the engine names it.
+ */
+export function loadIconArt(material: string): Promise<Texture> {
+  return Assets.load<Texture>(`/art/icons/${material}.png`);
+}
+
+/** A font's glyphs, each by its character: `<set>` under `/art/fonts` (rule 37). */
+export async function loadGlyphArt(set: string): Promise<ReadonlyMap<string, Texture>> {
+  const sheet = await loadSpriteSet(`fonts/${set}`, 'font');
+  return new Map(SET_CLIPS.font.map((glyph) => [glyph, must(sheet.clip(glyph)[0], `the glyph ${glyph} of ${set}`)]));
 }
 
 /** A set's art: `heroes/<set>`, `monsters/<set>` or `props/<set>` under `/art`. */

@@ -8,9 +8,11 @@ import {
   type AdventureEvent,
   type Line,
   MONSTER_SPRITE_SETS,
+  MONSTERS,
   type MonsterType,
   must,
   PROP_SPRITE_SETS,
+  RESOURCE_NODES,
   type ResourceType,
   UNIT_PROFILES,
   type UnitType,
@@ -23,9 +25,10 @@ import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
 import { effectFrameAt, effectMs, flightMs, flyingAt, followFrame, followMs, heldPoint, leadFrame, nockedAt, releaseMs } from './action-sprites';
 import { artSettled } from './art-loads';
-import { type EffectArt, type Frames, loadEffectArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
+import { type EffectArt, type Frames, loadEffectArt, loadGlyphArt, loadIconArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
 import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
 import { clipHold } from './clip-hold';
+import { AMOUNT_AT, amountRow, DROP_FROM, dropAt, dropTime } from './drop-clip';
 
 /**
  * The battle scene, drawn with PixiJS like the camp (decision 0028): the
@@ -38,7 +41,10 @@ import { clipHold } from './clip-hold';
  * hold frame, the blow or the release, together; a projectile, where the
  * ability's effect has one, let go then and flown to its target; and at the
  * blow, or where the projectile lands, the ability's effect, a hit and a
- * fall, held; a step up a line or a collapse as a walk.
+ * fall, held; a step up a line or a collapse as a walk; and, where an enemy
+ * that fell dropped something, the resource's icon and its amount rising
+ * from it and gone (decision 0058, Issue-344), which is all the scene says
+ * of a drop: one the party did not get is no event, and shows nothing.
  * The progression reads left to right: the party runs on from the left at
  * the start and walks in place while the road scrolls by on a travel; at a
  * fight or a gather the other side rushes on from the right as the road
@@ -75,8 +81,9 @@ export interface BattleSceneHandle {
   /**
    * Animates the events just happened; a fight or a gather beginning brings
    * the other side on. Answers how long the clock should wait for what
-   * they began, an action's swing, a projectile's flight, a hit, an effect
-   * and a fall, in presentation time: nothing where they began none.
+   * they began, an action's swing, a projectile's flight, a hit, an effect,
+   * a fall and a drop's rise, in presentation time: nothing where they
+   * began none.
    */
   feed(events: readonly AdventureEvent[], field: Field): number;
   /** Moves on by `ms` of presentation time, the wall clock times the speed. */
@@ -123,6 +130,11 @@ const FADE_MS = 500;
  * ahead of the canvas's centre and 20 px above the feet).
  */
 const HAND = { x: 10, y: -20 };
+
+/** The font the scene's digits are drawn in, under `/art/fonts` (assets.md, rule 37). */
+const SCENE_FONT = 'scene-01';
+/** A drop is drawn over everyone, whatever row they stand on: the stage is not this many rows high. */
+const DROP_Z = 1000;
 
 /** The road the units stand on, in the ground's lower terrain: the corner rows from 6 to 10, y 96 to 160 on the stage. */
 const ROAD_ROWS = { from: 6, to: 10 };
@@ -195,6 +207,16 @@ interface ProjectileView {
   from: { readonly x: number; readonly y: number } | null;
 }
 
+/** What an enemy dropped, rising from where it fell: the resource's icon and its amount (decision 0058). */
+interface DropView {
+  /** The enemy that dropped it, which it rises from and is carried with, should the road scroll. */
+  readonly from: UnitView;
+  /** When it begins, on the presentation clock. */
+  readonly at: number;
+  /** The icon and the digits of the amount, placed about the icon's middle. */
+  readonly picture: Container;
+}
+
 /** Where a unit's sprite set is under `/art`: a hero's own set, anyone else's by its type; null where there is none. */
 function artPath(kind: FieldUnit['kind'], type: string, heroSet: string | undefined): UnitArtPath | null {
   if (kind === 'hero') return heroSet ? `heroes/${heroSet}` : null;
@@ -205,6 +227,17 @@ function artPath(kind: FieldUnit['kind'], type: string, heroSet: string | undefi
   }
   const set = PROP_SPRITE_SETS[type as ResourceType]?.[0];
   return set ? `props/${set}` : null;
+}
+
+/**
+ * The resources a unit of this type may drop, by this build's content: the
+ * icons a run is prepared with. A hero drops nothing, and nor does a type
+ * that a stored timeline names and this build no longer has.
+ */
+function dropsOf(kind: FieldUnit['kind'], type: string): readonly string[] {
+  if (kind === 'monster' && Object.hasOwn(MONSTERS, type)) return MONSTERS[type as MonsterType].drops.map((drop) => drop.material);
+  if (kind === 'resource' && Object.hasOwn(RESOURCE_NODES, type)) return RESOURCE_NODES[type as ResourceType].drops.map((drop) => drop.material);
+  return [];
 }
 
 /** The weapon by unit type for now; a hero's equipped weapon replaces this lookup (game.md, "Heroes"). */
@@ -291,6 +324,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
 
   const units = new Map<string, UnitView>();
   const effects: EffectView[] = [];
+  const drops: DropView[] = [];
   /** At most one a unit: its action being animated. */
   const projectiles = new Map<string, ProjectileView>();
   /** The presentation clock, the wall clock times the speed: what an effect plays on. */
@@ -327,6 +361,17 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     const art = await loadEffectArt(set);
     effectArt.set(set, art);
     return art;
+  };
+  // A drop's: the icon of each resource the cast may drop, and the digits. A drop is drawn only with an icon in hand.
+  const iconArt = new Map<string, Texture>();
+  const iconArtOf = async (material: string) => {
+    const art = await loadIconArt(material);
+    iconArt.set(material, art);
+    return art;
+  };
+  let glyphArt: ReadonlyMap<string, Texture> = new Map();
+  const glyphArtOf = async () => {
+    glyphArt = await loadGlyphArt(SCENE_FONT);
   };
 
   const addUnit = (unit: FieldUnit): UnitView => {
@@ -372,8 +417,56 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       unitView.weapon = weaponArt.get(weapon) ?? null;
       if (!unitView.weapon) take(weaponArtOf(weapon), (art) => { unitView.weapon = art; });
     }
+    for (const material of dropsOf(unit.kind, unit.type)) if (!iconArt.has(material)) void iconArtOf(material).catch(failed);
     units.set(unit.unitId, unitView);
     return unitView;
+  };
+
+  const removeDrop = (drop: DropView) => {
+    drops.splice(drops.indexOf(drop), 1);
+    drop.picture.destroy({ children: true });
+  };
+
+  /**
+   * Readies the picture of what an enemy dropped, to begin `delay` from now:
+   * the resource's icon, and on its lower right the amount, a sprite a
+   * digit. Nothing for a resource whose icon is not in hand, which is one
+   * this build does not know: the party's panel still counts it.
+   */
+  const addDrop = (from: UnitView, material: string, amount: number, delay: number): boolean => {
+    const icon = iconArt.get(material);
+    if (!icon) return false;
+    const picture = new Container();
+    picture.visible = false;
+    picture.zIndex = DROP_Z + drops.length;
+    const sprite = new Sprite(icon);
+    sprite.anchor.set(0.5);
+    picture.addChild(sprite);
+    for (const { digit, x } of amountRow(amount, (glyph) => glyphArt.get(glyph)?.width).digits) {
+      const glyph = new Sprite(must(glyphArt.get(digit), `the glyph ${digit}`));
+      glyph.position.set(AMOUNT_AT.x + x, AMOUNT_AT.y);
+      picture.addChild(glyph);
+    }
+    things.addChild(picture);
+    drops.push({ from, at: shown + delay, picture });
+    return true;
+  };
+
+  /** Shows each drop where it has risen to above its enemy, and lets go of those gone, or whose enemy has left the scene. */
+  const drawDrops = () => {
+    for (const drop of [...drops]) {
+      const { from, picture } = drop;
+      const since = shown - drop.at;
+      const at = dropAt(since);
+      if (units.get(from.unit.unitId) !== from || (since >= 0 && !at)) {
+        removeDrop(drop);
+        continue;
+      }
+      picture.visible = at !== null;
+      if (!at) continue;
+      picture.position.set(Math.round(from.x), Math.round(from.y) - DROP_FROM - at.lift);
+      picture.alpha = at.alpha;
+    }
   };
 
   const removeEffect = (effect: EffectView) => {
@@ -637,8 +730,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const sets = uniq(cast.flatMap((member) => artPath(member.kind, member.type, member.spriteSet) ?? []));
       const weapons = uniq(cast.flatMap((member) => weaponOf(member.kind, member.type) ?? []));
       const effectSets = uniq(Object.values(ABILITY_EFFECTS));
+      const icons = uniq(cast.flatMap((member) => dropsOf(member.kind, member.type)));
       return artSettled(
-        [...sets.map((path) => unitArtOf(path)), ...weapons.map((set) => weaponArtOf(set)), ...effectSets.map((set) => effectArtOf(set))],
+        [
+          ...sets.map((path) => unitArtOf(path)),
+          ...weapons.map((set) => weaponArtOf(set)),
+          ...effectSets.map((set) => effectArtOf(set)),
+          ...icons.map((material) => iconArtOf(material)),
+          glyphArtOf(),
+        ],
         ART_WAIT_MS,
         failed,
       );
@@ -647,6 +747,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     reset(field, sets, enter) {
       heroSets = sets;
       for (const effect of [...effects]) removeEffect(effect);
+      for (const drop of [...drops]) removeDrop(drop);
       for (const id of [...projectiles.keys()]) removeProjectile(id);
       for (const id of [...units.keys()]) removeUnit(id);
       scroll = 0;
@@ -698,6 +799,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const clips: number[] = [];
       // How long until the blow, or the projectile, on its way to each unit lands, for a fall these same events bring.
       const landing = new Map<string, number>();
+      // How many drops of each enemy these events have shown, for the stagger of one that drops more than one thing.
+      const dropped = new Map<string, number>();
       for (const event of events) {
         if (event.kind === 'action-declared') {
           // Nothing is drawn for an action until it happens; its warmup is kept, because it times a projectile's flight.
@@ -751,6 +854,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
             unitView.downAt = unitView.clock + delay;
             // The fall alone: the while it lies and its fading are not waited for.
             if (unitView.art) clips.push(delay + unitView.art.down.textures.length * DOWN_MS);
+          }
+        } else if (event.kind === 'drop') {
+          // What the enemy dropped rises as it falls, with the blow or the projectile that felled it, and the clock waits for the rise too.
+          const unitView = units.get(event.unitId);
+          const index = dropped.get(event.unitId) ?? 0;
+          const time = dropTime(index, landing.get(event.unitId) ?? 0);
+          if (unitView && addDrop(unitView, event.material, event.amount, time.from)) {
+            dropped.set(event.unitId, index + 1);
+            clips.push(time.until);
           }
         }
       }
@@ -831,6 +943,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
 
       drawProjectiles();
       drawEffects();
+      drawDrops();
 
       if ((entering === 'party' && partyOn) || (entering === 'opponents' && offset <= 0)) {
         entering = null;
