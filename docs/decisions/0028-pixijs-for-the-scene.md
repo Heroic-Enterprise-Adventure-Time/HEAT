@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene), 2026-10-22 by Issue-130 (an action's weapon and effect) and 2026-11-19 by Issue-205 (a sheet per set, packed by the build, and a run that waits for its art)
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene), 2026-10-22 by Issue-130 (an action's weapon and effect) 2026-11-19 by Issue-205 (a sheet per set, packed by the build, and a run that waits for its art) and 2026-11-22 by Issue-341 (a run's cast is who its seed rolls, where the amendment of Issue-205 says "The cast is whoever may appear, not whoever will": a job's stages are expanded from the seed before the run starts, decision 0058, so who will appear is known then)
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
