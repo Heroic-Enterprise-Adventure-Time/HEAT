@@ -570,18 +570,30 @@ export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on
  * enemies that always appear, to what decision 0030 gave it: 5, 15, 20, 15
  * and 25. A job's description is all the page tells of it beside its pay
  * and its bonus, so it says what its author chooses to tell.
+ *
+ * An entry of a fight or a gather stage may vary (decision 0058, Issue-341):
+ * its count a range, and a chance of appearing at all, rolled from the
+ * adventure's seed by `expandStages`. Every such stage keeps an entry that
+ * always appears, its time limit fits its largest roll, and that roll brings
+ * home no more of a resource than a level-1 warehouse holds; the content's
+ * test checks all three. A job's bonus XP counts only the enemies that always
+ * appear: one that appears by chance adds its own.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
-  // A lone villager cannot fail it: no monster, and its time limit is beyond
-  // even a villager forced to swing at the tree every turn (decision 0031).
+  // A lone villager cannot fail it, whatever it is forced to do (decision
+  // 0031). One time in ten a wolf is beside the tree, the first use of a job
+  // that varies (Issue-341): the villager strikes the wolf first, since a node
+  // is worked only when no monster is in reach, and beats it with a little
+  // health left on every seed tried. It is 5 more XP, and a hide to a party
+  // that brought a skinner. The description does not say so.
   "pick-up-sticks": {
     id: "pick-up-sticks",
     name: "Pick up sticks",
-    description: "One old tree by the village green needs felling. Bring a hero who can cut wood and the timber is yours; nothing out there bites.",
+    description: "One old tree by the village green needs felling. Bring a hero who can cut wood and the timber is yours.",
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", opponents: [{ type: "tree", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 1 }, { type: "wolf", count: 1, chancePercent: 10 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [],

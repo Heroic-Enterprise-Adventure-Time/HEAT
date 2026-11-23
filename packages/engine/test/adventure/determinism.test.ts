@@ -8,8 +8,8 @@
 import { sortBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { AdventureEngine, type AdventureSnapshot, type PartyOrder, type PlayerOverride, replay } from "../../src/index.js";
-import { GOBLINS, hero, snapshot, TIMBER, WOLVES } from "./helpers.js";
+import { AdventureEngine, type AdventureSnapshot, JOBS, type PartyOrder, type PlayerOverride, replay } from "../../src/index.js";
+import { GOBLINS, hero, meets, ofKind, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 type Click =
   | { readonly atWallMs: number; readonly heroId: string; readonly override: PlayerOverride }
@@ -78,6 +78,32 @@ describe("Determinism within one version", () => {
       expect(live.timeline.overrideLog.some((e) => e.kind === "unit" && e.unitId === "ranger-1")).toBe(true);
       expect(replay(snap, seed, live.timeline.overrideLog)).toEqual(live);
       for (const frameMs of [1, 33, 5000]) expect(playLive(snap, seed, [], frameMs)).toEqual(replay(snap, seed, []));
+    }
+  });
+
+  // A job that varies (Issue-341): the browser's run and the hub's replay each
+  // construct the engine from the snapshot and the seed, and so expand the
+  // job's stages alike, on a seed with the wolf and on one without.
+  it("expands a varied job alike live and replayed: the same wolf or none, the same timeline and result", () => {
+    const sticks = JOBS[STICKS];
+    const wolfSeeds = seeds.filter((seed) => meets(sticks, seed, "wolf")).slice(0, 5);
+    const quietSeeds = seeds.filter((seed) => !meets(sticks, seed, "wolf")).slice(0, 5);
+    expect([wolfSeeds.length, quietSeeds.length]).toEqual([5, 5]);
+    const forced: readonly Click[] = [
+      { atWallMs: 4200, heroId: "villager-1", override: chop }, // with a wolf in reach: dropped
+      { atWallMs: 5200, heroId: "villager-2", override: strike },
+      { atWallMs: 9000, heroId: "fighter-1", override: guard },
+      { atWallMs: 12_000, heroId: "villager-1", override: strike },
+    ];
+    for (const [seedsOfKind, wolves] of [[wolfSeeds, 1], [quietSeeds, 0]] as const) {
+      for (const seed of seedsOfKind) {
+        const snap = snapshot(STICKS, party);
+        const live = playLive(snap, seed, forced);
+        const against = ofKind(live.timeline.events, "battle-start")[0]?.participants.filter((p) => p.side === "opponents").map((p) => p.type);
+        expect(against, seed).toEqual(["tree", ...(wolves ? ["wolf"] : [])]);
+        expect(replay(snap, seed, live.timeline.overrideLog), seed).toEqual(live);
+        for (const frameMs of [1, 33, 5000]) expect(playLive(snap, seed, [], frameMs), seed).toEqual(replay(snap, seed, []));
+      }
     }
   });
 

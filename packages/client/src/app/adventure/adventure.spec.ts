@@ -1,5 +1,6 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
+import { range } from 'es-toolkit';
 
 import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
 
@@ -60,8 +61,8 @@ const result: AdventureResultView = {
 };
 
 /** A game with the open adventure and a submit that answers as the test says, recording each log it was given. */
-function fakeGame(answer: () => AdventureResultView | null | Error = () => result) {
-  const open = signal<AdventureView | null>(adventure);
+function fakeGame(answer: () => AdventureResultView | null | Error = () => result, opened: AdventureView = adventure) {
+  const open = signal<AdventureView | null>(opened);
   const settled = signal<SettledView | null>(null);
   const fake = {
     location: signal('millbrook'),
@@ -330,7 +331,7 @@ describe('Adventure', () => {
     expect(chop()).toBeEnabled();
   });
 
-  it('begins a run only once the scene has the art of the party and of everyone the job may set against it', async () => {
+  it('begins a run only once the scene has the art of the party and of everyone this adventure sets against it', async () => {
     const scene = fakeBattleScene(false, true);
     const { run } = await renderAdventure(fakeGame(), scene);
     expect(scene.prepared).toEqual([
@@ -351,6 +352,32 @@ describe('Adventure', () => {
     expect(scene.resets).toMatchObject([{ field: { stage: 0 }, enter: true }]);
     expect(chop()).toBeEnabled();
   });
+
+  // A job that varies (Issue-341): the scene is handed the art of who this adventure's seed rolls, the first job's wolf among them only on a run that meets one.
+  for (const wolf of [true, false]) {
+    it(`hands the scene the first job's tree and ${wolf ? 'its wolf, on a seed that rolls one' : 'no wolf, on a seed that rolls none'}`, async () => {
+      const sticks = (seed: string): AdventureView => ({
+        ...adventure,
+        seed,
+        job: { id: 'pick-up-sticks', name: 'Pick up sticks', description: 'One old tree.' },
+        snapshot: { ...adventure.snapshot, jobId: 'pick-up-sticks' },
+      });
+      // Whether a seed's run meets the wolf is read off the engine's own run of it.
+      const meetsWolf = (seed: string) =>
+        replay(sticks(seed).snapshot as AdventureSnapshot, seed, []).timeline.events.some((e) => e.kind === 'battle-start' && e.participants.some((p) => p.type === 'wolf'));
+      const seed = must(range(200).map((i) => `seed-${i}`).find((s) => meetsWolf(s) === wolf), 'a seed of the kind');
+      const scene = fakeBattleScene(false, true);
+      await renderAdventure(fakeGame(() => result, sticks(seed)), scene);
+      expect(scene.prepared).toEqual([
+        [
+          { kind: 'hero', type: 'fighter', spriteSet: 'fighter-02' },
+          { kind: 'hero', type: 'villager', spriteSet: 'villager-01' },
+          { kind: 'resource', type: 'tree' },
+          ...(wolf ? [{ kind: 'monster', type: 'wolf' }] : []),
+        ],
+      ]);
+    });
+  }
 
   it('holds a resumed run the same way, where nobody runs on', async () => {
     const earlier = new AdventureRun(adventure.snapshot as AdventureSnapshot, adventure.seed);

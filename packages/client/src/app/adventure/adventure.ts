@@ -22,7 +22,7 @@ import { outcomeWords, stageResultWords } from './result-words';
  * controls' place, with the replay, which plays the stored timeline in the
  * same scene with no engine, and Back to camp. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
- * to load, and for the art of everyone the job may set against the party, so
+ * to load, and for the art of everyone this adventure sets against the party, so
  * that the party is seen running on from the start.
  */
 @Component({
@@ -86,7 +86,7 @@ export class Adventure {
       untracked(() => {
         this.startedId = adventure.id;
         this.play.start(adventure);
-        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), jobCast(adventure.snapshot.jobId));
+        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), jobCast(adventure.snapshot.jobId, adventure.seed));
       });
     });
     effect(() => {

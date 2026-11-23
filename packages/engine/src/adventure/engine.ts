@@ -5,7 +5,10 @@
  * New in HEAT (architecture overview, "Engine provenance"): the outer loop
  * of stages, carry-over, drops, retreat and the stage time limits. Each fight
  * and gather stage runs Issue-110's `CombatEngine`, seeded `<seed>#<stage>`,
- * and its events are shifted onto the adventure's clock. The stepping API is
+ * and its events are shifted onto the adventure's clock. The stages it runs
+ * are the job's as `expandStages` rolls them from the seed, before the first
+ * one begins (decision 0058): a live run and `replay` both construct this
+ * class, so the two cannot expand differently. The stepping API is
  * the battle's: a live client steps whatever is due by wall-clock time, and
  * `replay` steps event by event; both get the same timeline.
  *
@@ -33,7 +36,8 @@ import {
   type StageEnding,
   type StageResult,
 } from "./events.js";
-import type { AdventureContent, Job, Stage } from "./job.js";
+import { expandStages } from "./expand.js";
+import type { AdventureContent, ExpandedStage, Job } from "./job.js";
 import type { AdventureLogEntry, PartyOrder } from "./override.js";
 import { type AdventureSnapshot, MAX_PARTY } from "./snapshot.js";
 
@@ -70,7 +74,7 @@ function addTo(amounts: Partial<Record<Material, number>>, rewards: readonly Rew
  * whole timeline. Each type is numbered across the stage's whole list, so a
  * list that names a type twice still gives every unit its own id.
  */
-function opponentsOf(stage: Stage, index: number): Opponent[] {
+function opponentsOf(stage: ExpandedStage, index: number): Opponent[] {
   const groups = stage.kind === "fight" || stage.kind === "gather" ? stage.opponents : [];
   const numbered = new Map<string, number>();
   return groups.flatMap(({ type, count }) =>
@@ -89,6 +93,8 @@ function opponentsOf(stage: Stage, index: number): Opponent[] {
  */
 export class AdventureEngine {
   private readonly job: Job;
+  /** The job's stages as this adventure meets them, rolled from its seed. */
+  private readonly stages: readonly ExpandedStage[];
   private readonly retreatRng: SeededRng;
   private readonly events: AdventureEvent[] = [];
   private readonly overrideLog: AdventureLogEntry[] = [];
@@ -130,6 +136,7 @@ export class AdventureEngine {
       this.health.set(hero.heroId, hero.stats.maxHealth);
     }
     this.job = job;
+    this.stages = expandStages(job, seed);
     this.retreatRng = new SeededRng(`${seed}#retreat`);
   }
 
@@ -263,8 +270,8 @@ export class AdventureEngine {
 
   // ── Internal ─────────────────────────────────────────────────────
 
-  private currentStage(): Stage {
-    const stage = this.job.stages[this.stageIndex];
+  private currentStage(): ExpandedStage {
+    const stage = this.stages[this.stageIndex];
     if (!stage) throw new Error(`No stage ${String(this.stageIndex)}`);
     return stage;
   }

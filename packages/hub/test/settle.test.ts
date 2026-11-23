@@ -3,7 +3,20 @@ import { randomUUID } from "node:crypto";
 import { type DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, MONSTERS, must, replay, RESOURCE_NODES, type UnitType, warehouseCapacity } from "@heat/engine";
+import {
+  type AdventureTimeline,
+  expandStages,
+  JOBS,
+  LEVEL_XP,
+  levelForXp,
+  MONSTERS,
+  must,
+  replay,
+  RESOURCE_NODES,
+  rollDrops,
+  type UnitType,
+  warehouseCapacity,
+} from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
@@ -24,7 +37,8 @@ import { PREVIOUS_VERSION as previous, VERSION as version } from "./versions.js"
  * bucket in memory (src/timelines.ts): the result is the hub's replay; XP
  * and levels; what dropped credited beside the pay, one holding and one
  * ledger entry for each resource, and what a retreat keeps of both (decision
- * 0058); credits capped at the warehouse with the loss in the ledger;
+ * 0058); a job that varies settled as its seed rolls it (Issue-341);
+ * credits capped at the warehouse with the loss in the ledger;
  * a death with the camp's living count and the sighting; a repeated and a
  * concurrent submit that pay once; the adventure's item in its location's
  * feed, which a discard never writes (decision 0050); a balance moved during settlement; a
@@ -52,6 +66,7 @@ const wolves = JOBS["wolves-on-the-mill-road"];
 /** What the wolves job gives a hero that arrives: its two wolves' XP and its bonus (decision 0058). */
 const WOLVES_XP = 2 * MONSTERS.wolf.xp + wolves.bonusXp;
 const timber = JOBS["timber-from-the-near-woods"];
+const sticks = JOBS["pick-up-sticks"];
 
 /** Living heroes of the given unit types and a camp that counts them, with their sightings. */
 async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): Promise<Hero[]> {
@@ -451,6 +466,37 @@ describe("what dropped (decision 0058)", () => {
     expect(paid.result?.credited).toEqual(wolves.pay);
     expect(await balanceOf(q, "hide")).toBeUndefined();
     expect(await storedItem(db, tables.player, playerKeys.ledger(q, without.adventureId, "credit#hide"))).toBeUndefined();
+  });
+
+  it("settles a job that varies as its seed rolls it: the first job's wolf, its XP and a ranger's hide on a seed that has one, and none of them on a seed that has not (Issue-341)", async () => {
+    // The record holds the job's id and the seed, and nothing of the roll: the hub's replay expands the stages again.
+    const seeds = Array.from({ length: 2000 }, (_, i) => `varies-${String(i)}`);
+    const wolfIn = (seed: string) => expandStages(sticks, seed).some((stage) => "opponents" in stage && stage.opponents.some((o) => o.type === "wolf"));
+    // A wolf's hide falls half the time at skinning 1, so the seed with the wolf is one where it does.
+    const hideOn = (seed: string) => rollDrops(`${seed}#1`, "s1-wolf-1", MONSTERS.wolf.drops, () => 1).length > 0;
+    const withWolf = must(seeds.find((seed) => wolfIn(seed) && hideOn(seed)), "a seed with the wolf and its hide");
+    const quiet = must(seeds.find((seed) => !wolfIn(seed)), "a seed without the wolf");
+
+    for (const [seed, wolf] of [[withWolf, true], [quiet, false]] as const) {
+      const p = player();
+      const heroes = await putParty(p, ["ranger", "villager"]);
+      const started = await start(p, heroes, version, sticks.id, seed);
+      expect(started.snapshot.jobId, seed).toBe(sticks.id);
+      const timelines = new MemoryTimelines();
+      const settled = await submitAdventure(repo, timelines, p, version, started.adventureId, []);
+      expect(settled.result?.outcome, seed).toBe("complete");
+
+      const stored = JSON.parse(must(timelines.objects.get(started.adventureId), "the stored timeline")) as AdventureTimeline;
+      const met = stored.events.flatMap((e) => (e.kind === "battle-start" ? e.participants.filter((x) => x.side === "opponents").map((x) => x.type) : []));
+      expect(met, seed).toEqual(wolf ? ["tree", "wolf"] : ["tree"]);
+
+      const xp = RESOURCE_NODES.tree.xp + sticks.bonusXp + (wolf ? MONSTERS.wolf.xp : 0);
+      expect(xp, seed).toBe(wolf ? 10 : 5);
+      for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp, seed).toBe(xp);
+      expect(settled.result?.credited.map((r) => r.material), seed).toEqual(wolf ? ["timber", "hide"] : ["timber"]);
+      expect(await balanceOf(p, "hide"), seed).toBe(wolf ? 1 : undefined);
+      expect(await balanceOf(p, "timber"), seed).toBeGreaterThanOrEqual(30);
+    }
   });
 
   it("is capped by the warehouse like the pay, each resource on its own balance", async () => {

@@ -9,8 +9,11 @@ import {
   type AdventureResult,
   type AdventureSnapshot,
   dropRow,
+  expandStages,
   isResourceType,
   type Job,
+  largestStages,
+  leastStages,
   type Material,
   MONSTERS,
   must,
@@ -55,10 +58,10 @@ export function haul(type: ResourceType, level: number, count = 1): { readonly m
   return { min: row.min * count, max: row.max * count };
 }
 
-/** The XP of the enemies a job always sets against a party, every stage's together. */
+/** The XP of the enemies a job always sets against a party, every stage's together: its least roll. */
 export function enemiesXp(job: Job): number {
   return sum(
-    job.stages.flatMap((stage) =>
+    leastStages(job).flatMap((stage) =>
       stage.kind === "fight" || stage.kind === "gather" ? stage.opponents.map((o) => o.count * (isResourceType(o.type) ? RESOURCE_NODES[o.type].xp : MONSTERS[o.type].xp)) : [],
     ),
   );
@@ -71,6 +74,20 @@ export function snapshot(jobId: string, heroes: readonly SnapshotHero[]): Advent
 /** The game's content with one more job, or a job replaced. */
 export function contentWithJob(job: Job): AdventureContent {
   return { ...ADVENTURE_CONTENT, jobs: { ...ADVENTURE_CONTENT.jobs, [job.id]: job } };
+}
+
+/**
+ * The job at its largest roll, as a job with no variance: every entry
+ * appears, at its most. What a time limit has to fit, and the hardest the
+ * job can be for a party.
+ */
+export function atLargest(job: Job): Job {
+  return { ...job, id: `${job.id}-at-its-largest`, stages: largestStages(job) };
+}
+
+/** Whether this adventure of the job meets the type in any stage. */
+export function meets(job: Job, seed: string, type: string): boolean {
+  return expandStages(job, seed).some((stage) => (stage.kind === "fight" || stage.kind === "gather") && stage.opponents.some((o) => o.type === type));
 }
 
 export function ofKind<K extends AdventureEvent["kind"]>(events: readonly AdventureEvent[], kind: K): Extract<AdventureEvent, { kind: K }>[] {
