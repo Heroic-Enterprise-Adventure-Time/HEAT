@@ -12,32 +12,60 @@ import type { BattleContent } from "../battle/index.js";
 import type { FacilityKind, MonsterType, ResourceType } from "../content.js";
 import type { Reward } from "../index.js";
 
+/** A least and a most, both whole numbers from 1, for a count rolled from the adventure's seed. */
+export interface CountRange {
+  readonly min: number;
+  readonly max: number;
+}
+
 /**
- * One stage of a job.
- *
- * - `travel`: a fixed length in which nothing happens.
- * - `fight` and `gather`: what stands on the other side, monsters and
- *   resource nodes together, by type and count, with its own time limit. The
- *   stage ends when all of it is down. The two kinds run alike; the kind is
- *   how the stage reads, a fight where the job is the monsters and a gather
- *   where it is the nodes (decision 0051).
- * - `arrive`: the job is done.
- *
- * Reaching a fight's or a gather's time limit ends the adventure as a retreat.
+ * One entry of a fight or a gather stage as the content writes it: a type,
+ * how many of it, and how often it appears at all (decision 0058). The count
+ * is one number, or a range the adventure's seed rolls within; an entry with
+ * no chance always appears. So a job's adventures have the same stages and
+ * about the same enemies, and are not the same. `expandStages` (expand.ts)
+ * makes the roll, and what it gives is a `StageOpponents`.
  */
+export interface StageEntry {
+  readonly type: MonsterType | ResourceType;
+  readonly count: number | CountRange;
+  /** How often the entry appears, in whole percent from 1 to 99; one that always appears states none. */
+  readonly chancePercent?: number;
+}
+
+/** One entry of a stage as an adventure meets it, the roll made: a type and how many. */
 export interface StageOpponents {
   readonly type: MonsterType | ResourceType;
   readonly count: number;
 }
 
-export type Stage =
+/**
+ * One stage of a job, by what its fight or gather lists.
+ *
+ * - `travel`: a fixed length in which nothing happens.
+ * - `fight` and `gather`: what stands on the other side, monsters and
+ *   resource nodes together, with its own time limit. The stage ends when all
+ *   of it is down. The two kinds run alike; the kind is how the stage reads,
+ *   a fight where the job is the monsters and a gather where it is the nodes
+ *   (decision 0051).
+ * - `arrive`: the job is done.
+ *
+ * Reaching a fight's or a gather's time limit ends the adventure as a retreat.
+ */
+type StageOf<Entry> =
   | { readonly kind: "travel"; readonly lengthMs: number }
   | {
       readonly kind: "fight" | "gather";
-      readonly opponents: readonly StageOpponents[];
+      readonly opponents: readonly Entry[];
       readonly timeLimitMs: number;
     }
   | { readonly kind: "arrive" };
+
+/** A stage as a job's content writes it: its entries may vary. */
+export type Stage = StageOf<StageEntry>;
+
+/** A stage as one adventure runs it, expanded from its seed: every entry a type and a count. */
+export type ExpandedStage = StageOf<StageOpponents>;
 
 export type StageKind = Stage["kind"];
 
@@ -63,6 +91,7 @@ export interface Job {
    * it; a job with none is on the location's job board (Issue-133).
    */
   readonly facility?: FacilityKind;
+  /** The stages as written; an adventure runs `expandStages(job, seed)`, never these. */
   readonly stages: readonly Stage[];
   /** The reward from whoever posted the job, paid on arrival. */
   readonly pay: readonly Reward[];

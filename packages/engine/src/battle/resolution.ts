@@ -17,6 +17,15 @@
  * in reach, and chop and mine work the nodes of their kind in their place in
  * the list. Nothing here reads a unit's gathering traits: a hit gathers
  * nothing, and who hit a node does not matter to what it drops.
+ *
+ * A node is worked only when nothing else is in the gather ability's reach
+ * (Issue-341, amending decisions 0051 and 0058): with a monster on a line a
+ * chop reaches, the chop has no target, in the list and forced alike. It is
+ * the same rule from the node's side. A hit gathers nothing, so working a
+ * node while something bites only costs the unit the blows it takes: a
+ * lumberjack, whose list chops before it strikes, turned its back on a wolf
+ * beside its tree and died of it on every seed, and one forced chop lost a
+ * lone villager the first job.
  */
 
 import type { AbilityDefinition } from "./ability.js";
@@ -76,8 +85,9 @@ export function targetCandidates(
     case "damage":
       return pool.filter((u) => (u.kind === "resource") === (pass === "resources"));
     case "gather":
-      if (pass !== "units") return [];
-      return pool.filter((u) => u.kind === "resource" && u.drops.some((drop) => drop.trait === effect.trait));
+      // Nothing but nodes in reach, or the node waits.
+      if (pass !== "units" || pool.some((u) => u.kind !== "resource")) return [];
+      return pool.filter((u) => u.drops.some((drop) => drop.trait === effect.trait));
     case "guard":
       if (pass !== "units" || holdsGuard(actor, clock)) return [];
       return pool.filter((u) => u.kind !== "resource" && belowHalf(u));

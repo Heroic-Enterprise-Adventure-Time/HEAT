@@ -64,7 +64,9 @@ describe("The miner and the lumberjack", () => {
   // On the mixed stage of "Goblins in the old workings" a specialist digs
   // before it strikes, its own material first in its list. That costs nothing
   // there: the goblins stand behind the veins, out of a melee hero's reach
-  // until the veins fall, so a villager has nothing to strike either. Put in a
+  // until the veins fall, so a villager has nothing to strike either. With a
+  // monster in reach beside a node a specialist strikes it first, as a
+  // villager does (Issue-341; first-job.test.ts plays that). Put in a
   // villager's place, a specialist is defeated where a villager is, and
   // completes where a villager does, with no more deaths (the review of PR-304).
   it(`on the goblins job, a specialist in a villager's place loses where villagers lose and wins where they win, on every one of ${SEEDS} seeds`, () => {

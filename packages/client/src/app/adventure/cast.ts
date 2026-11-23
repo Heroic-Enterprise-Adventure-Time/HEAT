@@ -1,15 +1,15 @@
 import { uniqBy } from 'es-toolkit';
 
-import { type AdventureEvent, type JobId, JOBS, MONSTERS } from '@heat/engine';
+import { type AdventureEvent, expandStages, jobOf, MONSTERS } from '@heat/engine';
 
 import type { FieldUnit } from './field';
 
 /**
  * Who a run may show, which the battle scene loads the art of before the run
  * begins (Issue-205): a hero by its unit type and sprite set, anyone else by
- * its kind and type. It is whoever may appear, not whoever will: a run is
- * begun once the art of its whole cast is in, so a cast too wide costs a
- * longer wait and one too narrow a unit that shows a moment after it arrives.
+ * its kind and type. A run is begun once the art of its whole cast is in, so
+ * a cast too wide costs a longer wait and one too narrow a unit that shows a
+ * moment after it arrives.
  */
 export interface CastMember {
   readonly kind: FieldUnit['kind'];
@@ -22,14 +22,18 @@ export interface CastMember {
 const once = (cast: readonly CastMember[]) => uniqBy(cast, (member) => `${member.kind}/${member.type}`);
 
 /**
- * Everyone a job may set against the party: today exactly what its stages
- * name, which the engine reads from the same content. A job that is not in
- * this build's content has nobody known.
+ * Everyone this adventure of a job sets against the party: the job's stages
+ * as the engine expands them from the adventure's seed (decision 0058,
+ * Issue-341), by the same function the run itself is about to call, so the
+ * cast is who the run will meet and nobody else. A job that varies loads its
+ * wolf's art on the runs that have a wolf. A job that is not in this build's
+ * content has nobody known.
  */
-export function jobCast(jobId: string): readonly CastMember[] {
-  if (!Object.hasOwn(JOBS, jobId)) return [];
+export function jobCast(jobId: string, seed: string): readonly CastMember[] {
+  const job = jobOf(jobId);
+  if (!job) return [];
   return once(
-    JOBS[jobId as JobId].stages.flatMap((stage) =>
+    expandStages(job, seed).flatMap((stage) =>
       'opponents' in stage ? stage.opponents.map(({ type }): CastMember => ({ kind: Object.hasOwn(MONSTERS, type) ? 'monster' : 'resource', type })) : [],
     ),
   );
