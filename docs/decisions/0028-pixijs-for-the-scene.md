@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene), 2026-10-22 by Issue-130 (an action's weapon and effect) 2026-11-19 by Issue-205 (a sheet per set, packed by the build, and a run that waits for its art) and 2026-11-22 by Issue-341 (a run's cast is who its seed rolls, where the amendment of Issue-205 says "The cast is whoever may appear, not whoever will": a job's stages are expanded from the seed before the run starts, decision 0058, so who will appear is known then)
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene), 2026-10-22 by Issue-130 (an action's weapon and effect), 2026-11-19 by Issue-205 (a sheet per set, packed by the build, and a run that waits for its art) and 2026-11-22 by Issue-341 (a run's cast is who its seed rolls, where the amendment of Issue-205 says "The cast is whoever may appear, not whoever will")
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -84,6 +84,10 @@
 - **Our own PNG codec and a row per animation,** which the set scripts already carry on Node's own modules because they may import nothing else. The build may, and reading and placing pictures are common problems with known libraries (`docs/standards/typescript.md`, rule 17).
 
 The amendment of Issue-15 above says the frame counts and hold frames are read from each set's `provenance.json`: since this amendment the build reads them there and the page reads the sheet.
+
+## Amendment: a run's cast is who its seed rolls (Issue-341, 2026-11-22)
+
+The amendment of Issue-205 above has "The cast is whoever may appear, not whoever will", the owner's word of 2026-11-19, given ahead of jobs whose opponents are not all known when a run starts. Decision 0058 then had the engine expand a job's stages from the adventure's seed before the first stage runs, so who will appear is known when the run starts. A new run's cast is now who that expansion names: `jobCast` in `cast.ts` calls the engine's `expandStages` with the adventure's seed, the function the run itself is about to call, so a job that varies loads its wolf's art only for a run that has a wolf. A replay's cast is still whom its timeline's battles hold. A unit that appears without having been in the cast still loads then and shows when its picture arrives, as it may where an adventure another version issued is resumed with this engine. The reasons, and the wider cast as what was weighed and not chosen, are in decision 0058's second amendment.
 
 ## Considered and not chosen
 

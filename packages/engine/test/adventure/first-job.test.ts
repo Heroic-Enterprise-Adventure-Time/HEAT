@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { type AbilityId, AdventureEngine, type AdventureResult, JOBS, jobsPostedBy, location, MONSTERS, replay, STARTING_LOCATION, type UnitType } from "../../src/index.js";
+import { AdventureEngine, type AdventureResult, JOBS, jobsPostedBy, location, MONSTERS, must, replay, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "../../src/index.js";
 import { atLargest, contentWithJob, haul, hero, meets, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 // The first progression (decision 0031, with the hauls of decision 0058): a
@@ -25,11 +25,13 @@ const VILLAGER_COST = 20;
 /** What the job gives a survivor without its wolf, and with it (decision 0058). */
 const XP = 5;
 const XP_WITH_WOLF = XP + MONSTERS.wolf.xp;
-/** Everything a villager can be forced to do. */
-const FORCED: readonly AbilityId[] = ["strike", "chop", "mine", "move-up"];
+/** Everything a villager can be forced to do: its unit type's own list, read from the content (typescript.md, rule 25). */
+const FORCED = must(UNIT_PROFILES.villager, "the villager").actions;
+/** Every unit type Millbrook recruits, read from the content. */
+const RECRUITS = must(location(STARTING_LOCATION), "Millbrook").recruits.map((r) => r.unitType);
 
 /** The job with one hero forced to the same ability at every step: the worst a player can do with forced actions. */
-function forcedEveryTurn(jobId: string, unitType: UnitType, abilityId: AbilityId, seed: string, content = wolfContent): AdventureResult {
+function forcedEveryTurn(jobId: string, unitType: UnitType, abilityId: string, seed: string, content = wolfContent): AdventureResult {
   const engine = new AdventureEngine(snapshot(jobId, [hero("h", unitType)]), seed, content);
   while (!engine.isComplete()) {
     engine.submitOverride("h", { kind: "force-action", abilityId });
@@ -122,8 +124,9 @@ describe("Pick up sticks", () => {
     }
   });
 
-  it(`is completed with its wolf by a lone hero of every type a camp can recruit, on every one of ${SEEDS} seeds: a specialist strikes the wolf before it works the tree`, () => {
-    for (const unitType of ["lumberjack", "miner", "fighter", "ranger"] as const) {
+  it(`is completed with its wolf by a lone hero of every type Millbrook recruits, on every one of ${SEEDS} seeds: a specialist strikes the wolf before it works the tree`, () => {
+    expect(RECRUITS).toEqual(expect.arrayContaining(["villager", "lumberjack", "miner"]));
+    for (const unitType of RECRUITS) {
       for (const seed of seeds) {
         const { result } = replay(snapshot(withWolf.id, [hero("h", unitType)]), seed, [], wolfContent);
         expect(result.outcome, `${unitType} ${seed}`).toBe("complete");

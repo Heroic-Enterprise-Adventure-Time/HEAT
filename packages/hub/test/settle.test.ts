@@ -1,9 +1,11 @@
 import { randomUUID } from "node:crypto";
 
 import { type DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { range } from "es-toolkit";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
+  type AdventureSnapshot,
   type AdventureTimeline,
   expandStages,
   JOBS,
@@ -13,7 +15,7 @@ import {
   must,
   replay,
   RESOURCE_NODES,
-  rollDrops,
+  UNIT_PROFILES,
   type UnitType,
   warehouseCapacity,
 } from "@heat/engine";
@@ -470,16 +472,27 @@ describe("what dropped (decision 0058)", () => {
 
   it("settles a job that varies as its seed rolls it: the first job's wolf, its XP and a ranger's hide on a seed that has one, and none of them on a seed that has not (Issue-341)", async () => {
     // The record holds the job's id and the seed, and nothing of the roll: the hub's replay expands the stages again.
-    const seeds = Array.from({ length: 2000 }, (_, i) => `varies-${String(i)}`);
+    // The seeds are picked by asking the engine what each gives, not by restating how it draws (graphql.md, rule 26):
+    // who the job sets against a party is its expansion, and what a ranger and a villager bring home is a replay
+    // with a stand-in party of those two types, since a roll does not read who the heroes are.
+    const seeds = range(2000).map((i) => `varies-${String(i)}`);
+    const types = ["ranger", "villager"] as const satisfies readonly UnitType[];
+    const standIn: AdventureSnapshot = {
+      version,
+      jobId: sticks.id,
+      heroes: types.map((unitType) => ({
+        heroId: `stand-in-${unitType}`, unitType, name: unitType, spriteSet: `${unitType}-01`, level: 1, stats: must(UNIT_PROFILES[unitType], `the ${unitType}'s profile`).stats,
+      })),
+    };
     const wolfIn = (seed: string) => expandStages(sticks, seed).some((stage) => "opponents" in stage && stage.opponents.some((o) => o.type === "wolf"));
     // A wolf's hide falls half the time at skinning 1, so the seed with the wolf is one where it does.
-    const hideOn = (seed: string) => rollDrops(`${seed}#1`, "s1-wolf-1", MONSTERS.wolf.drops, () => 1).length > 0;
+    const hideOn = (seed: string) => replay(standIn, seed, []).result.rewards.some((r) => r.material === "hide");
     const withWolf = must(seeds.find((seed) => wolfIn(seed) && hideOn(seed)), "a seed with the wolf and its hide");
     const quiet = must(seeds.find((seed) => !wolfIn(seed)), "a seed without the wolf");
 
     for (const [seed, wolf] of [[withWolf, true], [quiet, false]] as const) {
       const p = player();
-      const heroes = await putParty(p, ["ranger", "villager"]);
+      const heroes = await putParty(p, [...types]);
       const started = await start(p, heroes, version, sticks.id, seed);
       expect(started.snapshot.jobId, seed).toBe(sticks.id);
       const timelines = new MemoryTimelines();

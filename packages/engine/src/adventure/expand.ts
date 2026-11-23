@@ -52,10 +52,9 @@ export function expandStages(job: Job, seed: string): readonly ExpandedStage[] {
   const rng = new SeededRng(`${seed}#stages`);
   const stages = expanded(job.stages, (entry) => {
     const chance = rng.nextInt(1, 100);
-    const share = rng.next();
-    if (chance > (entry.chancePercent ?? 100)) return 0;
     const { min, max } = countRange(entry.count);
-    return min + Math.floor(share * (max - min + 1));
+    const count = rng.nextInt(min, max);
+    return chance > (entry.chancePercent ?? 100) ? 0 : count;
   });
   stages.forEach((stage, index) => {
     if ((stage.kind === "fight" || stage.kind === "gather") && stage.opponents.length === 0) {

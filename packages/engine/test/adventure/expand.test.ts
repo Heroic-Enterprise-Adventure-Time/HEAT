@@ -11,6 +11,7 @@ import {
   JOBS,
   largestStages,
   leastStages,
+  must,
   replay,
   type StageEntry,
 } from "../../src/index.js";
@@ -96,7 +97,7 @@ describe("A job's stages, expanded from the seed", () => {
   });
 
   it("do not depend on the party or on anything forced: the roll is the seed's and the job's alone", () => {
-    const wolfSeed = seeds.find((seed) => meets(sticks, seed, "wolf")) ?? "";
+    const wolfSeed = must(seeds.find((seed) => meets(sticks, seed, "wolf")), "a seed that rolls the wolf");
     const lone = replay(snapshot(STICKS, [hero("villager-1", "villager")]), wolfSeed, []).timeline;
     const three = replay(snapshot(STICKS, [hero("fighter-1", "fighter"), hero("ranger-1", "ranger"), hero("villager-1", "villager")]), wolfSeed, []).timeline;
     const forced = new AdventureEngine(snapshot(STICKS, [hero("villager-1", "villager")]), wolfSeed);
@@ -112,16 +113,16 @@ describe("A job's stages, expanded from the seed", () => {
 
   it("refuse a stage that rolled nothing to meet, naming the job", () => {
     const job = gatherOf("nothing-certain", [{ type: "tree", count: 1, chancePercent: 1 }]);
-    const empty = seeds.find((seed) => {
+    const rollsNothing = (seed: string): boolean => {
       try {
         expandStages(job, seed);
         return false;
       } catch {
         return true;
       }
-    });
-    expect(empty).toBeDefined();
-    expect(() => expandStages(job, empty ?? "")).toThrow(/Stage 0 of job nothing-certain rolled nothing to meet/);
+    };
+    const empty = must(seeds.find(rollsNothing), "a seed on which the one entry does not appear");
+    expect(() => expandStages(job, empty)).toThrow(/Stage 0 of job nothing-certain rolled nothing to meet/);
   });
 });
 

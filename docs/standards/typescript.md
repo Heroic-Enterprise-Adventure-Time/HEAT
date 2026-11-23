@@ -70,6 +70,10 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 24. **A value a shared test helper must agree with in the source is exported from the source and imported by the helper, never copied into it.** A limit the page applies, such as the longest frame the battle view takes, `MAX_FRAME_MS` in `battle-view.ts`, which the specs' frame loop and `runToBlow` in `testing/fake-battle.ts` read, is one constant: a copy in the helper would go on driving the page in frames the browser no longer gives, with nothing failing. Rule 19 says where a helper lives; this says where its numbers come from. A candidate rule from the review of PR-338 (Issue-335), accepted by the owner on 2026-11-20.
 
+### What a test says it covers
+
+25. **A test that says it covers every member of a content list reads that list from the content.** A test named for everything a villager can be forced to do, or for every type Millbrook recruits, iterates over `UNIT_PROFILES.villager.actions` or the location's `recruits`, and does not spell the members again: a member added to the content later would go untested while the test's name stayed true. A test of some members, named for them, lists the ones it means. Rule 18 keeps a list and its union together; this keeps a test's loop and the content together. A candidate rule from the review of PR-347 (Issue-341), accepted by the owner on 2026-11-23, where the first job's test copied the villager's four abilities and Millbrook's recruits.
+
 ## Held back
 
 Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.

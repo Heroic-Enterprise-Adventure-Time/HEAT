@@ -61,6 +61,7 @@ Standards for the API and `packages/hub`, beside `docs/standards/typescript.md`,
 ### What a test draws
 
 25. **A test fixes every draw its outcome depends on.** Where a verb draws, the seed above all, the draw is a parameter of the function whose default is the cryptographic source (rule 10), as `issueSeed` is of `startAdventure`, so that a test passes the seed it means, as it passes a store or a version. A test does not start adventures until a draw comes out right. No caller outside a test passes the parameter, and nothing of a request reaches it.
+26. **A test that picks a seed for an engine draw asks the engine for that draw.** It finds its seed by running what the hub will run, `expandStages` for who a job sets against the party and `replay` for what an adventure brings home, and does not restate how the engine derives a generator's seed or a unit's id. A test that rebuilt `<seed>#1` and `s1-wolf-1` to predict a wolf's hide would pick the wrong seed the day the engine numbered a stage or a unit differently, and fail without saying why. Rule 25 says the seed is passed; this says how it is chosen. A candidate rule from the review of PR-347 (Issue-341), accepted by the owner on 2026-11-23.
 
 ## Held back
 
