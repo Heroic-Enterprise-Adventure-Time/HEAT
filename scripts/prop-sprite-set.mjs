@@ -25,6 +25,7 @@
 //   "pick": { "reviewObjectId": "...", "index": 0, "itemDescription": "..." }. A swing that begins at a picture
 //   other than the icon gives it as "startFrame": { "from": "...", "sha256": "<of the bytes passed>", "generations": 0 }, beside "endFrame". A set made
 //   before the engine has its wielder leaves "wielders" empty and says what it is for in "madeFor" (docs/process/assets.md, rule 5).
+//   A prop made that way leaves "props" empty and gives its PixelLab tags in "tags", which are otherwise "heat", "prop" and its props.
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -137,7 +138,7 @@ const provenance = {
   ...(weapon ? { wielders: record.wielders } : { props: record.props }),
   ...(record.madeFor ? { madeFor: record.madeFor } : {}),
   service: SERVICE,
-  pixellab: { objectId: values.object, name: record.name, tags: weapon ? record.tags : ["heat", "prop", ...record.props] },
+  pixellab: { objectId: values.object, name: record.name, tags: record.tags ?? ["heat", "prop", ...record.props] },
   object: {
     tool: weapon ? "create_1_direction_object" : "create_map_object",
     via: "MCP",
