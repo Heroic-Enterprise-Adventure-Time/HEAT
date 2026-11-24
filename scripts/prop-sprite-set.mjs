@@ -20,12 +20,15 @@
 //                              "frameCount": 6, "frames": 7, "generations": 1, "heldLast"?: true, "fadeAboveEnd"?: true,
 //                              "endFrame"?: { "objectId": "...", "stateName": "...", "editDescription": "...", "generations": 1 },
 //                              "replaced"?: [{ "groupId": "...", "description": "...", "generations": 1, "why": "..." }] } },
-//     "rejected"?: [{ "name": "...", "objectId": "...", "description": "..." }] }
+//     "rejected"?: [{ "name": "...", "objectId": "...", "description": "...", "generations": 1, "parameters": "...", "why": "..." }],
+//     "chosenBy"?: "who chose the set, when, and the mock-up it was chosen in (docs/process/assets.md, rule 19)" }
+//   A look not kept carries what it cost and the rest of its call, so the provenance accounts for every generation.
 //   A weapon's has "kind": "weapon", "wielders": [...] in place of "props", and
 //   "pick": { "reviewObjectId": "...", "index": 0, "itemDescription": "..." }. A swing that begins at a picture
 //   other than the icon gives it as "startFrame": { "from": "...", "sha256": "<of the bytes passed>", "generations": 0 }, beside "endFrame". A set made
 //   before the engine has its wielder leaves "wielders" empty and says what it is for in "madeFor" (docs/process/assets.md, rule 5).
 //   A prop made that way leaves "props" empty and gives its PixelLab tags in "tags", which are otherwise "heat", "prop" and its props.
+//   A weapon's record always gives "tags". A record that owes its tags and has none is refused before anything is written.
 
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -41,6 +44,11 @@ if (!values.object || !values.out || !values.record) {
   process.exit(2);
 }
 const record = JSON.parse(readFileSync(values.record, "utf8"));
+const weapon = record.kind === "weapon";
+// A weapon is tagged by what it is, and a set made before the engine has what it draws names nothing
+// its tags could be derived from: both give them, as scripts/hero-sprite-set.mjs asks of a set made ahead.
+if (weapon && !record.tags) throw new Error("a weapon's record gives its PixelLab tags in full");
+if (record.madeFor && !record.tags) throw new Error("a record with madeFor gives its PixelLab tags in full");
 
 // The same reader as scripts/hero-sprite-set.mjs: PixelLab's zips are stored or deflated, nothing else.
 function unzip(buf) {
@@ -89,7 +97,6 @@ const write = (file, from) => {
   report.files++;
 };
 
-const weapon = record.kind === "weapon";
 const still = weapon ? "icon.png" : "standing.png";
 write(still, "rotations/unknown.png");
 for (const [name, a] of Object.entries(record.animations)) {
@@ -162,6 +169,7 @@ const provenance = {
     0,
   ),
   ...(record.rejected ? { rejected: record.rejected } : {}),
+  ...(record.chosenBy ? { chosenBy: record.chosenBy } : {}),
   verified: `Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded ${new Date().toISOString().slice(0, 10)}.`,
 };
 const json = JSON.stringify(provenance, null, 2).replace(/\[\s+([^[\]{}]*?)\s+\]/g, (_, items) => `[${items.split(/,\s+/).join(", ")}]`);
