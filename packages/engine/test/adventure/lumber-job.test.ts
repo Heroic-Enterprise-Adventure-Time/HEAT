@@ -171,7 +171,7 @@ describe("Lumber from the deep woods", () => {
     });
   }
 
-  for (const unitType of ["villager", "lumberjack", "ranger"] as const) {
+  for (const unitType of ["villager", "lumberjack", "miner", "ranger"] as const) {
     it(`defeats a lone ${unitType} on every one of ${SEEDS} seeds that roll two wolves: about one run in four`, () => {
       const runs = played(LUMBER, party(unitType));
       for (const { seed, result } of runs) expect(result.outcome, seed).toBe(rolled(seed).wolves === WOLVES.max ? "defeat" : "complete");
