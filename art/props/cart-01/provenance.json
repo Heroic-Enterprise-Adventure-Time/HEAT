@@ -2,7 +2,7 @@
   "set": "cart-01",
   "kind": "prop sprite set",
   "props": [],
-  "madeFor": "The caravan's cart, a member of the party that is hit and goes down and never acts (decision 0059). It stands on the party's side and faces east; a travel has no clip of its own, the scene moves the still picture. Issue-353 adds it to the engine and names it in `props`.",
+  "madeFor": "The caravan's cart, a member of the party that is hit and goes down and never acts (decision 0059). It stands on the party's side and faces east. It has no clip for a travel: the scene is to move the still picture. Its down ends in its wreck, which is to stay on the road; the wreck's lowest row is 4 px below the standing cart's, and it is drawn by the standing picture's foot as every prop's down is, so it lies that much lower, which the owner saw and kept. Issue-353 adds the cart to the engine, draws it and names it in `props`.",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",
@@ -77,6 +77,8 @@
       "objectId": "9683fe9c-9b17-4d0f-b4b8-4e95665270f1",
       "description": "small two-wheeled wooden handcart with a white canvas cover, seen from the side, facing right, two pull shafts at the front, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Side-on and close to the wagon by the caravan hub, but it faces west, and a mirrored file would not be the service's own."
     },
     {
@@ -84,6 +86,8 @@
       "objectId": "709ef4f6-0adb-47fb-bf7e-a3a032021c04",
       "description": "small two-wheeled wooden handcart loaded with crates and sacks, no cover, seen from the side, facing right, two pull shafts at the front, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Drawn from high above at three-quarters, with a black shadow painted under it."
     },
     {
@@ -91,6 +95,8 @@
       "objectId": "9eb8cf08-919c-49ac-adcc-37c670ebd965",
       "description": "small two-wheeled wooden trader's cart with a low rounded brown canvas cover tied down with rope, seen from the side, facing right, two pull shafts at the front, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Seen from the front at three-quarters, on four wheels."
     },
     {
@@ -98,6 +104,8 @@
       "objectId": "cd05aeb3-bd46-44c3-bfa0-f034b8d6e1e7",
       "description": "small two-wheeled wooden handcart with a white canvas cover, side view, the cart points to the right, its two pull shafts stick out on the right side of the picture, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Side-on and facing east, the agent's pick of the covered carts; the owner asked for an open cart with its goods showing."
     },
     {
@@ -105,6 +113,8 @@
       "objectId": "c848876a-28b7-4694-935f-8578dd09060e",
       "description": "small two-wheeled wooden handcart with a white canvas cover, side view, travelling east toward the right edge, pull shafts on the right, one large spoked wheel, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "side",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Maroon and pink, off the palette."
     },
     {
@@ -112,6 +122,8 @@
       "objectId": "0c3558b8-20b0-4b2b-af84-d0ebb2783663",
       "description": "small two-wheeled wooden handcart piled with crates and sacks under a rope, no cover, side view, the cart points to the right, its two pull shafts stick out on the right side of the picture, no animal, no shadow, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "side",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Side-on and facing east, but small and dark, with a purple and red load."
     },
     {
@@ -119,6 +131,8 @@
       "objectId": "e8de44c7-99a6-4d2d-a347-7b363e416857",
       "description": "small two-wheeled wooden handcart with a white canvas cover, seen from the side, facing right, two pull shafts at the front, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "The first roll's description again: three-quarters, facing down and to the left."
     },
     {
@@ -126,6 +140,8 @@
       "objectId": "7381eee7-9206-42f0-a6b1-bbf2d6866dd2",
       "description": "small two-wheeled wooden handcart with a white canvas cover, side view, the cart points to the right, two short pull shafts stick out on the right side of the picture, one spoked wheel, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Side-on and facing east, but washed out, with an orange outline in place of the black."
     },
     {
@@ -133,6 +149,8 @@
       "objectId": "387f7eb3-c5e8-4794-a186-d10feafcb52b",
       "description": "small two-wheeled wooden handcart loaded with wooden crates and tan sacks tied with rope, no cover, side view, the cart points to the right, two short pull shafts stick out on the right side of the picture, one spoked wheel, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "The look the owner liked, an open cart of tan sacks, but drawn at three-quarters; the kept cart is that look side-on."
     },
     {
@@ -140,6 +158,8 @@
       "objectId": "33508cf1-b2f3-4480-a701-4e4ad2cff65e",
       "description": "small two-wheeled wooden handcart loaded with tan sacks and wooden crates tied with rope, no cover, side view, the cart points to the right, its two pull shafts stick out on the right side of the picture, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Facing east, but dark olive and still a little three-quarter."
     },
     {
@@ -147,6 +167,8 @@
       "objectId": "cc19b66a-f051-4d0c-90cf-4a1862ce0d7f",
       "description": "small two-wheeled wooden handcart loaded with tan sacks and wooden crates tied with rope, no cover, side view, the cart points to the right, its two pull shafts stick out on the right side of the picture, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "side",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "Three-quarters again, crates only."
     },
     {
@@ -154,8 +176,11 @@
       "objectId": "eff23962-9cf9-4724-a84c-a47b5cff4865",
       "description": "small two-wheeled wooden handcart piled high with bulging tan grain sacks, no cover, flat side-on profile, one large spoked wheel in the middle, the cart points to the right, its two pull shafts stick out on the right side of the picture, no animal, black outline, warm earthy tones, NES-era retro pixel art, few colors",
       "view": "low top-down",
+      "generations": 1,
+      "parameters": "create_map_object through the MCP on a 48×48 canvas with the kept look's outline, shading and detail (docs/process/assets.md, rule 15); the description differs, and the view where it is not `side`",
       "why": "The kept description at `view: low top-down`: side-on and facing east, but bright gold with an orange outline."
     }
   ],
+  "chosenBy": "The owner, 2026-11-24, in a mock-up of the battle at 4× beside kept hero sets and bandit-01 (art/mockups/cart-in-battle-4x.png): an open cart with its goods showing, asked for after the first nine looks and kept from the four rolled next. Its hit and down the owner saw playing, at the battle's frame lengths, and kept.",
   "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-11-24."
 }
