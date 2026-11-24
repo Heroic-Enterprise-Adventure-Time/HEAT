@@ -192,7 +192,7 @@ export interface Unlock {
   earned: string;
 }
 
-/** Every unlock, by its name and the words said when it is earned. No job grants the road until Issue-352. */
+/** Every unlock, by its name and the words said when it is earned. The road is granted by the caravan hub's scouting job (Issue-352). */
 export const UNLOCKS: Readonly<Record<UnlockId, Unlock>> = {
   "road-to-highcrag": {
     name: "The road to Highcrag",
@@ -622,6 +622,7 @@ export type JobId =
   | "ore-from-the-hill"
   | "goblins-in-the-old-workings"
   | "lumber-from-the-deep-woods"
+  | "scout-the-road-to-highcrag"
   | "ore-from-the-crag";
 
 /**
@@ -633,9 +634,10 @@ export type JobId =
  * (decision 0058). Each job's bonus XP is what brings its XP, with the
  * enemies that always appear, to what decision 0030 gave it: 5, 15, 20, 15
  * and 25; the lumber camp's job and Highcrag's, written since, give the ore
- * job's 15. A job's description is all the page tells of it beside its pay
- * and its bonus, so it says what its author chooses to tell. A job may grant
- * unlocks on arrival (decision 0059); none does until Issue-352.
+ * job's 15, and the caravan hub's scouting job the wolves job's 20. A job's
+ * description is all the page tells of it beside its pay and its bonus, so it
+ * says what its author chooses to tell. A job may grant unlocks on arrival
+ * (decision 0059): the scouting job grants the first, the road to Highcrag.
  *
  * An entry of a fight or a gather stage may vary (decision 0058, Issue-341):
  * its count a range, and a chance of appearing at all, rolled from the
@@ -760,6 +762,31 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     ],
     pay: [],
     bonusXp: 6,
+  },
+  // The caravan hub's first job, and the first that grants an unlock
+  // (Issue-352, decision 0059): a plain job with no cart, the road and two
+  // bandits on it, and on arrival the road to Highcrag is the player's. It is
+  // the bandit's first job, and a step past the wolves job: no lone hero of a
+  // type Millbrook recruits comes through it, nor do two villagers; a fighter
+  // with a villager opens the road on every seed tried and loses one of the
+  // two on about one run in four; two fighters, a fighter with a ranger and a
+  // villager, and a fighter with three villagers open it with nobody lost. Its
+  // description says what it opens, and it stays listed once the road is
+  // open, a job like any other.
+  "scout-the-road-to-highcrag": {
+    id: "scout-the-road-to-highcrag",
+    name: "Scout the road to Highcrag",
+    description: "Nobody has walked the hill road to Highcrag since bandits took it. Clear it as far as the fort's gate and the way is open: you will have a camp there. One sword is not enough.",
+    location: "millbrook",
+    facility: "caravan-hub",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
+    grants: ["road-to-highcrag"],
   },
   // Highcrag's one board job (Issue-351, decision 0059): the mine's first
   // job on another hill, two veins and then a wolf, for the parties Highcrag

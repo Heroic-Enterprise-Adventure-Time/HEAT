@@ -3,9 +3,8 @@ import { randomUUID } from "node:crypto";
 import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { FACILITIES, type FacilityKind, jobsPostedBy, location, must, UNIT_PROFILES } from "@heat/engine";
+import { jobsPostedBy, location, must, UNIT_PROFILES } from "@heat/engine";
 
-import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { type AdventureRecord, type Camp, type Hero, type HeroStatus, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
@@ -14,7 +13,7 @@ import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { player, whole } from "./data.js";
+import { build, player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -247,7 +246,8 @@ describe("startAdventure", () => {
 /**
  * Every facility a camp at Millbrook may build that posts a job, with the
  * first job it posts, read from the content (typescript.md, rule 25): the
- * mine (Issue-133) and the lumber camp (Issue-291). A facility every camp
+ * mine (Issue-133), the lumber camp (Issue-291) and the caravan hub
+ * (Issue-352), which needs a level-2 warehouse first. A facility every camp
  * has, the hall or the warehouse, is not among them: a job of its own could
  * never be refused for want of it.
  */
@@ -256,22 +256,9 @@ const posters = must(location(at), "Millbrook").buildableFacilities.flatMap((kin
   return job ? [{ kind, job: job.id }] : [];
 });
 
-describe("a facility's job (Issue-133, Issue-291)", () => {
-  /**
-   * The facility built as a player builds it: paid for with what its first
-   * level costs. It builds nothing that level needs first, since no facility
-   * that posts a job needs anything yet, and says so the day one does, as the
-   * caravan hub will with its level-2 warehouse.
-   */
-  async function build(p: string, kind: FacilityKind): Promise<void> {
-    const first = must(FACILITIES[kind].levels[0], `the first level of the ${kind}`);
-    expect(first.requires, `the ${kind} needs another facility first, which this helper does not build`).toEqual([]);
-    for (const { material, amount } of first.cost) await repo.setBalance(p, at, material, amount);
-    await buildFacility(repo, p, at, kind, 1);
-  }
-
-  it("is the mine's and the lumber camp's: the facilities a camp at Millbrook may build that post one", () => {
-    expect(posters.map((poster) => poster.kind)).toEqual(["mine", "lumber-camp"]);
+describe("a facility's job (Issue-133, Issue-291, Issue-352)", () => {
+  it("is the mine's, the lumber camp's and the caravan hub's: the facilities a camp at Millbrook may build that post one", () => {
+    expect(posters.map((poster) => poster.kind)).toEqual(["mine", "lumber-camp", "caravan-hub"]);
   });
 
   for (const { kind, job } of posters) {
@@ -288,7 +275,7 @@ describe("a facility's job (Issue-133, Issue-291)", () => {
     it(`starts the ${kind}'s job once the camp has built it`, async () => {
       const p = player();
       const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-      await build(p, kind);
+      await build(repo, p, at, kind);
       const started = await startAdventure(repo, p, version, randomUUID(), at, job, [hero.id]);
       expect(started).toMatchObject({ location: at, jobId: job, status: "OPEN" });
       expect((await repo.openAdventure(p))?.adventureId).toBe(started.adventureId);
@@ -298,7 +285,7 @@ describe("a facility's job (Issue-133, Issue-291)", () => {
     it(`refuses the ${kind}'s job at a camp that has built every other facility that posts one: a job needs its own`, async () => {
       const p = player();
       const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-      for (const other of posters) if (other.kind !== kind) await build(p, other.kind);
+      for (const other of posters) if (other.kind !== kind) await build(repo, p, at, other.kind);
       const refused = await refusal(startAdventure(repo, p, version, randomUUID(), at, job, [hero.id]));
       expect(refused).toBeInstanceOf(Requires);
       expect(refused).toMatchObject({ missing: [{ kind, level: 1 }] });

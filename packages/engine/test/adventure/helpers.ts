@@ -126,4 +126,5 @@ export const TIMBER = "timber-from-the-near-woods";
 export const ORE = "ore-from-the-hill";
 export const GOBLINS = "goblins-in-the-old-workings";
 export const LUMBER = "lumber-from-the-deep-woods";
+export const ROAD = "scout-the-road-to-highcrag";
 export const CRAG = "ore-from-the-crag";
