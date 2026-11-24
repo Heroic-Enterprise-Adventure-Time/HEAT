@@ -11,6 +11,7 @@ import {
   hallCapacity,
   HERO_NAMES,
   heroNames,
+  isUnlockId,
   jobOf,
   JOBS,
   location,
@@ -23,6 +24,9 @@ import {
   SPRITE_SETS,
   STARTING_LOCATION,
   UNIT_TYPES,
+  UNLOCK_IDS,
+  unlockedLocations,
+  UNLOCKS,
   WAREHOUSE_CAPACITY,
   warehouseCapacity,
 } from "../src/index.js";
@@ -48,11 +52,57 @@ describe("static content", () => {
     for (const p of Object.values(SPRITE_SET_PRESENTATION)) expect(PRESENTATIONS).toContain(p);
   });
 
-  it("offers the villager at hall level 1 at every location, which the free villager needs", () => {
+  it("offers the villager at hall level 1 at the starting location, which the free villager needs, and gives every location's camp a hall and a warehouse", () => {
+    expect(location(STARTING_LOCATION)?.recruits.find((r) => r.unitType === "villager")?.hallLevel).toBe(1);
     for (const l of LOCATIONS) {
-      expect(l.recruits.find((r) => r.unitType === "villager")?.hallLevel).toBe(1);
       expect(l.ownFacilities).toContain("heroes-hall");
       expect(l.ownFacilities).toContain("warehouse");
+    }
+  });
+
+  it("names every unlock once, each with a name and the words said when it is earned", () => {
+    expect(Object.keys(UNLOCKS)).toEqual([...UNLOCK_IDS]);
+    expect(new Set(UNLOCK_IDS).size).toBe(UNLOCK_IDS.length);
+    for (const id of UNLOCK_IDS) {
+      expect(UNLOCKS[id].name.length, id).toBeGreaterThan(0);
+      expect(UNLOCKS[id].earned.length, id).toBeGreaterThan(0);
+      expect(isUnlockId(id)).toBe(true);
+    }
+    expect(isUnlockId("an-unlock-of-another-version")).toBe(false);
+  });
+
+  it("needs no unlock for the starting location, and for any other a known unlock that no second location needs", () => {
+    expect(location(STARTING_LOCATION)?.unlock).toBeUndefined();
+    const needed = LOCATIONS.filter((l) => l.id !== STARTING_LOCATION).map((l) => l.unlock);
+    for (const unlock of needed) expect(UNLOCK_IDS).toContain(unlock);
+    expect(new Set(needed).size).toBe(needed.length);
+    expect(new Set(LOCATIONS.map((l) => l.id)).size).toBe(LOCATIONS.length);
+  });
+
+  it("gives a player a camp at the starting location alone until an unlock is held, and then at its location too", () => {
+    expect(unlockedLocations(new Set()).map((l) => l.id)).toEqual([STARTING_LOCATION]);
+    expect(unlockedLocations(new Set(["an-unlock-of-another-version"])).map((l) => l.id)).toEqual([STARTING_LOCATION]);
+    expect(unlockedLocations(new Set(UNLOCK_IDS))).toEqual(LOCATIONS);
+    for (const l of LOCATIONS) {
+      if (l.unlock) expect(unlockedLocations(new Set([l.unlock])).map((u) => u.id)).toEqual([STARTING_LOCATION, l.id]);
+    }
+  });
+
+  it("has Highcrag behind the road's unlock, with the shared job board, nothing to build, and the miner and the fighter at Millbrook's costs", () => {
+    const highcrag = must(location("highcrag"), "Highcrag");
+    const millbrook = must(location(STARTING_LOCATION), "the starting location");
+    expect(highcrag.name).toBe("Highcrag");
+    expect(highcrag.unlock).toBe("road-to-highcrag");
+    expect(highcrag.sharedFacilities).toEqual(["job-board"]);
+    expect(highcrag.buildableFacilities).toEqual([]);
+    expect(highcrag.recruits.map((r) => r.unitType)).toEqual(["miner", "fighter"]);
+    for (const recruit of highcrag.recruits) expect(recruit).toEqual(millbrook.recruits.find((r) => r.unitType === recruit.unitType));
+  });
+
+  it("has no free hero at Highcrag: every recruit there costs its cost with no hero alive", () => {
+    for (const recruit of must(location("highcrag"), "Highcrag").recruits) {
+      expect(recruit.cost.length, recruit.unitType).toBeGreaterThan(0);
+      expect(recruitCost(recruit, 0), recruit.unitType).toEqual(recruit.cost);
     }
   });
 

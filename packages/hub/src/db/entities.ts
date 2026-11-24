@@ -1,13 +1,13 @@
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { CustomAttributeType, Entity, type EntityItem, Service } from "electrodb";
 
-import { ADVENTURE_OUTCOMES, type AdventureSnapshot, FACILITY_KINDS, MATERIALS, type Reward, type StageResult, UNIT_TYPES } from "@heat/engine";
+import { ADVENTURE_OUTCOMES, type AdventureSnapshot, FACILITY_KINDS, MATERIALS, type Reward, type StageResult, UNIT_TYPES, UNLOCK_IDS } from "@heat/engine";
 
 import type { RecentAdventure, RecentHero } from "../recent.js";
 import type { Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
 import { GSI1, ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
-import type { AdventureRecord, Hero, OpenAdventure, Player, SettledResult } from "./repository.js";
+import type { AdventureRecord, EarnedUnlock, Hero, OpenAdventure, Player, SettledResult } from "./repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
 
 /**
@@ -126,6 +126,23 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         primary: {
           pk: playerPk,
           sk: { field: KEY.sk, composite: [], template: TEMPLATES.open, casing: "none" },
+        },
+      },
+    },
+    onPlayer,
+  );
+  /**
+   * An unlock the player holds (decision 0059). Settlement writes it with every
+   * attribute set only if absent, so the first grant's time and adventure stay.
+   */
+  const unlock = new Entity(
+    {
+      model: { entity: "unlock", service, version },
+      attributes: { playerId, unlock: { type: UNLOCK_IDS, required: true }, earnedAt: text, adventureId: text },
+      indexes: {
+        primary: {
+          pk: playerPk,
+          sk: { field: KEY.sk, composite: ["unlock"], template: TEMPLATES.unlock, casing: "none" },
         },
       },
     },
@@ -251,7 +268,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
     },
     onLocation,
   );
-  return new Service({ adventure, camp, facility, hero, holding, ledger, open, profile, recent, sighting }, { client });
+  return new Service({ adventure, camp, facility, hero, holding, ledger, open, profile, recent, sighting, unlock }, { client });
 }
 
 export type HeatService = ReturnType<typeof createService>;
@@ -269,4 +286,5 @@ export type EntitiesCoverTheirItems = [
   NothingUndeclared<Exclude<keyof Player, keyof EntityItem<HeatService["entities"]["profile"]>>>,
   NothingUndeclared<Exclude<keyof RecentAdventure, keyof EntityItem<HeatService["entities"]["recent"]>>>,
   NothingUndeclared<Exclude<keyof Sighting, keyof EntityItem<HeatService["entities"]["sighting"]>>>,
+  NothingUndeclared<Exclude<keyof EarnedUnlock, keyof EntityItem<HeatService["entities"]["unlock"]>>>,
 ];

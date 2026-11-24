@@ -82,8 +82,10 @@ export type PartyOrder =
   | 'PRESS_ON'
   | 'RETREAT';
 
-/** What to recruit, and the request's id. */
+/** Where to recruit and what, and the request's id. */
 export type RecruitHeroInput = {
+  /** The camp's location, whose heroes hall recruits. */
+  readonly location: string | number;
   /** A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made. */
   readonly requestId: string;
   /** A unit type on the location's recruitment list. */

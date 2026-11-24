@@ -3,6 +3,8 @@ import { randomInt, randomUUID } from "node:crypto";
 import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { STARTING_LOCATION } from "@heat/engine";
+
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { type Hero, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
@@ -115,7 +117,7 @@ describe("the sample of heroes seen at a location", () => {
 describe("sightings written by the flows that change a hero", () => {
   it("recruit writes the hero's public fields, no owner, expiring a week after it was recruited", async () => {
     const p = player();
-    const made = await recruitHero(repo, p, "villager", randomUUID());
+    const made = await recruitHero(repo, p, STARTING_LOCATION, "villager", randomUUID());
     const r = await db.send(new GetCommand({ TableName: tables.location, Key: locationKeys.seen(made.location, made.id) }));
     const recruited = Math.floor(new Date(made.recruitedAt).getTime() / 1000);
     expect(r.Item).toEqual({
@@ -137,7 +139,7 @@ describe("sightings written by the flows that change a hero", () => {
 
   it("retire deletes the hero's sighting, so it leaves other players' camps", async () => {
     const p = player();
-    const made = await recruitHero(repo, p, "villager", randomUUID());
+    const made = await recruitHero(repo, p, STARTING_LOCATION, "villager", randomUUID());
     await retireHero(repo, p, made.id);
     const r = await db.send(new GetCommand({ TableName: tables.location, Key: locationKeys.seen(made.location, made.id) }));
     expect(r.Item).toBeUndefined();

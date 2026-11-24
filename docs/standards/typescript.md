@@ -47,7 +47,7 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 ### Closed sets
 
-18. **A list that enumerates a closed union is checked against it.** An exported list of a union's members, `UNIT_TYPES`, `MATERIALS`, `GATHERING_TRAITS`, `FACILITY_KINDS`, `MONSTER_TYPES`, `RESOURCE_TYPES`, `STAGE_ENDINGS`, `ADVENTURE_OUTCOMES`, is the one declaration: the list is `as const` and the union is `(typeof LIST)[number]`, so a member added to one is added to the other. Where the union is declared elsewhere, `StageKind` from `Stage`, the list `satisfies` it and a typed assignment beside it fails on a member the list lacks. A list annotated `readonly T[]` is not checked: a member added to the union alone compiles and is dropped from whatever the list feeds, the API's enums among them (graphql.md, rule 4). A closed set spelled in more than one place inside a package has one exported list, and every other place reads it, an unexported inline list included: `HERO_STATUSES` in the hub's `db/statuses.ts` feeds the entity, the union and the API's enum. From the reviews of PR-192 (Issue-155) and PR-212 (Issue-200).
+18. **A list that enumerates a closed union is checked against it.** An exported list of a union's members, `UNIT_TYPES`, `MATERIALS`, `GATHERING_TRAITS`, `FACILITY_KINDS`, `MONSTER_TYPES`, `RESOURCE_TYPES`, `STAGE_ENDINGS`, `ADVENTURE_OUTCOMES`, `UNLOCK_IDS`, is the one declaration: the list is `as const` and the union is `(typeof LIST)[number]`, so a member added to one is added to the other. Where the union is declared elsewhere, `StageKind` from `Stage`, the list `satisfies` it and a typed assignment beside it fails on a member the list lacks. A list annotated `readonly T[]` is not checked: a member added to the union alone compiles and is dropped from whatever the list feeds, the API's enums among them (graphql.md, rule 4). A closed set spelled in more than one place inside a package has one exported list, and every other place reads it, an unexported inline list included: `HERO_STATUSES` in the hub's `db/statuses.ts` feeds the entity, the union and the API's enum. From the reviews of PR-192 (Issue-155) and PR-212 (Issue-200).
 
 ### Shared test helpers
 
@@ -79,6 +79,10 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 ### What a comment says was measured
 
 27. **A comment that states a result over seeds states one that a test asserts.** A comment beside a job or a unit type that says how a party fares, how often something happens or what comes home says no more than a test in the repository holds, in the test's terms, and changes in the commit that changes the test; what was measured once and is held by no test goes into the decision record or the pull request, with how it was measured. `docs/README.md`, rules 5 and 6, hold documents to what is true, and nothing held a comment. A candidate rule from the review of PR-349 (Issue-291), accepted by the owner on 2026-11-23, where the lumber job's comment said any lone hero falls to two wolves and a lone fighter falls to them on 55 of 124 seeds.
+
+### What a test says it covers, of the schema
+
+28. **A test that says it covers every verb or field of a kind reads them off the built schema.** A test named for every mutation that takes a location, or every field behind a scope, finds them by walking the schema the hub builds, as `packages/hub/test/access.test.ts` does for who may read what, and compares its own cases with what it finds: a fourth mutation that takes a location then fails the test until it has a case. A list the test file writes and compares with itself passes whatever is added. Rules 25 and 26 say this of a content list and of a file's own cases; this says it of the API. A candidate rule from the review of PR-359 (Issue-351), accepted by the owner on 2026-11-24, where the test of every verb that takes a location compared its three names with themselves.
 
 ## Held back
 

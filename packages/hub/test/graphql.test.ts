@@ -2,14 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import type { Context as LambdaContext } from "aws-lambda";
+import { constantCase } from "es-toolkit";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { MAX_PARTY, must } from "@heat/engine";
+import { MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
-import { emptyResult, putRecentAdventure, putSettledAdventure, recentAdventure, settledAdventure } from "./data.js";
+import { emptyResult, putRecentAdventure, putSettledAdventure, putUnlock, recentAdventure, settledAdventure } from "./data.js";
 import { event, type Handler } from "./event.js";
 import { locationKeys } from "./keys.js";
 
@@ -77,7 +78,7 @@ const START = `mutation($requestId: UUID!, $heroIds: [ID!]!) {
   }
 }` as Query<{ startAdventure: Result<"adventure", { id: string; seed: string }> }>;
 const RECRUIT = `mutation($id: UUID!) {
-  recruitHero(input: { unitType: VILLAGER, requestId: $id }) {
+  recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) {
     __typename
     ... on RecruitHeroSuccess { hero { id name unitType spriteSet status } }
     ... on Error { message }
@@ -262,6 +263,52 @@ describe("the camp through the graph", () => {
     expect(nowhere.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
   });
 
+  it("serves the unlocks a player holds to that player alone, with the camp one opens, and the unlocks a settled run earned to any signed-in player (decision 0059)", async () => {
+    const owner = `p-${randomUUID()}`;
+    const other = `p-${randomUUID()}`;
+    await gql(JOIN, {}, owner);
+    const mine = `{ me { unlocks { unlock earnedAt adventureId } camps { location name } } }` as Query<{ me: { unlocks: unknown[]; camps: unknown[] } }>;
+    const before = await gql(mine, {}, owner);
+    expect(before.errors).toBeUndefined();
+    expect(before.data?.me).toEqual({ unlocks: [], camps: [{ location: "millbrook", name: "Millbrook" }] });
+    // A location the player has not unlocked is not theirs to recruit at: the client's defect, not a refusal.
+    const HIGHCRAG = `mutation($id: UUID!) { recruitHero(input: { location: "highcrag", unitType: FIGHTER, requestId: $id }) { __typename } }` as Query<{ recruitHero: unknown }>;
+    const locked = await gql(HIGHCRAG, { id: randomUUID() }, owner);
+    expect(locked.data?.recruitHero).toBeNull();
+    expect(locked.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+
+    // As settlement leaves them: a settled record whose result lists the unlock, and the unlock's item naming that adventure.
+    const config = configFromEnv();
+    const db = createDocumentClient(config);
+    const unlock = must(UNLOCK_IDS[0], "an unlock of the content");
+    const earnedAt = "2026-11-24T12:00:00.000Z";
+    const record = await putSettledAdventure(
+      db,
+      config.tables.location,
+      settledAdventure("wolves-on-the-mill-road", new Date(earnedAt), { playerId: owner, result: { ...emptyResult("complete"), unlocks: [unlock] } }),
+    );
+    await putUnlock(db, config.tables.player, owner, unlock, { earnedAt, adventureId: record.adventureId });
+
+    const after = await gql(mine, {}, owner);
+    expect(after.errors).toBeUndefined();
+    // The engine's `road-to-highcrag` is the enum value ROAD_TO_HIGHCRAG on the wire (graphql.md, rule 4).
+    expect(after.data?.me.unlocks).toEqual([{ unlock: constantCase(unlock), earnedAt, adventureId: record.adventureId }]);
+    expect(after.data?.me.camps).toEqual([{ location: "millbrook", name: "Millbrook" }, { location: "highcrag", name: "Highcrag" }]);
+    // Now the recruit is read, and refused by a rule of the game: nothing is free at Highcrag.
+    const unlocked = await gql(HIGHCRAG, { id: randomUUID() }, owner);
+    expect(unlocked.data?.recruitHero).toEqual({ __typename: "InsufficientResources" });
+
+    const theirs = await gql(`query($id: ID!) { player(id: $id) { id unlocks { unlock } } }` as Query<{ player: { id: string; unlocks: unknown } }>, { id: owner }, other);
+    expect(theirs.data?.player).toEqual({ id: owner, unlocks: null });
+    expect(theirs.errors?.map((e) => [e.path, e.extensions?.["code"]])).toEqual([[["player", "unlocks"], "FORBIDDEN"]]);
+
+    // What the run earned is public, as its rewards are, and nothing in it says whose the run was or whether the unlock was new.
+    const run = await gql(`query($id: ID!) { adventure(id: $id) { id result { outcome unlocks } } }` as Query<{ adventure: unknown }>, { id: record.adventureId }, other);
+    expect(run.errors).toBeUndefined();
+    expect(run.data?.adventure).toEqual({ id: record.adventureId, result: { outcome: "COMPLETE", unlocks: [constantCase(unlock)] } });
+    expect(JSON.stringify(run)).not.toContain(owner);
+  });
+
   it("lists a job's replays, its settled adventures, to any signed-in player, and nothing of whose they were", async () => {
     // Settled far in the future, so that it is first whatever the other test files settle of the job meanwhile.
     const settledAt = "9999-01-01T00:00:00.000Z";
@@ -366,11 +413,15 @@ describe("the adventure loop through the graph", () => {
     const p = `p-${randomUUID()}`;
     await gql(JOIN, {}, p);
     // A unit type outside the enum, and a mutation called with its old positional arguments.
-    const dragon = await invalid(`mutation($id: UUID!) { recruitHero(input: { unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
+    const dragon = await invalid(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
     expect(dragon.data).toBeUndefined();
     expect(dragon.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
     const positional = await invalid(`mutation { recruitHero(unitType: VILLAGER, requestId: "x") { __typename } }`, {}, p);
     expect(positional.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+    // A recruit that names no location, as a tab loaded before Issue-351 sends it.
+    const nowhere = await invalid(`mutation($id: UUID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
+    expect(nowhere.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+    expect(await repo.heroes(p)).toEqual([]);
   });
 
   describe("every boundary of the contract", () => {
@@ -493,5 +544,17 @@ describe("the deploy's version", () => {
     // The deploy's own client is refused the same document and is not told to reload.
     const current = await invalid(dropped, {}, p, { "heat-version": must(process.env["HEAT_VERSION"], "HEAT_VERSION") });
     expect(current.extensions?.["outdated"]).toBeUndefined();
+  });
+
+  it("flags outdated on an input that lacks a field since required, which is how a tab loaded before a recruit named its location hears of the deploy", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(JOIN, {}, p);
+    // The client's own document, which is unchanged; until Issue-351 its input held no location.
+    const recruit = `mutation($input: RecruitHeroInput!) { recruitHero(input: $input) { __typename } }`;
+    const stale = await invalid(recruit, { input: { unitType: "VILLAGER", requestId: randomUUID() } }, p, { "heat-version": "0".repeat(40) });
+    expect(stale.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+    expect(stale.errors?.[0]?.message).toContain("location");
+    expect(stale.extensions?.["outdated"]).toBe(true);
+    expect(await repo.heroes(p)).toEqual([]);
   });
 });

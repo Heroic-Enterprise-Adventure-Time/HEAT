@@ -54,7 +54,7 @@ const stored = (adventureId: string) => storedItem(db, tables.location, location
 
 /** A player's adventure on the timber job, open, with the free villager. */
 async function opened(p: string) {
-  const villager = await recruitHero(repo, p, "villager", randomUUID());
+  const villager = await recruitHero(repo, p, at, "villager", randomUUID());
   return startAdventure(repo, p, version, randomUUID(), at, timber, [villager.id]);
 }
 

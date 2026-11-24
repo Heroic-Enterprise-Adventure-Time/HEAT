@@ -70,7 +70,7 @@ describe("the hub's spans", () => {
     exporter.reset();
 
     const { body, spans } = await traced(
-      `mutation Zzyzx($id: UUID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { __typename ... on RecruitHeroSuccess { hero { id name } } } }`,
+      `mutation Zzyzx($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) { __typename ... on RecruitHeroSuccess { hero { id name } } } }`,
       { id: requestId },
       player,
     );
@@ -94,7 +94,7 @@ describe("the hub's spans", () => {
     exporter.reset();
 
     // A new camp has no ore, so a fighter is refused, as data (graphql.md, rule 6).
-    const { body, spans } = await traced(`mutation($id: UUID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { __typename } }`, { id: randomUUID() }, player);
+    const { body, spans } = await traced(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: FIGHTER, requestId: $id }) { __typename } }`, { id: randomUUID() }, player);
 
     const reply = JSON.parse(body) as { data: { recruitHero: { __typename: string } }; errors?: unknown };
     expect(reply.errors).toBeUndefined();

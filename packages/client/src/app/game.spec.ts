@@ -268,7 +268,9 @@ describe('Game', () => {
 
     const hero = must(await run(game.recruit('villager')), 'the hero');
     const recruit = hub.calls.find((c) => c.op === 'RecruitHero');
-    const sent = recruit?.variables['input'] as { unitType: string; requestId: string };
+    const sent = recruit?.variables['input'] as { location: string; unitType: string; requestId: string };
+    // The camp on screen, which the hub recruits at (Issue-351).
+    expect(sent.location).toBe(game.location());
     expect(sent.unitType).toBe('VILLAGER');
     expect(sent.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(hero.id).toBe(sent.requestId);

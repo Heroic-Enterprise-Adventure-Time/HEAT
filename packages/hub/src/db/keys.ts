@@ -18,11 +18,13 @@
  *   PLAYER#<id>    | HERO#<heroId>                    a hero, its location an attribute, since a hero can move, and
  *                                                       adventureId while it is on the open adventure
  *   PLAYER#<id>    | OPEN                              the one open adventure: its id, seed and start time
+ *   PLAYER#<id>    | UNLOCK#<unlock>                   an unlock the player holds: when it was earned and the adventure
+ *                                                       that earned it; written once, never deleted, no TTL (decision 0059)
  *   PLAYER#<id>    | LEDGER#<causeId>#<entry>          append-only; the cause is an adventure id, a hero id or a
  *                                                       build-<location>-<kind>-<level>, and the entry can exist
  *                                                       once, which is what makes settle pay and a build charge once
  *
- * The keys and their reasons are decision 0026. The spike's HOLDING#<material>
+ * The keys and their reasons are decision 0026; an unlock's are decision 0059. The spike's HOLDING#<material>
  * items in dev and prod are no longer read and are left in place.
  *
  * The location table, partitioned by location, and by adventure for the one
@@ -63,6 +65,7 @@ export const TEMPLATES = {
   holding: "AT#${location}#HOLDING#${material}",
   hero: "HERO#${id}",
   open: "OPEN",
+  unlock: "UNLOCK#${unlock}",
   ledger: "LEDGER#${cause}#${entry}",
   adventurePk: "ADVENTURE#${adventureId}",
   adventure: "RECORD",

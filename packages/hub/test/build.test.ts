@@ -11,7 +11,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { BuildRefused, campLevels, type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
-import { player, whole } from "./data.js";
+import { balances as balancesAt, player, stock as stockAt, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -29,14 +29,8 @@ beforeAll(() => {
 
 const at = "millbrook";
 
-/** Puts stock into the camp directly, as settlement would credit it. */
-async function stock(p: string, holdings: Partial<Record<Material, number>>) {
-  for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, at, material, balance);
-}
-
-async function balances(p: string): Promise<Record<string, number>> {
-  return Object.fromEntries((await repo.holdings(p, at)).map((h) => [h.material, h.balance]));
-}
+const stock = (p: string, holdings: Partial<Record<Material, number>>) => stockAt(repo, p, at, holdings);
+const balances = (p: string) => balancesAt(repo, p, at);
 
 async function ledger(p: string): Promise<Record<string, unknown>[]> {
   const r = await db.send(
@@ -184,16 +178,16 @@ describe("buildFacility: the hall and the warehouse", () => {
         Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes: 4, livingHeroes: 0 }),
       }),
     );
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(HallFull);
+    expect(await refusal(recruitHero(repo, p, at, "villager", randomUUID()))).toBeInstanceOf(HallFull);
     await stock(p, { timber: 80, cloth: 20 });
     await buildFacility(repo, p, at, "heroes-hall", 2);
-    await recruitHero(repo, p, "villager", randomUUID());
+    await recruitHero(repo, p, at, "villager", randomUUID());
     expect(await repo.camp(p, at)).toMatchObject({ hallLevel: 2, activeHeroes: 5, livingHeroes: 1 });
   });
 
   it("upgrades a stored camp's warehouse, keeping its heroes", async () => {
     const p = player();
-    await recruitHero(repo, p, "villager", randomUUID());
+    await recruitHero(repo, p, at, "villager", randomUUID());
     await stock(p, { timber: 80, ore: 40 });
     const camp = await buildFacility(repo, p, at, "warehouse", 2);
     expect(camp).toMatchObject({ hallLevel: 1, warehouseLevel: 2, activeHeroes: 1, livingHeroes: 1 });
@@ -202,7 +196,7 @@ describe("buildFacility: the hall and the warehouse", () => {
 
   it("fails a recruit that read the hall before an upgrade, and the recruit then succeeds on a read again", async () => {
     const p = player();
-    await recruitHero(repo, p, "villager", randomUUID());
+    await recruitHero(repo, p, at, "villager", randomUUID());
     const stale = await repo.camp(p, at);
     await stock(p, { timber: 80, cloth: 20 });
     await buildFacility(repo, p, at, "heroes-hall", 2);
@@ -215,7 +209,7 @@ describe("buildFacility: the hall and the warehouse", () => {
 
   it("upgrades the hall once for two concurrent requests", async () => {
     const p = player();
-    await recruitHero(repo, p, "villager", randomUUID());
+    await recruitHero(repo, p, at, "villager", randomUUID());
     await stock(p, { timber: 200, cloth: 50 });
     await Promise.all([buildFacility(repo, p, at, "heroes-hall", 2), buildFacility(repo, p, at, "heroes-hall", 2)]);
     expect((await repo.camp(p, at)).hallLevel).toBe(2);
@@ -241,7 +235,7 @@ describe("buildFacility: what a level needs first", () => {
 
   it("holds the requirement in the transaction, against a camp read as if the warehouse were built", async () => {
     const p = player();
-    await recruitHero(repo, p, "villager", randomUUID());
+    await recruitHero(repo, p, at, "villager", randomUUID());
     await stock(p, { timber: 100, ore: 60, cloth: 20 });
     const camp = await repo.camp(p, at);
     const build = { kind: "caravan-hub" as const, from: 0, cost: [{ material: "timber" as const, amount: 100 }], requires: [{ kind: "warehouse" as const, level: 2 }] };

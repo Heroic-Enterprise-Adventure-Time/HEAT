@@ -54,7 +54,7 @@ enum AdventureOutcome {
 }
 
 """
-What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, and each hero's XP and fate.
+What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, each hero's XP and fate, and the unlocks the run earned.
 """
 type AdventureResult {
   """What went into the warehouse."""
@@ -70,6 +70,11 @@ type AdventureResult {
   """What the run yielded."""
   rewards: [Reward!]!
   stages: [StageResult!]!
+
+  """
+  The unlocks the run earned, whether or not the player held them already: what the run did, and nothing of what the player held before. Which were new is the owner's alone to read, from me.unlocks, where each names the adventure that first earned it.
+  """
+  unlocks: [Unlock!]!
 }
 
 """The adventure is settled, so it cannot be discarded."""
@@ -175,6 +180,18 @@ union DiscardAdventureResult = AdventureSettled | AdventureVerifiable | Conflict
 """The mutation did its work: the adventure, discarded."""
 type DiscardAdventureSuccess {
   adventure: Adventure!
+}
+
+"""
+An unlock the player holds, as it was first earned. It is never taken away, and earning it again changes nothing here.
+"""
+type EarnedUnlock {
+  """
+  The adventure that first earned it, so an unlock in that adventure's result was new to the player, and one in a later result was not.
+  """
+  adventureId: ID!
+  earnedAt: DateTime!
+  unlock: Unlock!
 }
 
 """
@@ -398,7 +415,7 @@ type Mutation {
   joinGame: JoinGameResult
 
   """
-  Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit, or a request id reused for another unit type, is BAD_USER_INPUT.
+  Recruits a hero of the unit type at the heroes hall of the player's camp at the location, paid in resources from that camp's holdings; a villager is free when no hero at the camp is alive, where the location recruits one. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a location the player has no camp at, a unit type the location does not recruit, or a request id reused for another location or unit type, is BAD_USER_INPUT.
   """
   recruitHero(input: RecruitHeroInput!): RecruitHeroResult
 
@@ -408,12 +425,12 @@ type Mutation {
   retireHero(input: RetireHeroInput!): RetireHeroResult
 
   """
-  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.
+  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.
   """
   startAdventure(input: StartAdventureInput!): StartAdventureResult
 
   """
-  Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. A settled adventure answers as it is; nothing is paid twice. Refused with EngineUpdated when another version issued it, AdventureDiscarded, or Conflict; an adventure that is not the player's, or a malformed log, is BAD_USER_INPUT.
+  Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths, and the unlocks the run earned. A settled adventure answers as it is; nothing is paid twice. Refused with EngineUpdated when another version issued it, AdventureDiscarded, or Conflict; an adventure that is not the player's, or a malformed log, is BAD_USER_INPUT.
   """
   submitAdventure(input: SubmitAdventureInput!): SubmitAdventureResult
 }
@@ -456,11 +473,11 @@ enum PartyOrder {
 }
 
 """
-A player: the id anyone may read, and the name, camps, heroes and open adventure only the player may.
+A player: the id anyone may read, and the name, camps, heroes, unlocks and open adventure only the player may.
 """
 type Player {
   """
-  Private: only the player may read their own camps. Null, with an error on this field, for anyone else.
+  Private: only the player may read their own camps, one at the starting location and one at each location whose unlock they hold. Null, with an error on this field, for anyone else.
   """
   camps: [Camp!]
 
@@ -473,6 +490,11 @@ type Player {
   """
   name: String
   openAdventure: Adventure
+
+  """
+  Private: only the player may read the unlocks they hold. Null, with an error on this field, for anyone else.
+  """
+  unlocks: [EarnedUnlock!]
 }
 
 """Integers that will have a value greater than 0."""
@@ -549,8 +571,11 @@ type RecentAdventureHero {
   unitType: UnitType!
 }
 
-"""What to recruit, and the request's id."""
+"""Where to recruit and what, and the request's id."""
 input RecruitHeroInput {
+  """The camp's location, whose heroes hall recruits."""
+  location: ID!
+
   """
   A UUID the client makes, which becomes the hero's id; a repeat answers the hero already made.
   """
@@ -773,4 +798,11 @@ enum UnitType {
   RANGER
   VILLAGER
   WIZARD
+}
+
+"""
+The unlocks, the engine's `UnlockId`: what a player earns once and holds for good. The client reads each one's name, and the words said when it is earned, from the engine it loaded.
+"""
+enum Unlock {
+  ROAD_TO_HIGHCRAG
 }

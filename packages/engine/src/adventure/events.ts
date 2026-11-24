@@ -7,6 +7,7 @@
  */
 
 import type { BattleEvent } from "../battle/index.js";
+import type { UnlockId } from "../content.js";
 import type { Reward } from "../index.js";
 import type { StageKind } from "./job.js";
 import type { AdventureLogEntry, PartyOrder } from "./override.js";
@@ -130,4 +131,10 @@ export interface AdventureResult {
   readonly dead: readonly string[];
   /** Every hero's health at the end, in the snapshot's order. */
   readonly health: readonly { readonly heroId: string; readonly health: number }[];
+  /**
+   * The unlocks the run earned: its job's grants on arrival, and none on a
+   * retreat or a defeat. What the run did, whether or not the player held
+   * them already; the hub writes whatever the list holds (decision 0059).
+   */
+  readonly unlocks: readonly UnlockId[];
 }

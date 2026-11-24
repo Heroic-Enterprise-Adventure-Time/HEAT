@@ -5,12 +5,12 @@ import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { Entity, Service } from "electrodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { must, UNIT_PROFILES } from "@heat/engine";
+import { must, UNIT_PROFILES, UNLOCK_IDS } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
 import { type Hero, HeroChanged, Repository, TransactionConflict } from "../src/db/repository.js";
-import { player, putOldCampsPastAPage, storedItem, whole } from "./data.js";
+import { emptyResult, player, putOldCampsPastAPage, settledAdventure, storedItem, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -127,7 +127,7 @@ describe("an item from before ElectroDB", () => {
     expect(sightings.map((s) => s.heroId)).toEqual(["a0", "b0"]);
   });
 
-  it("reads a settled adventure back whole, nested fields no entity declares included", async () => {
+  it("reads a settled adventure back whole, nested fields no entity declares included, and a result from before unlocks as having earned none", async () => {
     const adventureId = randomUUID();
     const snapshot = { version: "v", jobId: "sticks", heroes: [{ heroId: "h", name: "Old", stats: { traits: [] }, notDeclared: { deep: [1, null] } }] };
     const result = { outcome: "won", endedAtMs: 12, reachedStage: 0, stages: [{ stage: 0, kind: "battle", ended: "cleared", startedAtMs: 0, endedAtMs: 12 }], rewards: [{ material: "timber", amount: 3 }], credited: [], lost: [], heroes: [] };
@@ -136,7 +136,15 @@ describe("an item from before ElectroDB", () => {
       status: "SETTLED", result, settledAt: "2026-10-21T12:01:00.000Z",
     };
     await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
-    expect(await repo.getAdventure(adventureId)).toEqual(record);
+    expect(await repo.getAdventure(adventureId)).toEqual({ ...record, result: { ...result, unlocks: [] } });
+  });
+
+  it("reads a result's unlocks as stored, but for one this deploy's content does not know, which is left out", async () => {
+    const known = must(UNLOCK_IDS[0], "an unlock of the content");
+    const stored = settledAdventure("sticks", new Date("2026-11-24T12:00:00.000Z"));
+    const result = { ...emptyResult("complete"), unlocks: ["an-unlock-of-another-version", known] };
+    await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(stored.adventureId), ...stored, result }) }));
+    expect((await repo.getAdventure(stored.adventureId))?.result?.unlocks).toEqual([known]);
   });
 
   it("reads a snapshot from before the gathering traits with each hero's unit type's traits of today, a trait added since among them, and one that has traits as it is (Issue-339, Issue-340)", async () => {
@@ -245,6 +253,89 @@ describe("a transaction across the two tables", () => {
   });
 });
 
+/**
+ * What decision 0059 left for Issue-351 to check: how ElectroDB writes an item
+ * only if it is absent, inside a transaction, without cancelling the
+ * transaction when the item exists. An update whose every attribute is set
+ * with `ifNotExists`, and no condition.
+ */
+describe("an unlock written only if it is absent", () => {
+  const unlock = must(UNLOCK_IDS[0], "an unlock of the content");
+  const first = { earnedAt: "2026-11-24T12:00:00.000Z", adventureId: "the-first-adventure" };
+  const second = { earnedAt: "2026-11-25T12:00:00.000Z", adventureId: "the-second-adventure" };
+
+  /** The write settlement makes for an unlock, beside another write of the same transaction. */
+  const grant = (p: string, location: string, { earnedAt, adventureId }: typeof first) =>
+    service.transaction.write((i) => [
+      i.unlock
+        .update({ playerId: p, unlock })
+        .data((a, op) => {
+          op.ifNotExists(a.earnedAt, earnedAt);
+          op.ifNotExists(a.adventureId, adventureId);
+        })
+        .commit(),
+      i.camp.update({ playerId: p, location }).add({ activeHeroes: 1 }).commit(),
+    ]);
+
+  it("is an Update with no condition, whose attributes are set by if_not_exists", () => {
+    const [item] = (grant(player(), at, first).params() as { TransactItems: { Update: { UpdateExpression: string; ConditionExpression?: string } }[] }).TransactItems;
+    expect(item?.Update).not.toHaveProperty("ConditionExpression");
+    expect(item?.Update.UpdateExpression).toContain("#earnedAt = if_not_exists(#earnedAt, ");
+    expect(item?.Update.UpdateExpression).toContain("#adventureId = if_not_exists(#adventureId, ");
+  });
+
+  it("makes the item when the player holds none, whole enough for ElectroDB to read it back", async () => {
+    const p = player();
+    const location = `l-${randomUUID()}`;
+    expect((await grant(p, location, first).go()).canceled).toBe(false);
+    expect(await storedItem(db, tables.player, playerKeys.unlock(p, unlock))).toEqual({
+      ...playerKeys.unlock(p, unlock), playerId: p, unlock, ...first, __edb_e__: "unlock", __edb_v__: "1",
+    });
+    expect((await service.entities.unlock.get({ playerId: p, unlock }).go({ consistent: true })).data).toEqual({ playerId: p, unlock, ...first });
+  });
+
+  it("changes nothing on an item the player holds and cancels nothing: the rest of the transaction commits", async () => {
+    const p = player();
+    const location = `l-${randomUUID()}`;
+    await grant(p, location, first).go();
+    const held = await storedItem(db, tables.player, playerKeys.unlock(p, unlock));
+    const again = await grant(p, location, second).go();
+    expect(again.canceled).toBe(false);
+    expect(await storedItem(db, tables.player, playerKeys.unlock(p, unlock))).toEqual(held);
+    expect(await storedItem(db, tables.player, playerKeys.camp(p, location))).toMatchObject({ activeHeroes: 2 });
+  });
+
+  it("is what a condition check on the unlock's item passes on, and fails on without it", async () => {
+    const p = player();
+    const location = `l-${randomUUID()}`;
+    const checked = () =>
+      service.transaction
+        .write((i) => [
+          i.unlock.check({ playerId: p, unlock }).where((a, op) => op.exists(a.earnedAt)).commit(),
+          i.camp.update({ playerId: p, location }).add({ activeHeroes: 1 }).commit(),
+        ])
+        .go();
+    expect((await checked()).data.map((item) => item.code)).toEqual(["ConditionalCheckFailed", "None"]);
+    await grant(p, `l-${randomUUID()}`, first).go();
+    expect((await checked()).canceled).toBe(false);
+    expect(await storedItem(db, tables.player, playerKeys.camp(p, location))).toMatchObject({ activeHeroes: 1 });
+  });
+
+  it("is read with every unlock of the player in one Query, and one the content does not know is left out", async () => {
+    const p = player();
+    await grant(p, `l-${randomUUID()}`, first).go();
+    // As the deploy after this one may write it, for an unlock its content has and this one's has not.
+    const unknown = "an-unlock-of-another-version";
+    await db.send(new PutCommand({ TableName: tables.player, Item: whole("unlock", { ...playerKeys.unlock(p, unknown), playerId: p, unlock: unknown, ...second }) }));
+    expect(service.entities.unlock.query.primary({ playerId: p }).params({ consistent: true })).toMatchObject({
+      KeyConditionExpression: "#pk = :pk and begins_with(#sk1, :sk1)",
+      ExpressionAttributeValues: { ":sk1": "UNLOCK#" },
+    });
+    expect(await repo.unlocks(p)).toEqual([{ unlock, ...first }]);
+    expect(await repo.unlocks(player())).toEqual([]);
+  });
+});
+
 describe("a transaction DynamoDB cancels", () => {
   /** A repository whose every transaction is cancelled with these reasons, which ElectroDB reads as it would DynamoDB's. */
   function cancelledWith(reasons: CancellationReason[]): Repository {
@@ -337,7 +428,8 @@ describe("the reads of decision 0041", () => {
     // `pages` has no effect on a raw read, which is why the repository pages by hand (decision 0042).
     const first = await service.entities.camp.query.primary({ playerId: p }).go({ consistent: true, pages: "all", ignoreOwnership: true, data: "raw" });
     expect(first.data).toHaveProperty("LastEvaluatedKey");
-    expect((await repo.camps(p)).filter((c) => c.stored).map((c) => c.location).sort()).toEqual(locations);
+    // `camps` answers the locations the player has unlocked, which these are not, so each is read by `camp`.
+    for (const location of locations) expect((await repo.camp(p, location)).stored, location).toBe(true);
   });
 
   it("reads a sightings window as the repository does, with the limit before the filter", async () => {

@@ -18,6 +18,7 @@ import {
   replay,
   RESOURCE_NODES,
   RETREAT,
+  UNLOCK_IDS,
   warehouseCapacity,
 } from "../../src/index.js";
 import { atLargest, contentWithJob, enemiesXp, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
@@ -53,6 +54,7 @@ describe("The adventure's content", () => {
         }
       }
       for (const r of job.pay) expect(MATERIALS).toContain(r.material);
+      for (const unlock of job.grants ?? []) expect(UNLOCK_IDS, id).toContain(unlock);
       expect(Number.isInteger(job.bonusXp) && job.bonusXp >= 0, id).toBe(true);
       expect(job.description.length, id).toBeGreaterThan(0);
     }
@@ -67,7 +69,7 @@ describe("The adventure's content", () => {
     expect(JOBS["timber-from-the-near-woods"].pay).toEqual([{ material: "cloth", amount: 3 }]);
   });
 
-  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), and the ore job's 15 for the lumber camp's", () => {
+  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), and the ore job's 15 for the lumber camp's and for Highcrag's", () => {
     expect(mapValues(JOBS, (job) => job.bonusXp)).toEqual({
       "pick-up-sticks": 2,
       "timber-from-the-near-woods": 4,
@@ -75,6 +77,7 @@ describe("The adventure's content", () => {
       "ore-from-the-hill": 4,
       "goblins-in-the-old-workings": 6,
       "lumber-from-the-deep-woods": 6,
+      "ore-from-the-crag": 4,
     });
     expect(mapValues(JOBS, (job) => enemiesXp(job) + job.bonusXp)).toEqual({
       "pick-up-sticks": 5,
@@ -83,6 +86,7 @@ describe("The adventure's content", () => {
       "ore-from-the-hill": 15,
       "goblins-in-the-old-workings": 25,
       "lumber-from-the-deep-woods": 15,
+      "ore-from-the-crag": 15,
     });
   });
 

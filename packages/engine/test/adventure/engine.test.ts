@@ -13,6 +13,7 @@ import {
   MONSTERS,
   replay,
   RESOURCE_NODES,
+  UNLOCK_IDS,
 } from "../../src/index.js";
 import { contentWithJob, enemiesXp, haul, hero, ofKind, rewardOf, snapshot, TIMBER, WOLVES } from "./helpers.js";
 
@@ -279,6 +280,50 @@ describe("Defeat", () => {
     expect(result.outcome).toBe("defeat");
     expect(result.rewards).toEqual([]);
     expect(result.xp).toEqual([]);
+  });
+});
+
+describe("The unlocks a run earned", () => {
+  // No job of the content grants one until Issue-352, so the wolves job is given a grant here.
+  const scouting: Job = { ...JOBS[WOLVES], id: "wolves-that-open-a-road", grants: [...UNLOCK_IDS] };
+  const content = contentWithJob(scouting);
+
+  it("are its job's grants on arrival", () => {
+    const { result } = replay(snapshot(scouting.id, pair), "a", [], content);
+    expect(result.outcome).toBe("complete");
+    expect(result.unlocks).toEqual(UNLOCK_IDS);
+    expect(UNLOCK_IDS.length).toBeGreaterThan(0);
+  });
+
+  it("are none on a retreat, ordered in the fight or made certain on the road", () => {
+    for (const at of [5000, 1000]) {
+      const { result } = replay(snapshot(scouting.id, pair), "a", [retreatAt(at)], content);
+      expect(result.outcome, String(at)).toBe("retreat");
+      expect(result.unlocks, String(at)).toEqual([]);
+    }
+  });
+
+  it("are none when a stage's time limit is reached", () => {
+    const short: Job = { ...scouting, id: "wolves-with-no-time", stages: scouting.stages.map((s) => (s.kind === "fight" ? { ...s, timeLimitMs: 1000 } : s)) };
+    const { result } = replay(snapshot(short.id, pair), "a", [], contentWithJob(short));
+    expect(result.stages.at(-1)?.ended).toBe("timeout");
+    expect(result.unlocks).toEqual([]);
+  });
+
+  it("are none with all down", () => {
+    const { result } = replay(snapshot(scouting.id, [hero("villager-1", "villager")]), "a", [], content);
+    expect(result.outcome).toBe("defeat");
+    expect(result.unlocks).toEqual([]);
+  });
+
+  it("are none for a job that grants none, arrived or not", () => {
+    expect(replay(snapshot(WOLVES, pair), "a", []).result).toMatchObject({ outcome: "complete", unlocks: [] });
+    expect(replay(snapshot(WOLVES, pair), "a", [retreatAt(1000)]).result).toMatchObject({ outcome: "retreat", unlocks: [] });
+  });
+
+  it("are a list of the result's own: changing it does not change the job", () => {
+    const { result } = replay(snapshot(scouting.id, pair), "a", [], content);
+    expect(result.unlocks).not.toBe(scouting.grants);
   });
 });
 
