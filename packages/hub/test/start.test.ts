@@ -66,7 +66,7 @@ async function putHeroes(p: string, statuses: HeroStatus[], location = at): Prom
 describe("startAdventure", () => {
   it("starts the wolves job with the free villager: the record, the snapshot, the open item and the mark", async () => {
     const p = player();
-    const villager = await recruitHero(repo, p, "villager", randomUUID());
+    const villager = await recruitHero(repo, p, at, "villager", randomUUID());
     const now = new Date("2026-10-22T09:00:00Z");
 
     const started = await startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id], now);
@@ -108,7 +108,7 @@ describe("startAdventure", () => {
 
   it("answers a repeat with the adventure it started, open, settled or discarded, and refuses its id for another start", async () => {
     const p = player();
-    const villager = await recruitHero(repo, p, "villager", randomUUID());
+    const villager = await recruitHero(repo, p, at, "villager", randomUUID());
     const requestId = randomUUID();
     const first = await startAdventure(repo, p, version, requestId, at, wolves, [villager.id]);
     expect(first.adventureId).toBe(requestId);
@@ -337,7 +337,7 @@ describe("a facility's job (Issue-133, Issue-291)", () => {
 describe("no retiring a hero while it is adventuring", () => {
   it("refuses the retire until the adventure is settled, or until the hero is dead", async () => {
     const p = player();
-    const villager = await recruitHero(repo, p, "villager", randomUUID());
+    const villager = await recruitHero(repo, p, at, "villager", randomUUID());
     const started = await startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id]);
     expect(await refusal(retireHero(repo, p, villager.id))).toBeInstanceOf(HeroAdventuring);
     expect((await repo.getHero(p, villager.id))?.status).toBe("ALIVE");

@@ -6,8 +6,10 @@ import {
   type Camp,
   campLevels,
   InsufficientBalance,
+  LocationLocked,
   type Repository,
 } from "./db/repository.js";
+import { refuseNoCamp } from "./locations.js";
 import { badInput, Conflict, InsufficientResources, MaxLevel, Requires } from "./refusals.js";
 
 /**
@@ -28,8 +30,9 @@ import { badInput, Conflict, InsufficientResources, MaxLevel, Requires } from ".
  * The refusals, answered as data (`refusals.ts`): MaxLevel, Requires (each
  * facility and the level it needs), InsufficientResources (each material's
  * amount and the camp's balance), and Conflict, when the camp changed and no
- * rule explains the failure. No such camp or facility, or a level that is
- * not the next, is BAD_USER_INPUT.
+ * rule explains the failure. No such camp, which a location the player has
+ * not unlocked is (locations.ts, decision 0059), no such facility, or a level
+ * that is not the next, is BAD_USER_INPUT.
  */
 
 /** Refuses the build with the first rule the camp fails, in the order the panel shows them. */
@@ -51,9 +54,10 @@ export function buildFacility(repo: Repository, playerId: string, locationId: st
 }
 
 async function buildOnce(repo: Repository, playerId: string, locationId: string, kind: string, level: number): Promise<Camp> {
+  // The player's camps are the locations they have unlocked (decision 0059), so this read refuses a locked one.
   const at = location(locationId);
   const camp = at && (await repo.camps(playerId)).find((c) => c.location === at.id);
-  if (!at || !camp) badInput(`there is no camp of yours at ${locationId}`);
+  if (!at || !camp) refuseNoCamp(locationId);
   const own = [...at.ownFacilities, ...at.buildableFacilities];
   if (!own.includes(kind as FacilityKind)) badInput(`${at.name} has no ${kind} of yours to build`);
   const facility = kind as FacilityKind;
@@ -70,6 +74,8 @@ async function buildOnce(repo: Repository, playerId: string, locationId: string,
   try {
     await repo.build(playerId, camp, { kind: facility, from, cost: next.cost, requires: next.requires });
   } catch (e) {
+    // The transaction's own check of the unlock, which the read above passed: an unlock is never taken away, so nothing explains it but the read.
+    if (e instanceof LocationLocked) refuseNoCamp(at.id);
     if (!(e instanceof BuildRefused || e instanceof InsufficientBalance)) throw e;
     const now = await repo.camp(playerId, at.id);
     if ((campLevels(now)[facility] ?? 0) >= level) return now;

@@ -7,15 +7,18 @@ import {
   type AdventureSnapshot,
   type Cost,
   type FacilityKind,
+  isUnlockId,
+  location as locationOf,
   type Material,
   must,
   type Requirement,
   type Reward,
   type StageResult,
-  STARTING_LOCATION,
   UNIT_PROFILES,
   type UnitStats,
   type UnitType,
+  unlockedLocations,
+  type UnlockId,
 } from "@heat/engine";
 
 import { type RecentAdventure, recentOf } from "../recent.js";
@@ -37,6 +40,11 @@ import type { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
  * needs, and the cost's debits with their ledger entries). Each is one
  * TransactWriteItems call with condition checks; a failed condition cancels
  * the whole write and the cancellation reasons say which item failed.
+ *
+ * Start, recruit and build take a location, and where the location needs an
+ * unlock each checks, in its transaction, that the player holds it (decision
+ * 0059); the starting location needs none, and its transactions carry no such
+ * check. Settle writes each unlock the result lists, only if it is absent.
  *
  * Start and settle write to both tables in one transaction: the player's
  * open item and ledger in the player table, the adventure record in the
@@ -63,6 +71,8 @@ export class FacilityMissing extends Error {}
 export class CampChanged extends Error {}
 /** The open item is gone or the record is no longer open: settled or discarded already. */
 export class AdventureClosed extends Error {}
+/** The location needs an unlock the player does not hold, so the player has no camp there. */
+export class LocationLocked extends Error {}
 
 export interface Player {
   id: string;
@@ -74,9 +84,17 @@ export interface Holding {
   balance: number;
 }
 
+/** An unlock the player holds, from its `UNLOCK#<unlock>` item: when it was first earned, and by which adventure (decision 0059). */
+export interface EarnedUnlock {
+  unlock: UnlockId;
+  earnedAt: string;
+  adventureId: string;
+}
+
 /**
  * A camp: one player's view of one location (decision 0026). A camp with no
- * item is the starting location at level 1 with no heroes; `stored` says
+ * item is at level 1 with no heroes, at the starting location and at any
+ * location whose unlock the player holds (decision 0059); `stored` says
  * whether the item exists, which is what the recruit transaction's
  * condition depends on.
  */
@@ -189,7 +207,10 @@ export interface HeroOutcome {
 /**
  * What settlement recorded (overview, "Camps, heroes and resources"): how
  * each stage ended and overall the rewards the run yielded, what the
- * warehouse took and what its cap lost, and each hero's XP, level and fate.
+ * warehouse took and what its cap lost, each hero's XP, level and fate, and
+ * the unlocks the run earned, whether or not the player held them already:
+ * the result is public, and which were new is the owner's alone to read, from
+ * their own unlocks (decision 0059).
  */
 export interface SettledResult {
   outcome: AdventureOutcome;
@@ -200,6 +221,7 @@ export interface SettledResult {
   credited: Reward[];
   lost: Reward[];
   heroes: HeroOutcome[];
+  unlocks: UnlockId[];
 }
 
 /**
@@ -328,9 +350,26 @@ export function withTraits(snapshot: AdventureSnapshot): AdventureSnapshot {
 
 const hasSnapshot = (i: MayLack<Stored<"adventure">, "snapshot">): boolean => i.snapshot !== undefined;
 
+/**
+ * A result with the unlocks its run earned. One settled before unlocks
+ * (Issue-351) lists none and is read as having earned none; an unlock this
+ * deploy's content does not know, which the deploy after it may have written,
+ * is left out, as a job it does not know is (recent.ts).
+ */
+function withUnlocks(result: MayLack<SettledResult, "unlocks">): SettledResult {
+  return { ...result, unlocks: (result.unlocks ?? []).filter(isUnlockId) };
+}
+
 /** A record from before Issue-113 has no snapshot and is answered as it is. */
 function toAdventure(i: Stored<"adventure">): AdventureRecord {
-  return hasSnapshot(i) ? { ...i, snapshot: withTraits(i.snapshot) } : i;
+  const record: AdventureRecord = hasSnapshot(i) ? { ...i, snapshot: withTraits(i.snapshot) } : i;
+  return record.result ? { ...record, result: withUnlocks(record.result) } : record;
+}
+
+/** The unlock a transaction at the location checks for, or none where the location needs none (decision 0059). */
+function unlockNeededAt(location: string): UnlockId[] {
+  const unlock = locationOf(location)?.unlock;
+  return unlock === undefined ? [] : [unlock];
 }
 
 /**
@@ -402,14 +441,45 @@ export class Repository {
   }
 
   /**
-   * Every camp of the player, with its holdings, from one Query of the
-   * `AT#` items (decision 0026). The starting location is always a camp, item
-   * or not. The query takes `ignoreOwnership` for good: without it, it is
-   * filtered to camps alone (decision 0041).
+   * The unlocks the player holds, from one Query of the `UNLOCK#` items, in
+   * key order (decision 0059). An unlock this deploy's content does not know
+   * is left out, as it is from a result.
+   */
+  async unlocks(playerId: string): Promise<EarnedUnlock[]> {
+    const { data } = await this.service.entities.unlock.query.primary({ playerId }).go({ ...STRONG, pages: "all" });
+    return data.flatMap(({ unlock, earnedAt, adventureId }) => (isUnlockId(unlock) ? [{ unlock, earnedAt, adventureId }] : []));
+  }
+
+  /**
+   * Every camp of the player, in the content's order: one at the starting
+   * location and one at each location whose unlock the player holds, item or
+   * not (decisions 0026 and 0059). Two Queries, of the `AT#` items and of the
+   * `UNLOCK#` items. Items at a location the player has not unlocked, which no
+   * verb writes, are no camp.
    */
   async camps(playerId: string): Promise<Camp[]> {
+    const [stored, unlocks] = await Promise.all([this.storedCamps(playerId), this.unlocks(playerId)]);
+    return unlockedLocations(new Set(unlocks.map((u) => u.unlock))).map((at) => stored.get(at.id) ?? emptyCamp(at.id));
+  }
+
+  /**
+   * The camp at a location as its items say, at level 1 with no heroes where
+   * it has none. It reads no unlock: whether the player has a camp there is
+   * `camps`, and a verb's own check (locations.ts).
+   */
+  async camp(playerId: string, location: string): Promise<Camp> {
+    return (await this.storedCamps(playerId)).get(location) ?? emptyCamp(location);
+  }
+
+  /**
+   * The camps that have an item, by location, with their holdings and
+   * facilities, from one Query of the `AT#` items (decision 0026). The query
+   * takes `ignoreOwnership` for good: without it, it is filtered to camps
+   * alone (decision 0041).
+   */
+  private async storedCamps(playerId: string): Promise<Map<string, Camp>> {
     const { camp: campEntity, facility: facilityEntity, holding: holdingEntity } = this.service.entities;
-    const camps = new Map<string, Camp>([[STARTING_LOCATION, emptyCamp(STARTING_LOCATION)]]);
+    const camps = new Map<string, Camp>();
     const campAt = (location: string) => {
       let camp = camps.get(location);
       if (!camp) camps.set(location, (camp = emptyCamp(location)));
@@ -429,11 +499,7 @@ export class Repository {
         camp.facilities[i.kind] = i.level;
       }
     }
-    return [...camps.values()];
-  }
-
-  async camp(playerId: string, location: string): Promise<Camp> {
-    return (await this.camps(playerId)).find((c) => c.location === location) ?? emptyCamp(location);
+    return camps;
   }
 
   async holdings(playerId: string, location: string): Promise<Holding[]> {
@@ -467,8 +533,10 @@ export class Repository {
    * location and on no adventure, so a retire, a death or a move that races
    * the start fails one side or the other; and check that each facility the
    * job needs, the one that posts it, is built at its level or above
-   * (Issue-133). Throws AdventureAlreadyOpen when the first condition fails,
-   * HeroChanged when a hero's does and FacilityMissing when a facility's does.
+   * (Issue-133); and, where the location needs an unlock, that the player
+   * holds it (decision 0059). Throws AdventureAlreadyOpen when the first
+   * condition fails, HeroChanged when a hero's does, FacilityMissing when a
+   * facility's does and LocationLocked when the unlock's does.
    * A job's facility is one a camp builds, so it has an item of its own.
    */
   async startAdventure(
@@ -503,6 +571,15 @@ export class Repository {
             items.facility
               .check({ playerId, location, kind: r.kind })
               .where((a, op) => op.gte(a.level, r.level))
+              .commit(),
+          ),
+        ),
+        ...unlockNeededAt(location).map((unlock) =>
+          on(
+            LocationLocked,
+            items.unlock
+              .check({ playerId, unlock })
+              .where((a, op) => op.exists(a.earnedAt))
               .commit(),
           ),
         ),
@@ -553,6 +630,12 @@ export class Repository {
    * its public line with no owner (decision 0050), so an adventure is in the
    * feed exactly when it is settled. Every hero's write is conditioned on its
    * mark being this adventure's.
+   *
+   * Each unlock the result lists is written with its time and this adventure
+   * only where the attribute is absent, with no condition and no read (decision
+   * 0059): the first grant makes the item, a later one changes nothing on it
+   * and cancels nothing, and a repeat of this settlement is stopped by the
+   * record's condition as before. test/electrodb.test.ts holds the write.
    *
    * Throws AdventureClosed when the open item or the record has moved on,
    * which is a repeat or a race with a discard; CampChanged when a balance
@@ -635,6 +718,18 @@ export class Repository {
           on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `credit#${material}`, location, material, delta: credit, lost }).commit()),
         ]),
         on(AdventureClosed, items.recent.put(recentOf(s, now)).commit()),
+        ...s.result.unlocks.map((unlock) =>
+          on(
+            AdventureClosed,
+            items.unlock
+              .update({ playerId, unlock })
+              .data((a, op) => {
+                op.ifNotExists(a.earnedAt, now.toISOString());
+                op.ifNotExists(a.adventureId, adventureId);
+              })
+              .commit(),
+          ),
+        ),
       ])
       .go();
     throwIfCancelled(write, failures);
@@ -701,9 +796,13 @@ export class Repository {
    * charged, or charged that was free. A unit type whose price does not
    * depend on it passes "any".
    *
+   * Where the camp's location needs an unlock, the transaction checks that
+   * the player holds it (decision 0059).
+   *
    * Throws HeroExists when the id is taken, which is a repeated request;
    * RecruitRefused when the camp's condition fails; InsufficientBalance when
-   * a holding does not cover its debit.
+   * a holding does not cover its debit; LocationLocked when the unlock is not
+   * held.
    */
   async recruit(
     playerId: string,
@@ -753,6 +852,15 @@ export class Repository {
           on(HeroExists, items.ledger.create({ playerId, cause: hero.id, entry: `debit#${material}`, location, material, delta: -amount }).commit()),
         ]),
         on(HeroExists, items.sighting.put(sightingOf(hero, new Date(hero.recruitedAt))).commit()),
+        ...unlockNeededAt(location).map((unlock) =>
+          on(
+            LocationLocked,
+            items.unlock
+              .check({ playerId, unlock })
+              .where((a, op) => op.exists(a.earnedAt))
+              .commit(),
+          ),
+        ),
       ])
       .go();
     throwIfCancelled(result, failures);
@@ -771,8 +879,12 @@ export class Repository {
    * item being built is folded into its own condition, since a transaction
    * touches an item once.
    *
-   * Throws BuildRefused when the level or a requirement is not as read, and
-   * InsufficientBalance when a holding does not cover its debit.
+   * Where the camp's location needs an unlock, the transaction checks that
+   * the player holds it (decision 0059).
+   *
+   * Throws BuildRefused when the level or a requirement is not as read,
+   * InsufficientBalance when a holding does not cover its debit, and
+   * LocationLocked when the unlock is not held.
    */
   async build(playerId: string, camp: Camp, b: Build): Promise<void> {
     const { location } = camp;
@@ -856,6 +968,15 @@ export class Repository {
             // A ledger entry under the build's cause exists only if the level was built, so its failure is a repeat too.
             on(BuildRefused, items.ledger.create({ playerId, cause, entry: `debit#${material}`, location, material, delta: -amount }).commit()),
           ]),
+          ...unlockNeededAt(location).map((unlock) =>
+            on(
+              LocationLocked,
+              items.unlock
+                .check({ playerId, unlock })
+                .where((a, op) => op.exists(a.earnedAt))
+                .commit(),
+            ),
+          ),
         ];
       })
       .go();

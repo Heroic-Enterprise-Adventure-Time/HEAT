@@ -30,7 +30,7 @@ const ACCESS = {
   "any signed-in player": {
     Query: ["adventure", "heroesSeenAt", "me", "recentAdventuresAt", "replaysOf"],
     Adventure: ["id", "job", "location", "result", "seed", "settledAt", "snapshot", "startedAt", "status", "timeline", "version"],
-    AdventureResult: ["credited", "endedAtMs", "heroes", "lost", "outcome", "reachedStage", "rewards", "stages"],
+    AdventureResult: ["credited", "endedAtMs", "heroes", "lost", "outcome", "reachedStage", "rewards", "stages", "unlocks"],
     HeroOutcome: ["dead", "health", "heroId", "level", "xp", "xpGained"],
     Job: ["description", "facility", "id", "location", "name"],
     RecentAdventure: ["credited", "id", "job", "outcome", "party", "settledAt", "stages"],
@@ -44,7 +44,7 @@ const ACCESS = {
     UnitStats: ["damage", "maxHealth", "speed", "traits"],
   },
   "only the owner": {
-    Player: ["camps", "heroes", "name", "openAdventure"],
+    Player: ["camps", "heroes", "name", "openAdventure", "unlocks"],
   },
 } satisfies Record<string, Record<string, readonly string[]>>;
 

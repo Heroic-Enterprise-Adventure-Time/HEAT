@@ -3,12 +3,10 @@ import { randomInt } from "node:crypto";
 import {
   hallCapacity,
   heroNames,
-  location,
   type Recruit,
   recruitCost,
   SPRITE_SET_PRESENTATION,
   SPRITE_SETS,
-  STARTING_LOCATION,
 } from "@heat/engine";
 
 import { retryingConflicts } from "./conflict.js";
@@ -17,17 +15,21 @@ import {
   type Hero,
   HeroExists,
   InsufficientBalance,
+  LocationLocked,
   RecruitRefused,
   type Repository,
 } from "./db/repository.js";
+import { campLocation, refuseNoCamp } from "./locations.js";
 import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Refusal } from "./refusals.js";
 
 /**
- * Recruitment (decision 0026): the client names the unit type and a request
- * id, and the hub draws the rest. The request id becomes the hero id, so a
- * repeated request answers with the hero it already made. Any unit type on
- * the location's list can be recruited at its hall level, paid in resources;
- * the villager is free when no hero at the camp is alive (`recruitCost`).
+ * Recruitment (decisions 0026 and 0059): the client names the camp's
+ * location, the unit type and a request id, and the hub draws the rest. The
+ * request id becomes the hero id, so a repeated request answers with the hero
+ * it already made. Any unit type on the location's list can be recruited at
+ * its hall level, paid in resources; the villager is free when no hero at the
+ * camp is alive (`recruitCost`), which is a rule of the locations that
+ * recruit one: Highcrag does not, so nothing is free there.
  *
  * The rules are checked twice, on purpose: here, against the camp as read,
  * to give the player a reason; and in the transaction's conditions, which
@@ -39,8 +41,9 @@ import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Re
  *
  * The refusals, answered as data (`refusals.ts`): HallLevel, HallFull,
  * InsufficientResources (each material's amount and the camp's balance) and
- * Conflict, when the camp changed and no rule explains the failure. A unit
- * type the location does not recruit is BAD_USER_INPUT; the request id is a
+ * Conflict, when the camp changed and no rule explains the failure. A
+ * location the player has no camp at (locations.ts), or a unit type the
+ * location does not recruit, is BAD_USER_INPUT; the request id is a
  * lower-case UUID by the time it arrives (`RecruitHeroInput`).
  */
 
@@ -68,32 +71,36 @@ function barred(camp: Camp, recruit: Recruit): Refusal | undefined {
 
 /**
  * The hero this request made, if any. A request id reused for another unit
- * type is the client's defect, not a repeat: BAD_USER_INPUT, never the
- * first request's hero (graphql.md, rule 7).
+ * type or another location is the client's defect, not a repeat:
+ * BAD_USER_INPUT, never the first request's hero (graphql.md, rule 7). The
+ * location is compared with where the hero is, which is where it was
+ * recruited for as long as nothing moves a hero; a caravan will (Issue-354).
  */
-function madeBy(hero: Hero | undefined, requestId: string, unitType: string): Hero | undefined {
+function madeBy(hero: Hero | undefined, requestId: string, locationId: string, unitType: string): Hero | undefined {
   if (hero && hero.unitType !== unitType) badInput(`request ${requestId} recruited a ${hero.unitType}, not a ${unitType}`);
+  if (hero && hero.location !== locationId) badInput(`request ${requestId} recruited at ${hero.location}, not at ${locationId}`);
   return hero;
 }
 
 export function recruitHero(
   repo: Repository,
   playerId: string,
+  locationId: string,
   unitType: string,
   requestId: string,
   random: Random = randomInt,
   now = new Date(),
 ): Promise<Hero> {
-  return retryingConflicts("recruit", "the camp changed while recruiting; no hero was recruited", () => recruitOnce(repo, playerId, unitType, requestId, random, now));
+  return retryingConflicts("recruit", "the camp changed while recruiting; no hero was recruited", () => recruitOnce(repo, playerId, locationId, unitType, requestId, random, now));
 }
 
-async function recruitOnce(repo: Repository, playerId: string, unitType: string, requestId: string, random: Random, now: Date): Promise<Hero> {
-  const already = madeBy(await repo.getHero(playerId, requestId), requestId, unitType);
+async function recruitOnce(repo: Repository, playerId: string, locationId: string, unitType: string, requestId: string, random: Random, now: Date): Promise<Hero> {
+  const already = madeBy(await repo.getHero(playerId, requestId), requestId, locationId, unitType);
   if (already) return already;
 
-  const at = location(STARTING_LOCATION);
-  const recruit = at?.recruits.find((r) => r.unitType === unitType);
-  if (!at || !recruit) badInput(`${at?.name ?? STARTING_LOCATION} does not recruit ${unitType}`);
+  const at = await campLocation(repo, playerId, locationId);
+  const recruit = at.recruits.find((r) => r.unitType === unitType);
+  if (!recruit) badInput(`${at.name} does not recruit ${unitType}`);
 
   // A repeat of this request may make the hero after the read above, and the
   // camp then shows its recruit, so before any refusal the hero is read again,
@@ -102,7 +109,7 @@ async function recruitOnce(repo: Repository, playerId: string, unitType: string,
   const camp = await repo.camp(playerId, at.id);
   const refusal = barred(camp, recruit);
   if (refusal) {
-    const made = madeBy(await repo.getHero(playerId, requestId), requestId, unitType);
+    const made = madeBy(await repo.getHero(playerId, requestId), requestId, locationId, unitType);
     if (made) return made;
     throw refusal;
   }
@@ -131,10 +138,12 @@ async function recruitOnce(repo: Repository, playerId: string, unitType: string,
   try {
     return await repo.recruit(playerId, camp, hallCapacity(camp.hallLevel), hero, cost, living);
   } catch (e) {
+    // The transaction's own check of the unlock, which the read above passed: an unlock is never taken away, so nothing explains it but the read.
+    if (e instanceof LocationLocked) refuseNoCamp(at.id);
     if (!(e instanceof HeroExists || e instanceof RecruitRefused || e instanceof InsufficientBalance)) throw e;
     // The camp first and the hero after it, as above: a repeat that won the race is the answer.
     const after = await repo.camp(playerId, at.id);
-    const made = madeBy(await repo.getHero(playerId, requestId), requestId, unitType);
+    const made = madeBy(await repo.getHero(playerId, requestId), requestId, locationId, unitType);
     if (made) return made;
     throw barred(after, recruit) ?? new Conflict("the camp changed while recruiting; no hero was recruited");
   }

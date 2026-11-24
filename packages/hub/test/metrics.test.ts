@@ -49,7 +49,7 @@ describe("the handler's metrics", () => {
     const player = `p-${randomUUID()}`;
     const id = randomUUID();
     await call(`mutation { joinGame { __typename } }`, {}, player);
-    await call(`mutation($id: UUID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { __typename } }`, { id }, player);
+    await call(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) { __typename } }`, { id }, player);
     vi.spyOn(Repository.prototype, "retire").mockRejectedValue(new TransactionConflict("conflict"));
     emitted.mockClear();
 

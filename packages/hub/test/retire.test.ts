@@ -61,7 +61,7 @@ async function expectCountsAgree(p: string) {
 describe("retireHero", () => {
   it("retires a living hero and counts it out of the active and the living heroes", async () => {
     const p = player();
-    const villager = await recruitHero(repo, p, "villager", randomUUID());
+    const villager = await recruitHero(repo, p, at, "villager", randomUUID());
     const now = new Date("2026-10-21T12:00:00Z");
     const retired = await retireHero(repo, p, villager.id, now);
     expect(retired).toEqual({ ...villager, status: "RETIRED", retiredAt: now.toISOString() });
@@ -130,10 +130,10 @@ describe("retireHero", () => {
 
   it("makes the villager free again when the camp's only living hero retires", async () => {
     const p = player();
-    const villager = await recruitHero(repo, p, "villager", randomUUID());
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(InsufficientResources);
+    const villager = await recruitHero(repo, p, at, "villager", randomUUID());
+    expect(await refusal(recruitHero(repo, p, at, "villager", randomUUID()))).toBeInstanceOf(InsufficientResources);
     await retireHero(repo, p, villager.id);
-    const next = await recruitHero(repo, p, "villager", randomUUID());
+    const next = await recruitHero(repo, p, at, "villager", randomUUID());
     expect(next.status).toBe("ALIVE");
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
   });
@@ -141,9 +141,9 @@ describe("retireHero", () => {
   it("frees a slot in a hall full of dead heroes", async () => {
     const p = player();
     const dead = must((await putCamp(p, ["DEAD", "DEAD", "DEAD", "DEAD"]))[0], "the dead hero");
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(HallFull);
+    expect(await refusal(recruitHero(repo, p, at, "villager", randomUUID()))).toBeInstanceOf(HallFull);
     await retireHero(repo, p, dead.id);
-    await recruitHero(repo, p, "villager", randomUUID());
+    await recruitHero(repo, p, at, "villager", randomUUID());
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 4, livingHeroes: 1 });
   });
 
@@ -155,7 +155,7 @@ describe("retireHero", () => {
       const dead = must((await putCamp(p, ["DEAD", "DEAD", "DEAD", "DEAD"]))[0], "the dead hero");
       const [retire, recruit] = await Promise.allSettled([
         retireHero(repo, p, dead.id),
-        recruitHero(repo, p, "villager", randomUUID()),
+        recruitHero(repo, p, at, "villager", randomUUID()),
       ]);
       expect(retire.status).toBe("fulfilled");
       const heroes = await repo.heroes(p);
@@ -177,7 +177,7 @@ describe("retireHero", () => {
       const requestId = randomUUID();
       const [retire, recruit] = await Promise.allSettled([
         retireHero(repo, p, leaving.id),
-        recruitHero(repo, p, "villager", requestId),
+        recruitHero(repo, p, at, "villager", requestId),
       ]);
       expect(retire.status).toBe("fulfilled");
       const made = recruit.status === "fulfilled";

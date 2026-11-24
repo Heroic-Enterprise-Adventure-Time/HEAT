@@ -5,7 +5,6 @@ import {
   FACILITIES,
   type Job,
   jobOf,
-  location,
   type Requirement,
   type SnapshotHero,
   UNIT_PROFILES,
@@ -20,8 +19,10 @@ import {
   FacilityMissing,
   type Hero,
   HeroChanged,
+  LocationLocked,
   type Repository,
 } from "./db/repository.js";
+import { campLocation, refuseNoCamp } from "./locations.js";
 import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Refusal, Requires } from "./refusals.js";
 
 /**
@@ -44,8 +45,9 @@ import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHe
  * The refusals, answered as data (`refusals.ts`): AdventureOpen, Requires
  * (the facility that posts the job, not built), HeroDead, HeroRetired,
  * HeroNotHere and HeroAdventuring for a hero of the party, and Conflict. A
- * location or job the hub does not know, or a hero that is not the player's,
- * is BAD_USER_INPUT; the party is 1 to MAX_PARTY distinct lower-case ids by the
+ * location the player has no camp at (locations.ts, decision 0059), a job the
+ * location does not post, or a hero that is not the player's, is
+ * BAD_USER_INPUT; the party is 1 to MAX_PARTY distinct lower-case ids by the
  * time it arrives (`StartAdventureInput`).
  */
 
@@ -156,8 +158,7 @@ async function startOnce(
   const open = await repo.openAdventure(playerId);
   if (open) refuseOpen(open.adventureId);
 
-  const at = location(locationId);
-  if (!at) badInput(`no location ${locationId}`);
+  const at = await campLocation(repo, playerId, locationId);
   const job = jobAt(at.id, jobId);
   if (!job) badInput(`${at.name} has no job ${jobId}`);
 
@@ -208,6 +209,8 @@ async function startOnce(
       startedAt: now.toISOString(),
     }, needs);
   } catch (e) {
+    // The transaction's own check of the unlock, which the read above passed: an unlock is never taken away, so nothing explains it but the read.
+    if (e instanceof LocationLocked) refuseNoCamp(at.id);
     // AlreadyApplied: the record exists with no open item, a repeat after the adventure ended.
     if (!(e instanceof AdventureAlreadyOpen || e instanceof AlreadyApplied || e instanceof HeroChanged || e instanceof FacilityMissing)) throw e;
     // Another request got there first: answer with what it changed.
