@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } fr
 import { type FacilityKind, STARTING_LOCATION } from '@heat/engine';
 
 import { Game, type HeroView, type SeenHeroView } from '../game';
+import { Icons } from '../icons';
 import { CampState } from './camp-state';
 import { LAYOUT_SIZES } from './layout-sizes';
 import { iconScale, isSideBySide, menuLabels, stackedStageHeight } from './page-layout';
@@ -52,6 +53,7 @@ export const CAMP_SCENE_FACTORY = new InjectionToken<CampSceneFactory>('heat.cam
 export class Camp {
   protected readonly game = inject(Game);
   protected readonly state = inject(CampState);
+  protected readonly icons = inject(Icons);
   private readonly router = inject(Router);
   private readonly createScene = inject(CAMP_SCENE_FACTORY);
   private readonly readSizes = inject(LAYOUT_SIZES);

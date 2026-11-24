@@ -34,6 +34,8 @@ const SET_SCHEMAS = {
     feet: Feet,
     swing: z.object({ holdFrame: z.number(), grips: z.array(Pixel), frameMs: z.array(z.number()), nocks: z.nullable(z.array(Pixel)) }),
   }),
+  /** A font's set: its glyphs, each standing on the row its outline ends on (rule 37). */
+  font: z.object({ kind: z.literal('font'), feet: Feet }),
 } satisfies { readonly [Kind in SetKind]: z.ZodMiniType<{ kind: Kind; feet: Record<string, number> }> };
 
 /** What a scene reads about a set of each kind: its schema's type. */

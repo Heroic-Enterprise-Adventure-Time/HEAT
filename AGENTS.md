@@ -40,6 +40,7 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | Taking an image of the scene or of a battle out of the session's browser | `docs/runbooks/capture-scene.md` |
 | Making art or audio: the services, the connectors, the hero sprite set, a camp's ground and facilities, the page's icons, monsters and props | `docs/process/assets.md` |
 | Making a hero or monster sprite set, step by step | `docs/runbooks/hero-sprite-set.md` |
+| Making a resource's icon, or a facility's, step by step | `docs/runbooks/resource-icon.md` |
 | The index of every project document, and how documents are written | `docs/README.md` |
 
 Read the design and architecture documents before any work that touches them. Read `docs/README.md` before adding or changing a document.

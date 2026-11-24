@@ -208,6 +208,40 @@
           "hide"
         ]
       }
+    },
+    "timber": {
+      "file": "timber.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "thirdPack",
+      "candidate": 6,
+      "pixellab": {
+        "objectId": "40a0c1c7-9065-47bf-9e71-879fab4555c5",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "timber"
+        ]
+      }
+    },
+    "ore": {
+      "file": "ore.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "thirdPack",
+      "candidate": 14,
+      "pixellab": {
+        "objectId": "08cc5c94-929e-4a1f-8a6e-995be3b00a63",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "ore"
+        ]
+      }
     }
   },
   "secondPack": {
@@ -297,9 +331,9 @@
     "candidates": 64,
     "candidatesNote": "Indices 0 to 20 follow itemDescriptions; 21 to 63 were drawn by the service from the description alone.",
     "generations": 10,
-    "note": "The first resource icons (Issue-340). Ideas for timber, ore and cloth were rolled in the same pack, so that the resources' icons share one roll's style; the scene's picture of a drop promotes its picks from the review object (Issue-344). No page draws hide.png yet.",
-    "chosenBy": "The owner's pick (hide 0), 2026-11-20, from a numbered sheet of the 64 candidates at 3×, taking the agent's recommendation (Issue-340).",
-    "verified": "hide.png is byte-identical to its download from /mcp/objects/<id>/download, to its rotation's file and to its candidate frame in the review object, 2026-11-20.",
-    "rejects": "The 63 candidates not kept stay in the review object 68098ce5-1ff2-4019-920d-cb8eb3f76920, tagged heat, ui-icon and rejected, with their indices as rolled."
+    "note": "The resource icons. Ideas for hide, timber, ore and cloth were rolled in one pack (Issue-340), so that the resources' icons share one roll's style. The battle scene draws them where an enemy dropped something (Issue-344); cloth has no pick yet, and its ideas are candidates 16 to 20.",
+    "chosenBy": "The owner's picks from a numbered sheet of the candidates at 3×: hide 0 on 2026-11-20, taking the agent's recommendation (Issue-340); timber 6 and ore 14 on 2026-11-23, timber the agent's recommendation and ore the owner's own choice over the agent's 11 (Issue-344).",
+    "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download, to its rotation's file and to its candidate frame in the review object: hide.png on 2026-11-20, timber.png and ore.png on 2026-11-23.",
+    "rejects": "The 61 candidates not kept stay in the review object 68098ce5-1ff2-4019-920d-cb8eb3f76920, tagged heat, ui-icon and rejected, with their indices as rolled."
   }
 }

@@ -7,6 +7,7 @@ import { routes } from '../app.routes';
 import { type CampView, Game, type HeroView, type RecruitOffer, type SeenHeroView, upgradeOffer } from '../game';
 import { Refusal } from '../hub';
 import { Session } from '../session';
+import { fakeIcons } from '../testing/fake-icons';
 import { fakeSession, PLAYER } from '../testing/fake-session';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { itemHolding, listItems, menu, panel, panelBox } from '../testing/page';
@@ -138,6 +139,7 @@ async function renderCamp(game: ReturnType<typeof fakeGame>, url = '/camp/millbr
     { provide: Game, useValue: game },
     { provide: Session, useValue: fakeSession(PLAYER) },
     { provide: CAMP_SCENE_FACTORY, useValue: scene.factory },
+    fakeIcons,
     testLayoutSizes,
   ]);
   await waitFor(() => { expect(scene.callbacks).not.toBeNull(); });
@@ -309,7 +311,7 @@ describe('Camp', () => {
     expect(mine).toHaveAttribute('href', '/camp/millbrook/mine');
     expect(mine).toHaveClass('unbuilt');
     expect(hall).not.toHaveClass('unbuilt');
-    expect(within(hall).getByRole('presentation')).toHaveAttribute('src', 'art/icons/heroes-hall.png');
+    expect(within(hall).getByRole('presentation')).toHaveAttribute('src', '/art/icons/heroes-hall.test.png');
   });
 
   it('hands the scene each facility level: 0 for the ones not built', async () => {
