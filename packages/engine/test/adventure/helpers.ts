@@ -14,6 +14,7 @@ import {
   type Job,
   largestStages,
   leastStages,
+  location,
   type Material,
   MONSTERS,
   must,
@@ -21,6 +22,7 @@ import {
   RESOURCE_NODES,
   type ResourceType,
   type SnapshotHero,
+  STARTING_LOCATION,
   UNIT_PROFILES,
   type UnitStats,
   type UnitType,
@@ -46,6 +48,17 @@ export function villagers(count: number): SnapshotHero[] {
 export function rewardOf(result: AdventureResult, material: Material): number {
   return result.rewards.find((r) => r.material === material)?.amount ?? 0;
 }
+
+/** How many hides a result brings home; none is 0. */
+export function hideOf(result: AdventureResult): number {
+  return rewardOf(result, "hide");
+}
+
+/** What Millbrook's hall recruits, each with its hall level and its cost, read from the content (typescript.md, rule 25). */
+export const MILLBROOK_RECRUITS = must(location(STARTING_LOCATION), "Millbrook").recruits;
+
+/** Every unit type Millbrook recruits, read from the content. */
+export const RECRUITED_TYPES = MILLBROOK_RECRUITS.map((r) => r.unitType);
 
 /**
  * The least and the most that `count` of a resource node drop for a party

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { type JobId, JOBS, location, type Material, must, replay, type ResourceType, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "../../src/index.js";
-import { GOBLINS, haul, ORE, party, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, villagers } from "./helpers.js";
+import { type JobId, JOBS, type Material, must, replay, type ResourceType, UNIT_PROFILES, type UnitType } from "../../src/index.js";
+import { GOBLINS, haul, MILLBROOK_RECRUITS, ORE, party, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, villagers } from "./helpers.js";
 
 // The miner and the lumberjack (Issue-287, as decision 0058 has them): each
 // carries its own trait alone, at level 2, where a villager carries both at
@@ -88,9 +88,8 @@ describe("The miner and the lumberjack", () => {
   });
 
   it("are recruited at Millbrook at hall level 1: the lumberjack for 40 timber, the miner for 30 ore and 20 timber", () => {
-    const recruits = must(location(STARTING_LOCATION), "Millbrook").recruits;
-    expect(recruits.find((r) => r.unitType === "lumberjack")).toEqual({ unitType: "lumberjack", hallLevel: 1, cost: [{ material: "timber", amount: 40 }] });
-    expect(recruits.find((r) => r.unitType === "miner")).toEqual({
+    expect(MILLBROOK_RECRUITS.find((r) => r.unitType === "lumberjack")).toEqual({ unitType: "lumberjack", hallLevel: 1, cost: [{ material: "timber", amount: 40 }] });
+    expect(MILLBROOK_RECRUITS.find((r) => r.unitType === "miner")).toEqual({
       unitType: "miner",
       hallLevel: 1,
       cost: [{ material: "ore", amount: 30 }, { material: "timber", amount: 20 }],

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { AdventureEngine, type AdventureResult, JOBS, jobsPostedBy, location, MONSTERS, must, replay, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "../../src/index.js";
-import { atLargest, contentWithJob, haul, hero, meets, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
+import { AdventureEngine, type AdventureResult, JOBS, jobsPostedBy, MONSTERS, must, replay, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "../../src/index.js";
+import { atLargest, contentWithJob, haul, hero, meets, MILLBROOK_RECRUITS, RECRUITED_TYPES, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 // The first progression (decision 0031, with the hauls of decision 0058): a
 // new player's free villager cannot fail "Pick up sticks", and one run pays
@@ -27,8 +27,6 @@ const XP = 5;
 const XP_WITH_WOLF = XP + MONSTERS.wolf.xp;
 /** Everything a villager can be forced to do: its unit type's own list, read from the content (typescript.md, rule 25). */
 const FORCED = must(UNIT_PROFILES.villager, "the villager").actions;
-/** Every unit type Millbrook recruits, read from the content. */
-const RECRUITS = must(location(STARTING_LOCATION), "Millbrook").recruits.map((r) => r.unitType);
 
 /** The job with one hero forced to the same ability at every step: the worst a player can do with forced actions. */
 function forcedEveryTurn(jobId: string, unitType: UnitType, abilityId: string, seed: string, content = wolfContent): AdventureResult {
@@ -108,7 +106,7 @@ describe("Pick up sticks", () => {
   }
 
   it("pays for the next villager in one run, at its worst roll", () => {
-    const villager = location(STARTING_LOCATION)?.recruits.find((r) => r.unitType === "villager");
+    const villager = MILLBROOK_RECRUITS.find((r) => r.unitType === "villager");
     expect(villager?.cost).toEqual([{ material: "timber", amount: VILLAGER_COST }]);
     expect(VILLAGER_TREE.min).toBeGreaterThanOrEqual(VILLAGER_COST);
   });
@@ -125,8 +123,8 @@ describe("Pick up sticks", () => {
   });
 
   it(`is completed with its wolf by a lone hero of every type Millbrook recruits, on every one of ${SEEDS} seeds: a specialist strikes the wolf before it works the tree`, () => {
-    expect(RECRUITS).toEqual(expect.arrayContaining(["villager", "lumberjack", "miner"]));
-    for (const unitType of RECRUITS) {
+    expect(RECRUITED_TYPES).toEqual(expect.arrayContaining(["villager", "lumberjack", "miner"]));
+    for (const unitType of RECRUITED_TYPES) {
       for (const seed of seeds) {
         const { result } = replay(snapshot(withWolf.id, [hero("h", unitType)]), seed, [], wolfContent);
         expect(result.outcome, `${unitType} ${seed}`).toBe("complete");

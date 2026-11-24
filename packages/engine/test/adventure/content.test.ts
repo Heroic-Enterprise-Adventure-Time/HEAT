@@ -1,4 +1,4 @@
-import { mapValues, sum } from "es-toolkit";
+import { isEqual, mapValues, sum } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -92,7 +92,7 @@ describe("The adventure's content", () => {
   });
 
   it("has two jobs that vary, the first job and the lumber camp's: every other job's largest roll is the job as written", () => {
-    const varying = Object.values(JOBS).filter((job) => JSON.stringify(largestStages(job)) !== JSON.stringify(job.stages));
+    const varying = Object.values(JOBS).filter((job) => !isEqual(largestStages(job), job.stages));
     expect(varying.map((job) => job.id)).toEqual(["pick-up-sticks", "lumber-from-the-deep-woods"]);
   });
 
@@ -109,10 +109,9 @@ describe("The adventure's content", () => {
     });
   }
 
-  it("brings home from a job's largest roll no more of any resource than a level-1 warehouse holds, at the best row of every drop, or than the level the owner accepted for the job holds", () => {
+  it("brings home from a job's largest roll no more of any resource than a level-1 warehouse holds, at the best row of every drop, but for the one resource of a job that the owner accepted at a higher level", () => {
     for (const [id, job] of Object.entries(JOBS) as [JobId, (typeof JOBS)[JobId]][]) {
-      const level = JOB_WAREHOUSE_LEVEL[id] ?? 1;
-      const cap = warehouseCapacity(level);
+      const accepted = JOB_WAREHOUSE_LEVEL[id];
       const most = Object.fromEntries(MATERIALS.map((material) => [material, job.pay.find((r) => r.material === material)?.amount ?? 0]));
       for (const stage of largestStages(job)) {
         if (stage.kind !== "fight" && stage.kind !== "gather") continue;
@@ -122,9 +121,16 @@ describe("The adventure's content", () => {
           }
         }
       }
-      for (const material of MATERIALS) expect(most[material], `${job.id} ${material}`).toBeLessThanOrEqual(cap);
-      // A job is named with a level only because it passes the level below: the list excuses nothing that needs no excuse.
-      if (level > 1) expect(Math.max(...Object.values(most)), job.id).toBeGreaterThan(warehouseCapacity(level - 1));
+      // Every other resource of the job is held to level 1: the acceptance is for the one it names.
+      for (const material of MATERIALS) {
+        const level = accepted?.material === material ? accepted.level : 1;
+        expect(most[material], `${job.id} ${material}`).toBeLessThanOrEqual(warehouseCapacity(level));
+      }
+      // A job is named only because that resource passes the level below: the list excuses nothing that needs no excuse.
+      if (accepted) {
+        expect(accepted.level, job.id).toBeGreaterThan(1);
+        expect(most[accepted.material], job.id).toBeGreaterThan(warehouseCapacity(accepted.level - 1));
+      }
       expect(sum(Object.values(most)), job.id).toBeGreaterThan(0);
     }
   });

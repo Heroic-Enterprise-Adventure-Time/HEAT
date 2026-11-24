@@ -245,9 +245,11 @@ describe("startAdventure", () => {
 });
 
 /**
- * Every own facility of Millbrook that posts a job, with the first job it
- * posts, read from the content (typescript.md, rule 25): the mine (Issue-133)
- * and the lumber camp (Issue-291).
+ * Every facility a camp at Millbrook may build that posts a job, with the
+ * first job it posts, read from the content (typescript.md, rule 25): the
+ * mine (Issue-133) and the lumber camp (Issue-291). A facility every camp
+ * has, the hall or the warehouse, is not among them: a job of its own could
+ * never be refused for want of it.
  */
 const posters = must(location(at), "Millbrook").buildableFacilities.flatMap((kind) => {
   const job = jobsPostedBy(at, kind)[0];
@@ -255,13 +257,20 @@ const posters = must(location(at), "Millbrook").buildableFacilities.flatMap((kin
 });
 
 describe("a facility's job (Issue-133, Issue-291)", () => {
-  /** The facility built as a player builds it: paid for with what its first level costs. */
+  /**
+   * The facility built as a player builds it: paid for with what its first
+   * level costs. It builds nothing that level needs first, since no facility
+   * that posts a job needs anything yet, and says so the day one does, as the
+   * caravan hub will with its level-2 warehouse.
+   */
   async function build(p: string, kind: FacilityKind): Promise<void> {
-    for (const { material, amount } of must(FACILITIES[kind].levels[0], `the first level of the ${kind}`).cost) await repo.setBalance(p, at, material, amount);
+    const first = must(FACILITIES[kind].levels[0], `the first level of the ${kind}`);
+    expect(first.requires, `the ${kind} needs another facility first, which this helper does not build`).toEqual([]);
+    for (const { material, amount } of first.cost) await repo.setBalance(p, at, material, amount);
     await buildFacility(repo, p, at, kind, 1);
   }
 
-  it("is the mine's and the lumber camp's: the facilities of Millbrook that post one", () => {
+  it("is the mine's and the lumber camp's: the facilities a camp at Millbrook may build that post one", () => {
     expect(posters.map((poster) => poster.kind)).toEqual(["mine", "lumber-camp"]);
   });
 
