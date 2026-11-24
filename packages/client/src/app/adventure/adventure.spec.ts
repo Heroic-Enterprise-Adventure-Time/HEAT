@@ -58,7 +58,6 @@ const result: AdventureResultView = {
     { heroId: 'h1', xpGained: 15, xp: 15, level: 2, dead: false },
     { heroId: 'h2', xpGained: 0, xp: 0, level: 1, dead: true },
   ],
-  unlocks: [],
 };
 
 /** The one unlock of the content, which the caravan hub's scouting job grants. */
@@ -426,7 +425,7 @@ describe('Adventure', () => {
   });
 
   it("tells the player an unlock the run earned that they did not hold, in the content's words, under how it ended (Issue-352)", async () => {
-    const game = fakeGame(() => ({ ...result, unlocks: [ROAD] }));
+    const game = fakeGame();
     // The player's own unlock names this adventure, so it was new.
     game.holdsAfter = [{ unlock: ROAD, adventureId: adventure.id }];
     const { run } = await renderAdventure(game);
@@ -437,7 +436,7 @@ describe('Adventure', () => {
   });
 
   it('says nothing of an unlock the run earned again: the player holds it from an earlier adventure', async () => {
-    const game = fakeGame(() => ({ ...result, unlocks: [ROAD] }));
+    const game = fakeGame();
     game.holdsAfter = [{ unlock: ROAD, adventureId: 'an-earlier-adventure' }];
     const { run } = await renderAdventure(game);
     await run(120_000);

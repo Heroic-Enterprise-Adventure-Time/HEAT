@@ -215,7 +215,6 @@ function resultFromWire(result: ResultFieldsFragment): AdventureResultView {
     rewards: materials(result.rewards),
     credited: materials(result.credited),
     lost: materials(result.lost),
-    unlocks: result.unlocks.map(unlock),
   };
 }
 

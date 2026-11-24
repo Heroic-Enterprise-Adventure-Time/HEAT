@@ -55,7 +55,6 @@ const wireResult = (r: AdventureResultView) => ({
   rewards: wireAmounts('Reward', r.rewards),
   credited: wireAmounts('Reward', r.credited),
   lost: wireAmounts('Reward', r.lost),
-  unlocks: r.unlocks.map((unlock) => constantCase(unlock)),
 });
 
 const villager: HeroView = {
@@ -449,8 +448,6 @@ const settledResult: AdventureResultView = {
   credited: [{ material: 'cloth', amount: 10 }],
   lost: [],
   heroes: [{ heroId: 'h1', xpGained: 20, xp: 20, level: 2, dead: false }],
-  // The hub sends ROAD_TO_HIGHCRAG, and the result kept to show has the engine's own.
-  unlocks: ['road-to-highcrag'],
 };
 
 /**

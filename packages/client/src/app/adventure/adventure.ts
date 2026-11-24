@@ -43,13 +43,14 @@ export class Adventure {
   protected readonly stages = computed(() => stageResultWords(this.game.settled()?.result?.stages ?? []));
   /**
    * What the player is told for each unlock this run earned that they did
-   * not hold, in the content's words (game.md, "Unlocks"). The result lists
-   * what the run earned, held or not; which were new is worked out here from
-   * the player's own unlocks, read again after the submit (decision 0059).
+   * not hold, in the content's words (game.md, "Unlocks"): those of the
+   * player's own unlocks that name this adventure as the one that first
+   * earned them, once the player has been read again after the submit
+   * (decision 0059).
    */
   protected readonly unlocked = computed(() => {
     const settled = this.game.settled();
-    return settled?.result ? earnedWords(settled.result.unlocks, this.game.player()?.unlocks ?? [], settled.adventure.id) : [];
+    return settled?.result ? earnedWords(this.game.player()?.unlocks ?? [], settled.adventure.id) : [];
   });
 
   private readonly view = viewChild.required(BattleView);

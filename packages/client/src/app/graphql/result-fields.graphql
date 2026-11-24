@@ -1,6 +1,5 @@
 fragment ResultFields on AdventureResult {
   outcome
-  unlocks
   credited {
     amount
     material
