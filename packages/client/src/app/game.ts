@@ -440,15 +440,15 @@ export class Game {
   }
 
   /**
-   * Recruits a hero of the unit type, with a fresh request id; the hub
-   * draws its name and look, and debits its cost. Answers the new hero, or
+   * Recruits a hero of the unit type at the camp on screen, with a fresh
+   * request id; the hub draws its name and look, and debits its cost. Answers the new hero, or
    * throws the hub's refusal, a `Refusal` named by its type, for the hall to
    * show in place. The player is read again either way, since a refusal
    * such as `HallFull` means the view was stale.
    */
   async recruit(unitType: UnitType): Promise<HeroView> {
     try {
-      const input = { unitType: wireUnitType(unitType), requestId: crypto.randomUUID() };
+      const input = { location: this.location(), unitType: wireUnitType(unitType), requestId: crypto.randomUUID() };
       const data = await this.mutate(RecruitHeroDocument, { input });
       return heroFromWire(answered(must(data.recruitHero, 'recruitHero'), 'RecruitHeroSuccess').hero);
     } finally {

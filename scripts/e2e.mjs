@@ -220,8 +220,20 @@ const campQuery = `{ me { camps { location livingHeroes activeHeroes } heroes { 
 const camp = await graphql(token, campQuery);
 const millbrook = camp.data?.me?.camps?.find((c) => c.location === "millbrook");
 check(!camp.errors && millbrook, `me shows the starting camp: ${JSON.stringify(millbrook)} (${camp.ms} ms)`);
+
+// Unlocks and the second location (Issue-351, decision 0059). No job grants
+// the road's unlock until Issue-352, so no test user can hold it: the user
+// has the starting camp alone, and a recruit at Highcrag is refused as the
+// client's defect, by the read of the player's unlocks. What is behind the
+// unlock, a recruit, a build and a job there, is proven by the hub's
+// data-layer tests until a run of this test can open the road.
+const unlocks = await graphql(token, `{ me { unlocks { unlock earnedAt adventureId } camps { location } } }`);
+check(!unlocks.errors && unlocks.data?.me?.unlocks?.length === 0, `me holds no unlock: ${JSON.stringify(unlocks.data?.me?.unlocks)} (${unlocks.ms} ms)`);
+check(unlocks.data.me.camps.map((c) => c.location).join() === "millbrook", `the starting camp is the player's only camp: ${JSON.stringify(unlocks.data.me.camps)}`);
+const lockedRecruit = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { location: "highcrag", unitType: FIGHTER, requestId: $id }) { __typename } }`, { id: crypto.randomUUID() });
+check(lockedRecruit.data?.recruitHero === null && lockedRecruit.errors?.[0]?.extensions?.code === "BAD_USER_INPUT", `a recruit at Highcrag, which the player has not unlocked, is BAD_USER_INPUT: ${JSON.stringify(lockedRecruit.errors?.[0]?.message)} (${lockedRecruit.ms} ms)`);
 const recruitFields = `__typename ... on Error { message } ... on InsufficientResources { short { material amount balance } } ... on RecruitHeroSuccess { hero { id unitType spriteSet name status } }`;
-const recruitMutation = `mutation($id: UUID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { ${recruitFields} } }`;
+const recruitMutation = `mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) { ${recruitFields} } }`;
 if (millbrook.livingHeroes === 0) {
   const requestId = crypto.randomUUID();
   const recruited = await graphql(token, recruitMutation, { id: requestId });
@@ -241,7 +253,7 @@ if (millbrook.livingHeroes === 0) {
 // failed between the ore and the fighter leaves the ore, and the next skips it.
 const oreAtStart = (await graphql(token, `{ me { camps { location holdings { material balance } } } }`)).data?.me?.camps?.find((c) => c.location === "millbrook")?.holdings?.find((h) => h.material === "ORE")?.balance ?? 0;
 if (oreAtStart < 40) {
-  const fighter = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
+  const fighter = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
   const refused = fighter.data?.recruitHero;
   check(!fighter.errors && refused?.__typename === "InsufficientResources" && refused.short?.[0]?.material === "ORE" && refused.short[0].amount === 40, `a fighter is refused for want of ore, as data: ${JSON.stringify(refused)} (${fighter.ms} ms)`);
 } else {
@@ -451,7 +463,7 @@ if (mineLevel(atMine) === 0) {
   check(!settled.errors && oreResult?.outcome === "COMPLETE" && sorted(engineRewards(oreResult.rewards)) === sorted(expectedOre.rewards), `the villager came home from the hill: ${sorted(oreResult?.rewards ?? [])} (${settled.ms} ms)`);
   const withOre = campIn((await graphql(token, facilitiesQuery)).data?.me);
   check(stockOf(withOre, "ORE") >= 40, `the camp holds ${stockOf(withOre, "ORE")} ore, enough for a fighter`);
-  const hired = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
+  const hired = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
   const fighter = success(hired, "recruitHero", "hero");
   check(!hired.errors && fighter?.unitType === "FIGHTER" && fighter.status === "ALIVE", `recruitHero sold a fighter for the ore: ${JSON.stringify(hired.data)} (${hired.ms} ms)`);
   const paidOre = campIn((await graphql(token, facilitiesQuery)).data?.me);
