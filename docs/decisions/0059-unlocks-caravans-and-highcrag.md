@@ -3,7 +3,7 @@
 - **Status:** Decided; the numbers are working assumptions. Not built: the art is Issue-350; unlocks and Highcrag in the engine and the hub, Issue-351; the client's second camp and the job that opens it, Issue-352; the cart in the engine, Issue-353; the hub's caravan, Issue-354; the caravan hub's panel, Issue-355; Highcrag's own content, Issue-356; Millbrook's second levels, Issue-357.
 - **Date:** 2026-11-23
 - **Settles:** Issue-292: the second location, how a location unlocks, caravans with their cargo and their passengers, what a caravan risks, the caravan hub's jobs, and the keys all of it needs, which the overview's "Open" and decision 0013 left to be designed before they are built. The owner's calls of 2026-11-23, made in the Issue-292 session.
-- **Amends:** 0026, "every location offers villagers, so no player is ever locked out": Highcrag offers none, and the guarantee is the starting location's. 0058, "a job's own penalty returns with caravans": no job states a penalty, and what a caravan loses is its cargo, by the one table below.
+- **Amends:** 0026, "every location offers villagers, so no player is ever locked out": Highcrag offers none, and the guarantee is the starting location's; and 0026, "Recruitment", `recruitHero(unitType, requestId)`, which names no location: recruiting takes its location from Issue-351 on. 0032, "The first numbers", which give the mine, the lumber camp and the caravan hub one level each: each gains a second at Millbrook, costing stone (Issue-357). 0058, "a job's own penalty returns with caravans": no job states a penalty, and what a caravan loses is its cargo, by the one table below.
 
 ## Decision
 
@@ -21,11 +21,11 @@
 
 Settlement writes each unlock of the result that the player does not hold, in its one transaction, so that a second grant changes nothing and fails nothing. A player has one open adventure (decision 0003), so the only settlement that can race another is a repeat of the same submit, which the record's own condition already answers. The item is never deleted, has no TTL, and nothing revokes it. It is the player's private data, served to its owner alone.
 
-**An unlock is told when it is earned.** The result names each unlock the run earned that the player did not hold. Whether a job says beforehand what it grants is its description's choice, as it is for a drop (decision 0058): the job that opens Highcrag says so, and a later unlock may be a secret.
+**An unlock is told when it is earned, and what was new is told to its owner alone.** A settled result is served to any signed-in player, so it lists the unlocks the run earned whether or not the player held them: that says what the run did, as what dropped does, and nothing of what the player held before. Which of them were new to the player is said to the owner alone, by the page from the player's own unlocks or by the submit's answer; Issue-351 picks which, and no public field says it. Whether a job says beforehand what it grants is its description's choice, as it is for a drop (decision 0058): the job that opens Highcrag says so, and a later unlock may be a secret.
 
 **A location may need an unlock, and the starting location needs none.** A camp at a location whose unlock the player holds is level 1 with no heroes until something changes it, with no item of its own, as the starting location's camp is (decision 0026). The player's camps are the starting location's and one for every location whose unlock they hold. Every verb that takes a location refuses one the player has not unlocked, by its read and by a condition on the unlock's item in its transaction: recruit, build, start, and a caravan's destination. Recruiting takes its location from here on, where it recruits at the starting location alone today.
 
-**The first unlock is the road to Highcrag, and a job of the caravan hub grants it.** "Scout the road to Highcrag" is a plain job with no cart: travel, bandits on the road, arrive, and the party comes home. The caravan hub is then the one door to the rest of the world, and a camp that is opened can be reached: warehouse level 2, the hub, the road, then caravans. The job stays listed afterwards as a job like any other.
+**The first unlock is the road to Highcrag, and a job of the caravan hub grants it.** "Scout the road to Highcrag" is a plain job with no cart: travel, bandits on the road, arrive, and the party comes home. The caravan hub is then the one door to the rest of the world, and a camp that is opened can be reached: warehouse level 2, the hub, the road, then caravans. That holds once all of it is built, and not in between ("The build order" below). The job stays listed afterwards as a job like any other.
 
 **The second location is Highcrag, a hill fort above a quarry, supplied from Millbrook and not a second start.**
 
@@ -40,7 +40,7 @@ Settlement writes each unlock of the result that the player does not hold, in it
 
 **Highcrag recruits no villager** (the owner, 2026-11-23), so there is no free villager there. A camp at Highcrag begins empty, and its first hero comes by caravan: a hero who stays, or a cargo that pays for a recruit. The free-villager rule is unchanged wherever a villager is recruited, and it still keeps a player from being locked out of the game, because Millbrook is every player's and offers it. What it no longer promises is that every camp can restart itself: a camp at Highcrag whose heroes are all dead waits for a caravan.
 
-**Stone is gathered by mining at level 2, with no new trait.** A stone outcrop's drop has no chance in its first row, which decision 0058's rows by level allow for and nothing has used. A villager's mining 1 brings home none, and is not told why. **Hide gets its first cost:** the knight costs ore and hide, and hide comes only from Millbrook's wolves and a skinner. **Millbrook wants stone** for a second level of the mine, the lumber camp and the caravan hub; the costs that exist do not change.
+**Stone is gathered by mining at level 2, with no new trait.** A stone outcrop's drop has no chance in its first row, which decision 0058's rows by level allow for and nothing has used. A villager's mining 1 brings home none, and is not told why. **Hide gets its first cost:** the knight costs ore and hide, and hide comes from wolves and a skinner, and Highcrag recruits no skinner. **Millbrook wants stone** for a second level of the mine, the lumber camp and the caravan hub; the costs that exist do not change.
 
 **A caravan is a job that delivers.** A route is a job the caravan hub posts, "Caravan to Highcrag", which names the location it delivers to and is run by a party of one to four like any job. A caravan has no pay: the delivery is the reward.
 
@@ -64,6 +64,8 @@ The one retreat rule of decision 0058 stands for a caravan, and the cargo is all
 
 **Everything but the cargo and the heroes who stay goes to the origin camp,** as every job's does: the drops, the enemies' XP and the bonus. The adventure is the origin's: its record names the origin as its location, and its line in "Recently here" is the origin's.
 
+**Who may read a caravan.** Once settled, its result says what was delivered and what was lost, and is public as every result is, with no owner. The cargo of a caravan still in flight is on an open adventure's record, which is served to its owner alone.
+
 **One direction per hub.** Millbrook's hub sends to Highcrag; coming back needs Highcrag's own hub and its job, "Caravan to Millbrook". A hero who stays before that hub is built stays until it is, and the page says so before the caravan departs.
 
 **The caravan needs no new table, index or partition key.** Decision 0026 keyed a hero by its id with its location an attribute, and a holding and a camp by their location, for this.
@@ -75,17 +77,17 @@ The one retreat rule of decision 0058 stands for a caravan, and the cargo is all
 | Cargo delivered | `LEDGER#<adventureId>#deliver#<material>`, with the credit to the destination's holding and what its cap lost, at settlement |
 | Cargo returned | `LEDGER#<adventureId>#return#<material>`, with the credit to the origin's holding, in a discard |
 | A slot held | the destination camp's count of active heroes, raised in the start's transaction on the condition that the hall's cap there covers it, and lowered again at an end that delivers nobody |
-| A hero lands | its `location` attribute set to the destination; the origin's counts lowered and the destination's count of living heroes raised if it lives; its sighting deleted under the origin and put under the destination (decision 0029), all in the settle transaction |
+| A hero lands | its `location` attribute set to the destination; the origin's counts lowered and the destination's count of living heroes raised if it lives; its sighting deleted under the origin, and put under the destination only if it lives, a dead hero having none (decision 0029), all in the settle transaction |
 
 One open adventure per player means one caravan in flight, so a held slot is always the open adventure's: the page reads it from there, and the camp's item needs no count of its own for it. A resource that is both dropped and delivered in one settlement is two holdings, the origin's and the destination's, and two ledger entries, `credit` and `deliver`, so no two writes of the transaction name one item.
 
-**The largest settlement fits one transaction.** The open item, the record, the two camps, four heroes, two sightings for each hero who stays and one for each who does not, and the feed item are at most 17 items; each resource credited or delivered adds a holding and a ledger entry. Against DynamoDB's 100 that is room for about forty resources in one adventure, as decision 0058 found for a job with no caravan.
+**The largest settlement fits one transaction.** The open item, the record, the two camps, four heroes, two sightings for each hero who lands alive and one for each other, and the feed item are at most 17 items; each resource credited or delivered adds a holding and a ledger entry, and each unlock the run earned that the player does not hold adds one item. Against DynamoDB's 100 that is room for about forty resources in one adventure, as decision 0058 found for a job with no caravan.
 
 **Energy is not decided here.** Issue-337 is the owner's to think over, and nothing here is built toward it. This shape leaves it room without reserving anything: a caravan is a job like any other, so a cost per job is a field on a job, the start already writes each hero of the party, and a hero who stays is already rewritten when it lands. A comment on Issue-337 says so.
 
-**The numbers** are working assumptions that their build issues check over seeds. The owner has seen one: the cart carries 100 in all at hub level 1. Not seen: the cart's 60 health; the road's two bandits; at Highcrag a miner for 30 ore and 20 timber and a fighter for 40 ore, as at Millbrook; an outcrop's 40 health, 3 XP and 20 to 24 stone at mining 2; a level-2 hub's cart of 200. The knight's numbers and cost, the quarry's cost and jobs, and what each of Millbrook's second levels costs and gives are agreed at the start of Issue-356 and Issue-357.
+**The numbers** are working assumptions that their build issues check over seeds. The owner has seen one: the cart carries 100 in all at hub level 1. Not seen: the cart's 60 health; the road's two bandits; a caravan's road of two fights, bandits in each, with a wolf by chance; at Highcrag a miner for 30 ore and 20 timber and a fighter for 40 ore, as at Millbrook; an outcrop's 40 health, 3 XP and 20 to 24 stone at mining 2; a level-2 hub's cart of 200. The knight's numbers and cost, the quarry's cost and jobs, and what each of Millbrook's second levels costs and gives are agreed at the start of Issue-356 and Issue-357.
 
-**The build order,** inside step 3: the art of Highcrag's camp and the cart (Issue-350); unlocks and Highcrag in the engine and the hub (Issue-351); the client's second camp and the job that opens the road (Issue-352); the cart in the engine (Issue-353); the hub's caravan (Issue-354); the caravan hub's panel (Issue-355); Highcrag's own content, with its art (Issue-356); Millbrook's second levels (Issue-357). The owner's call is all of them in step 3, ahead of step 4. The agent put seven to the owner; the second location became two, its hub and its client, when unlocks became general.
+**The build order,** inside step 3: the art of Highcrag's camp and the cart (Issue-350); unlocks and Highcrag in the engine and the hub (Issue-351); the client's second camp and the job that opens the road (Issue-352); the cart in the engine (Issue-353); the hub's caravan (Issue-354); the caravan hub's panel (Issue-355); Highcrag's own content, with its art (Issue-356); Millbrook's second levels (Issue-357). The owner's call is all of them in step 3, ahead of step 4. The agent put seven to the owner; the second location became two, its hub and its client, when unlocks became general. In this order the road can be scouted from Issue-352 and the first caravan runs with Issue-355, so between them a player on `dev` can open Highcrag and find a camp that nothing reaches yet. That gap is accepted (the owner, 2026-11-24, the review of PR-358): the empty hall there says that a hero comes by caravan, and no release to `prod` is made between Issue-352 and Issue-355.
 
 ## Considered and not chosen
 
@@ -121,7 +123,7 @@ One open adventure per player means one caravan in flight, so a held slot is alw
 
 **A count of held slots on the camp's item.** One caravan is in flight at most, so the count would restate the open adventure.
 
-**The cargo on the open-adventure item,** in the player table. Settlement conditions on the record and its result names what was delivered; the cargo beside them is one read and one condition fewer. What a field serves of it follows what an adventure credited: public once settled, with no owner.
+**The cargo on the open-adventure item,** in the player table. Settlement conditions on the record and its result names what was delivered; the cargo beside them is one read and one condition fewer.
 
 **A line for an arrival in the destination's "Recently here".** A second feed item for one adventure. An arrival shown where it happens suits step 4's live feed.
 
