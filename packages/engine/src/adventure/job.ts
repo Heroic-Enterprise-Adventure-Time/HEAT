@@ -9,7 +9,7 @@
  */
 
 import type { BattleContent } from "../battle/index.js";
-import type { FacilityKind, MonsterType, ResourceType } from "../content.js";
+import type { FacilityKind, MonsterType, ResourceType, UnlockId } from "../content.js";
 import type { Reward } from "../index.js";
 
 /** A least and a most, both whole numbers from 1, for a count rolled from the adventure's seed. */
@@ -97,6 +97,8 @@ export interface Job {
   readonly pay: readonly Reward[];
   /** XP to each surviving hero on arrival, on top of the XP of the enemies that went down. */
   readonly bonusXp: number;
+  /** The unlocks the job grants on arrival, and not on a retreat or a defeat; most jobs grant none (decision 0059). */
+  readonly grants?: readonly UnlockId[];
 }
 
 /**

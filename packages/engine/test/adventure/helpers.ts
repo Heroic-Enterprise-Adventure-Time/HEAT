@@ -60,6 +60,10 @@ export const MILLBROOK_RECRUITS = must(location(STARTING_LOCATION), "Millbrook")
 /** Every unit type Millbrook recruits, read from the content. */
 export const RECRUITED_TYPES = MILLBROOK_RECRUITS.map((r) => r.unitType);
 
+/** Highcrag, the second location, and what its hall recruits, read from the content. */
+export const HIGHCRAG = "highcrag";
+export const HIGHCRAG_RECRUITS = must(location(HIGHCRAG), "Highcrag").recruits;
+
 /**
  * The least and the most that `count` of a resource node drop for a party
  * whose highest level in the node's trait is `level`, from the content's rows
@@ -122,3 +126,4 @@ export const TIMBER = "timber-from-the-near-woods";
 export const ORE = "ore-from-the-hill";
 export const GOBLINS = "goblins-in-the-old-workings";
 export const LUMBER = "lumber-from-the-deep-woods";
+export const CRAG = "ore-from-the-crag";

@@ -1,5 +1,5 @@
 /**
- * The game's static content: the locations, what each recruits, the caps of
+ * The game's static content: the unlocks, the locations, what each recruits, the caps of
  * the hall and the warehouse per level, the hero names, the sprite sets each
  * unit type allows, and the battle's abilities, unit types, monsters and
  * resource nodes, the jobs, and the XP each level needs. TypeScript data, imported by the hub and the client alike
@@ -177,9 +177,39 @@ export function recruitCost(recruit: Recruit, livingHeroes: number): Cost {
   return recruit.unitType === "villager" && livingHeroes === 0 ? [] : recruit.cost;
 }
 
+/**
+ * The unlocks: what a player earns once and holds for good (game.md,
+ * "Unlocks"; decision 0059). One closed list for every kind of unlock; the
+ * list declares the union (typescript.md, rule 18). What needs an unlock
+ * names it, a location first, and what grants one names it, a job first.
+ */
+export const UNLOCK_IDS = ["road-to-highcrag"] as const;
+export type UnlockId = (typeof UNLOCK_IDS)[number];
+
+export interface Unlock {
+  name: string;
+  /** The words said to the player when it is earned. */
+  earned: string;
+}
+
+/** Every unlock, by its name and the words said when it is earned. No job grants the road until Issue-352. */
+export const UNLOCKS: Readonly<Record<UnlockId, Unlock>> = {
+  "road-to-highcrag": {
+    name: "The road to Highcrag",
+    earned: "The road to Highcrag is open. You have a camp there now.",
+  },
+};
+
+/** Whether a string is an unlock of this version's content, as one stored by another version may not be. */
+export function isUnlockId(id: string): id is UnlockId {
+  return (UNLOCK_IDS as readonly string[]).includes(id);
+}
+
 export interface Location {
   id: string;
   name: string;
+  /** The unlock a player must hold to have a camp here; the starting location names none (decision 0059). */
+  unlock?: UnlockId;
   /** The facilities that belong to the location and look the same to every player. */
   sharedFacilities: readonly FacilityKind[];
   /** The facilities every camp here has at level 1 or above. */
@@ -213,13 +243,40 @@ export const LOCATIONS: readonly Location[] = [
       { unitType: "ranger", hallLevel: 2, cost: [{ material: "timber", amount: 40 }, { material: "cloth", amount: 10 }] },
     ],
   },
+  // A hill fort above a quarry, supplied from Millbrook and not a second
+  // start (decision 0059): it recruits no villager, so there is no free hero
+  // here, and a camp begins empty until a caravan brings its first. The miner
+  // and the fighter cost what they cost at Millbrook; there are no trees, so
+  // the miner's timber comes by caravan. Nothing can be built here until the
+  // quarry and its hub (Issue-356).
+  {
+    id: "highcrag",
+    name: "Highcrag",
+    unlock: "road-to-highcrag",
+    sharedFacilities: ["job-board"],
+    ownFacilities: ["heroes-hall", "warehouse"],
+    buildableFacilities: [],
+    recruits: [
+      { unitType: "miner", hallLevel: 1, cost: [{ material: "ore", amount: 30 }, { material: "timber", amount: 20 }] },
+      { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 40 }] },
+    ],
+  },
 ];
 
-/** A new player starts here, with a camp at level 1 and no heroes. */
+/** A new player starts here, with a camp at level 1 and no heroes. It needs no unlock, and it recruits the villager, so no player is ever locked out. */
 export const STARTING_LOCATION = "millbrook";
 
 export function location(id: string): Location | undefined {
   return LOCATIONS.find((l) => l.id === id);
+}
+
+/**
+ * The locations a player with these unlocks has a camp at, in the content's
+ * order: those that need none, and those whose unlock is held (decision
+ * 0059). One rule, which the hub's reads and its verbs both use.
+ */
+export function unlockedLocations(held: ReadonlySet<string>): Location[] {
+  return LOCATIONS.filter((l) => l.unlock === undefined || held.has(l.unlock));
 }
 
 /** Active heroes a camp can hold, by heroes hall level; index 0 is level 1. */
@@ -564,7 +621,8 @@ export type JobId =
   | "wolves-on-the-mill-road"
   | "ore-from-the-hill"
   | "goblins-in-the-old-workings"
-  | "lumber-from-the-deep-woods";
+  | "lumber-from-the-deep-woods"
+  | "ore-from-the-crag";
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
@@ -574,9 +632,10 @@ export type JobId =
  * brings home is what its enemies drop for the traits the party carries
  * (decision 0058). Each job's bonus XP is what brings its XP, with the
  * enemies that always appear, to what decision 0030 gave it: 5, 15, 20, 15
- * and 25; the lumber camp's job, written since, gives the ore job's 15. A
- * job's description is all the page tells of it beside its pay and its
- * bonus, so it says what its author chooses to tell.
+ * and 25; the lumber camp's job and Highcrag's, written since, give the ore
+ * job's 15. A job's description is all the page tells of it beside its pay
+ * and its bonus, so it says what its author chooses to tell. A job may grant
+ * unlocks on arrival (decision 0059); none does until Issue-352.
  *
  * An entry of a fight or a gather stage may vary (decision 0058, Issue-341):
  * its count a range, and a chance of appearing at all, rolled from the
@@ -701,6 +760,25 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     ],
     pay: [],
     bonusXp: 6,
+  },
+  // Highcrag's one board job (Issue-351, decision 0059): the mine's first
+  // job on another hill, two veins and then a wolf, for the parties Highcrag
+  // can field. A lone miner completes it on every seed tried, with no death,
+  // and brings home 56 to 64 ore, which pays for a fighter at its worst roll;
+  // a fighter alone comes through it with no ore, having no trait to mine by.
+  "ore-from-the-crag": {
+    id: "ore-from-the-crag",
+    name: "Ore from the crag",
+    description: "Two veins run bare along the crag below the fort. Dig them out; a wolf comes down off the scree at dusk.",
+    location: "highcrag",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: 2 }], timeLimitMs: 90_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 4,
   },
 };
 

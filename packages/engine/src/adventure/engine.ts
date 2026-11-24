@@ -240,6 +240,7 @@ export class AdventureEngine {
       xp: health.filter((h) => h.health > 0).map((h) => ({ heroId: h.heroId, xp: earned })),
       dead: health.filter((h) => h.health <= 0).map((h) => h.heroId),
       health,
+      unlocks: arrived ? [...(this.job.grants ?? [])] : [],
     };
   }
 
