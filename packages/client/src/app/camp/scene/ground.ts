@@ -10,6 +10,18 @@ import * as z from 'zod/mini';
 
 import { must } from '@heat/engine';
 
+/**
+ * The ground sets the scenes draw, by their directory under art/ground/, each
+ * with the colour its canvas shows until the tiles are laid: its upper
+ * terrain's, the grass of the meadow and the rock of the crag, so a scene
+ * does not flash another place's colour while its art loads.
+ */
+export const GROUNDS = {
+  'meadow-01': { backdrop: '#59a01c' },
+  'crag-01': { backdrop: '#645b59' },
+} as const;
+export type GroundSet = keyof typeof GROUNDS;
+
 /** The two terrains a tileset blends: the one declaration, which the type and the schema both read (typescript.md, rule 18). */
 export const TERRAINS = ['lower', 'upper'] as const;
 export type Terrain = (typeof TERRAINS)[number];

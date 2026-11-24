@@ -1,7 +1,7 @@
-import { must } from '@heat/engine';
+import { LOCATIONS, must } from '@heat/engine';
 
-import { layGround, type Terrain, type TilesetJson } from './ground';
-import { cornersAround, MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK } from './layout';
+import { GROUNDS, layGround, type Terrain, type TilesetJson } from './ground';
+import { cornersAround, groundAt, HIGHCRAG, LAYOUTS, MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK } from './layout';
 import { facingFor, gone, leave, newWalker, randomSpot, step, WALK_SPEED } from './wander';
 
 /** A tileset with one tile for each of the sixteen corner combinations, as PixelLab's tileset15 has. */
@@ -46,11 +46,13 @@ describe('the ground', () => {
     expect(() => layGround(tileset, [['lower', 'lower'], ['lower', 'lower']])).toThrow(/no tile with corners lower\/lower\/lower\/lower/);
   });
 
-  it('covers the whole Millbrook map', () => {
-    const tiles = layGround(fullTileset(), MILLBROOK.corners);
-    expect(Math.max(...tiles.map((t) => (t.col + 1) * 16))).toBeGreaterThanOrEqual(MAP_WIDTH);
-    expect(Math.max(...tiles.map((t) => (t.row + 1) * 16))).toBeGreaterThanOrEqual(MAP_HEIGHT);
-  });
+  for (const [id, layout] of Object.entries(LAYOUTS)) {
+    it(`covers the whole map at ${id}`, () => {
+      const tiles = layGround(fullTileset(), layout.corners);
+      expect(Math.max(...tiles.map((t) => (t.col + 1) * 16))).toBeGreaterThanOrEqual(MAP_WIDTH);
+      expect(Math.max(...tiles.map((t) => (t.row + 1) * 16))).toBeGreaterThanOrEqual(MAP_HEIGHT);
+    });
+  }
 
   it('runs the ground on past the map as grass, and keeps the corners of the map inside it', () => {
     const window = cornersAround(MILLBROOK, -2, -1, 4, 3);
@@ -61,32 +63,77 @@ describe('the ground', () => {
   });
 });
 
-describe('the Millbrook layout', () => {
-  it('stands every facility of the camp, built or not, inside the map', () => {
-    expect(MILLBROOK.facilities.map((f) => f.kind).sort()).toEqual(['caravan-hub', 'heroes-hall', 'job-board', 'lumber-camp', 'mine', 'warehouse']);
-    for (const f of MILLBROOK.facilities) {
-      expect(f.at.x).toBeGreaterThan(0);
-      expect(f.at.x).toBeLessThan(MAP_WIDTH);
-      expect(f.at.y).toBeLessThan(MAP_HEIGHT);
+describe('the layouts', () => {
+  it("are one for every location of the engine's content, each standing exactly the facilities the location gives a camp, built or not", () => {
+    expect(Object.keys(LAYOUTS).sort()).toEqual(LOCATIONS.map((l) => l.id).sort());
+    for (const at of LOCATIONS) {
+      const layout = must(LAYOUTS[at.id], `the layout of ${at.id}`);
+      expect(layout.facilities.map((f) => f.kind).sort(), at.id).toEqual([...at.sharedFacilities, ...at.ownFacilities, ...at.buildableFacilities].sort());
     }
   });
 
-  it('stands every facility inside the core width, which a narrow box never crops', () => {
-    // Half the widest facility canvas, 64 px, on either side of its spot.
-    const margin = (MAP_WIDTH - MAP_CORE_WIDTH) / 2;
-    for (const f of MILLBROOK.facilities) {
-      expect(f.at.x - 32).toBeGreaterThanOrEqual(margin);
-      expect(f.at.x + 32).toBeLessThanOrEqual(MAP_WIDTH - margin);
+  it('stand Millbrook on the meadow and Highcrag on the crag, which is also the ground of a battle that left from each', () => {
+    expect(MILLBROOK.ground).toBe('meadow-01');
+    expect(HIGHCRAG.ground).toBe('crag-01');
+    for (const [id, layout] of Object.entries(LAYOUTS)) {
+      expect(groundAt(id)).toBe(layout.ground);
+      expect(GROUNDS[layout.ground].backdrop).toMatch(/^#[0-9a-f]{6}$/);
     }
+    // A location this client has no layout for, as a newer deploy may name, is drawn on the meadow.
+    expect(groundAt('atlantis')).toBe('meadow-01');
   });
 
-  it('keeps every walkable spot inside the scene', () => {
-    for (const a of MILLBROOK.walkable) {
-      expect(a.x0).toBeGreaterThanOrEqual(0);
-      expect(a.x1).toBeLessThanOrEqual(MAP_WIDTH);
-      expect(a.y0).toBeGreaterThanOrEqual(0);
-      expect(a.y1).toBeLessThanOrEqual(MAP_HEIGHT);
-    }
+  it('give Highcrag the hall, the warehouse and the job board: nothing can be built there yet (Issue-356)', () => {
+    expect(HIGHCRAG.facilities.map((f) => f.kind)).toEqual(['heroes-hall', 'warehouse', 'job-board']);
+  });
+
+  for (const [id, layout] of Object.entries(LAYOUTS)) {
+    it(`stands every facility of ${id} inside the map`, () => {
+      for (const f of layout.facilities) {
+        expect(f.at.x).toBeGreaterThan(0);
+        expect(f.at.x).toBeLessThan(MAP_WIDTH);
+        expect(f.at.y).toBeLessThan(MAP_HEIGHT);
+      }
+    });
+
+    it(`stands every facility of ${id} inside the core width, which a narrow box never crops`, () => {
+      // Half the widest facility canvas, 64 px, on either side of its spot.
+      const margin = (MAP_WIDTH - MAP_CORE_WIDTH) / 2;
+      for (const f of layout.facilities) {
+        expect(f.at.x - 32).toBeGreaterThanOrEqual(margin);
+        expect(f.at.x + 32).toBeLessThanOrEqual(MAP_WIDTH - margin);
+      }
+    });
+
+    it(`keeps every walkable spot of ${id}, and its hall's door, inside the scene`, () => {
+      for (const a of layout.walkable) {
+        expect(a.x0).toBeGreaterThanOrEqual(0);
+        expect(a.x1).toBeLessThanOrEqual(MAP_WIDTH);
+        expect(a.y0).toBeGreaterThanOrEqual(0);
+        expect(a.y1).toBeLessThanOrEqual(MAP_HEIGHT);
+        expect(a.x1).toBeGreaterThan(a.x0);
+        expect(a.y1).toBeGreaterThan(a.y0);
+      }
+      expect(layout.hallDoor.x).toBeGreaterThan(0);
+      expect(layout.hallDoor.x).toBeLessThan(MAP_WIDTH);
+      expect(layout.hallDoor.y).toBeGreaterThan(0);
+      expect(layout.hallDoor.y).toBeLessThan(MAP_HEIGHT);
+    });
+
+    it(`lets heroes walk only on the lower terrain of ${id}, the earth, never on what lies around it`, () => {
+      // The corner at or left of and above a point, and the one right of and below it: both are earth where a hero may stand.
+      const lower = (x: number, y: number) => layout.corners[Math.round(y / 16)]?.[Math.round(x / 16)] === 'lower';
+      for (const a of layout.walkable) {
+        for (const [x, y] of [[a.x0, a.y0], [a.x1, a.y0], [a.x0, a.y1], [a.x1, a.y1]] as const) expect(lower(x, y), `${id} ${x},${y}`).toBe(true);
+      }
+    });
+  }
+
+  it('runs the ground on past the map as rock at Highcrag, where Millbrook has grass: the upper terrain of each', () => {
+    const window = cornersAround(HIGHCRAG, -2, -1, 4, 3);
+    expect(window[0]).toEqual(['upper', 'upper', 'upper', 'upper', 'upper']);
+    // The road leaves the yard at the foot of the map, two corners wide.
+    expect(cornersAround(HIGHCRAG, 12, 14, 1, 1)[0]).toEqual(['lower', 'lower']);
   });
 });
 

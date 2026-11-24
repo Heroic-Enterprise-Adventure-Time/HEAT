@@ -4,6 +4,7 @@ import { must } from '@heat/engine';
 
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
+import type { GroundSet } from '../camp/scene/ground';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
 import type { CastMember } from './cast';
@@ -101,15 +102,16 @@ export class BattleView {
 
   /**
    * Hands the scene the run just begun: each hero's sprite set, by hero id,
-   * and `others`, everyone the run may set against the party. The scene
+   * `others`, everyone the run may set against the party, and the ground of
+   * the location the run left from, which its road is drawn on. The scene
    * shows the run's field once it has the art of all of them.
    */
-  reset(spriteSets: ReadonlyMap<string, string>, others: readonly CastMember[]): void {
+  reset(spriteSets: ReadonlyMap<string, string>, others: readonly CastMember[], ground: GroundSet): void {
     const scene = this.scene;
     if (!scene) return;
     const party = must(this.play.field(), 'the field').party.map((hero): CastMember => ({ kind: hero.kind, type: hero.type, spriteSet: spriteSets.get(hero.unitId) }));
     const run = ++this.handedOver;
-    void scene.prepare([...party, ...others]).then(() => {
+    void scene.prepare([...party, ...others], ground).then(() => {
       if (run !== this.handedOver || scene !== this.scene) return;
       this.prepared = run;
       // A page that stopped the run while its art was on its way has no field to show.

@@ -1,7 +1,7 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
-import { JOBS, must, UNIT_PROFILES } from '@heat/engine';
+import { JOBS, jobsPostedBy, must, UNIT_PROFILES } from '@heat/engine';
 
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/battle-view';
 import { routes } from '../../app.routes';
@@ -68,6 +68,7 @@ const party = [hero('h1', 'Wren'), hero('h2', 'Moss'), hero('h3', 'Lark'), hero(
 function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => AdventureView | Refusal = adventureOf) {
   const all = signal(heroes);
   const open = signal<AdventureView | null>(null);
+  const camps = signal<{ location: string }[]>([]);
   const here = computed(() => all().filter((h) => h.status !== 'RETIRED'));
   const fake = {
     heroesHere: here,
@@ -88,7 +89,9 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     recruits: signal([]),
     upgrade: () => null,
     location: signal('millbrook'),
-    player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
+    /** The locations the player has a camp at; a camp is sent away from an address the player has none at. */
+    camps,
+    player: computed(() => ({ id: 'p1', camps: camps(), heroes: all(), openAdventure: open() })),
     adventure: open,
     settled: signal(null),
     error: signal<string | null>(null),
@@ -150,6 +153,8 @@ function renderJobs(game: ReturnType<typeof fakeGame>, url: string) {
 }
 
 const WOLVES = '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road';
+/** What Highcrag's job board posts, read from the content. */
+const HIGHCRAG_BOARD = jobsPostedBy('highcrag', 'job-board');
 
 const box = (name: string) => screen.getByRole('checkbox', { name });
 const depart = () => screen.getByRole('button', { name: 'Depart' });
@@ -217,6 +222,22 @@ describe('Job board', () => {
     expect(heroes).toHaveLength(2);
     expect(heroes[0]).toHaveAccessibleName('Wren next action');
     expect(heroes[1]).toHaveAccessibleName('Lark next action');
+  });
+
+  it("lists Highcrag's own board at Highcrag, and Departs from the camp it is opened in (Issue-352)", async () => {
+    const game = fakeGame(party);
+    game.camps.set([{ location: 'millbrook' }, { location: 'highcrag' }]);
+    const { router, user } = await renderJobs(game, '/camp/highcrag/job-board');
+    expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(HIGHCRAG_BOARD.map((j) => j.name));
+    expect(HIGHCRAG_BOARD.map((j) => j.id)).toEqual(['ore-from-the-crag']);
+
+    await user.click(panel().getByRole('link', { name: 'Ore from the crag' }));
+    await waitFor(() => { expect(router.url).toBe('/camp/highcrag/job-board/jobs/ore-from-the-crag'); });
+    await user.click(await screen.findByRole('checkbox', { name: 'Wren' }));
+    await waitFor(() => { expect(depart()).toBeEnabled(); });
+    await user.click(depart());
+    await waitFor(() => { expect(router.url).toBe('/adventure'); });
+    expect(game.started).toEqual([{ location: 'highcrag', jobId: 'ore-from-the-crag', heroIds: ['h1'] }]);
   });
 
   it("shows a start's refusal in place, in the player's words", async () => {

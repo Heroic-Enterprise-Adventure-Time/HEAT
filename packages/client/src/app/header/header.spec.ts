@@ -1,12 +1,13 @@
 import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
-import { render, screen } from '@testing-library/angular/zoneless';
+import { provideRouter, Router } from '@angular/router';
+import { render, screen, waitFor } from '@testing-library/angular/zoneless';
 import userEvent from '@testing-library/user-event';
 
 import { must, UNIT_PROFILES } from '@heat/engine';
 
 import { Game, type PlayerView } from '../game';
 import { Session, type SessionUser } from '../session';
+import { Blank } from '../testing/blank';
 import { fakeSession, PLAYER } from '../testing/fake-session';
 import { textsOf } from '../testing/texts-of';
 import { Header } from './header';
@@ -15,6 +16,7 @@ const player: PlayerView = {
   id: 'p1',
   camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes: 0, livingHeroes: 0, holdings: [], resourceCapacity: 100, warehouseLevel: 1, facilities: [] }],
   heroes: [],
+  unlocks: [],
   openAdventure: {
     id: 'a1',
     startedAt: '2026-10-20T07:00:00.000Z',
@@ -30,19 +32,28 @@ const player: PlayerView = {
   },
 };
 
-async function renderHeader(signedIn: SessionUser | null, loaded: PlayerView | null) {
+/** The player once the road is open: a camp at Highcrag beside Millbrook's, as the hub then answers (decision 0059). */
+const withHighcrag: PlayerView = {
+  ...player,
+  camps: [...player.camps, { ...must(player.camps[0], 'the first camp'), location: 'highcrag', name: 'Highcrag' }],
+  unlocks: [{ unlock: 'road-to-highcrag', adventureId: 'a0' }],
+};
+
+async function renderHeader(signedIn: SessionUser | null, loaded: PlayerView | null, at = 'millbrook') {
   const session = fakeSession(signedIn);
-  const game = { player: signal(loaded), location: signal('millbrook') };
+  const game = { player: signal(loaded), location: signal(at) };
   const user = userEvent.setup();
-  await render(Header, {
+  const { fixture } = await render(Header, {
     providers: [
-      provideRouter([]),
+      provideRouter([{ path: 'camp/:location', component: Blank }]),
       { provide: Session, useValue: session },
       { provide: Game, useValue: game },
     ],
   });
-  return { session, user };
+  return { session, user, router: fixture.debugElement.injector.get(Router) };
 }
+
+const campSelect = () => screen.getByRole('combobox', { name: 'Camp' });
 
 describe('Header', () => {
   it('shows the title and Google sign-in to a visitor', async () => {
@@ -60,5 +71,19 @@ describe('Header', () => {
     expect(screen.getByText('player@example.com')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(session.signedOut).toBe(1);
+  });
+
+  it('lists Highcrag once the player has a camp there, and goes to the camp chosen (Issue-352)', async () => {
+    const { user, router } = await renderHeader(PLAYER, withHighcrag);
+    expect(textsOf(screen.getAllByRole('option'))).toEqual(['Millbrook', 'Highcrag']);
+    expect(campSelect()).toHaveValue('millbrook');
+    await user.selectOptions(campSelect(), 'Highcrag');
+    await waitFor(() => { expect(router.url).toBe('/camp/highcrag'); });
+  });
+
+  it('shows the camp on screen as the one selected, the second as well as the first', async () => {
+    await renderHeader(PLAYER, withHighcrag, 'highcrag');
+    expect(campSelect()).toHaveValue('highcrag');
+    expect(screen.getByRole<HTMLOptionElement>('option', { name: 'Highcrag' }).selected).toBe(true);
   });
 });

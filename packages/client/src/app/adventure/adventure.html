@@ -7,6 +7,9 @@
       <button type="button" (click)="play.endReplay()">Back to the result</button>
     } @else if (settled.result; as result) {
       <p class="outcome">{{ outcomeWords(result.outcome) }}.</p>
+      @for (words of unlocked(); track words) {
+        <p class="unlocked">{{ words }}</p>
+      }
 
       <h3 id="stages-title">Stages</h3>
       <ol class="stages" aria-labelledby="stages-title">

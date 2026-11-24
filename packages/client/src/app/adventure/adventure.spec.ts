@@ -2,7 +2,7 @@ import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 import { range } from 'es-toolkit';
 
-import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
+import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES, type UnlockId, UNLOCKS } from '@heat/engine';
 
 import { type AdventureResultView, type AdventureView, Game, type SettledView } from '../game';
 import { ApiError } from '../hub';
@@ -58,15 +58,27 @@ const result: AdventureResultView = {
     { heroId: 'h1', xpGained: 15, xp: 15, level: 2, dead: false },
     { heroId: 'h2', xpGained: 0, xp: 0, level: 1, dead: true },
   ],
+  unlocks: [],
 };
+
+/** The one unlock of the content, which the caravan hub's scouting job grants. */
+const ROAD: UnlockId = 'road-to-highcrag';
+/** An unlock the player holds, as `me.unlocks` answers it: with the adventure that first earned it. */
+interface Held {
+  readonly unlock: string;
+  readonly adventureId: string;
+}
 
 /** A game with the open adventure and a submit that answers as the test says, recording each log it was given. */
 function fakeGame(answer: () => AdventureResultView | null | Error = () => result, opened: AdventureView = adventure) {
   const open = signal<AdventureView | null>(opened);
   const settled = signal<SettledView | null>(null);
+  const held = signal<readonly Held[]>([]);
   const fake = {
     location: signal('millbrook'),
-    player: computed(() => ({ id: 'p1', camps: [], heroes: [], openAdventure: open() })),
+    player: computed(() => ({ id: 'p1', camps: [], heroes: [], openAdventure: open(), unlocks: held() })),
+    /** The unlocks the player holds once the submit has answered and the player is read again. */
+    holdsAfter: [] as readonly Held[],
     adventure: open,
     settled,
     submitted: [] as (readonly AdventureLogEntry[])[],
@@ -81,6 +93,7 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
       if (answered instanceof Error) return Promise.reject(answered);
       settled.set({ adventure: submittedAdventure, result: answered });
       open.set(null);
+      held.set(fake.holdsAfter);
       return Promise.resolve();
     },
   };
@@ -411,6 +424,34 @@ describe('Adventure', () => {
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
     expect(game.settled()).toBeNull();
   });
+
+  it("tells the player an unlock the run earned that they did not hold, in the content's words, under how it ended (Issue-352)", async () => {
+    const game = fakeGame(() => ({ ...result, unlocks: [ROAD] }));
+    // The player's own unlock names this adventure, so it was new.
+    game.holdsAfter = [{ unlock: ROAD, adventureId: adventure.id }];
+    const { run } = await renderAdventure(game);
+    await run(120_000);
+    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    expect(await screen.findByText(UNLOCKS[ROAD].earned)).toBeInTheDocument();
+    expect(UNLOCKS[ROAD].earned).toMatch(/Highcrag/);
+  });
+
+  it('says nothing of an unlock the run earned again: the player holds it from an earlier adventure', async () => {
+    const game = fakeGame(() => ({ ...result, unlocks: [ROAD] }));
+    game.holdsAfter = [{ unlock: ROAD, adventureId: 'an-earlier-adventure' }];
+    const { run } = await renderAdventure(game);
+    await run(120_000);
+    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    expect(screen.queryByText(UNLOCKS[ROAD].earned)).not.toBeInTheDocument();
+  });
+
+  for (const [location, ground] of [['millbrook', 'meadow-01'], ['highcrag', 'crag-01']] as const) {
+    it(`hands the scene the ground of the location the run left from: ${ground} for ${location} (Issue-352)`, async () => {
+      const scene = fakeBattleScene();
+      await renderAdventure(fakeGame(() => result, { ...adventure, location }), scene);
+      expect(scene.grounds).toEqual([ground]);
+    });
+  }
 
   it('replays the stored timeline in the scene from its start, and goes back to the result', async () => {
     const scene = fakeBattleScene();

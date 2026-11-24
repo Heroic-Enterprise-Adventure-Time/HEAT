@@ -19,7 +19,7 @@ import {
   WEAPON_SPRITES,
 } from '@heat/engine';
 
-import { layGround, type Terrain, TilesetJsonSchema } from '../../camp/scene/ground';
+import { GROUNDS, type GroundSet, layGround, type Terrain, type TilesetJson, TilesetJsonSchema } from '../../camp/scene/ground';
 import { fetchJson } from '../../static-json';
 import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
@@ -32,8 +32,11 @@ import { AMOUNT_AT, amountRow, DROP_FROM, dropAt, dropTime } from './drop-clip';
 
 /**
  * The battle scene, drawn with PixiJS like the camp (decision 0028): the
- * camp's sprites side-on on a meadow road, at the largest whole scale of
- * device pixels that fits, the ground running on to fill the box.
+ * camp's sprites side-on on a road, at the largest whole scale of
+ * device pixels that fits, the ground running on to fill the box. The road
+ * is drawn on the ground of the location the run left from, the meadow's
+ * for Millbrook's jobs and the crag's for Highcrag's (Issue-352); before any
+ * run is handed over it is the meadow's.
  *
  * It draws from the field, where everyone stands and how they are, and
  * animates from the events: as an action resolves, the whole of it in one
@@ -71,12 +74,13 @@ export interface BattleSceneCallbacks {
 export interface BattleSceneHandle {
   /**
    * Loads the art of everyone a run may show, their weapons and every
-   * ability's effect, before the run is handed over with `reset`. Over when
-   * each has arrived or failed, or at the limit; it never fails, and a
-   * failure is the page's uncaught error.
+   * ability's effect, and the ground its road is drawn on, before the run is
+   * handed over with `reset`. Over when each has arrived or failed, or at
+   * the limit; it never fails, and a failure is the page's uncaught error. A
+   * ground that fails leaves the road as it was.
    */
-  prepare(cast: readonly CastMember[]): Promise<void>;
-  /** Shows the field as it stands; `enter` runs the party on from the left first. */
+  prepare(cast: readonly CastMember[], ground: GroundSet): Promise<void>;
+  /** Shows the field as it stands, on the ground prepared last; `enter` runs the party on from the left first. */
   reset(field: Field, heroSets: ReadonlyMap<string, string>, enter: boolean): void;
   /**
    * Animates the events just happened; a fight or a gather beginning brings
@@ -138,6 +142,9 @@ const DROP_Z = 1000;
 
 /** The road the units stand on, in the ground's lower terrain: the corner rows from 6 to 10, y 96 to 160 on the stage. */
 const ROAD_ROWS = { from: 6, to: 10 };
+
+/** The ground the road is laid with before any run is handed over: the starting location's. */
+const START_GROUND: GroundSet = 'meadow-01';
 
 interface UnitView {
   unit: FieldUnit;
@@ -255,15 +262,30 @@ const frameOf = (frames: Frames, index: number) => must(frames.textures[clamp(in
 export async function createBattleScene(host: HTMLElement, callbacks: BattleSceneCallbacks): Promise<BattleSceneHandle> {
   TextureStyle.defaultOptions.scaleMode = 'nearest';
   const app = new Application();
-  await app.init({ width: 320, height: 180, background: '#4f7f2a', antialias: false, resolution: 1, roundPixels: true });
+  await app.init({ width: 320, height: 180, background: GROUNDS[START_GROUND].backdrop, antialias: false, resolution: 1, roundPixels: true });
   app.canvas.style.imageRendering = 'pixelated';
   app.canvas.style.display = 'block';
   app.canvas.setAttribute('role', 'img');
   app.canvas.setAttribute('aria-label', 'The battle');
   host.appendChild(app.canvas);
 
-  const tileset = await fetchJson('/art/ground/meadow-01/tileset.json', TilesetJsonSchema);
-  const sheet = await Assets.load<Texture>('/art/ground/meadow-01/tileset.png');
+  // A ground's tiles, loaded once and kept: the one the road is laid with, and the one the run prepared last asked for.
+  const grounds = new Map<GroundSet, Promise<{ readonly set: GroundSet; readonly tileset: TilesetJson; readonly sheet: Texture }>>();
+  const groundOf = (set: GroundSet) => {
+    let load = grounds.get(set);
+    if (!load) {
+      load = Promise.all([fetchJson(`/art/ground/${set}/tileset.json`, TilesetJsonSchema), Assets.load<Texture>(`/art/ground/${set}/tileset.png`)]).then(
+        ([tileset, sheet]) => ({ set, tileset, sheet }),
+      );
+      grounds.set(set, load);
+    }
+    return load;
+  };
+  let laid = await groundOf(START_GROUND);
+  /** The ground the run prepared last asked for, and its tiles once they are in: an earlier run's ground arriving late is not this one's. */
+  let wanted: GroundSet = START_GROUND;
+  let prepared = laid;
+  let { tileset, sheet } = laid;
 
   // The world in the stage's coordinates: the road, then everyone back to front by the row they stand on.
   const world = new Container();
@@ -726,7 +748,11 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   };
 
   return {
-    prepare(cast) {
+    prepare(cast, ground) {
+      wanted = ground;
+      const road = groundOf(ground).then((arrived) => {
+        if (arrived.set === wanted) prepared = arrived;
+      });
       const sets = uniq(cast.flatMap((member) => artPath(member.kind, member.type, member.spriteSet) ?? []));
       const weapons = uniq(cast.flatMap((member) => weaponOf(member.kind, member.type) ?? []));
       const effectSets = uniq(Object.values(ABILITY_EFFECTS));
@@ -738,6 +764,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
           ...effectSets.map((set) => effectArtOf(set)),
           ...icons.map((material) => iconArtOf(material)),
           glyphArtOf(),
+          road,
         ],
         ART_WAIT_MS,
         failed,
@@ -746,6 +773,13 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
 
     reset(field, sets, enter) {
       heroSets = sets;
+      if (prepared !== laid) {
+        laid = prepared;
+        ({ tileset, sheet } = laid);
+        app.renderer.background.color = GROUNDS[laid.set].backdrop;
+        layRoad();
+        placeRoad();
+      }
       for (const effect of [...effects]) removeEffect(effect);
       for (const drop of [...drops]) removeDrop(drop);
       for (const id of [...projectiles.keys()]) removeProjectile(id);

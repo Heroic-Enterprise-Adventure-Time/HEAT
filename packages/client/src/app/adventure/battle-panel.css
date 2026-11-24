@@ -97,6 +97,13 @@ meter {
   font-weight: bold;
 }
 
+/* An unlock the run earned that the player did not hold: the one line of a result that is news beyond the run. */
+.unlocked {
+  padding-left: var(--space-sm);
+  border-left: var(--border-thick) solid var(--gold);
+  font-weight: bold;
+}
+
 .link {
   color: inherit;
   font-weight: bold;

@@ -4,13 +4,14 @@ import { Router } from '@angular/router';
 import { ABILITIES, type AbilityId, isPlayableTimeline, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
 import { rewardWords } from '../camp/panels/job-words';
+import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
 import { BattleView } from './battle-view';
 import { jobCast, timelineCast } from './cast';
 import { secondsLeft, waitingWords } from './field';
 import { Play } from './play';
 import { Playback } from './playback';
-import { outcomeWords, stageResultWords } from './result-words';
+import { earnedWords, outcomeWords, stageResultWords } from './result-words';
 
 /**
  * The open adventure, `/adventure` (Issue-15): the battle in the stage, and
@@ -19,7 +20,8 @@ import { outcomeWords, stageResultWords } from './result-words';
  * abilities to force its next action, the party's orders, press on and
  * retreat, and in a stage's last ten seconds the time left before the party
  * turns back. When the run ends it is submitted, and the result takes the
- * controls' place, with the replay, which plays the stored timeline in the
+ * controls' place, with each unlock the run earned that the player did not
+ * hold (Issue-352), the replay, which plays the stored timeline in the
  * same scene with no engine, and Back to camp. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
  * to load, and for the art of everyone this adventure sets against the party, so
@@ -39,6 +41,16 @@ export class Adventure {
   protected readonly outcomeWords = outcomeWords;
   /** Each stage of the settled result in words, "fight: won". */
   protected readonly stages = computed(() => stageResultWords(this.game.settled()?.result?.stages ?? []));
+  /**
+   * What the player is told for each unlock this run earned that they did
+   * not hold, in the content's words (game.md, "Unlocks"). The result lists
+   * what the run earned, held or not; which were new is worked out here from
+   * the player's own unlocks, read again after the submit (decision 0059).
+   */
+  protected readonly unlocked = computed(() => {
+    const settled = this.game.settled();
+    return settled?.result ? earnedWords(settled.result.unlocks, this.game.player()?.unlocks ?? [], settled.adventure.id) : [];
+  });
 
   private readonly view = viewChild.required(BattleView);
   private startedId: string | null = null;
@@ -86,7 +98,7 @@ export class Adventure {
       untracked(() => {
         this.startedId = adventure.id;
         this.play.start(adventure);
-        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), jobCast(adventure.snapshot.jobId, adventure.seed));
+        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), jobCast(adventure.snapshot.jobId, adventure.seed), groundAt(adventure.location));
       });
     });
     effect(() => {
@@ -113,7 +125,7 @@ export class Adventure {
     }
     this.replayState.set('idle');
     this.play.replay(timeline);
-    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events));
+    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events), groundAt(settled.adventure.location));
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */
