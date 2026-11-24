@@ -1,6 +1,6 @@
 # 0059: More locations: general unlocks, caravans with a cart, and Highcrag
 
-- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Not built: the client's second camp and the job that opens it, Issue-352; the cart in the engine, Issue-353; the hub's caravan, Issue-354; the caravan hub's panel, Issue-355; Highcrag's own content, Issue-356; Millbrook's second levels, Issue-357.
+- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Not built: the cart in the engine, Issue-353; the hub's caravan, Issue-354; the caravan hub's panel, Issue-355; Highcrag's own content, Issue-356; Millbrook's second levels, Issue-357.
 - **Date:** 2026-11-23
 - **Settles:** Issue-292: the second location, how a location unlocks, caravans with their cargo and their passengers, what a caravan risks, the caravan hub's jobs, and the keys all of it needs, which the overview's "Open" and decision 0013 left to be designed before they are built. The owner's calls of 2026-11-23, made in the Issue-292 session.
 - **Amends:** 0026, "every location offers villagers, so no player is ever locked out": Highcrag offers none, and the guarantee is the starting location's; and 0026, "Recruitment", `recruitHero(unitType, requestId)`, which names no location: recruiting takes its location from Issue-351 on. 0032, "The first numbers", which give the mine, the lumber camp and the caravan hub one level each: each gains a second at Millbrook, costing stone (Issue-357). 0058, "a job's own penalty returns with caravans": no job states a penalty, and what a caravan loses is its cargo, by the one table below.
@@ -121,6 +121,41 @@ Every hero earns 15 XP, and the limits are 90 s and 60 s. One run by a lone mine
 **What Issue-351 chose where this record is silent.** The first unlock is `road-to-highcrag`, "The road to Highcrag", and its words when earned are "The road to Highcrag is open. You have a camp there now.", a working assumption for Issue-352 to show. A result settled before the deploy has no list of unlocks and is read as having earned none, and a deploy leaves out an unlock its content does not know, in a result and among a player's own, since the deploy after it reads the same tables. No job grants an unlock until Issue-352, so `submitAdventure` takes the content its replay reads as a last parameter that only a test passes, as `startAdventure` takes the seed's source, and the hub's tests settle a job they add to it.
 
 Not chosen in this issue: **the submit's answer saying which unlocks were new,** which has to be stored or worked out again for a repeat, since a repeat answers the record as it is, and puts a second shape on a mutation's success; **a create of the unlock's item on the condition that it is absent,** which cancels the settlement of every later run that earns it; **a read of the unlocks at settlement, writing only those not held,** a read and a race for what the update does without either; **a refusal type for a locked location,** a member of three result unions that no honest page can be answered with; **an optional location that defaults to Millbrook,** a second meaning for one mutation; and **closing a locked location's feeds,** which would make a public table's read depend on the caller's private data.
+
+## Amendment: the road's job and the page's second camp (Issue-352, 2026-11-24)
+
+The owner's calls at the start of Issue-352, which built the job that grants the first unlock and the client's side of a second camp. The agent put six to the owner, each with one recommendation, and the owner took all six as recommended.
+
+**The road's fight is two bandits, with no pay and a bonus of 8,** which brings the job's XP to the wolves job's 20, under a limit of 60 s. The numbers, over 500 seeds, `seed-0` to `seed-499`, with nothing forced. The engine's test holds every row but the two marked, which a probe of the same runs measured on `main` at 007b55f before the job was written, with the longest fight, 13.9 s.
+
+| Party | Complete | Defeated | Completed runs with a death |
+| --- | --- | --- | --- |
+| Any lone hero of a type Millbrook recruits | 0 | 500 | |
+| 2 villagers; ranger and villager | 0 | 500 | |
+| 2 rangers (probe) | 78 | 422 | 74 |
+| 3 villagers (probe) | 487 | 13 | 487, with 780 villagers lost |
+| 4 villagers | 500 | 0 | 402, one villager each |
+| Fighter and villager | 500 | 0 | 134: the villager 117, the fighter 17 |
+| Fighter and ranger | 500 | 0 | 65, the fighter |
+| 2 fighters | 500 | 0 | 0 |
+| Fighter, ranger, villager | 500 | 0 | 0 |
+| Fighter and 3 villagers | 500 | 0 | 0 |
+
+The party that is safe on the wolves job, a fighter with a villager, always opens the road and loses a hero on about one run in four, so the job asks for one more hero than a player has needed. A death is permanent and nothing brings a hero back yet (game.md, "Heroes"), which is the cost of the choice; the description warns of it. One bandit, with a bonus of 14, is easier than the wolves job: a lone fighter and two villagers complete it on every seed with no death. Three, with a bonus of 2, defeat a fighter with a villager, a fighter with a ranger and three villagers on every seed, and only two fighters with a ranger are safe.
+
+**The words,** each a working assumption to be changed by looking. The job's description: "Nobody has walked the hill road to Highcrag since bandits took it. Clear it as far as the fort's gate and the way is open: you will have a camp there. One sword is not enough." The unlock's words stay Issue-351's. An empty hall at Highcrag: "No hero is here yet. Nobody at Highcrag joins for nothing: its first hero comes by caravan from another camp.", and where every hero there is dead, that the next comes by caravan.
+
+**A new unlock is told on the result of the run that earned it,** under how it ended, and not on a replay's page: a replay is public, and which unlocks were new is the owner's alone to be told.
+
+**Highcrag's layout lists the hall, the warehouse and the job board.** The content gives a camp there nothing to build until Issue-356, and the engine has no quarry among its facilities. The sites the owner chose in the mock-up for the caravan hub and the quarry are in a comment beside the layout and on Issue-356, and the earth under the hub's site stands bare until then.
+
+**A battle is drawn on the ground of the location its adventure left from** (decision 0028, its amendment of the same date): found while reading for this issue, and done in it by `docs/process/code-changes.md`, rule 30.
+
+**The stack test's three checks of Issue-351 stand as they were,** where the agent first put to the owner that they would branch on whether the user holds the unlock. The pipeline's test user builds the mine and nothing else, on a sandbox stack and on `dev`, so it never has a caravan hub and never scouts the road, and a branch for a user that holds the unlock would be code no run reaches. What is behind the unlock is proven against DynamoDB Local, and on the issue's stack by hand, as a base test user whose camp was played up to the hub.
+
+**`submitAdventure`'s content parameter stays,** where Issue-351's hand-over had it that it "can go" once a job of the content grants: `docs/standards/graphql.md`, rule 27, accepted since, holds it as the way a test settles a job the game does not have, and the tests of the rule still use it, beside the new tests that settle the content's own job through the verbs.
+
+Not chosen in this issue: **a link from the result to the camp it opens,** since an unlock is general and the next one may open no camp, and the select is where a camp is chosen; **the unlock's words on a replay's page,** above; **the hub's and the quarry's spots in the layout before their facilities exist,** which would draw and list a caravan hub the content does not give Highcrag; and **the stack test playing its user up to the hub,** some twenty adventures on every run for one check.
 
 ## Considered and not chosen
 
