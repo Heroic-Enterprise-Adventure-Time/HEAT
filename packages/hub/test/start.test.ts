@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { must, UNIT_PROFILES } from "@heat/engine";
+import { FACILITIES, type FacilityKind, jobsPostedBy, location, must, UNIT_PROFILES } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
@@ -244,56 +244,79 @@ describe("startAdventure", () => {
   });
 });
 
-describe("a facility's job (Issue-133)", () => {
-  const ore = "ore-from-the-hill";
+/**
+ * Every own facility of Millbrook that posts a job, with the first job it
+ * posts, read from the content (typescript.md, rule 25): the mine (Issue-133)
+ * and the lumber camp (Issue-291).
+ */
+const posters = must(location(at), "Millbrook").buildableFacilities.flatMap((kind) => {
+  const job = jobsPostedBy(at, kind)[0];
+  return job ? [{ kind, job: job.id }] : [];
+});
 
-  /** The mine built as a player builds it: paid for with the timber run's 60 timber and 3 cloth. */
-  async function buildMine(p: string): Promise<void> {
-    await repo.setBalance(p, at, "timber", 60);
-    await repo.setBalance(p, at, "cloth", 3);
-    await buildFacility(repo, p, at, "mine", 1);
+describe("a facility's job (Issue-133, Issue-291)", () => {
+  /** The facility built as a player builds it: paid for with what its first level costs. */
+  async function build(p: string, kind: FacilityKind): Promise<void> {
+    for (const { material, amount } of must(FACILITIES[kind].levels[0], `the first level of the ${kind}`).cost) await repo.setBalance(p, at, material, amount);
+    await buildFacility(repo, p, at, kind, 1);
   }
 
-  it("refuses the mine's job while the camp has not built the mine, and writes nothing", async () => {
-    const p = player();
-    const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    const refused = await refusal(startAdventure(repo, p, version, randomUUID(), at, ore, [hero.id]));
-    expect(refused).toBeInstanceOf(Requires);
-    expect(refused).toMatchObject({ missing: [{ kind: "mine", level: 1 }] });
-    expect(await repo.openAdventure(p)).toBeUndefined();
-    expect((await repo.getHero(p, hero.id))?.adventureId).toBeNull();
+  it("is the mine's and the lumber camp's: the facilities of Millbrook that post one", () => {
+    expect(posters.map((poster) => poster.kind)).toEqual(["mine", "lumber-camp"]);
   });
 
-  it("starts the mine's job once the camp has built the mine", async () => {
-    const p = player();
-    const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    await buildMine(p);
-    const started = await startAdventure(repo, p, version, randomUUID(), at, ore, [hero.id]);
-    expect(started).toMatchObject({ location: at, jobId: ore, status: "OPEN" });
-    expect((await repo.openAdventure(p))?.adventureId).toBe(started.adventureId);
-    expect((await repo.getHero(p, hero.id))?.adventureId).toBe(started.adventureId);
-  });
-
-  it("holds the rule in the transaction, against a camp read with the mine built", async () => {
-    const p = player();
-    const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
-    // The first read of the camp sees a mine, as no camp yet can lose one; the transaction finds no mine item.
-    let reads = 0;
-    const stale = new Proxy(repo, {
-      get: (target, key, receiver): unknown =>
-        key === "camp"
-          ? async (id: string, location: string): Promise<Camp> => {
-              const camp = await target.camp(id, location);
-              return reads++ === 0 ? { ...camp, facilities: { ...camp.facilities, mine: 1 } } : camp;
-            }
-          : Reflect.get(target, key, receiver),
+  for (const { kind, job } of posters) {
+    it(`refuses the ${kind}'s job while the camp has not built it, and writes nothing`, async () => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      const refused = await refusal(startAdventure(repo, p, version, randomUUID(), at, job, [hero.id]));
+      expect(refused).toBeInstanceOf(Requires);
+      expect(refused).toMatchObject({ missing: [{ kind, level: 1 }] });
+      expect(await repo.openAdventure(p)).toBeUndefined();
+      expect((await repo.getHero(p, hero.id))?.adventureId).toBeNull();
     });
-    const refused = await refusal(startAdventure(stale, p, version, randomUUID(), at, ore, [hero.id]));
-    expect(refused).toBeInstanceOf(Requires);
-    expect(refused).toMatchObject({ missing: [{ kind: "mine", level: 1 }] });
-    expect(await repo.openAdventure(p)).toBeUndefined();
-    expect((await repo.getHero(p, hero.id))?.adventureId).toBeNull();
-  });
+
+    it(`starts the ${kind}'s job once the camp has built it`, async () => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      await build(p, kind);
+      const started = await startAdventure(repo, p, version, randomUUID(), at, job, [hero.id]);
+      expect(started).toMatchObject({ location: at, jobId: job, status: "OPEN" });
+      expect((await repo.openAdventure(p))?.adventureId).toBe(started.adventureId);
+      expect((await repo.getHero(p, hero.id))?.adventureId).toBe(started.adventureId);
+    });
+
+    it(`refuses the ${kind}'s job at a camp that has built every other facility that posts one: a job needs its own`, async () => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      for (const other of posters) if (other.kind !== kind) await build(p, other.kind);
+      const refused = await refusal(startAdventure(repo, p, version, randomUUID(), at, job, [hero.id]));
+      expect(refused).toBeInstanceOf(Requires);
+      expect(refused).toMatchObject({ missing: [{ kind, level: 1 }] });
+      expect(await repo.openAdventure(p)).toBeUndefined();
+    });
+
+    it(`holds the rule for the ${kind} in the transaction, against a camp read with it built`, async () => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      // The first read of the camp sees the facility, as no camp yet can lose one; the transaction finds no item for it.
+      let reads = 0;
+      const stale = new Proxy(repo, {
+        get: (target, key, receiver): unknown =>
+          key === "camp"
+            ? async (id: string, location: string): Promise<Camp> => {
+                const camp = await target.camp(id, location);
+                return reads++ === 0 ? { ...camp, facilities: { ...camp.facilities, [kind]: 1 } } : camp;
+              }
+            : Reflect.get(target, key, receiver),
+      });
+      const refused = await refusal(startAdventure(stale, p, version, randomUUID(), at, job, [hero.id]));
+      expect(refused).toBeInstanceOf(Requires);
+      expect(refused).toMatchObject({ missing: [{ kind, level: 1 }] });
+      expect(await repo.openAdventure(p)).toBeUndefined();
+      expect((await repo.getHero(p, hero.id))?.adventureId).toBeNull();
+    });
+  }
 
   it("needs nothing built for a job on the job board", async () => {
     const p = player();

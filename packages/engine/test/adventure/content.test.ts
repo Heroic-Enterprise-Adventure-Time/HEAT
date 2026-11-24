@@ -6,6 +6,8 @@ import {
   BATTLE_CONTENT,
   countRange,
   isResourceType,
+  JOB_WAREHOUSE_LEVEL,
+  type JobId,
   JOBS,
   largestStages,
   LEVEL_XP,
@@ -16,7 +18,7 @@ import {
   replay,
   RESOURCE_NODES,
   RETREAT,
-  WAREHOUSE_CAPACITY,
+  warehouseCapacity,
 } from "../../src/index.js";
 import { atLargest, contentWithJob, enemiesXp, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
@@ -65,13 +67,14 @@ describe("The adventure's content", () => {
     expect(JOBS["timber-from-the-near-woods"].pay).toEqual([{ material: "cloth", amount: 3 }]);
   });
 
-  it("gives each job the XP it gave before the enemies had any: its enemies' and its bonus together (decision 0058)", () => {
+  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), and the ore job's 15 for the lumber camp's", () => {
     expect(mapValues(JOBS, (job) => job.bonusXp)).toEqual({
       "pick-up-sticks": 2,
       "timber-from-the-near-woods": 4,
       "wolves-on-the-mill-road": 10,
       "ore-from-the-hill": 4,
       "goblins-in-the-old-workings": 6,
+      "lumber-from-the-deep-woods": 6,
     });
     expect(mapValues(JOBS, (job) => enemiesXp(job) + job.bonusXp)).toEqual({
       "pick-up-sticks": 5,
@@ -79,16 +82,18 @@ describe("The adventure's content", () => {
       "wolves-on-the-mill-road": 20,
       "ore-from-the-hill": 15,
       "goblins-in-the-old-workings": 25,
+      "lumber-from-the-deep-woods": 15,
     });
   });
 
   it("gives 5 more XP when the first job's wolf appears: an enemy that appears by chance adds its own (decision 0058)", () => {
     const sticks = JOBS["pick-up-sticks"];
     expect(enemiesXp(atLargest(sticks)) + sticks.bonusXp).toBe(10);
-    // No other job varies yet, so its largest roll is the job.
-    for (const [id, job] of Object.entries(JOBS)) {
-      if (id !== "pick-up-sticks") expect(largestStages(job), id).toEqual(job.stages);
-    }
+  });
+
+  it("has two jobs that vary, the first job and the lumber camp's: every other job's largest roll is the job as written", () => {
+    const varying = Object.values(JOBS).filter((job) => JSON.stringify(largestStages(job)) !== JSON.stringify(job.stages));
+    expect(varying.map((job) => job.id)).toEqual(["pick-up-sticks", "lumber-from-the-deep-woods"]);
   });
 
   for (const job of Object.values(JOBS)) {
@@ -104,9 +109,10 @@ describe("The adventure's content", () => {
     });
   }
 
-  it("brings home from a job's largest roll no more of any resource than a level-1 warehouse holds, at the best row of every drop", () => {
-    const cap = WAREHOUSE_CAPACITY[0] ?? 0;
-    for (const job of Object.values(JOBS)) {
+  it("brings home from a job's largest roll no more of any resource than a level-1 warehouse holds, at the best row of every drop, or than the level the owner accepted for the job holds", () => {
+    for (const [id, job] of Object.entries(JOBS) as [JobId, (typeof JOBS)[JobId]][]) {
+      const level = JOB_WAREHOUSE_LEVEL[id] ?? 1;
+      const cap = warehouseCapacity(level);
       const most = Object.fromEntries(MATERIALS.map((material) => [material, job.pay.find((r) => r.material === material)?.amount ?? 0]));
       for (const stage of largestStages(job)) {
         if (stage.kind !== "fight" && stage.kind !== "gather") continue;
@@ -117,6 +123,8 @@ describe("The adventure's content", () => {
         }
       }
       for (const material of MATERIALS) expect(most[material], `${job.id} ${material}`).toBeLessThanOrEqual(cap);
+      // A job is named with a level only because it passes the level below: the list excuses nothing that needs no excuse.
+      if (level > 1) expect(Math.max(...Object.values(most)), job.id).toBeGreaterThan(warehouseCapacity(level - 1));
       expect(sum(Object.values(most)), job.id).toBeGreaterThan(0);
     }
   });
