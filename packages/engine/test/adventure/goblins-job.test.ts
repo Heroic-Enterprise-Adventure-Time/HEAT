@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { type AdventureResult, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { GOBLINS, haul, ORE, party, played, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { type AdventureResult, JOBS, jobsPostedBy, replay, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
+import { GOBLINS, haul, MILLBROOK_RECRUITS, ORE, party, played, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The first mixed stage (Issue-286, decision 0052): three ore veins hold the
 // front line and two goblin rock throwers stand behind them. Its numbers are
@@ -88,7 +88,7 @@ describe("Goblins in the old workings", () => {
   });
 
   it("is paid for in the hall: a ranger needs the hall's second level, and costs timber and cloth", () => {
-    const ranger = location(STARTING_LOCATION)?.recruits.find((r) => r.unitType === "ranger");
+    const ranger = MILLBROOK_RECRUITS.find((r) => r.unitType === "ranger");
     expect(ranger).toEqual({ unitType: "ranger", hallLevel: 2, cost: [{ material: "timber", amount: 40 }, { material: "cloth", amount: 10 }] });
   });
 });

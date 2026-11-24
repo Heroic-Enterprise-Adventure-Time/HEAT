@@ -15,7 +15,7 @@ import {
   replay,
   type StageEntry,
 } from "../../src/index.js";
-import { contentWithJob, hero, meets, ofKind, SEEDS, seeds, snapshot, STICKS, TIMBER } from "./helpers.js";
+import { contentWithJob, hero, LUMBER, meets, ofKind, SEEDS, seeds, snapshot, STICKS, TIMBER } from "./helpers.js";
 
 // A job's adventures vary (decision 0058, Issue-341): each entry of a fight or
 // a gather stage has a count or a range for it and perhaps a chance of
@@ -65,8 +65,8 @@ describe("A job's stages, expanded from the seed", () => {
 
   it("leave a job with no variance exactly as it is written, on every seed", () => {
     const fixed = Object.values(JOBS).filter((job) => job.stages.every((s) => !("opponents" in s) || s.opponents.every((o) => alwaysAppears(o) && typeof o.count === "number")));
-    // Every job but the first, today.
-    expect(fixed.map((job) => job.id)).toEqual(Object.keys(JOBS).filter((id) => id !== STICKS));
+    // Every job but the first and the lumber camp's, today.
+    expect(fixed.map((job) => job.id)).toEqual(Object.keys(JOBS).filter((id) => id !== STICKS && id !== LUMBER));
     for (const job of fixed) {
       for (const seed of seeds.slice(0, 50)) expect(expandStages(job, seed), `${job.id} ${seed}`).toEqual(job.stages);
     }

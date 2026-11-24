@@ -558,7 +558,13 @@ export const BATTLE_CONTENT: BattleContent = {
 
 // ── Jobs and advancement ───────────────────────────────────────────
 
-export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road" | "ore-from-the-hill" | "goblins-in-the-old-workings";
+export type JobId =
+  | "pick-up-sticks"
+  | "timber-from-the-near-woods"
+  | "wolves-on-the-mill-road"
+  | "ore-from-the-hill"
+  | "goblins-in-the-old-workings"
+  | "lumber-from-the-deep-woods";
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
@@ -568,16 +574,19 @@ export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on
  * brings home is what its enemies drop for the traits the party carries
  * (decision 0058). Each job's bonus XP is what brings its XP, with the
  * enemies that always appear, to what decision 0030 gave it: 5, 15, 20, 15
- * and 25. A job's description is all the page tells of it beside its pay
- * and its bonus, so it says what its author chooses to tell.
+ * and 25; the lumber camp's job, written since, gives the ore job's 15. A
+ * job's description is all the page tells of it beside its pay and its
+ * bonus, so it says what its author chooses to tell.
  *
  * An entry of a fight or a gather stage may vary (decision 0058, Issue-341):
  * its count a range, and a chance of appearing at all, rolled from the
  * adventure's seed by `expandStages`. Every such stage keeps an entry that
  * always appears, its time limit fits its largest roll, and that roll brings
- * home no more of a resource than a level-1 warehouse holds; the content's
- * test checks all three. A job's bonus XP counts only the enemies that always
- * appear: one that appears by chance adds its own.
+ * home no more of a resource than a level-1 warehouse holds, but for the one
+ * resource of a job that the owner accepted at a higher level, which
+ * `JOB_WAREHOUSE_LEVEL` names;
+ * the content's test checks all three. A job's bonus XP counts only the
+ * enemies that always appear: one that appears by chance adds its own.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
   // A lone villager cannot fail it, whatever it is forced to do (decision
@@ -663,6 +672,52 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     pay: [],
     bonusXp: 6,
   },
+  // The lumber camp's first job (Issue-291), and the first written for
+  // decision 0058's shape, not converted to it: three trees or four, and on
+  // half its runs a wolf or two among them. The puzzle is the owner's, a
+  // woodcutter for the trees and a skinner for the wolves that may appear, in
+  // a party that survives them: two wolves come on one run in four, and then
+  // a lone villager, lumberjack, miner or ranger always falls and a lone
+  // fighter on about half; a fighter beside the cutter makes it safe. It brings
+  // home clearly more timber than the board's timber job, 90 to 144 for
+  // villagers and 126 to 200 for a lumberjack, which a level-1 warehouse
+  // cannot hold (`JOB_WAREHOUSE_LEVEL`). Its XP is 15 at its least roll, as
+  // the mine's first job, and 28 at its largest. The description names
+  // neither the wolves nor their hides.
+  "lumber-from-the-deep-woods": {
+    id: "lumber-from-the-deep-woods",
+    name: "Lumber from the deep woods",
+    description: "The old stand in the deep woods is marked for the camp's axes: three trees at least, and some days a fourth worth felling. Cutters who went out alone have not all come back.",
+    location: "millbrook",
+    facility: "lumber-camp",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      {
+        kind: "gather",
+        opponents: [{ type: "tree", count: { min: 3, max: 4 } }, { type: "wolf", count: { min: 1, max: 2 }, chancePercent: 50 }],
+        timeLimitMs: 180_000,
+      },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 6,
+  },
+};
+
+/**
+ * For a job whose largest roll passes a level-1 warehouse: the one resource
+ * the owner accepted that for, and the warehouse level whose cap holds it at
+ * the best row of its drop. Every other job, and every other resource of a
+ * job named here, fits level 1, and the content's test holds each to that.
+ * The lumber camp's job is the first, for its timber (the owner, 2026-11-23,
+ * Issue-291; decision 0058, its fourth amendment): the board's timber job
+ * already reaches a level-1 warehouse's 100 at a lumberjack's best roll, so a
+ * job with clearly more timber passes it. A level-1 warehouse loses what it
+ * cannot hold, the result says how much, and the job is what makes the second
+ * level worth building.
+ */
+export const JOB_WAREHOUSE_LEVEL: Readonly<Partial<Record<JobId, { readonly material: Material; readonly level: number }>>> = {
+  "lumber-from-the-deep-woods": { material: "timber", level: 2 },
 };
 
 /** The job with this id, or undefined for an id this version's content does not know, as an adventure of another version may carry. */

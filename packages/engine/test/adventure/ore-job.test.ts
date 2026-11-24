@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { FACILITIES, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION } from "../../src/index.js";
-import { haul, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { FACILITIES, JOBS, jobsPostedBy, replay, STARTING_LOCATION } from "../../src/index.js";
+import { haul, MILLBROOK_RECRUITS, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The mine's first job (Issue-133, decision 0031, with the hauls of decision
 // 0058): posted by the mine, not the job board, and one run of it by
@@ -63,7 +63,7 @@ describe("Ore from the hill", () => {
   });
 
   it("pays for a fighter in one run, at its worst roll", () => {
-    const fighter = location(STARTING_LOCATION)?.recruits.find((r) => r.unitType === "fighter");
+    const fighter = MILLBROOK_RECRUITS.find((r) => r.unitType === "fighter");
     expect(fighter?.cost).toEqual([{ material: "ore", amount: VILLAGERS_ORE.min }]);
   });
 });

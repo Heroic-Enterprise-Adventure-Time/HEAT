@@ -1,8 +1,8 @@
 import { countBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { type AdventureResult, JOBS, must } from "../../src/index.js";
-import { haul, ORE, party, played, rewardOf, SEEDS, TIMBER, villagers, WOLVES } from "./helpers.js";
+import { JOBS, must } from "../../src/index.js";
+import { haul, hideOf, ORE, party, played, rewardOf, SEEDS, TIMBER, villagers, WOLVES } from "./helpers.js";
 
 // Hide and skinning, the first new pair (Issue-340, decision 0058): the wolf
 // drops hide to a party with a ranger standing, and nothing to any other. The
@@ -11,8 +11,6 @@ import { haul, ORE, party, played, rewardOf, SEEDS, TIMBER, villagers, WOLVES } 
 // so: not every drop is told.
 
 const wolves = JOBS[WOLVES];
-
-const hideOf = (result: AdventureResult) => rewardOf(result, "hide");
 
 describe("The wolf's hide on Millbrook's jobs", () => {
   it("is told by no job's description", () => {
