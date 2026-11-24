@@ -1,0 +1,56 @@
+{
+  "set": "crag-01",
+  "kind": "ground tileset",
+  "terrains": { "lower": "dirt", "upper": "rock" },
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "tilesetId": "ee164450-f3ce-4dd4-af9e-a17237fa05c8",
+    "baseTileIds": {
+      "lower": "b5837710-5020-44df-bd73-dfa42d8dbd3f",
+      "upper": "68cc10c0-3963-47c8-9644-c4de6f857723"
+    }
+  },
+  "generation": {
+    "tool": "create_topdown_tileset",
+    "via": "MCP",
+    "createdAt": "2026-11-24T19:57:28Z",
+    "parameters": {
+      "lower_description": "packed brown dirt path, warm earthy tones, NES-era retro pixel art, few colors",
+      "lower_base_tile_id": "b5837710-5020-44df-bd73-dfa42d8dbd3f",
+      "upper_description": "rugged grey rock slabs with deep cracks and scattered stones, warm earthy tones, NES-era retro pixel art, few colors",
+      "transition_description": "quarried rock face, a cut stone wall",
+      "transition_size": 0.5,
+      "mode": "standard",
+      "tile_size": { "width": 16, "height": 16 },
+      "shading": "flat shading",
+      "detail": "low detail"
+    },
+    "lowerFrom": "meadow-01's dirt, by its base tile id, so the road is the same earth at both ends of a caravan's route; standard redraws the shared terrain close to the first, not byte for byte.",
+    "drawnAs": {
+      "why": "Standard rewrites the descriptions before drawing (its `enhance`, on by default) and always draws high top-down; tileset.json keeps both texts, under metadata.user_prompts and metadata.terrain_prompts.",
+      "view": "high top-down",
+      "upper_description": "rugged grey rock slabs with wide deep cracks and sparse scattered stones in flat solid tones, no gradients or shadows",
+      "transition_description": "quarried rock face forming a cut stone wall with large even blocks in flat uniform colour, no gradients or shadows"
+    },
+    "generations": 1
+  },
+  "files": {
+    "tileset.png": "The 64×64 sheet of 16 tiles, 16×16 each.",
+    "tileset.json": "PixelLab's metadata for the sheet: each tile's corners (NW, NE, SW, SE as lower or upper) and its bounding_box on the sheet. Whatever draws the ground picks each tile by its four corners and cuts it out by its bounding_box, never by its wang_N name or original_position."
+  },
+  "rejectedTags": "Tilesets cannot be tagged in PixelLab; this list is how the rejects are found.",
+  "rejected": [
+    { "tilesetId": "c97b770e-c027-44f5-b613-73b3884dfda9", "generations": 1, "why": "New earth, `packed dry earth yard`, under `bare weathered rock, cracked grey-brown stone`, transition_size 0.25: both terrains came out brown, the rock as more earth." },
+    { "tilesetId": "fd536850-ae24-47da-8f1a-9f6e0de7669f", "generations": 1, "why": "The same descriptions with transition_size 0: the rock a flat purple-grey field with no texture." },
+    { "tilesetId": "633789d6-7e35-4bce-aa55-3bd2bc6371a0", "generations": 1, "why": "Meadow-01's dirt under `bare weathered rock, cracked grey-brown stone`, transition_size 0.25: grey rock, but only speckles on it." },
+    { "tilesetId": "82b3ef35-617c-45d7-80cd-8acda90f102c", "generations": 1, "why": "The kept descriptions with the transition `low rock ledge with rubble over packed earth` at 0.25: light grey slabs that read as paving more than as a crag." }
+  ],
+  "chosenBy": "The owner, 2026-11-24, in a 400×225 camp mock-up at 3× with kept hero sets (art/mockups/highcrag-400x225-3x.png).",
+  "verified": "tileset.png (/mcp/tilesets/<id>/image) and tileset.json (/mcp/tilesets/<id>/metadata) are byte-identical to a second download of each, 2026-11-24; the metadata holds 16 tiles, one for each set of four corners, each box a whole tile inside the sheet."
+}
