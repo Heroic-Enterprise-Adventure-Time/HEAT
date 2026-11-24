@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { range } from "es-toolkit";
+import { getNamedType, type GraphQLInputType, isInputObjectType } from "graphql";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
@@ -26,10 +27,11 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { type AdventureRecord, type EarnedUnlock, type Hero, LocationLocked, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { InsufficientResources } from "../src/refusals.js";
+import { schema } from "../src/schema/schema.js";
 import { startAdventure } from "../src/start.js";
 import { type OverrideInput, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { player, putParty, putUnlock, storedItem } from "./data.js";
+import { balances, player, putParty, putUnlock, stock, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -244,14 +246,7 @@ describe("the player's camps", () => {
   });
 });
 
-/** Puts stock into a camp directly, as a caravan will deliver it. */
-async function stock(p: string, location: string, holdings: Partial<Record<Material, number>>) {
-  for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, location, material, balance);
-}
-
-const balances = async (p: string, location: string) => Object.fromEntries((await repo.holdings(p, location)).map((h) => [h.material, h.balance]));
-
-/** Enough of everything Highcrag's recruits and a warehouse's second level cost. */
+/** Enough of everything a fighter and a warehouse's second level cost. */
 const PLENTY = { ore: 100, timber: 100 } as const;
 
 /**
@@ -269,52 +264,66 @@ function trusting(): Repository {
 
 describe("a location the player has not unlocked", () => {
   /**
-   * Each verb that takes a location, at Highcrag, for a player whose camp
+   * Each verb that takes a location, by its mutation, for a player whose camp
    * there passes every other rule: the repository's transaction it ends in,
-   * and what it leaves when it is let through.
+   * and what it leaves when it is let through. Each is something Millbrook
+   * and Highcrag both offer: a fighter, the warehouse's second level and a
+   * job on the board.
    */
   const VERBS = [
     {
-      name: "recruit",
+      mutation: "recruitHero",
       transaction: "recruit",
-      run: (r: Repository, p: string) => recruitHero(r, p, highcrag.id, "fighter", randomUUID()),
-      done: async (p: string) => { expect((await repo.heroes(p)).map((h) => h.unitType).sort()).toEqual(["fighter", "miner"]); },
+      run: (r: Repository, p: string, at: string) => recruitHero(r, p, at, "fighter", randomUUID()),
+      done: async (p: string, _at: string) => { expect((await repo.heroes(p)).map((h) => h.unitType).sort()).toEqual(["fighter", "miner"]); },
     },
     {
-      name: "build",
+      mutation: "buildFacility",
       transaction: "build",
-      run: (r: Repository, p: string) => buildFacility(r, p, highcrag.id, "warehouse", 2),
-      done: async (p: string) => { expect((await repo.camp(p, highcrag.id)).warehouseLevel).toBe(2); },
+      run: (r: Repository, p: string, at: string) => buildFacility(r, p, at, "warehouse", 2),
+      done: async (p: string, at: string) => { expect((await repo.camp(p, at)).warehouseLevel).toBe(2); },
     },
     {
-      name: "start",
+      mutation: "startAdventure",
       transaction: "startAdventure",
-      run: async (r: Repository, p: string) => startAdventure(r, p, version, randomUUID(), highcrag.id, crag.id, (await repo.heroes(p)).map((h) => h.id)),
-      done: async (p: string) => { expect(await repo.openAdventure(p)).toBeDefined(); },
+      run: async (r: Repository, p: string, at: string) =>
+        startAdventure(r, p, version, randomUUID(), at, must(jobsPostedBy(at, "job-board")[0], "a job on the board").id, (await repo.heroes(p)).map((h) => h.id)),
+      done: async (p: string, _at: string) => { expect(await repo.openAdventure(p)).toBeDefined(); },
     },
   ] as const;
 
-  /** A player with a miner and stock at Highcrag, put past the verbs, and no unlock. */
-  async function locked(): Promise<string> {
+  /** A player with a miner and stock at the location, put past the verbs, and no unlock. */
+  async function camped(at: string): Promise<string> {
     const p = player();
-    await putParty(db, tables, p, ["miner"], highcrag.id);
-    await stock(p, highcrag.id, PLENTY);
+    await putParty(db, tables, p, ["miner"], at);
+    await stock(repo, p, at, PLENTY);
     return p;
   }
 
   async function untouched(p: string): Promise<void> {
-    expect(await balances(p, highcrag.id)).toEqual(PLENTY);
+    expect(await balances(repo, p, highcrag.id)).toEqual(PLENTY);
     expect(await repo.camp(p, highcrag.id)).toMatchObject({ hallLevel: 1, warehouseLevel: 1, activeHeroes: 1, livingHeroes: 1 });
     expect(await repo.openAdventure(p)).toBeUndefined();
     expect((await repo.heroes(p)).map((h) => h.adventureId)).toEqual([null]);
   }
 
+  it("is refused by every mutation whose input names a location, read off the schema: the verbs below are all of them", () => {
+    const takesLocation = (field: { args: readonly { type: GraphQLInputType }[] }) =>
+      field.args.some((arg) => {
+        const input = getNamedType(arg.type);
+        return isInputObjectType(input) && Object.hasOwn(input.getFields(), "location");
+      });
+    const mutations = Object.values(must(schema.getMutationType(), "the mutation type").getFields()).filter(takesLocation).map((field) => field.name);
+    expect(mutations.length).toBeGreaterThan(0);
+    expect(VERBS.map((verb) => verb.mutation).sort()).toEqual(mutations.sort());
+  });
+
   for (const verb of VERBS) {
-    it(`refuses a ${verb.name} by its read, as bad input, before any transaction`, async () => {
-      const p = await locked();
+    it(`refuses ${verb.mutation} by its read, as bad input, before any transaction`, async () => {
+      const p = await camped(highcrag.id);
       const transaction = vi.spyOn(Repository.prototype, verb.transaction);
       try {
-        expect(await refusal(verb.run(repo, p))).toMatchObject(BAD_USER_INPUT);
+        expect(await refusal(verb.run(repo, p, highcrag.id))).toMatchObject(BAD_USER_INPUT);
         expect(transaction).not.toHaveBeenCalled();
       } finally {
         transaction.mockRestore();
@@ -322,11 +331,11 @@ describe("a location the player has not unlocked", () => {
       await untouched(p);
     });
 
-    it(`refuses a ${verb.name} by its transaction when the read is wrong, as bad input, and writes nothing`, async () => {
-      const p = await locked();
+    it(`refuses ${verb.mutation} by its transaction when the read is wrong, as bad input, and writes nothing`, async () => {
+      const p = await camped(highcrag.id);
       const transaction = vi.spyOn(Repository.prototype, verb.transaction);
       try {
-        expect(await refusal(verb.run(trusting(), p))).toMatchObject(BAD_USER_INPUT);
+        expect(await refusal(verb.run(trusting(), p, highcrag.id))).toMatchObject(BAD_USER_INPUT);
         expect(transaction).toHaveBeenCalledTimes(1);
         await expect(transaction.mock.results[0]?.value).rejects.toBeInstanceOf(LocationLocked);
       } finally {
@@ -335,29 +344,28 @@ describe("a location the player has not unlocked", () => {
       await untouched(p);
     });
 
-    it(`lets the ${verb.name} through once the unlock is held`, async () => {
-      const p = await locked();
+    it(`lets ${verb.mutation} through once the unlock is held`, async () => {
+      const p = await camped(highcrag.id);
       await putUnlock(db, tables.player, p, road);
-      await verb.run(repo, p);
-      await verb.done(p);
+      await verb.run(repo, p, highcrag.id);
+      await verb.done(p, highcrag.id);
+    });
+
+    it(`reads and checks no unlock for ${verb.mutation} at the starting location, which needs none`, async () => {
+      const p = await camped(home);
+      const send = vi.spyOn(db, "send");
+      try {
+        await verb.run(repo, p, home);
+        // Every request the verb made of DynamoDB, its reads and its transaction: none names an unlock's item.
+        const requests = send.mock.calls.map(([command]) => JSON.stringify(command.input));
+        expect(requests.some((request) => request.includes("TransactItems"))).toBe(true);
+        expect(requests.join()).not.toContain("UNLOCK#");
+      } finally {
+        send.mockRestore();
+      }
+      await verb.done(p, home);
     });
   }
-
-  it("is every verb that takes a location: the three above", () => {
-    expect(VERBS.map((v) => v.name)).toEqual(["recruit", "build", "start"]);
-  });
-
-  it("puts no such check on the starting location, whose transactions name no unlock", async () => {
-    const p = player();
-    const send = vi.spyOn(db, "send");
-    try {
-      await recruitHero(repo, p, home, "villager", randomUUID());
-      const keys = send.mock.calls.flatMap(([command]) => JSON.stringify(command.input));
-      expect(keys.join()).not.toContain("UNLOCK#");
-    } finally {
-      send.mockRestore();
-    }
-  });
 });
 
 describe("Highcrag", () => {
@@ -365,7 +373,7 @@ describe("Highcrag", () => {
   async function arrived(holdings: Partial<Record<Material, number>> = {}): Promise<string> {
     const p = player();
     await putUnlock(db, tables.player, p, road);
-    await stock(p, highcrag.id, holdings);
+    await stock(repo, p, highcrag.id, holdings);
     return p;
   }
 
@@ -378,7 +386,7 @@ describe("Highcrag", () => {
       expect(recruit.cost.length, recruit.unitType).toBeGreaterThan(0);
       const paid: Record<string, number> = { ...PLENTY };
       for (const { material, amount } of recruit.cost) paid[material] = must(paid[material], `the stock of ${material}`) - amount;
-      expect(await balances(p, highcrag.id), recruit.unitType).toEqual(paid);
+      expect(await balances(repo, p, highcrag.id), recruit.unitType).toEqual(paid);
       for (const { material, amount } of recruit.cost) {
         expect(await storedItem(db, tables.player, playerKeys.ledger(p, requestId, `debit#${material}`))).toMatchObject({ location: highcrag.id, delta: -amount });
       }
@@ -392,21 +400,21 @@ describe("Highcrag", () => {
 
   it("has no free hero: with no hero alive every recruit on its list is refused for its whole cost, and Millbrook's stock does not pay", async () => {
     const p = await arrived();
-    await stock(p, home, PLENTY);
+    await stock(repo, p, home, PLENTY);
     for (const recruit of highcrag.recruits) {
       const refused = await refusal(recruitHero(repo, p, highcrag.id, recruit.unitType, randomUUID()));
       expect(refused, recruit.unitType).toBeInstanceOf(InsufficientResources);
       expect(refused, recruit.unitType).toMatchObject({ short: recruit.cost.map(({ material, amount }) => ({ material, amount, balance: 0 })) });
     }
     expect(await repo.heroes(p)).toEqual([]);
-    expect(await balances(p, home)).toEqual(PLENTY);
+    expect(await balances(repo, p, home)).toEqual(PLENTY);
   });
 
   it("does not recruit the villager, which Millbrook still gives a player with no hero for nothing", async () => {
     const p = await arrived(PLENTY);
     expect(highcrag.recruits.map((r) => r.unitType)).not.toContain("villager");
     expect(await refusal(recruitHero(repo, p, highcrag.id, "villager", randomUUID()))).toMatchObject(BAD_USER_INPUT);
-    expect(await balances(p, highcrag.id)).toEqual(PLENTY);
+    expect(await balances(repo, p, highcrag.id)).toEqual(PLENTY);
     const free = await recruitHero(repo, p, home, "villager", randomUUID());
     expect(free).toMatchObject({ location: home, unitType: "villager" });
     expect(await repo.holdings(p, home)).toEqual([]);
@@ -414,22 +422,22 @@ describe("Highcrag", () => {
 
   it("refuses a request id reused for another location, and charges nothing for it", async () => {
     const p = await arrived(PLENTY);
-    await stock(p, home, PLENTY);
+    await stock(repo, p, home, PLENTY);
     const requestId = randomUUID();
     const first = await recruitHero(repo, p, highcrag.id, "fighter", requestId);
-    const afterFirst = await balances(p, highcrag.id);
+    const afterFirst = await balances(repo, p, highcrag.id);
     expect(await refusal(recruitHero(repo, p, home, "fighter", requestId))).toMatchObject(BAD_USER_INPUT);
-    expect(await balances(p, home)).toEqual(PLENTY);
+    expect(await balances(repo, p, home)).toEqual(PLENTY);
     // The repeat at the location it named is still answered with its hero.
     expect(await recruitHero(repo, p, highcrag.id, "fighter", requestId)).toEqual(first);
-    expect(await balances(p, highcrag.id)).toEqual(afterFirst);
+    expect(await balances(repo, p, highcrag.id)).toEqual(afterFirst);
   });
 
   it("posts its board job to a miner recruited there, and credits the ore to Highcrag's own warehouse", async () => {
     const p = await arrived(PLENTY);
-    await stock(p, home, { ore: 7 });
+    await stock(repo, p, home, { ore: 7 });
     const miner = await recruitHero(repo, p, highcrag.id, "miner", randomUUID());
-    const before = must((await balances(p, highcrag.id))["ore"], "the ore left after the recruit");
+    const before = must((await balances(repo, p, highcrag.id))["ore"], "the ore left after the recruit");
     // A seed the engine's own test of the job plays, so the run is one it holds: a lone miner completes it.
     const started = await startAdventure(repo, p, version, randomUUID(), highcrag.id, crag.id, [miner.id], undefined, () => "seed-0");
     expect(started).toMatchObject({ location: highcrag.id, jobId: crag.id, status: "OPEN" });
@@ -441,8 +449,8 @@ describe("Highcrag", () => {
     // A level-1 warehouse holds 100 of each, so what the cap turns away is said, and the rest is credited there.
     const credited = must(settled.result?.credited.find((r) => r.material === "ore"), "the ore credited").amount;
     expect(credited + (settled.result?.lost.find((r) => r.material === "ore")?.amount ?? 0)).toBe(ore);
-    expect((await balances(p, highcrag.id))["ore"]).toBe(before + credited);
-    expect(await balances(p, home)).toEqual({ ore: 7 });
+    expect((await balances(repo, p, highcrag.id))["ore"]).toBe(before + credited);
+    expect(await balances(repo, p, home)).toEqual({ ore: 7 });
     // A job of another location is not started from Highcrag's camp.
     expect(await refusal(startAdventure(repo, p, version, randomUUID(), highcrag.id, "wolves-on-the-mill-road", [miner.id]))).toMatchObject(BAD_USER_INPUT);
   });
@@ -451,7 +459,7 @@ describe("Highcrag", () => {
     const p = await arrived({ timber: 80, ore: 40 });
     const camp = await buildFacility(repo, p, highcrag.id, "warehouse", 2);
     expect(camp).toMatchObject({ location: highcrag.id, warehouseLevel: 2, hallLevel: 1, stored: true });
-    expect(await balances(p, highcrag.id)).toEqual({ timber: 0, ore: 0 });
+    expect(await balances(repo, p, highcrag.id)).toEqual({ timber: 0, ore: 0 });
     expect(await repo.camp(p, home)).toMatchObject({ warehouseLevel: 1, stored: false });
   });
 });

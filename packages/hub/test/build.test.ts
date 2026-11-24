@@ -11,7 +11,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { BuildRefused, campLevels, type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
-import { player, whole } from "./data.js";
+import { balances as balancesAt, player, stock as stockAt, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -29,14 +29,8 @@ beforeAll(() => {
 
 const at = "millbrook";
 
-/** Puts stock into the camp directly, as settlement would credit it. */
-async function stock(p: string, holdings: Partial<Record<Material, number>>) {
-  for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, at, material, balance);
-}
-
-async function balances(p: string): Promise<Record<string, number>> {
-  return Object.fromEntries((await repo.holdings(p, at)).map((h) => [h.material, h.balance]));
-}
+const stock = (p: string, holdings: Partial<Record<Material, number>>) => stockAt(repo, p, at, holdings);
+const balances = (p: string) => balancesAt(repo, p, at);
 
 async function ledger(p: string): Promise<Record<string, unknown>[]> {
   const r = await db.send(

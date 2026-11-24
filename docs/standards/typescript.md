@@ -80,6 +80,10 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 27. **A comment that states a result over seeds states one that a test asserts.** A comment beside a job or a unit type that says how a party fares, how often something happens or what comes home says no more than a test in the repository holds, in the test's terms, and changes in the commit that changes the test; what was measured once and is held by no test goes into the decision record or the pull request, with how it was measured. `docs/README.md`, rules 5 and 6, hold documents to what is true, and nothing held a comment. A candidate rule from the review of PR-349 (Issue-291), accepted by the owner on 2026-11-23, where the lumber job's comment said any lone hero falls to two wolves and a lone fighter falls to them on 55 of 124 seeds.
 
+### What a test says it covers, of the schema
+
+28. **A test that says it covers every verb or field of a kind reads them off the built schema.** A test named for every mutation that takes a location, or every field behind a scope, finds them by walking the schema the hub builds, as `packages/hub/test/access.test.ts` does for who may read what, and compares its own cases with what it finds: a fourth mutation that takes a location then fails the test until it has a case. A list the test file writes and compares with itself passes whatever is added. Rules 25 and 26 say this of a content list and of a file's own cases; this says it of the API. A candidate rule from the review of PR-359 (Issue-351), accepted by the owner on 2026-11-24, where the test of every verb that takes a location compared its three names with themselves.
+
 ## Held back
 
 Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.

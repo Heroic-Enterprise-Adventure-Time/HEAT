@@ -14,7 +14,7 @@ if (gather?.kind !== "gather") throw new Error("The crag job gathers second");
 /** What a party with a miner brings home from the two veins: each vein's drop at mining 2. */
 const MINERS_ORE = haul("ore-vein", 2, 2);
 
-/** The parties played, and whether one of them carries mining. */
+/** The parties played. */
 const PARTIES: readonly (readonly UnitType[])[] = [
   ["miner"],
   ["fighter"],

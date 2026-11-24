@@ -10,7 +10,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
-import { player, whole } from "./data.js";
+import { player, stock, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -143,7 +143,7 @@ describe("recruitHero: the free villager", () => {
 /** A camp with living heroes and holdings, as recruits and settlements leave it. */
 async function putPaidCamp(p: string, livingHeroes: number, holdings: Partial<Record<Material, number>>) {
   await putCamp(p, livingHeroes, livingHeroes);
-  for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, at, material, balance);
+  await stock(repo, p, at, holdings);
 }
 
 const wren = (): Hero => ({

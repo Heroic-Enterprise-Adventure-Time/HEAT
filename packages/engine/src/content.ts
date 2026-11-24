@@ -247,8 +247,8 @@ export const LOCATIONS: readonly Location[] = [
   // start (decision 0059): it recruits no villager, so there is no free hero
   // here, and a camp begins empty until a caravan brings its first. The miner
   // and the fighter cost what they cost at Millbrook; there are no trees, so
-  // the miner's timber comes by caravan. Nothing can be built here until the
-  // quarry and its hub (Issue-356).
+  // the miner's timber comes by caravan. Nothing can be built here but the
+  // hall's and the warehouse's levels until the quarry and its hub (Issue-356).
   {
     id: "highcrag",
     name: "Highcrag",

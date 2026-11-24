@@ -366,10 +366,24 @@ function toAdventure(i: Stored<"adventure">): AdventureRecord {
   return record.result ? { ...record, result: withUnlocks(record.result) } : record;
 }
 
-/** The unlock a transaction at the location checks for, or none where the location needs none (decision 0059). */
-function unlockNeededAt(location: string): UnlockId[] {
+/** The entities as a transaction's callback is handed them. */
+type TransactionItems = Parameters<Parameters<HeatService["transaction"]["write"]>[0]>[0];
+
+/**
+ * The condition check that the player holds the unlock the location needs,
+ * or none where the location needs none (decision 0059). Written once, for
+ * every transaction that takes a location (graphql.md, rule 28): one that
+ * checked differently would be a location open by one verb.
+ */
+function unlockHeld(items: TransactionItems, playerId: string, location: string) {
   const unlock = locationOf(location)?.unlock;
-  return unlock === undefined ? [] : [unlock];
+  if (unlock === undefined) return [];
+  return [
+    items.unlock
+      .check({ playerId, unlock })
+      .where((a, op) => op.exists(a.earnedAt))
+      .commit(),
+  ];
 }
 
 /**
@@ -574,15 +588,7 @@ export class Repository {
               .commit(),
           ),
         ),
-        ...unlockNeededAt(location).map((unlock) =>
-          on(
-            LocationLocked,
-            items.unlock
-              .check({ playerId, unlock })
-              .where((a, op) => op.exists(a.earnedAt))
-              .commit(),
-          ),
-        ),
+        ...unlockHeld(items, playerId, location).map((check) => on(LocationLocked, check)),
       ])
       .go();
     throwIfCancelled(result, failures);
@@ -852,15 +858,7 @@ export class Repository {
           on(HeroExists, items.ledger.create({ playerId, cause: hero.id, entry: `debit#${material}`, location, material, delta: -amount }).commit()),
         ]),
         on(HeroExists, items.sighting.put(sightingOf(hero, new Date(hero.recruitedAt))).commit()),
-        ...unlockNeededAt(location).map((unlock) =>
-          on(
-            LocationLocked,
-            items.unlock
-              .check({ playerId, unlock })
-              .where((a, op) => op.exists(a.earnedAt))
-              .commit(),
-          ),
-        ),
+        ...unlockHeld(items, playerId, location).map((check) => on(LocationLocked, check)),
       ])
       .go();
     throwIfCancelled(result, failures);
@@ -968,15 +966,7 @@ export class Repository {
             // A ledger entry under the build's cause exists only if the level was built, so its failure is a repeat too.
             on(BuildRefused, items.ledger.create({ playerId, cause, entry: `debit#${material}`, location, material, delta: -amount }).commit()),
           ]),
-          ...unlockNeededAt(location).map((unlock) =>
-            on(
-              LocationLocked,
-              items.unlock
-                .check({ playerId, unlock })
-                .where((a, op) => op.exists(a.earnedAt))
-                .commit(),
-            ),
-          ),
+          ...unlockHeld(items, playerId, location).map((check) => on(LocationLocked, check)),
         ];
       })
       .go();

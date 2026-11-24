@@ -1,4 +1,4 @@
-import { buildRefusal, FACILITIES, type FacilityKind, location, nextLevel } from "@heat/engine";
+import { buildRefusal, FACILITIES, type FacilityKind, nextLevel } from "@heat/engine";
 
 import { retryingConflicts } from "./conflict.js";
 import {
@@ -9,7 +9,7 @@ import {
   LocationLocked,
   type Repository,
 } from "./db/repository.js";
-import { refuseNoCamp } from "./locations.js";
+import { campLocation, refuseNoCamp } from "./locations.js";
 import { badInput, Conflict, InsufficientResources, MaxLevel, Requires } from "./refusals.js";
 
 /**
@@ -54,10 +54,8 @@ export function buildFacility(repo: Repository, playerId: string, locationId: st
 }
 
 async function buildOnce(repo: Repository, playerId: string, locationId: string, kind: string, level: number): Promise<Camp> {
-  // The player's camps are the locations they have unlocked (decision 0059), so this read refuses a locked one.
-  const at = location(locationId);
-  const camp = at && (await repo.camps(playerId)).find((c) => c.location === at.id);
-  if (!at || !camp) refuseNoCamp(locationId);
+  const at = await campLocation(repo, playerId, locationId);
+  const camp = await repo.camp(playerId, at.id);
   const own = [...at.ownFacilities, ...at.buildableFacilities];
   if (!own.includes(kind as FacilityKind)) badInput(`${at.name} has no ${kind} of yours to build`);
   const facility = kind as FacilityKind;

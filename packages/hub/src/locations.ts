@@ -9,7 +9,7 @@ import { badInput } from "./refusals.js";
  *
  * A verb that takes a location refuses one the player has not unlocked,
  * twice, as it holds its other rules: by this read, and by a condition on the
- * unlock's item in its transaction (`unlockNeededAt` in db/repository.ts). A
+ * unlock's item in its transaction (`unlockHeld` in db/repository.ts). A
  * location that needs no unlock costs neither a read nor a condition.
  *
  * The refusal is BAD_USER_INPUT and not a refusal type: `me.camps` lists the
