@@ -116,7 +116,7 @@ describe("Scout the road to Highcrag", () => {
     const lostOne = runs.filter((r) => r.result.dead.length === 1).length;
     expect(lostOne).toBeGreaterThan(SEEDS * 0.2);
     expect(lostOne).toBeLessThan(SEEDS * 0.34);
-    // The bandit strikes the weakest in reach, so it is the villager far more often than the fighter.
+    // The bandit strikes the weakest in reach, so it is the villager more often than the fighter.
     const villagerLost = runs.filter((r) => r.result.dead.includes("villager-2")).length;
     expect(villagerLost).toBeGreaterThan(lostOne / 2);
   });

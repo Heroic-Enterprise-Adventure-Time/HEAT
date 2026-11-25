@@ -19,7 +19,8 @@ import {
   WEAPON_SPRITES,
 } from '@heat/engine';
 
-import { GROUNDS, type GroundSet, layGround, type Terrain, type TilesetJson, TilesetJsonSchema } from '../../camp/scene/ground';
+import { layGround, type Terrain, type TilesetJson, TilesetJsonSchema } from '../../camp/scene/ground';
+import { GROUNDS, type GroundSet } from '../../ground-sets';
 import { fetchJson } from '../../static-json';
 import type { CastMember } from '../cast';
 import type { Field, FieldUnit } from '../field';
@@ -77,7 +78,9 @@ export interface BattleSceneHandle {
    * ability's effect, and the ground its road is drawn on, before the run is
    * handed over with `reset`. Over when each has arrived or failed, or at
    * the limit; it never fails, and a failure is the page's uncaught error. A
-   * ground that fails leaves the road as it was.
+   * ground that fails leaves the road as it was, and is asked for again by
+   * the next run; one that arrives after the limit is laid when it arrives,
+   * as a unit's picture shows when it does.
    */
   prepare(cast: readonly CastMember[], ground: GroundSet): Promise<void>;
   /** Shows the field as it stands, on the ground prepared last; `enter` runs the party on from the left first. */
@@ -270,6 +273,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   host.appendChild(app.canvas);
 
   // A ground's tiles, loaded once and kept: the one the road is laid with, and the one the run prepared last asked for.
+  // A load that failed is not kept, so the next run that asks tries again, as a sprite set's is (`sprite-sheet.ts`).
   const grounds = new Map<GroundSet, Promise<{ readonly set: GroundSet; readonly tileset: TilesetJson; readonly sheet: Texture }>>();
   const groundOf = (set: GroundSet) => {
     let load = grounds.get(set);
@@ -278,6 +282,10 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         ([tileset, sheet]) => ({ set, tileset, sheet }),
       );
       grounds.set(set, load);
+      const asked = load;
+      asked.catch(() => {
+        if (grounds.get(set) === asked) grounds.delete(set);
+      });
     }
     return load;
   };
@@ -285,6 +293,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   /** The ground the run prepared last asked for, and its tiles once they are in: an earlier run's ground arriving late is not this one's. */
   let wanted: GroundSet = START_GROUND;
   let prepared = laid;
+  /** Whether the run prepared last has been handed over: its ground, arriving after that, is laid at once. */
+  let handedOver = true;
   let { tileset, sheet } = laid;
 
   // The world in the stage's coordinates: the road, then everyone back to front by the row they stand on.
@@ -316,6 +326,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   };
   const placeRoad = () => {
     ground.x = -view.stageX - (Math.round(scroll) % 16);
+  };
+  /** Lays the road with the ground prepared last, where it is not the one laid: when its run is handed over, or when it arrives after that. */
+  const layPrepared = () => {
+    if (prepared === laid) return;
+    laid = prepared;
+    ({ tileset, sheet } = laid);
+    app.renderer.background.color = GROUNDS[laid.set].backdrop;
+    layRoad();
+    placeRoad();
   };
 
   const resize = (deviceWidth: number, deviceHeight: number, cssWidth: number, cssHeight: number) => {
@@ -750,8 +769,11 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   return {
     prepare(cast, ground) {
       wanted = ground;
+      handedOver = false;
       const road = groundOf(ground).then((arrived) => {
-        if (arrived.set === wanted) prepared = arrived;
+        if (destroyed || arrived.set !== wanted) return;
+        prepared = arrived;
+        if (handedOver) layPrepared();
       });
       const sets = uniq(cast.flatMap((member) => artPath(member.kind, member.type, member.spriteSet) ?? []));
       const weapons = uniq(cast.flatMap((member) => weaponOf(member.kind, member.type) ?? []));
@@ -773,13 +795,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
 
     reset(field, sets, enter) {
       heroSets = sets;
-      if (prepared !== laid) {
-        laid = prepared;
-        ({ tileset, sheet } = laid);
-        app.renderer.background.color = GROUNDS[laid.set].backdrop;
-        layRoad();
-        placeRoad();
-      }
+      handedOver = true;
+      layPrepared();
       for (const effect of [...effects]) removeEffect(effect);
       for (const drop of [...drops]) removeDrop(drop);
       for (const id of [...projectiles.keys()]) removeProjectile(id);

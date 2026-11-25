@@ -624,8 +624,13 @@ export class Game {
     return must(data, 'the mutation’s data');
   }
 
-  /** Reads the player again after a mutation; a failed read leaves the view as it was, since the mutation's own answer is what matters. */
-  private async reload(): Promise<void> {
+  /**
+   * Reads the player again, after a mutation and where a page asks for it. A
+   * failed read leaves the view as it was, since a mutation's own answer is
+   * what matters, and `error` says why; the result of a run offers the read
+   * again, because what the run unlocked is told from it (Issue-352).
+   */
+  async reload(): Promise<void> {
     await this.me.refetch().catch(() => undefined);
   }
 }

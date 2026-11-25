@@ -493,6 +493,13 @@ describe('The camp at Highcrag (Issue-352)', () => {
     expect(textsOf(listItems('Dead').map((item) => within(item).getByRole('link')))).toEqual(['Wren']);
   });
 
+  it('says the same of a camp whose heroes have all retired: it has had heroes, and none is its first', async () => {
+    await renderCamp(atHighcrag(fakeGame([{ ...wren, status: 'RETIRED', retiredAt: '2026-11-24T12:00:00.000Z', location: 'highcrag' }])), '/camp/highcrag');
+    expect(panel().getByText('No living hero is here. Nobody at Highcrag joins for nothing: the next comes by caravan from another camp.')).toBeInTheDocument();
+    expect(panel().queryByText(/No hero is here yet/)).not.toBeInTheDocument();
+    expect(panel().getByText('Retired (1)')).toBeInTheDocument();
+  });
+
   it('says nothing of a caravan while a hero is alive there', async () => {
     await renderCamp(atHighcrag(fakeGame([{ ...wren, location: 'highcrag' }])), '/camp/highcrag');
     expect(textsOf(listItems('Living').map((item) => within(item).getByRole('link')))).toEqual(['Wren']);

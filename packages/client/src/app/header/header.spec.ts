@@ -10,6 +10,7 @@ import { Session, type SessionUser } from '../session';
 import { Blank } from '../testing/blank';
 import { fakeSession, PLAYER } from '../testing/fake-session';
 import { textsOf } from '../testing/texts-of';
+import { withHighcrag } from '../testing/with-highcrag';
 import { Header } from './header';
 
 const player: PlayerView = {
@@ -30,13 +31,6 @@ const player: PlayerView = {
       heroes: [{ heroId: 'h1', name: 'Wren', unitType: 'villager', spriteSet: 'villager-01', level: 1, stats: must(UNIT_PROFILES.villager, 'the villager profile').stats }],
     },
   },
-};
-
-/** The player once the road is open: a camp at Highcrag beside Millbrook's, as the hub then answers (decision 0059). */
-const withHighcrag: PlayerView = {
-  ...player,
-  camps: [...player.camps, { ...must(player.camps[0], 'the first camp'), location: 'highcrag', name: 'Highcrag' }],
-  unlocks: [{ unlock: 'road-to-highcrag', adventureId: 'a0' }],
 };
 
 async function renderHeader(signedIn: SessionUser | null, loaded: PlayerView | null, at = 'millbrook') {
@@ -74,7 +68,7 @@ describe('Header', () => {
   });
 
   it('lists Highcrag once the player has a camp there, and goes to the camp chosen (Issue-352)', async () => {
-    const { user, router } = await renderHeader(PLAYER, withHighcrag);
+    const { user, router } = await renderHeader(PLAYER, withHighcrag(player));
     expect(textsOf(screen.getAllByRole('option'))).toEqual(['Millbrook', 'Highcrag']);
     expect(campSelect()).toHaveValue('millbrook');
     await user.selectOptions(campSelect(), 'Highcrag');
@@ -82,8 +76,9 @@ describe('Header', () => {
   });
 
   it('shows the camp on screen as the one selected, the second as well as the first', async () => {
-    await renderHeader(PLAYER, withHighcrag, 'highcrag');
+    await renderHeader(PLAYER, withHighcrag(player), 'highcrag');
     expect(campSelect()).toHaveValue('highcrag');
-    expect(screen.getByRole<HTMLOptionElement>('option', { name: 'Highcrag' }).selected).toBe(true);
+    expect(screen.getByRole('option', { name: 'Highcrag', selected: true })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'Millbrook', selected: false })).toBeInTheDocument();
   });
 });

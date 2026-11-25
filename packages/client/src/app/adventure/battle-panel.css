@@ -97,8 +97,13 @@ meter {
   font-weight: bold;
 }
 
-/* An unlock the run earned that the player did not hold: the one line of a result that is news beyond the run. */
-.unlocked {
+/*
+ * An unlock the run earned that the player did not hold: the one line of a
+ * result that is news beyond the run. Its region is in the page with the
+ * result and empty until the player has been read again, so that the line is
+ * spoken when it arrives (angular.md, rule 14).
+ */
+.unlocked p {
   padding-left: var(--space-sm);
   border-left: var(--border-thick) solid var(--gold);
   font-weight: bold;

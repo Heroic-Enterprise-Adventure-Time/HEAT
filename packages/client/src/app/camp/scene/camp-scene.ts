@@ -3,11 +3,12 @@ import * as z from 'zod/mini';
 
 import { facilityArtLevel, type FacilityKind, must } from '@heat/engine';
 
+import { GROUNDS } from '../../ground-sets';
 import type { SetClip } from '../../sprite-sets';
 import { loadSpriteSet } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
 import { sceneView, type SceneView } from '../page-layout';
-import { GROUNDS, layGround, TilesetJsonSchema } from './ground';
+import { layGround, TilesetJsonSchema } from './ground';
 import { type CampLayout, cornersAround, MAP_HEIGHT, MAP_WIDTH, TILE } from './layout';
 import { type Facing, gone, leave, newWalker, randomSpot, step, WALK_SPEED, type Walker } from './wander';
 

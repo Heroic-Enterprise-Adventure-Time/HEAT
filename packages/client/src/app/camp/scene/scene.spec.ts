@@ -1,6 +1,7 @@
 import { LOCATIONS, must } from '@heat/engine';
 
-import { GROUNDS, layGround, type Terrain, type TilesetJson } from './ground';
+import { GROUNDS } from '../../ground-sets';
+import { layGround, type Terrain, type TilesetJson } from './ground';
 import { cornersAround, groundAt, HIGHCRAG, LAYOUTS, MAP_CORE_WIDTH, MAP_HEIGHT, MAP_WIDTH, MILLBROOK } from './layout';
 import { facingFor, gone, leave, newWalker, randomSpot, step, WALK_SPEED } from './wander';
 
@@ -120,8 +121,9 @@ describe('the layouts', () => {
       expect(layout.hallDoor.y).toBeLessThan(MAP_HEIGHT);
     });
 
-    it(`lets heroes walk only on the lower terrain of ${id}, the earth, never on what lies around it`, () => {
-      // The corner at or left of and above a point, and the one right of and below it: both are earth where a hero may stand.
+    it(`ends every walkable area of ${id} on the earth: the grid corner nearest each of its four corners is the lower terrain`, () => {
+      // The nearest corner alone, and the area's own four corners alone: an area may still end up to half a tile into a
+      // blended edge, as Millbrook's road does along its sides, and nothing here reads what lies between its corners.
       const lower = (x: number, y: number) => layout.corners[Math.round(y / 16)]?.[Math.round(x / 16)] === 'lower';
       for (const a of layout.walkable) {
         for (const [x, y] of [[a.x0, a.y0], [a.x1, a.y0], [a.x0, a.y1], [a.x1, a.y1]] as const) expect(lower(x, y), `${id} ${x},${y}`).toBe(true);

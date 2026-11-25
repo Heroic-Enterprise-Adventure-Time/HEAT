@@ -9,6 +9,7 @@ import { must, UNIT_PROFILES } from '@heat/engine';
 import { type AdventureResultView, type AdventureView, Game, type HeroView, overrideInput, type PlayerView, type SeenHeroView } from './game';
 import possibleTypes from './graphql/generated/possible-types';
 import { Session, type SessionUser } from './session';
+import { withHighcrag } from './testing/with-highcrag';
 
 /** The cache as the application builds it: with the schema's unions and interfaces, so `... on Error` is matched (app.config.ts). */
 const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCache(possibleTypes) });
@@ -85,12 +86,8 @@ function playerWith(
   };
 }
 
-/** The player once the road is open: an empty camp at Highcrag beside Millbrook's, and the unlock, with the adventure that first earned it (decision 0059). */
-function playerWithHighcrag(heroes: HeroView[] = []): PlayerView {
-  const player = playerWith(heroes);
-  const highcrag = { ...must(player.camps[0], 'the camp'), location: 'highcrag', name: 'Highcrag', activeHeroes: 0, livingHeroes: 0, holdings: [] };
-  return { ...player, camps: [...player.camps, highcrag], unlocks: [{ unlock: 'road-to-highcrag', adventureId: 'a0' }] };
-}
+/** The player once the road is open, with these heroes at Millbrook (`withHighcrag`). */
+const playerWithHighcrag = (heroes: HeroView[] = []): PlayerView => withHighcrag(playerWith(heroes));
 
 const moss: SeenHeroView = { id: 's1', name: 'Moss', unitType: 'villager', spriteSet: 'villager-07', level: 2 };
 

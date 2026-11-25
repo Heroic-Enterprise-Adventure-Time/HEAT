@@ -4,7 +4,7 @@ import { must } from '@heat/engine';
 
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
 import { isSideBySide } from '../camp/page-layout';
-import type { GroundSet } from '../camp/scene/ground';
+import type { GroundSet } from '../ground-sets';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
 import type { CastMember } from './cast';

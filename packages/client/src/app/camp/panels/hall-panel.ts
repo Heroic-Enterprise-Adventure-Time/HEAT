@@ -39,12 +39,13 @@ export class HallPanel {
    * Why nobody is alive here and how a hero gets here, at a camp whose
    * location offers no hero for nothing (game.md, "The heroes hall"; decision
    * 0059): it comes by caravan. Null where the free villager answers the
-   * same question, or while anyone is alive.
+   * same question, or while anyone is alive. A camp whose heroes are dead or
+   * retired has had heroes, and is told of the next and not of a first.
    */
   protected readonly byCaravan = computed(() => {
     const camp = this.game.camp();
     if (!camp || !this.game.noFreeRecruit() || this.game.livingHere().length > 0) return null;
-    return this.dead().length > 0
+    return this.dead().length > 0 || this.game.retiredHere().length > 0
       ? `No living hero is here. Nobody at ${camp.name} joins for nothing: the next comes by caravan from another camp.`
       : `No hero is here yet. Nobody at ${camp.name} joins for nothing: its first hero comes by caravan from another camp.`;
   });

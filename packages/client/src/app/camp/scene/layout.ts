@@ -2,7 +2,8 @@ import { range } from 'es-toolkit';
 
 import type { FacilityKind } from '@heat/engine';
 
-import type { GroundSet, Terrain } from './ground';
+import type { GroundSet } from '../../ground-sets';
+import type { Terrain } from './ground';
 
 /**
  * Where things stand in a camp, in the map's pixels: 400×225, 16 px tiles.

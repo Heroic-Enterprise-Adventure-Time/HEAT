@@ -78,20 +78,21 @@ const hub = must(scoutTheRoad.facility, "the facility that posts it");
 const scouting: Job = { ...JOBS["wolves-on-the-mill-road"], id: "wolves-that-open-the-road", grants: [road] };
 const content: AdventureContent = { ...ADVENTURE_CONTENT, jobs: { ...ADVENTURE_CONTENT.jobs, [scouting.id]: scouting } };
 
-const snapshotOf = (heroes: readonly { id: string; unitType: UnitType; name: string; spriteSet: string }[]): AdventureSnapshot => ({
+const snapshotOf = (heroes: readonly { id: string; unitType: UnitType; name: string; spriteSet: string }[], jobId = scouting.id): AdventureSnapshot => ({
   version,
-  jobId: scouting.id,
+  jobId,
   heroes: heroes.map((h) => ({ heroId: h.id, unitType: h.unitType, name: h.name, spriteSet: h.spriteSet, level: 1, stats: must(UNIT_PROFILES[h.unitType], `the ${h.unitType}'s profile`).stats })),
 });
 
 /**
- * A seed on which a party of these unit types ends the scouting job this way,
- * every hero alive where it completes, found by asking the engine (graphql.md,
- * rule 26): a roll does not read who the heroes are, so a stand-in party of
- * the same types says what the player's will do.
+ * A seed on which a party of these unit types ends a job this way, every hero
+ * alive where it completes, found by asking the engine (graphql.md, rule 26):
+ * a roll does not read who the heroes are, so a stand-in party of the same
+ * types says what the player's will do. The job is the scouting job these
+ * tests add, unless another of the same content is named.
  */
-function seedFor(unitTypes: readonly UnitType[], outcome: "complete" | "defeat"): string {
-  const standIn = snapshotOf(unitTypes.map((unitType, i) => ({ id: `stand-in-${i}`, unitType, name: unitType, spriteSet: `${unitType}-01` })));
+function seedFor(unitTypes: readonly UnitType[], outcome: "complete" | "defeat", jobId = scouting.id): string {
+  const standIn = snapshotOf(unitTypes.map((unitType, i) => ({ id: `stand-in-${i}`, unitType, name: unitType, spriteSet: `${unitType}-01` })), jobId);
   const ends = (seed: string): boolean => {
     const { result } = replay(standIn, seed, [], content);
     return result.outcome === outcome && (outcome === "defeat" || result.dead.length === 0);
@@ -237,9 +238,9 @@ describe("an unlock a run earned", () => {
 });
 
 describe("the road to Highcrag (Issue-352)", () => {
-  // Two fighters open the road with nobody lost on every seed the engine's own test of the job plays, and this is one of them.
+  // A seed on which two fighters open the road with nobody lost, found by asking the engine.
   const PARTY: UnitType[] = ["fighter", "fighter"];
-  const SEED = "seed-0";
+  const SEED = seedFor(PARTY, "complete", scoutTheRoad.id);
 
   it("is the job of Millbrook's caravan hub, which the camp must have built", async () => {
     expect(scoutTheRoad.location).toBe(home);

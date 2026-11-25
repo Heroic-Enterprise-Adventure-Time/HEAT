@@ -13,6 +13,9 @@ import { Play } from './play';
 import { Playback } from './playback';
 import { earnedWords, outcomeWords, stageResultWords } from './result-words';
 
+/** What a result says while the player could not be read again after the run was sent. */
+const UNREAD = 'Your camp could not be read again, so anything this run opened is not shown yet.';
+
 /**
  * The open adventure, `/adventure` (Issue-15): the battle in the stage, and
  * in the content area beside it, below it on a narrow screen, the party and
@@ -52,6 +55,15 @@ export class Adventure {
     const settled = this.game.settled();
     return settled?.result ? earnedWords(this.game.player()?.unlocks ?? [], settled.adventure.id) : [];
   });
+  /**
+   * What the result says where the player could not be read again after the
+   * submit: an unlock the run earned is told from that read alone, and it is
+   * told once, here, so the page says that it does not know yet and offers
+   * the read again (the review of PR-361).
+   */
+  protected readonly unread = computed(() => (this.game.error() === null ? null : UNREAD));
+  /** Whether the player is being read again, from the result. */
+  protected readonly reading = signal(false);
 
   private readonly view = viewChild.required(BattleView);
   private startedId: string | null = null;
@@ -108,6 +120,16 @@ export class Adventure {
         void this.router.navigate(['/camp', this.game.location()], { replaceUrl: true });
       }
     });
+  }
+
+  /** Reads the player again from the result, where the read after the submit failed. */
+  protected async readAgain(): Promise<void> {
+    this.reading.set(true);
+    try {
+      await this.game.reload();
+    } finally {
+      this.reading.set(false);
+    }
   }
 
   /** Plays the stored timeline of the adventure just settled, read through the hub, in the same scene. */
