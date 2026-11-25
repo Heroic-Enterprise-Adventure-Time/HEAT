@@ -30,6 +30,7 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | --- | --- |
 | Why the project exists and what it concentrates on | `docs/design/purpose.md` |
 | The game: what the player does | `docs/design/game.md` |
+| The battle: how an adventure plays out | `docs/design/battle.md` |
 | The system: services, data and flows | `docs/architecture/overview.md` |
 | How an adventure is started, played, verified and replayed | `docs/architecture/adventure-loop.md` |
 | The tables' keys and the transactions that write them | `docs/architecture/camps.md` |

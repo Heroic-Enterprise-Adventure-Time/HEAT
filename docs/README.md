@@ -24,10 +24,13 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [process/deployment.md](process/deployment.md) | How a change reaches each environment and how a release is made: the release pull request, the guard, the tag, hotfixes, the first release | When a release is made, from `code-changes.md` rule 18 |
 | [design/purpose.md](design/purpose.md) | Why the project exists and what it concentrates on | When the agent reads it |
 | [design/game.md](design/game.md) | The game: what the player does | When the agent reads it |
+| [design/battle.md](design/battle.md) | The battle: how an adventure plays out, its stages, units, actions, retreat and what it yields | When the agent reads it |
+| [design/history.md](design/history.md) | The dated accounts behind the design documents' items, where no decision record holds them | When an item's reason is in doubt, or the item is about to change |
 | [architecture/overview.md](architecture/overview.md) | The system: three diagrams, then services, data, environments, build order | When the agent reads it |
 | [architecture/adventure-loop.md](architecture/adventure-loop.md) | The adventure loop: the seed and the snapshot, the override log, one version per deploy, what start, submit and discard write, the client's play, resume and replay, what verification proves | When the agent reads it |
 | [architecture/camps.md](architecture/camps.md) | Camps, heroes and resources: the player table's keys, the recruit, retire, build and settle transactions, the location table's keys for the heroes seen at a location, recent adventures and replays by job, a player's unlocks and the refusal of a location not unlocked, and, decided and not built, a caravan's start, settlement and discard | When the agent reads it |
 | [decisions/](decisions/README.md) | One record per significant decision, including what was rejected | When the agent reads it |
+| [decisions/history.md](decisions/history.md) | The dated accounts behind the rules of `decisions/README.md` | When a rule's reason is in doubt, or the rule is about to change |
 | [../terraform/backend/README.md](../terraform/backend/README.md) | The state bucket, who applies it, and the one-time bootstrap | When the agent reads it |
 | [../terraform/bootstrap/README.md](../terraform/bootstrap/README.md) | The pipeline's plan and apply roles, their boundary and the budget action in each workload account, who applies, what waits on what | When the agent reads it |
 | [../terraform/environment/sandbox-base/README.md](../terraform/environment/sandbox-base/README.md) | The sandbox base: the zone, the shared user pool and its CI client, the test users, and how the pipeline plans and applies a permanent root | When the agent reads it |
@@ -38,6 +41,8 @@ Everything a person or an agent needs in order to understand HEAT and work on it
 | [standards/angular.md](standards/angular.md) | How the client is written: components, signals and injection, where the data lives, pages and panels, the PixiJS boundary, templates, accessibility, tests, styles and their tokens, and what it may ask of the previous deploy | When the agent works under `packages/client/`, through that directory's `AGENTS.md` |
 | [standards/graphql.md](standards/graphql.md) | How the API and the hub are written: the schema's shape, resolvers, authorization, input, errors, logging, the data layer, tests | When the agent works under `packages/hub/`, through that directory's `AGENTS.md` |
 | [standards/terraform.md](standards/terraform.md) | How a stack is written: roots and modules, what never enters git, naming and tags, the guardrails, versions and state, comments, the Terraform floor, when a change needs a decision record | When the agent works under `terraform/`, through that directory's `AGENTS.md` |
+| [standards/history.md](standards/history.md) | The dated accounts behind the standards' rules, under each standard's name and by the rule's number | When a rule's reason is in doubt, or the rule is about to change |
+| [history.md](history.md) | The dated accounts behind this document's rules for writing documents | When a rule's reason is in doubt, or the rule is about to change |
 
 ## Planned
 
