@@ -19,9 +19,11 @@ import { parseArgs } from "node:util";
  * again, so a thing costs its size times the calls made while it was in the
  * context, which ends at the next compaction or at the session's end.
  *
- * Nothing of the conversation is printed: sizes, the names of tools, the
- * paths of files and the first word or two of a command, and no text of a
- * message, a file or a command's output.
+ * Of the conversation, one thing is printed: the session's title, which the
+ * app may have made from the first message, so a profile is read before it
+ * is posted. The rest is sizes, the names of tools, the paths of files and
+ * the first word or two of a command, and no text of a message, a file or a
+ * command's output.
  *
  *   node scripts/session-profile.mjs <transcript.jsonl> [--top 25]
  */
@@ -135,6 +137,11 @@ export function readTranscript(text) {
       if (metadata) Object.assign(last, metadata);
       return;
     }
+    // What a tool returned after the last call and before this compaction was summarized away: no
+    // call read it. The user's own message there is the one the next call answers, and is kept.
+    for (const block of blocks) {
+      if (block.at === calls.length && block.category !== "user text") block.dropped = true;
+    }
     compactions.push({ beforeCall: calls.length, idle: false, trigger: "unknown", ...metadata });
   };
 
@@ -163,10 +170,12 @@ export function readTranscript(text) {
     const message = record.message;
     const at = calls.length;
     if (record.type === "assistant" && message) {
-      let call = callById.get(message.id);
+      // A streamed response is several records with one id; a record with no id is a call of its own.
+      const id = message.id ?? record.uuid;
+      let call = id === undefined ? undefined : callById.get(id);
       if (!call) {
         call = { model: message.model ?? "?", time: record.timestamp, usage: message.usage ?? {} };
-        callById.set(message.id, call);
+        if (id !== undefined) callById.set(id, call);
         calls.push(call);
       } else if (message.usage) {
         call.usage = message.usage;
@@ -267,14 +276,15 @@ export function buildProfile({ baseline, blocks, calls, compactions, images, tit
   const cost = Object.fromEntries(Object.entries(weighed).map(([kind, value]) => [kind, value / weighedSum]));
 
   const contextSum = context.reduce((sum, value) => sum + value, 0);
+  // Ten slices of the session, or one a call where it made fewer than ten, so that no call is in two.
   const tenths = [];
-  for (let tenth = 0; tenth < 10; tenth++) {
-    const from = Math.floor((tenth * count) / 10);
-    const to = Math.max(from + 1, Math.floor(((tenth + 1) * count) / 10));
+  const slices = Math.min(10, count);
+  for (let tenth = 0; tenth < slices; tenth++) {
+    const from = Math.floor((tenth * count) / slices);
+    const to = Math.floor(((tenth + 1) * count) / slices);
     const slice = context.slice(from, to);
-    if (slice.length === 0) continue;
     const sum = slice.reduce((total, value) => total + value, 0);
-    tenths.push({ average: sum / slice.length, from: from + 1, share: sum / contextSum, to: Math.min(to, count) });
+    tenths.push({ average: sum / slice.length, from: from + 1, share: sum / contextSum, to });
   }
 
   // Tokens: each call's growth, less what the model wrote, split among what entered before it.
@@ -319,7 +329,7 @@ export function buildProfile({ baseline, blocks, calls, compactions, images, tit
     .sort((a, b) => b.share - a.share);
 
   // Characters: every block by its size times the calls that carried it, for the names behind the groups.
-  const weight = (block) => (NOT_CONTEXT.has(block.category) ? 0 : block.chars * carried(block.at));
+  const weight = (block) => (block.dropped || NOT_CONTEXT.has(block.category) ? 0 : block.chars * carried(block.at));
   const weightSum = blocks.reduce((sum, block) => sum + weight(block), 0) || 1;
   const keyed = new Map();
   const areas = new Map();

@@ -36,7 +36,9 @@ const records = [
   result("t2", 2, CONTENT.repeat(50)),
   // A subagent's call is another conversation.
   { ...call("side", 2, usage(0, 900_000, 9_000)), isSidechain: true },
-  call("m3", 3, usage(101_100, 400, 50)),
+  call("m3", 3, usage(101_100, 400, 50), [use("t3", "Bash", { command: `cat ${CONTENT}.md` })]),
+  // What this returns is summarized away by the compaction before any call reads it.
+  result("t3", 3, CONTENT.repeat(2_000)),
   { compactMetadata: { precomputed: true, preTokens: 101_500, trigger: "auto" }, subtype: "compact_boundary", timestamp: at(123), type: "system" },
   { isCompactSummary: true, message: { content: `${CONTENT} summary`, role: "user" }, timestamp: at(58), type: "user" },
   call("m4", 123, usage(0, 60_000, 10)),
@@ -72,6 +74,32 @@ test("growth is given to what entered, weighed by the calls that carried it", ()
   assert.equal(by["written by the model"].tokens, 200);
   assert.equal(by["the baseline"].share, 400_000 / all);
   assert.ok(Math.abs(groups.reduce((sum, group) => sum + group.share, 0) - 1) < 1e-9);
+});
+
+test("what a tool returned just before a compaction is carried by no call", () => {
+  const { keys } = buildProfile(transcript());
+  const share = (name) => keys.find((key) => key.name === name).share;
+  assert.equal(share("result Bash: cat"), 0);
+  assert.ok(share("result Read: HEAT-9/docs/design/game.md") > 0);
+});
+
+test("a session of fewer than ten calls is sliced by call, each call once", () => {
+  const { tenths } = buildProfile(transcript()).context;
+  assert.deepEqual(
+    tenths.map(({ from, to }) => [from, to]),
+    [
+      [1, 1],
+      [2, 2],
+      [3, 3],
+      [4, 4],
+    ],
+  );
+  assert.ok(Math.abs(tenths.reduce((sum, tenth) => sum + tenth.share, 0) - 1) < 1e-9);
+});
+
+test("a response with no id is a call of its own", () => {
+  const anonymous = (minutes) => JSON.stringify({ message: { content: [], model: "claude-test", usage: usage(0, 10, 1) }, timestamp: at(minutes), type: "assistant" });
+  assert.equal(buildProfile(readTranscript([anonymous(1), anonymous(2)].join("\n"))).calls, 2);
 });
 
 test("the cost is weighed at the API's ratios, and a large cache write is listed with its pause", () => {

@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { posix } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /**
@@ -9,40 +10,63 @@ import { pathToFileURL } from "node:url";
  * while only a guideline in lines held it (Issue-363).
  *
  * Each loader named here is held to a size in bytes for itself and what it
- * imports, followed through the imports' own imports. A pull request that
- * takes one past its size makes room, by moving out of a loaded document
- * what a session does not need at its start, or raises the number here and
- * says why in its description. Bytes and not tokens, because a byte is what
- * a job can count with nothing installed; on these documents a token is
- * about 2.7 bytes.
+ * imports. An import is followed as Claude Code follows one (its
+ * documentation, "Import additional files"): a relative path is read from
+ * the directory of the document that holds it, an import in a code span or
+ * a fenced block is not one, and imports are followed four deep. A path
+ * outside the repository, absolute or under `~`, is a person's own file and
+ * is not counted.
+ *
+ * A pull request that takes a loader past its size makes room, by moving out
+ * of a loaded document what a session does not need at its start, or raises
+ * the number here and says why in its description. Bytes and not tokens,
+ * because a byte is what a job can count with nothing installed; Issue-363
+ * measured the four process documents at 50K bytes and 18.6k tokens.
  *
  *   node scripts/check-loaded-documents.mjs
  */
 
 /** Each loader, and the most bytes it and its imports may hold together. */
 export const LIMITS = {
-  // The root: the four process documents every session reads (Issue-363 cut them from 54,624).
+  // The root, with the four process documents every session reads (decision 0060).
   "AGENTS.md": 45_000,
 };
 
+/** How many imports deep Claude Code follows. */
+const DEPTH = 4;
+
 /** An import is `@` and a path to a Markdown file, standing where a word starts. */
-const IMPORT = /(?<![\w`@/.-])@([\w./-]+\.md)\b/g;
+const IMPORT = /(?<![\w@/.-])@([\w./~-]+\.md)\b/g;
+
+/** A document's text without its fenced blocks and its code spans, where an `@path` is only text. */
+const withoutCode = (text) => text.replace(/^(`{3,}|~{3,})[^\n]*\n[\s\S]*?^\1[^\n]*$/gm, "").replace(/`[^`\n]*`/g, "");
 
 /**
  * The loader and every document it imports, each once, in the order met.
- * `read` returns a file's text by its path from the repository's root.
+ * `read` returns a file's text by its path from the repository's root, and
+ * throws when there is no such file.
  */
 export function loadedDocuments(loader, read) {
   const documents = [];
   const seen = new Set();
-  const visit = (path) => {
+  const visit = (path, importer, depth) => {
     if (seen.has(path)) return;
     seen.add(path);
-    const text = read(path);
+    let text;
+    try {
+      text = read(path);
+    } catch (error) {
+      if (importer === undefined) throw error;
+      throw new Error(`${importer} imports ${path}, which cannot be read`, { cause: error });
+    }
     documents.push({ bytes: Buffer.byteLength(text, "utf8"), path });
-    for (const [, imported] of text.matchAll(IMPORT)) visit(imported);
+    if (depth === DEPTH) return;
+    for (const [, imported] of withoutCode(text).matchAll(IMPORT)) {
+      if (imported.startsWith("~") || imported.startsWith("/")) continue;
+      visit(posix.join(posix.dirname(path), imported), path, depth + 1);
+    }
   };
-  visit(loader);
+  visit(loader, undefined, 0);
   return documents;
 }
 
