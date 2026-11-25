@@ -5,8 +5,8 @@
  * it lasts, how far it has risen and how much of it shows a while after it
  * began, and where the digits of its amount stand beside it. On the
  * presentation clock, the wall clock times the speed, as every clip of the
- * scene is, so the adventure's
- * clock waits for it and the wait shortens at 2× and 4× (decision 0057).
+ * scene is, so the adventure's clock waits for it and the wait shortens at
+ * 2× and 4× (decision 0057).
  */
 
 /** How long a drop's icon rises, in presentation time. A taste, set by looking. */

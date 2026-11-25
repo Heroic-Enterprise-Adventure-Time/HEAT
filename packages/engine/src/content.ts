@@ -5,9 +5,9 @@
  * resource nodes, the jobs, and the XP each level needs. TypeScript data, imported by the hub and the client alike
  * (decision 0013); a change here is a change to the rules, reviewed like
  * code. The design is docs/design/game.md, "Locations and camps", "The heroes
- * hall" and "Resources", and docs/design/battle.md, and the jobs, the
- * retreat and the XP table at the end; the numbers are its working
- * assumptions.
+ * hall" and "Resources", and docs/design/battle.md; the numbers are its
+ * working assumptions. The jobs, the retreat and the XP table are at the end
+ * of this file.
  */
 
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
