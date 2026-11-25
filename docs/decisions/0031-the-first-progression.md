@@ -56,4 +56,4 @@ The engine's test replays the sticks job with a lone villager over 500 seeds, wi
 
 ## Where it is described
 
-`docs/design/game.md`, "The battle", "The heroes hall" and "Resources". The numbers are in `packages/engine/src/content.ts`. Issue-82, Issue-93 and Issue-133 carry the numbers each builds to.
+`docs/design/battle.md`. `docs/design/game.md`, "The heroes hall" and "Resources". The numbers are in `packages/engine/src/content.ts`. Issue-82, Issue-93 and Issue-133 carry the numbers each builds to.

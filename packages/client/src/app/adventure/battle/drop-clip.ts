@@ -1,10 +1,11 @@
 /**
- * The arithmetic of a drop's picture (game.md, "The battle"; decision 0058;
- * Issue-344), apart from the renderer so that it is tested without one: when
- * the icon of what an enemy dropped begins and how long it lasts, how far it
- * has risen and how much of it shows a while after it began, and where the
- * digits of its amount stand beside it. On the presentation clock, the wall
- * clock times the speed, as every clip of the scene is, so the adventure's
+ * The arithmetic of a drop's picture (battle.md, "A drop shows twice";
+ * decision 0058; Issue-344), apart from the renderer so that it is tested
+ * without one: when the icon of what an enemy dropped begins and how long
+ * it lasts, how far it has risen and how much of it shows a while after it
+ * began, and where the digits of its amount stand beside it. On the
+ * presentation clock, the wall clock times the speed, as every clip of the
+ * scene is, so the adventure's
  * clock waits for it and the wait shortens at 2× and 4× (decision 0057).
  */
 

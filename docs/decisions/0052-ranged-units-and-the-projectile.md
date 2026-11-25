@@ -69,4 +69,4 @@ Four villagers can force the goblins job and lose one of them on most runs; a ra
 
 ## Where it is described
 
-`docs/design/game.md`, "The battle" and "The heroes hall". `docs/process/assets.md`, rules 33 and 35. `docs/architecture/adventure-loop.md`, "The loop", the item built by Issue-286. The abilities, the two profiles, the recruit and the job are in `packages/engine/src/content.ts`; the flight's arithmetic in `packages/client/src/app/adventure/battle/action-sprites.ts` and its drawing in `battle-scene.ts`; the bow's frame lengths and nocks in `art/weapons/bow-01/provenance.json`.
+`docs/design/battle.md`. `docs/design/game.md`, "The heroes hall". `docs/process/assets.md`, rules 33 and 35. `docs/architecture/adventure-loop.md`, "The loop", the item built by Issue-286. The abilities, the two profiles, the recruit and the job are in `packages/engine/src/content.ts`; the flight's arithmetic in `packages/client/src/app/adventure/battle/action-sprites.ts` and its drawing in `battle-scene.ts`; the bow's frame lengths and nocks in `art/weapons/bow-01/provenance.json`.

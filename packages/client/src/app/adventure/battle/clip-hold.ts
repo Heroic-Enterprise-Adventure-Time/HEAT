@@ -1,10 +1,11 @@
 /**
- * The arithmetic of the play clock's hold for a battle's clips (game.md,
- * "The battle"; Issue-335), apart from the renderer so that it is tested
- * without one. An action's swing, a projectile's flight, the hit, the
- * ability's effect and a fall each play on the presentation
- * clock, the wall clock times the speed, and the adventure's clock waits
- * for a share of the longest that one frame's events start, the whole of it
+ * The arithmetic of the play clock's hold for a battle's clips (battle.md,
+ * "The clock pauses while an action is animated"; Issue-335), apart from
+ * the renderer so that it is tested without one. An action's swing, a
+ * projectile's flight, the hit, the ability's effect and a fall each play
+ * on the presentation clock, the wall clock times the speed, and the
+ * adventure's clock waits for a share of the longest that one frame's
+ * events start, the whole of it
  * by the scene's `HOLD_SHARE`, so that one action is animated to its end
  * before the next thing happens (decision 0057). The hold is the page's alone:
  * the engine, its events and the timeline know nothing of it, so a run, its

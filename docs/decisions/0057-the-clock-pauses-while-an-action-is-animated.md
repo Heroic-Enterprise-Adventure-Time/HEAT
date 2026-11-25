@@ -34,4 +34,4 @@
 
 ## Where it is described
 
-`docs/design/game.md`, "The battle". `docs/process/assets.md`, rules 33 and 35. `docs/architecture/adventure-loop.md`, "The loop", the item built by Issue-335. The hold in `packages/client/src/app/adventure/play.ts` and `battle/clip-hold.ts`; the frames of an act and the flight in `battle/action-sprites.ts`; the drawing, the share `HOLD_SHARE` and what is waited for in `battle/battle-scene.ts`.
+`docs/design/battle.md`, "The clock pauses while an action is animated". `docs/process/assets.md`, rules 33 and 35. `docs/architecture/adventure-loop.md`, "The loop", the item built by Issue-335. The hold in `packages/client/src/app/adventure/play.ts` and `battle/clip-hold.ts`; the frames of an act and the flight in `battle/action-sprites.ts`; the drawing, the share `HOLD_SHARE` and what is waited for in `battle/battle-scene.ts`.

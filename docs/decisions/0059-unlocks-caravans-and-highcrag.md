@@ -210,4 +210,4 @@ Not checked here, and for the build issues to check: how ElectroDB writes an ite
 
 ## Where it is described
 
-`docs/design/game.md`, "Locations and camps", "Unlocks", "Caravans", "The heroes hall" and "Resources". `docs/architecture/camps.md`, the keys and the items for unlocks and for a caravan's start, settlement and discard. `docs/architecture/adventure-loop.md`, the item for what the loop sees of an unlock and a caravan. `docs/architecture/overview.md`, "Build order". The build issues carry what each builds: Issue-350 to Issue-357.
+`docs/design/battle.md`, the cart, which the Decision calls `docs/design/game.md`, "The battle", where it stood before Issue-364. `docs/design/game.md`, "Locations and camps", "Unlocks", "Caravans", "The heroes hall" and "Resources". `docs/architecture/camps.md`, the keys and the items for unlocks and for a caravan's start, settlement and discard. `docs/architecture/adventure-loop.md`, the item for what the loop sees of an unlock and a caravan. `docs/architecture/overview.md`, "Build order". The build issues carry what each builds: Issue-350 to Issue-357.
