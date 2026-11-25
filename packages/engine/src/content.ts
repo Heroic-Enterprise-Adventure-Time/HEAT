@@ -5,8 +5,9 @@
  * resource nodes, the jobs, and the XP each level needs. TypeScript data, imported by the hub and the client alike
  * (decision 0013); a change here is a change to the rules, reviewed like
  * code. The design is docs/design/game.md, "Locations and camps", "The heroes
- * hall", "Resources" and "The battle", and the jobs, the retreat and the XP
- * table at the end; the numbers are its working assumptions.
+ * hall" and "Resources", and docs/design/battle.md; the numbers are its
+ * working assumptions. The jobs, the retreat and the XP table are at the end
+ * of this file.
  */
 
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
@@ -400,7 +401,7 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
 }));
 
 /**
- * Every ability a unit type or monster's list names (game.md, "The battle").
+ * Every ability a unit type or monster's list names (battle.md).
  * A gather ability works the node with the least left, so a gatherer fells
  * one tree before starting the next (Issue-15). Chop and mine are a strike
  * at a node with their own look: the same damage and the same warmup, so
@@ -627,8 +628,8 @@ export type JobId =
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
- * (game.md, "The battle"; decision 0031). A job that names a facility is
- * posted by it, not by the job board (Issue-133). A stage ends when
+ * (battle.md, "Millbrook's board"; decision 0031). A job that names a
+ * facility is posted by it, not by the job board (Issue-133). A stage ends when
  * everything on the other side is down (decision 0051), and what a job
  * brings home is what its enemies drop for the traits the party carries
  * (decision 0058). Each job's bonus XP is what brings its XP, with the

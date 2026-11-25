@@ -3,8 +3,8 @@ import { groupBy } from 'es-toolkit';
 import type { Line, Side } from '@heat/engine';
 
 /**
- * Where the battle scene puts things (game.md, "How the game looks" and
- * "The battle"): the camp's sprites arranged side-on, the party on the left
+ * Where the battle scene puts things (game.md, "How the game looks", and
+ * battle.md): the camp's sprites arranged side-on, the party on the left
  * facing east and the other side on the right facing west, each side's four
  * lines from the middle outwards, a line's units spread in depth. Plain
  * arithmetic in art pixels, tested without a renderer, as the camp's

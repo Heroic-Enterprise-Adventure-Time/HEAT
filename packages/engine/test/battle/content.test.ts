@@ -14,7 +14,7 @@ describe("The battle's content", () => {
     for (const [id, ability] of Object.entries(ABILITIES)) expect(ability.abilityId).toBe(id);
   });
 
-  it("has the design's home lines and lists (game.md, \"The battle\")", () => {
+  it("has the design's home lines and lists (battle.md)", () => {
     expect(UNIT_PROFILES.villager).toMatchObject({ homeLine: "near", actions: ["strike", "chop", "mine", "move-up"] });
     expect(UNIT_PROFILES.fighter).toMatchObject({ homeLine: "front", actions: ["guard", "strike"] });
     expect(MONSTERS.wolf).toMatchObject({ homeLine: "front", actions: ["bite", "move-up"] });

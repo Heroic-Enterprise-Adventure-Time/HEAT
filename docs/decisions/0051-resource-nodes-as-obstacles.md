@@ -85,4 +85,4 @@ The longest gather in those runs is 31 s, a lone villager on two nodes, against 
 
 ## Where it is described
 
-`docs/design/game.md`, "The battle". `docs/architecture/adventure-loop.md`, "The loop", the schema version and the item built by Issue-283. The rule is in `packages/engine/src/battle/unit.ts` (`harvested`), `engine.ts` and `resolution.ts`; the numbers and the jobs in `packages/engine/src/content.ts`.
+`docs/design/battle.md`. `docs/architecture/adventure-loop.md`, "The loop", the schema version and the item built by Issue-283. The rule is in `packages/engine/src/battle/unit.ts` (`harvested`), `engine.ts` and `resolution.ts`; the numbers and the jobs in `packages/engine/src/content.ts`.

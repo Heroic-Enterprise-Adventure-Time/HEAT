@@ -4,7 +4,7 @@
  * New in HEAT (architecture overview, "Engine provenance"): BattleScript
  * Online had single encounters and no outer loop. A job is an ordered list of
  * stages run on one timeline, with health, what dropped and the enemies' XP
- * carried between them (game.md, "The battle"; decisions 0030 and 0058). The
+ * carried between them (battle.md; decisions 0030 and 0058). The
  * jobs themselves are in content.ts.
  */
 

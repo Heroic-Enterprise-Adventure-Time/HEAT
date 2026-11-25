@@ -50,4 +50,4 @@
 
 ## Where it is described
 
-`docs/design/game.md`, "The adventure loop" and "The battle". `docs/architecture/adventure-loop.md` since Issue-282. `docs/architecture/overview.md`, "The adventure loop", "Camps, heroes and resources", "Environments" and "Engine provenance". Decision 0003 as amended.
+`docs/design/game.md`, "The adventure loop". `docs/design/battle.md`. `docs/architecture/adventure-loop.md` since Issue-282. `docs/architecture/overview.md`, "The adventure loop", "Camps, heroes and resources", "Environments" and "Engine provenance". Decision 0003 as amended.

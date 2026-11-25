@@ -30,6 +30,12 @@ import { pathToFileURL } from "node:url";
 export const LIMITS = {
   // The root, with the four process documents every session reads (decision 0060).
   "AGENTS.md": 45_000,
+  // Each area's loader, with its standard, in every session that works in the area (Issue-364).
+  // A session in the client or the hub loads `packages/AGENTS.md` too, so pays for both.
+  "packages/AGENTS.md": 35_000,
+  "packages/client/AGENTS.md": 25_000,
+  "packages/hub/AGENTS.md": 28_000,
+  "terraform/AGENTS.md": 14_000,
 };
 
 /** How many imports deep Claude Code follows. */
