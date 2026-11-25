@@ -19,7 +19,7 @@ A session is one issue. Asked to work on issue N, in whatever words, read these 
 
 1. The issue, `gh issue view N`, and the open list, `gh issue list`. The issue body is the agreed shape of the checkpoint.
 2. `docs/private/heat-working-context.md`, if it exists. Git ignores it. It holds what cannot be committed: the AWS account ids, how the agent reaches AWS, and the owner's own context. Nothing in it is copied into a committed file. It holds no state of the work: the issue, its comments, the open list and the log are the state.
-3. The sections of `docs/architecture/overview.md` and the records in `docs/decisions/` that the issue names.
+3. The sections of `docs/architecture/overview.md` and the records in `docs/decisions/` that the issue names, by section and not whole (`docs/process/sessions.md`, rule 18).
 4. The README of each stack under `terraform/` and the `AGENTS.md` of each area under `packages/` that the issue touches.
 
 Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the shape in conversation, confirm the checkout is clean on `main`, branch, and go.
@@ -43,7 +43,7 @@ Then follow the cycle in `docs/process/code-changes.md` from rule 20: agree the 
 | Making a resource's icon, or a facility's, step by step | `docs/runbooks/resource-icon.md` |
 | The index of every project document, and how documents are written | `docs/README.md` |
 
-Read the design and architecture documents before any work that touches them. Read `docs/README.md` before adding or changing a document.
+Read the design and architecture documents before any work that touches them, by the section it touches (`docs/process/sessions.md`, rule 18). Read `docs/README.md` before adding or changing a document.
 
 ## About this file
 

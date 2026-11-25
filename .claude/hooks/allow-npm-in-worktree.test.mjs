@@ -1,5 +1,5 @@
 // What allow-npm-in-worktree.mjs must allow and what it must let fall through
-// (docs/process/code-changes.md, "What enforces this"). The hook finds the
+// (docs/process/enforcement.md). The hook finds the
 // checkout from its own place in it, so the test copies it into a checkout of
 // its own, under the temporary directory, and names worktrees of that.
 import assert from 'node:assert/strict';

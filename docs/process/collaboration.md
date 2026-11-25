@@ -33,10 +33,4 @@ Candor without a decision rule would stall the work, which is what rule 4 is for
 
 Working things out in conversation also leaves a record. A gap that is closed silently by a guess looks the same in the code as a decision, and nobody can tell later which it was.
 
-The two practices added on 2026-10-13 come from the AWS review that preceded the platform work, and match the same two in the `dcg-platform` repository. A menu of options pushed the identity decisions back onto the owner, who does not want to be the identity expert; a recommendation with its reason did not. And "account" and "user" each name several different things in AWS, so a sentence that does not say which kind is a sentence that can be misread.
-
-The practice added on 2026-10-14 comes from the first code: Docker was missing on the owner's machine while the agreed local design runs its stand-ins as containers, and the agent downloaded a jar instead of asking. It worked, and it would have made the laptop's tests differ from CI's, which is the kind of difference that surfaces weeks later as "it passed for me". A workaround that keeps the work moving is the wrong trade when the thing it works around is the environment itself.
-
-The delivery practice added on 2026-10-17 comes from the Issue-37 session: a turn's summary said a checklist was "below", the summary ended the turn, and the checklist was never written. Chat is the one surface in this workflow that nothing reads back, so what the owner is owed has to be complete before the summary or live on GitHub. The first attempt put the items on the checkpoint's issue, which the merge had already closed; a closed issue is off the backlog, which is why the after-merge items go to a follow-up issue.
-
-The naming practice added on 2026-10-16 comes from the cloud-first pivot of that day, when pull requests, issues and the numbered decision records were all in one conversation and "#34" could mean two things. GitHub renders `#n` as a link to whichever of the two it finds, so the prefix is the only thing that disambiguates a number in prose.
+The dated account of each rule is `docs/process/history.md`.
