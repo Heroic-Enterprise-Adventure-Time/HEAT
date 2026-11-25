@@ -39,4 +39,4 @@ All read on 2026-10-17.
 
 ## Where it is described
 
-`docs/architecture/overview.md`, "Environments". `docs/process/code-changes.md`, rules 5 and 18 and "What enforces this". `terraform/bootstrap/README.md`, "On the GitHub side". `.github/rulesets/` once the `release` ruleset exists.
+`docs/architecture/overview.md`, "Environments". `docs/process/code-changes.md`, rules 5 and 18, and `docs/process/enforcement.md`, which was that document's "What enforces this" until Issue-363. `terraform/bootstrap/README.md`, "On the GitHub side". `.github/rulesets/` once the `release` ruleset exists.
