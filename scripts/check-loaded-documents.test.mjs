@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { checkLimits, LIMITS, loadedDocuments, renderLimits } from "./check-loaded-documents.mjs";
 
 const tree = {
-  "AGENTS.md": "# Entry\n\n- How we work: @docs/process/a.md\n- The shells: @docs/process/b.md\n\nWrite to someone@example.com, or read `@docs/process/quoted.md`.\n",
+  "AGENTS.md": "# Entry\n\n- How we work: @docs/process/a.md\n- The shells: @docs/process/b.md\n\nWrite to docs@heat.md, or read `@docs/process/quoted.md`.\n",
   "docs/process/a.md": "a".repeat(100) + " and @docs/process/c.md\n",
   "docs/process/b.md": "é".repeat(50),
   "docs/process/c.md": "back to @AGENTS.md",
@@ -27,9 +27,10 @@ test("a loader's documents are its imports and theirs, each once", () => {
 });
 
 test("an address and a path in backticks are not imports", () => {
-  const paths = loadedDocuments("AGENTS.md", read).map((document) => document.path);
-  assert.ok(!paths.includes("example.com"));
-  assert.ok(!paths.includes("docs/process/quoted.md"));
+  // `read` refuses a path that is not in the tree, so following either one would throw:
+  // the address ends in `.md` and the quoted path is written as an import is.
+  assert.equal(loadedDocuments("AGENTS.md", read).length, 4);
+  assert.throws(() => loadedDocuments("AGENTS.md", (path) => (path === "AGENTS.md" ? "see @heat.md" : read(path))), /not loaded: heat\.md/);
 });
 
 test("a document is counted in bytes, not characters", () => {
