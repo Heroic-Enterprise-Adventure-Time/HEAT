@@ -2,8 +2,10 @@
 // refuses, on documents written here; and that the loaders it names exist,
 // read from the tree. Run by `npm test` (test:scripts).
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 
 import { checkLimits, LIMITS, loadedDocuments, renderLimits } from "./check-loaded-documents.mjs";
 
@@ -77,4 +79,12 @@ test("a loader at its limit passes, and one byte over is refused", () => {
 
 test("every loader the script names is a file of the tree", () => {
   for (const loader of Object.keys(LIMITS)) assert.ok(existsSync(new URL(`../${loader}`, import.meta.url)), loader);
+});
+
+test("every AGENTS.md the tree tracks is a loader the script holds to a size", () => {
+  // A new area's loader would otherwise load into every session there with no limit (docs/README.md, rule 3).
+  const root = fileURLToPath(new URL("..", import.meta.url));
+  const tracked = execFileSync("git", ["ls-files", "AGENTS.md", "**/AGENTS.md"], { cwd: root, encoding: "utf8" }).split("\n").filter(Boolean);
+  assert.ok(tracked.includes("AGENTS.md"));
+  assert.deepEqual(tracked.sort(), Object.keys(LIMITS).sort());
 });
