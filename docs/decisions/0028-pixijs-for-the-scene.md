@@ -1,6 +1,6 @@
 # 0028: PixiJS draws the camp scene
 
-- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene), 2026-10-22 by Issue-130 (an action's weapon and effect), 2026-11-19 by Issue-205 (a sheet per set, packed by the build, and a run that waits for its art) and 2026-11-22 by Issue-341 (a run's cast is who its seed rolls, where the amendment of Issue-205 says "The cast is whoever may appear, not whoever will")
+- **Status:** Decided; amended 2026-10-20 by Issue-89 (the stage fills its box), 2026-10-21 by Issue-99 (heroes at half the scene's scale), 2026-10-21 by Issue-95 (the scale counts device pixels), 2026-10-22 by Issue-15 (the battle scene), 2026-10-22 by Issue-130 (an action's weapon and effect), 2026-11-19 by Issue-205 (a sheet per set, packed by the build, and a run that waits for its art), 2026-11-22 by Issue-341 (a run's cast is who its seed rolls, where the amendment of Issue-205 says "The cast is whoever may appear, not whoever will") and 2026-11-24 by Issue-352 (a battle's road is on its location's ground, where the amendment of Issue-15 says "The ground is the meadow tileset")
 - **Date:** 2026-10-20
 - **Settles:** Issue-81: what renders the 320×180 scene inside the Angular page, which no document named (raised by the owner in the Issue-80 session).
 
@@ -88,6 +88,16 @@ The amendment of Issue-15 above says the frame counts and hold frames are read f
 ## Amendment: a run's cast is who its seed rolls (Issue-341, 2026-11-22)
 
 The amendment of Issue-205 above has "The cast is whoever may appear, not whoever will", the owner's word of 2026-11-19, given ahead of jobs whose opponents are not all known when a run starts. Decision 0058 then had the engine expand a job's stages from the adventure's seed before the first stage runs, so who will appear is known when the run starts. A new run's cast is now who that expansion names: `jobCast` in `cast.ts` calls the engine's `expandStages` with the adventure's seed, the function the run itself is about to call, so a job that varies loads its wolf's art only for a run that has a wolf. A replay's cast is still whom its timeline's battles hold. A unit that appears without having been in the cast still loads then and shows when its picture arrives, as it may where an adventure another version issued is resumed with this engine. The reasons, and the wider cast as what was weighed and not chosen, are in decision 0058's second amendment.
+
+## Amendment: a battle's road is on its location's ground (Issue-352, 2026-11-24)
+
+**A battle is drawn on the ground of the location its adventure left from,** where the amendment of Issue-15 has "The ground is the meadow tileset": the meadow's for a job of Millbrook's and the crag's for one of Highcrag's, so a party that sets out from a hill fort is not seen on grass. The ground comes with the run, as its cast does: the page hands the scene the location's ground set when it hands over the run, `prepare` loads it beside the cast's art, and `reset` lays the road with it. A location's ground is its camp's layout's (`groundAt` in `packages/client/src/app/camp/scene/layout.ts`), and the ground sets are one list, `GROUNDS` in `packages/client/src/app/ground-sets.ts`, each with the colour its canvas shows until its tiles are laid, which the art build checks what it copied against (`docs/standards/typescript.md`, rule 23). A ground that fails to load leaves the road as it was and is asked for again by the next run, and one that arrives after the wait for a run's art is laid when it arrives, as a unit's picture shows when it does.
+
+**What it leaves.** Before any run is handed over, the scene is made with the meadow's road, as it was, so a battle of Highcrag's shows the meadow for the moment its art is loading; a replay that cannot be played shows the meadow beside its words. A caravan's road runs from one ground to another, and is drawn on the ground it left until the cart's own issue says otherwise (Issue-353).
+
+**Why here.** The review of this issue's own work found every battle drawn on Millbrook's meadow, with Highcrag's board job, built by Issue-351, among them. Nobody can fight at Highcrag until a caravan lands a hero there (Issue-355), so no stack can show it before then: it is judged on the dev server, with a job of Millbrook's drawn on the crag by a change that is not committed.
+
+**Considered and not chosen:** a scene made with no road until its first run, which would never show another place's ground and changes what every battle shows while it loads, and what an unplayable replay shows, for a moment that only Highcrag has; and a ground named by the job, a second place to say where a job is.
 
 ## Considered and not chosen
 

@@ -25,6 +25,7 @@ import {
   STARTING_LOCATION,
   UNIT_TYPES,
   type UnitType,
+  UNLOCK_IDS,
   warehouseCapacity,
 } from '@heat/engine';
 
@@ -63,6 +64,7 @@ import {
   type StageEnding as WireStageEnding,
   type StageKind as WireStageKind,
   type UnitType as WireUnitType,
+  type Unlock as WireUnlock,
 } from './graphql/generated/graphql';
 import { apiError, PREVIOUS, Refusal, type RefusalOf, type Route } from './hub';
 import { Session } from './session';
@@ -73,12 +75,12 @@ import { Session } from './session';
  * `graphql/generated/`): the same shape, with the engine's closed sets read
  * back from the schema's UPPER_CASE enum values into the engine's own
  * (`VILLAGER` is `villager`; docs/standards/graphql.md, rule 4). A unit
- * type, a material, a gathering trait, a stage's kind and its ending are `string`, because a
+ * type, a material, a gathering trait, a stage's kind and its ending, and an unlock are `string`, because a
  * value this client's engine lacks passes through (`engineValues`); a
  * facility kind and an outcome keep the engine's type, which the pages
  * switch on. Nothing past this file sees a wire value.
  */
-type Engine<T> = T extends WireUnitType | WireMaterial | WireGatheringTrait | WireStageKind | WireStageEnding
+type Engine<T> = T extends WireUnitType | WireMaterial | WireGatheringTrait | WireStageKind | WireStageEnding | WireUnlock
   ? string
   : T extends WireFacilityKind
     ? FacilityKind
@@ -114,8 +116,14 @@ type ReplayAdventure = NonNullable<ReplayQuery['adventure']>;
 export type ReplayedView = Engine<Omit<ReplayAdventure, 'timeline'>> & { readonly timeline: AdventureTimeline | null };
 
 type MePlayer = NonNullable<MeQuery['me']>;
-/** The signed-in player: `camps` and `heroes` are nulled only for another caller (graphql.md, rule 11), never for the player's own read. */
-export type PlayerView = Engine<Omit<MePlayer, 'camps' | 'heroes'> & { readonly camps: readonly CampFieldsFragment[]; readonly heroes: readonly HeroFieldsFragment[] }>;
+/** The signed-in player: `camps`, `heroes` and `unlocks` are nulled only for another caller (graphql.md, rule 11), never for the player's own read. */
+export type PlayerView = Engine<
+  Omit<MePlayer, 'camps' | 'heroes' | 'unlocks'> & {
+    readonly camps: readonly CampFieldsFragment[];
+    readonly heroes: readonly HeroFieldsFragment[];
+    readonly unlocks: readonly NonNullable<MePlayer['unlocks']>[number][];
+  }
+>;
 
 /** The refusals each mutation can answer, by type, which the tables of the player's words are keyed by (angular.md, rule 6). */
 export type RecruitRefusal = RefusalOf<RecruitHeroMutation['recruitHero']>;
@@ -168,6 +176,7 @@ const facilityKind = engineValues(FACILITY_KINDS);
 const outcome = engineValues(ADVENTURE_OUTCOMES);
 const stageKind = engineValues(STAGE_KINDS);
 const stageEnding = engineValues(STAGE_ENDINGS);
+const unlock = engineValues(UNLOCK_IDS);
 const wireUnitType = wireNames(UNIT_TYPES);
 const wireFacilityKind = wireNames(FACILITY_KINDS);
 const materials = <T extends { readonly material: string }>(items: readonly T[]) => items.map((item) => ({ ...item, material: material(item.material) }));
@@ -242,6 +251,7 @@ function playerFromWire(player: MePlayer): PlayerView {
     camps: (player.camps ?? []).map(campFromWire),
     heroes: (player.heroes ?? []).map(heroFromWire),
     openAdventure: player.openAdventure ? adventureFromWire(player.openAdventure) : null,
+    unlocks: (player.unlocks ?? []).map((held) => ({ ...held, unlock: unlock(held.unlock) })),
   };
 }
 
@@ -433,6 +443,17 @@ export class Game {
     });
   });
 
+  /**
+   * Whether the camp on screen, with nobody alive, is offered no hero for
+   * nothing: true where the location recruits no villager, as at Highcrag,
+   * whose first hero comes by caravan (decision 0059). The engine's own rule,
+   * `recruitCost` with no hero alive, read over the location's list.
+   */
+  readonly noFreeRecruit = computed(() => {
+    const at = location(this.location());
+    return !!at && !at.recruits.some((recruit) => recruitCost(recruit, 0).length === 0);
+  });
+
   /** The next level of one of the camp on screen's own facilities, or null at its highest (`upgradeOffer`). */
   upgrade(kind: FacilityKind): UpgradeOffer | null {
     const camp = this.camp();
@@ -603,8 +624,13 @@ export class Game {
     return must(data, 'the mutation’s data');
   }
 
-  /** Reads the player again after a mutation; a failed read leaves the view as it was, since the mutation's own answer is what matters. */
-  private async reload(): Promise<void> {
+  /**
+   * Reads the player again, after a mutation and where a page asks for it. A
+   * failed read leaves the view as it was, since a mutation's own answer is
+   * what matters, and `error` says why; the result of a run offers the read
+   * again, because what the run unlocked is told from it (Issue-352).
+   */
+  async reload(): Promise<void> {
     await this.me.refetch().catch(() => undefined);
   }
 }

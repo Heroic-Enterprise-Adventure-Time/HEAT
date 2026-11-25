@@ -25,12 +25,13 @@
 // the page reads no pixels. The page reads the picture's name there, so the
 // row is always the row of the picture it is drawn with, whatever a browser
 // has kept (the review of PR-334).
-import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
+import { GROUND_FILES, GROUNDS } from "../src/app/ground-sets.ts";
 import { PACKED_AREAS, SET_CLIPS } from "../src/app/sprite-sets.ts";
 import { glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
 import { colourToken } from "./style-tokens.mjs";
@@ -76,6 +77,15 @@ for (const area of COPIED_AREAS) {
     recursive: true,
     filter: (source) => !/\.[a-z]+$/i.test(source) || /\.(png|json)$/i.test(source),
   });
+}
+
+// Every ground set the page asks for was copied whole (typescript.md, rule 23): the list is the page's own,
+// src/app/ground-sets.ts, so a set named there with no art under art/ground fails here and not in a scene.
+for (const set of Object.keys(GROUNDS)) {
+  const dir = join(to, "ground", set);
+  const copied = new Set(existsSync(dir) ? readdirSync(dir) : []);
+  const missing = GROUND_FILES.filter((file) => !copied.has(file));
+  if (missing.length > 0) throw new Error(`art/ground/${set} lacks ${missing.join(" and ")}, which the page asks the ground set ${set} for (src/app/ground-sets.ts)`);
 }
 
 const facilityPictures = {};

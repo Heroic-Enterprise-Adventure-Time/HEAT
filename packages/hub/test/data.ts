@@ -1,10 +1,12 @@
 import { randomUUID } from "node:crypto";
 
 import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { range } from "es-toolkit";
 import { vi } from "vitest";
 
-import { type AdventureOutcome, type Material, must, type UnitType, type UnlockId } from "@heat/engine";
+import { type AdventureOutcome, FACILITIES, type FacilityKind, type Material, must, type UnitType, type UnlockId } from "@heat/engine";
 
+import { buildFacility } from "../src/build.js";
 import type { Tables } from "../src/db/client.js";
 import { ITEM_VERSION } from "../src/db/keys.js";
 import type { AdventureRecord, Hero, Repository, SettledResult } from "../src/db/repository.js";
@@ -51,6 +53,23 @@ export async function putRecentAdventure(db: DynamoDBDocumentClient, table: stri
 /** Puts stock into a player's camp at a location directly, as a settlement would credit it or a caravan deliver it. */
 export async function stock(repo: Repository, p: string, location: string, holdings: Partial<Record<Material, number>>): Promise<void> {
   for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, location, material, balance);
+}
+
+/**
+ * A facility built up to a level as a player builds it, through the verb:
+ * each level it lacks paid for with what that level costs, after whatever the
+ * level needs first is built the same way, as the caravan hub needs a level-2
+ * warehouse. It leaves the camp's stock at whatever the last build left.
+ */
+export async function build(repo: Repository, p: string, location: string, kind: FacilityKind, level = 1): Promise<void> {
+  const camp = await repo.camp(p, location);
+  const built = kind === "heroes-hall" ? camp.hallLevel : kind === "warehouse" ? camp.warehouseLevel : (camp.facilities[kind] ?? 0);
+  for (const next of range(built + 1, level + 1)) {
+    const step = must(FACILITIES[kind].levels[next - 1], `level ${next} of the ${kind}`);
+    for (const need of step.requires) await build(repo, p, location, need.kind, need.level);
+    for (const { material, amount } of step.cost) await repo.setBalance(p, location, material, amount);
+    await buildFacility(repo, p, location, kind, next);
+  }
 }
 
 /** A camp's balances by material, as the repository reads them. */

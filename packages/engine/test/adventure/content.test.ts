@@ -69,7 +69,7 @@ describe("The adventure's content", () => {
     expect(JOBS["timber-from-the-near-woods"].pay).toEqual([{ material: "cloth", amount: 3 }]);
   });
 
-  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), and the ore job's 15 for the lumber camp's and for Highcrag's", () => {
+  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), the ore job's 15 for the lumber camp's and for Highcrag's, and the wolves job's 20 for the road's", () => {
     expect(mapValues(JOBS, (job) => job.bonusXp)).toEqual({
       "pick-up-sticks": 2,
       "timber-from-the-near-woods": 4,
@@ -77,6 +77,7 @@ describe("The adventure's content", () => {
       "ore-from-the-hill": 4,
       "goblins-in-the-old-workings": 6,
       "lumber-from-the-deep-woods": 6,
+      "scout-the-road-to-highcrag": 8,
       "ore-from-the-crag": 4,
     });
     expect(mapValues(JOBS, (job) => enemiesXp(job) + job.bonusXp)).toEqual({
@@ -86,6 +87,7 @@ describe("The adventure's content", () => {
       "ore-from-the-hill": 15,
       "goblins-in-the-old-workings": 25,
       "lumber-from-the-deep-woods": 15,
+      "scout-the-road-to-highcrag": 20,
       "ore-from-the-crag": 15,
     });
   });
@@ -135,7 +137,8 @@ describe("The adventure's content", () => {
         expect(accepted.level, job.id).toBeGreaterThan(1);
         expect(most[accepted.material], job.id).toBeGreaterThan(warehouseCapacity(accepted.level - 1));
       }
-      expect(sum(Object.values(most)), job.id).toBeGreaterThan(0);
+      // Every job brings something home, a resource or an unlock: the road's job is the first whose reward is no resource (decision 0059).
+      if ((job.grants ?? []).length === 0) expect(sum(Object.values(most)), job.id).toBeGreaterThan(0);
     }
   });
 

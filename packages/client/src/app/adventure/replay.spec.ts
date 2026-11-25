@@ -105,6 +105,8 @@ describe('Replay page (Issue-290)', () => {
     expect(scene.prepared).toHaveLength(1);
     expect(scene.prepared[0]?.flatMap((member) => member.spriteSet ?? [])).toEqual(['fighter-02', 'villager-01']);
     expect(scene.prepared[0]).toContainEqual({ kind: 'resource', type: 'tree' });
+    // And the ground of the location it was played from (Issue-352).
+    expect(scene.grounds).toEqual(['meadow-01']);
 
     expect(panel().getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
     expect(screen.getByRole('complementary')).toHaveAccessibleName('Timber from the near woods');

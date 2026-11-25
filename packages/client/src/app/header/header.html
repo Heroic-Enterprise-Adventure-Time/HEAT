@@ -4,9 +4,9 @@
   @if (game.player(); as player) {
     <label>
       <span class="visually-hidden">Camp</span>
-      <select [value]="game.location()" (change)="selectLocation($event)">
+      <select (change)="selectLocation($event)">
         @for (camp of player.camps; track camp.location) {
-          <option [value]="camp.location">{{ camp.name }}</option>
+          <option [selected]="camp.location === game.location()" [value]="camp.location">{{ camp.name }}</option>
         }
       </select>
     </label>

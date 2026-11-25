@@ -2,7 +2,7 @@ import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 import { range } from 'es-toolkit';
 
-import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
+import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES, type UnlockId, UNLOCKS } from '@heat/engine';
 
 import { type AdventureResultView, type AdventureView, Game, type SettledView } from '../game';
 import { ApiError } from '../hub';
@@ -60,13 +60,35 @@ const result: AdventureResultView = {
   ],
 };
 
+/** The one unlock of the content, which the caravan hub's scouting job grants. */
+const ROAD: UnlockId = 'road-to-highcrag';
+/** An unlock the player holds, as `me.unlocks` answers it: with the adventure that first earned it. */
+interface Held {
+  readonly unlock: string;
+  readonly adventureId: string;
+}
+
 /** A game with the open adventure and a submit that answers as the test says, recording each log it was given. */
 function fakeGame(answer: () => AdventureResultView | null | Error = () => result, opened: AdventureView = adventure) {
   const open = signal<AdventureView | null>(opened);
   const settled = signal<SettledView | null>(null);
+  const held = signal<readonly Held[]>([]);
   const fake = {
     location: signal('millbrook'),
-    player: computed(() => ({ id: 'p1', camps: [], heroes: [], openAdventure: open() })),
+    player: computed(() => ({ id: 'p1', camps: [], heroes: [], openAdventure: open(), unlocks: held() })),
+    /** The unlocks the player holds once the submit has answered and the player is read again. */
+    holdsAfter: [] as readonly Held[],
+    /** Why the player could not be read, as the read after a submit leaves it; null once a read succeeds. */
+    error: signal<string | null>(null),
+    /** Whether the read after the submit fails, as when the hub is not reached for it. */
+    readFails: false,
+    reloads: 0,
+    reload: () => {
+      fake.reloads++;
+      held.set(fake.holdsAfter);
+      fake.error.set(null);
+      return Promise.resolve();
+    },
     adventure: open,
     settled,
     submitted: [] as (readonly AdventureLogEntry[])[],
@@ -81,6 +103,8 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
       if (answered instanceof Error) return Promise.reject(answered);
       settled.set({ adventure: submittedAdventure, result: answered });
       open.set(null);
+      if (fake.readFails) fake.error.set('The hub could not be reached.');
+      else held.set(fake.holdsAfter);
       return Promise.resolve();
     },
   };
@@ -411,6 +435,59 @@ describe('Adventure', () => {
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
     expect(game.settled()).toBeNull();
   });
+
+  it("tells the player an unlock the run earned that they did not hold, in the content's words, under how it ended (Issue-352)", async () => {
+    const game = fakeGame();
+    // The player's own unlock names this adventure, so it was new.
+    game.holdsAfter = [{ unlock: ROAD, adventureId: adventure.id }];
+    const { run } = await renderAdventure(game);
+    await run(120_000);
+    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    expect(await within(screen.getByRole('status')).findByText(UNLOCKS[ROAD].earned)).toBeInTheDocument();
+    expect(UNLOCKS[ROAD].earned).toMatch(/Highcrag/);
+    expect(screen.queryByRole('button', { name: 'Read again' })).not.toBeInTheDocument();
+  });
+
+  it('says nothing of an unlock the run earned again: the player holds it from an earlier adventure', async () => {
+    const game = fakeGame();
+    game.holdsAfter = [{ unlock: ROAD, adventureId: 'an-earlier-adventure' }];
+    const { run } = await renderAdventure(game);
+    await run(120_000);
+    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    expect(screen.queryByText(UNLOCKS[ROAD].earned)).not.toBeInTheDocument();
+  });
+
+  it('has the place for that news in the page with the result, empty until there is some, so that it is spoken when it arrives', async () => {
+    const game = fakeGame();
+    const { run } = await renderAdventure(game);
+    await run(120_000);
+    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+  });
+
+  it('says so where the player could not be read again after the run was sent, and tells the unlock once Read again has read them', async () => {
+    const game = fakeGame();
+    game.holdsAfter = [{ unlock: ROAD, adventureId: adventure.id }];
+    game.readFails = true;
+    const { run, user } = await renderAdventure(game);
+    await run(120_000);
+    expect(await screen.findByText('Your camp could not be read again, so anything this run opened is not shown yet.')).toHaveRole('alert');
+    expect(screen.queryByText(UNLOCKS[ROAD].earned)).not.toBeInTheDocument();
+
+    await user.click(button('Read again'));
+    expect(await within(screen.getByRole('status')).findByText(UNLOCKS[ROAD].earned)).toBeInTheDocument();
+    expect(game.reloads).toBe(1);
+    expect(screen.queryByRole('button', { name: 'Read again' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  for (const [location, ground] of [['millbrook', 'meadow-01'], ['highcrag', 'crag-01']] as const) {
+    it(`hands the scene the ground of the location the run left from: ${ground} for ${location} (Issue-352)`, async () => {
+      const scene = fakeBattleScene();
+      await renderAdventure(fakeGame(() => result, { ...adventure, location }), scene);
+      expect(scene.grounds).toEqual([ground]);
+    });
+  }
 
   it('replays the stored timeline in the scene from its start, and goes back to the result', async () => {
     const scene = fakeBattleScene();

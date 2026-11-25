@@ -4,6 +4,7 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { type AdventureTimeline, isPlayableTimeline, location } from '@heat/engine';
 
+import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
 import { BattleView } from './battle-view';
 import { timelineCast } from './cast';
@@ -105,6 +106,6 @@ export class Replay {
 
   private start(timeline: AdventureTimeline): void {
     this.play.replay(timeline);
-    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events));
+    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events), groundAt(this.from().id));
   }
 }

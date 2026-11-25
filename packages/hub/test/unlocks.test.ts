@@ -26,12 +26,12 @@ import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { type AdventureRecord, type EarnedUnlock, type Hero, LocationLocked, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
-import { InsufficientResources } from "../src/refusals.js";
+import { InsufficientResources, Requires } from "../src/refusals.js";
 import { schema } from "../src/schema/schema.js";
 import { startAdventure } from "../src/start.js";
 import { type OverrideInput, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { balances, player, putParty, putUnlock, stock, storedItem } from "./data.js";
+import { balances, build, player, putParty, putUnlock, stock, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -46,10 +46,13 @@ import { VERSION as version } from "./versions.js";
  * the transaction; and Highcrag, where a hero is recruited at its own camp
  * and nothing is free.
  *
- * No job of the content grants an unlock until Issue-352, so settlement is
- * given a job that does: the wolves job with a grant, started through the
- * repository, since the verb starts only the content's jobs, and submitted
- * with the content that has it.
+ * The rule is tested apart from the one job of the content that grants an
+ * unlock: settlement is given the wolves job with a grant, started through
+ * the repository, since the verb starts only the content's jobs, and
+ * submitted with the content that has it (graphql.md, rule 27). The content's
+ * own job, the caravan hub's "Scout the road to Highcrag" (Issue-352), is
+ * started and settled through the verbs with the engine's content, under
+ * "the road to Highcrag" below.
  */
 
 let db: DynamoDBDocumentClient;
@@ -68,24 +71,28 @@ const home = STARTING_LOCATION;
 const highcrag = must(LOCATIONS.find((l) => l.unlock !== undefined), "a location that needs an unlock");
 const road = must(highcrag.unlock, "its unlock");
 const crag = must(jobsPostedBy(highcrag.id, "job-board")[0], "Highcrag's board job");
+/** The job of the content that grants the road, and the facility that posts it, read from the content. */
+const scoutTheRoad = must(Object.values(JOBS).find((job) => job.grants?.includes(road)), "the job that grants the road");
+const hub = must(scoutTheRoad.facility, "the facility that posts it");
 
 const scouting: Job = { ...JOBS["wolves-on-the-mill-road"], id: "wolves-that-open-the-road", grants: [road] };
 const content: AdventureContent = { ...ADVENTURE_CONTENT, jobs: { ...ADVENTURE_CONTENT.jobs, [scouting.id]: scouting } };
 
-const snapshotOf = (heroes: readonly { id: string; unitType: UnitType; name: string; spriteSet: string }[]): AdventureSnapshot => ({
+const snapshotOf = (heroes: readonly { id: string; unitType: UnitType; name: string; spriteSet: string }[], jobId = scouting.id): AdventureSnapshot => ({
   version,
-  jobId: scouting.id,
+  jobId,
   heroes: heroes.map((h) => ({ heroId: h.id, unitType: h.unitType, name: h.name, spriteSet: h.spriteSet, level: 1, stats: must(UNIT_PROFILES[h.unitType], `the ${h.unitType}'s profile`).stats })),
 });
 
 /**
- * A seed on which a party of these unit types ends the scouting job this way,
- * every hero alive where it completes, found by asking the engine (graphql.md,
- * rule 26): a roll does not read who the heroes are, so a stand-in party of
- * the same types says what the player's will do.
+ * A seed on which a party of these unit types ends a job this way, every hero
+ * alive where it completes, found by asking the engine (graphql.md, rule 26):
+ * a roll does not read who the heroes are, so a stand-in party of the same
+ * types says what the player's will do. The job is the scouting job these
+ * tests add, unless another of the same content is named.
  */
-function seedFor(unitTypes: readonly UnitType[], outcome: "complete" | "defeat"): string {
-  const standIn = snapshotOf(unitTypes.map((unitType, i) => ({ id: `stand-in-${i}`, unitType, name: unitType, spriteSet: `${unitType}-01` })));
+function seedFor(unitTypes: readonly UnitType[], outcome: "complete" | "defeat", jobId = scouting.id): string {
+  const standIn = snapshotOf(unitTypes.map((unitType, i) => ({ id: `stand-in-${i}`, unitType, name: unitType, spriteSet: `${unitType}-01` })), jobId);
   const ends = (seed: string): boolean => {
     const { result } = replay(standIn, seed, [], content);
     return result.outcome === outcome && (outcome === "defeat" || result.dead.length === 0);
@@ -218,8 +225,8 @@ describe("an unlock a run earned", () => {
     expect((await repo.camps(q)).map((c) => c.location)).toEqual([home]);
   });
 
-  it("is not written by a job that grants none: no job of the content does yet", async () => {
-    expect(Object.values(JOBS).flatMap((job) => job.grants ?? [])).toEqual([]);
+  it("is not written by a job that grants none, as the wolves job of the content does not", async () => {
+    expect(JOBS["wolves-on-the-mill-road"].grants).toBeUndefined();
     const p = player();
     const heroes = await putParty(db, tables, p, PAIR, home);
     // The scouting job is the wolves job with a grant, so a seed that completes the one completes the other.
@@ -227,6 +234,63 @@ describe("an unlock a run earned", () => {
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(settled.result).toMatchObject({ outcome: "complete", unlocks: [] });
     expect(await repo.unlocks(p)).toEqual([]);
+  });
+});
+
+describe("the road to Highcrag (Issue-352)", () => {
+  // A seed on which two fighters open the road with nobody lost, found by asking the engine.
+  const PARTY: UnitType[] = ["fighter", "fighter"];
+  const SEED = seedFor(PARTY, "complete", scoutTheRoad.id);
+
+  it("is the job of Millbrook's caravan hub, which the camp must have built", async () => {
+    expect(scoutTheRoad.location).toBe(home);
+    expect(jobsPostedBy(home, hub).map((job) => job.id)).toEqual([scoutTheRoad.id]);
+    const p = player();
+    const heroes = await putParty(db, tables, p, PARTY, home);
+    const refused = await refusal(startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, heroes.map((h) => h.id)));
+    expect(refused).toBeInstanceOf(Requires);
+    expect(refused).toMatchObject({ missing: [{ kind: hub, level: 1 }] });
+  });
+
+  it("is open once the job is started at a camp with the hub and settled with the engine's own content: Highcrag is then among the player's camps, and a recruit there is refused for want of resources", async () => {
+    const p = player();
+    const heroes = await putParty(db, tables, p, PARTY, home);
+    await build(repo, p, home, hub);
+    expect((await repo.camps(p)).map((c) => c.location)).toEqual([home]);
+
+    const started = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, heroes.map((h) => h.id), undefined, () => SEED);
+    expect(started).toMatchObject({ location: home, jobId: scoutTheRoad.id, status: "OPEN" });
+    const expected = replay(started.snapshot, started.seed, []).result;
+    expect(expected).toMatchObject({ outcome: "complete", dead: [], unlocks: [road] });
+
+    const now = new Date("2026-11-24T18:00:00.000Z");
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, [], now);
+    expect(settled.result).toMatchObject({ outcome: "complete", unlocks: [road], rewards: [], credited: [] });
+    expect(await repo.unlocks(p)).toEqual([{ unlock: road, earnedAt: now.toISOString(), adventureId: started.adventureId }]);
+    expect((await repo.camps(p)).map((c) => c.location)).toEqual([home, highcrag.id]);
+    expect(await repo.camp(p, highcrag.id)).toMatchObject({ hallLevel: 1, warehouseLevel: 1, activeHeroes: 0, livingHeroes: 0, holdings: [], stored: false });
+    // The party came home: the adventure was Millbrook's, and nobody is at Highcrag.
+    for (const hero of heroes) expect(await repo.getHero(p, hero.id)).toMatchObject({ location: home, status: "ALIVE", adventureId: null });
+
+    // The camp it opens is empty and has nothing: every recruit there is refused for its whole cost.
+    for (const recruit of highcrag.recruits) {
+      const short = await refusal(recruitHero(repo, p, highcrag.id, recruit.unitType, randomUUID()));
+      expect(short, recruit.unitType).toBeInstanceOf(InsufficientResources);
+    }
+  });
+
+  it("stays a job like any other once the road is open: a second run earns the unlock again and the first adventure keeps it", async () => {
+    const p = player();
+    const heroes = await putParty(db, tables, p, PARTY, home);
+    await build(repo, p, home, hub);
+    const ids = heroes.map((h) => h.id);
+    const first = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, ids, undefined, () => SEED);
+    await submitAdventure(repo, new MemoryTimelines(), p, version, first.adventureId, []);
+    const second = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, ids, undefined, () => SEED);
+    const again = await submitAdventure(repo, new MemoryTimelines(), p, version, second.adventureId, []);
+    expect(again.result).toMatchObject({ outcome: "complete", unlocks: [road] });
+    expect((await repo.unlocks(p)).map((u) => u.adventureId)).toEqual([first.adventureId]);
+    expect((await repo.camps(p)).map((c) => c.location)).toEqual([home, highcrag.id]);
   });
 });
 

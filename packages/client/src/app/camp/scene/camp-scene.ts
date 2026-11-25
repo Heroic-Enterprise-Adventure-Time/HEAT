@@ -3,6 +3,7 @@ import * as z from 'zod/mini';
 
 import { facilityArtLevel, type FacilityKind, must } from '@heat/engine';
 
+import { GROUNDS } from '../../ground-sets';
 import type { SetClip } from '../../sprite-sets';
 import { loadSpriteSet } from '../../sprite-sheet';
 import { fetchJson } from '../../static-json';
@@ -120,7 +121,7 @@ export async function createCampScene(
   // Nearest-neighbour everywhere: pixel art blurs under any other filter.
   TextureStyle.defaultOptions.scaleMode = 'nearest';
   const app = new Application();
-  await app.init({ width: MAP_WIDTH, height: MAP_HEIGHT, background: '#4f7f2a', antialias: false, resolution: 1, roundPixels: true });
+  await app.init({ width: MAP_WIDTH, height: MAP_HEIGHT, background: GROUNDS[layout.ground].backdrop, antialias: false, resolution: 1, roundPixels: true });
   app.canvas.style.imageRendering = 'pixelated';
   app.canvas.style.display = 'block';
   app.canvas.setAttribute('role', 'img');
@@ -140,7 +141,7 @@ export async function createCampScene(
   world.addChild(ground, things);
   app.stage.addChild(world);
 
-  /** Lays the ground over the window, the map's tiles where it overlaps the map and grass around it. */
+  /** Lays the ground over the window, the map's tiles where it overlaps the map and its upper terrain around it. */
   const layWindow = (x0: number, y0: number, width: number, height: number) => {
     for (const child of ground.removeChildren()) child.destroy();
     const col0 = Math.floor(x0 / TILE);

@@ -30,12 +30,18 @@ import { parseArgs } from "node:util";
 import sharp from "sharp";
 
 import { colourToken } from "../packages/client/scripts/style-tokens.mjs";
+import { GROUNDS } from "../packages/client/src/app/ground-sets.ts";
 
 const art = (path) => fileURLToPath(new URL(`../art/${path}`, import.meta.url));
 /** An icon's canvas (rule 25). */
 const ICON = 32;
-/** The scenes' ground, `#4f7f2a` where each scene makes its canvas, which a drop's icon is read against: it is no token of the stylesheet. */
-const GROUND = [79, 127, 42, 255];
+/**
+ * The scenes' ground, which a drop's icon is read against: the colour the
+ * meadow's canvas is made with, read from the page's own list of ground sets
+ * and never copied here (typescript.md, rule 29). It is no token of the
+ * stylesheet.
+ */
+const GROUND = [1, 3, 5].map((at) => Number.parseInt(GROUNDS["meadow-01"].backdrop.slice(at, at + 2), 16)).concat(255);
 /** The page's light and ink, for the numbers and the sheet behind them, from the stylesheet's tokens (assets.md, rule 39). */
 const LIGHT = colourToken("--light");
 const INK = colourToken("--ink");

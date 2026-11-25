@@ -284,7 +284,7 @@ describe("Defeat", () => {
 });
 
 describe("The unlocks a run earned", () => {
-  // No job of the content grants one until Issue-352, so the wolves job is given a grant here.
+  // The rule, apart from the one job that grants: the wolves job is given every unlock of the content here. The road's own job is road-job.test.ts.
   const scouting: Job = { ...JOBS[WOLVES], id: "wolves-that-open-a-road", grants: [...UNLOCK_IDS] };
   const content = contentWithJob(scouting);
 

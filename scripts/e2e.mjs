@@ -221,12 +221,15 @@ const camp = await graphql(token, campQuery);
 const millbrook = camp.data?.me?.camps?.find((c) => c.location === "millbrook");
 check(!camp.errors && millbrook, `me shows the starting camp: ${JSON.stringify(millbrook)} (${camp.ms} ms)`);
 
-// Unlocks and the second location (Issue-351, decision 0059). No job grants
-// the road's unlock until Issue-352, so no test user can hold it: the user
-// has the starting camp alone, and a recruit at Highcrag is refused as the
-// client's defect, by the read of the player's unlocks. What is behind the
-// unlock, a recruit, a build and a job there, is proven by the hub's
-// data-layer tests until a run of this test can open the road.
+// Unlocks and the second location (Issue-351, decision 0059). The road's
+// unlock is granted by a job of Millbrook's caravan hub (Issue-352), and this
+// test's user never builds the hub: it builds the mine and nothing else, on a
+// sandbox stack and on dev alike. So it holds no unlock, has the starting
+// camp alone, and a recruit at Highcrag is refused as the client's defect, by
+// the read of the player's unlocks. What is behind the unlock, the job
+// settled, the camp it opens and a recruit there, is proven by the hub's
+// data-layer tests, and on a stack by hand, as a base test user whose camp
+// was played up to the hub (docs/process/development.md, rule 5).
 const unlocks = await graphql(token, `{ me { unlocks { unlock earnedAt adventureId } camps { location } } }`);
 check(!unlocks.errors && unlocks.data?.me?.unlocks?.length === 0, `me holds no unlock: ${JSON.stringify(unlocks.data?.me?.unlocks)} (${unlocks.ms} ms)`);
 check(unlocks.data.me.camps.map((c) => c.location).join() === "millbrook", `the starting camp is the player's only camp: ${JSON.stringify(unlocks.data.me.camps)}`);

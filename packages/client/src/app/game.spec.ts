@@ -9,6 +9,7 @@ import { must, UNIT_PROFILES } from '@heat/engine';
 import { type AdventureResultView, type AdventureView, Game, type HeroView, overrideInput, type PlayerView, type SeenHeroView } from './game';
 import possibleTypes from './graphql/generated/possible-types';
 import { Session, type SessionUser } from './session';
+import { withHighcrag } from './testing/with-highcrag';
 
 /** The cache as the application builds it: with the schema's unions and interfaces, so `... on Error` is matched (app.config.ts). */
 const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCache(possibleTypes) });
@@ -45,6 +46,7 @@ const wirePlayer = (p: PlayerView) => ({
   })),
   heroes: p.heroes.map(wireHero),
   openAdventure: p.openAdventure && wireAdventure(p.openAdventure),
+  unlocks: p.unlocks.map((held) => ({ __typename: 'EarnedUnlock', ...held, unlock: constantCase(held.unlock) })),
 });
 const wireResult = (r: AdventureResultView) => ({
   __typename: 'AdventureResult',
@@ -80,8 +82,12 @@ function playerWith(
     camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings, resourceCapacity: 100, warehouseLevel: 1, facilities: [{ kind: 'heroes-hall', level: 1 }] }],
     heroes,
     openAdventure: null,
+    unlocks: [],
   };
 }
+
+/** The player once the road is open, with these heroes at Millbrook (`withHighcrag`). */
+const playerWithHighcrag = (heroes: HeroView[] = []): PlayerView => withHighcrag(playerWith(heroes));
 
 const moss: SeenHeroView = { id: 's1', name: 'Moss', unitType: 'villager', spriteSet: 'villager-07', level: 2 };
 
@@ -107,7 +113,9 @@ function fakeHub(start: PlayerView) {
     if (op === 'JoinGame') return { joinGame: { __typename: 'JoinGameSuccess', player: { __typename: 'Player', id: player.id } } };
     if (op === 'HeroesSeenAt') return { heroesSeenAt: variables['location'] === 'millbrook' ? [wireSeen(moss)] : [] };
     if (op === 'RecruitHero') {
-      const { unitType, requestId } = variables['input'] as { unitType: string; requestId: string };
+      const { location, unitType, requestId } = variables['input'] as { location: string; unitType: string; requestId: string };
+      // A camp elsewhere is empty and holds nothing, as Highcrag's is until a caravan reaches it: the hub refuses for the cost.
+      if (location !== 'millbrook') return { recruitHero: { __typename: 'InsufficientResources', message: `the camp at ${location} cannot pay` } };
       // The hub's price, on the fake's holdings: a villager is free with no hero alive, 20 timber otherwise.
       const camp = must(player.camps[0], 'the camp');
       const timber = camp.holdings.find((h) => h.material === 'timber')?.balance ?? 0;
@@ -147,6 +155,10 @@ function fakeHub(start: PlayerView) {
       };
       player = { ...player, openAdventure: adventure };
       return { startAdventure: { __typename: 'StartAdventureSuccess', adventure: wireAdventure(adventure) } };
+    }
+    if (op === 'BuildFacility') {
+      const { location } = variables['input'] as { location: string };
+      return { buildFacility: { __typename: 'BuildFacilitySuccess', camp: { __typename: 'Camp', location } } };
     }
     if (op === 'Me') return { me: wirePlayer(player) };
     throw new Error(`the fake hub does not answer ${op}`);
@@ -229,6 +241,42 @@ describe('Game', () => {
     await run();
     expect(game.heroesHere().map((h) => h.unitType)).toEqual(['dragon-rider']);
     expect(game.camp()?.holdings).toMatchObject([{ material: 'gold', balance: 1 }]);
+  });
+
+  it("reads the player's unlocks back as the engine's own, each with the adventure that first earned it, and a camp for each location the hub answers", async () => {
+    const { game, run } = setup(playerWithHighcrag());
+    await run();
+    expect(game.player()?.unlocks).toMatchObject([{ unlock: 'road-to-highcrag', adventureId: 'a0' }]);
+    expect(game.player()?.camps.map((c) => c.location)).toEqual(['millbrook', 'highcrag']);
+  });
+
+  it('offers no hero for nothing at Highcrag, where Millbrook offers the free villager: each recruit there at its cost with nobody alive', async () => {
+    const { game, run } = setup(playerWithHighcrag());
+    await run();
+    expect(game.noFreeRecruit()).toBe(false);
+    expect(game.recruits()[0]).toEqual({ unitType: 'villager', cost: [], reason: null });
+
+    game.location.set('highcrag');
+    expect(game.camp()?.name).toBe('Highcrag');
+    expect(game.noFreeRecruit()).toBe(true);
+    expect(game.recruits()).toEqual([
+      { unitType: 'miner', cost: [{ material: 'ore', amount: 30, balance: 0 }, { material: 'timber', amount: 20, balance: 0 }], reason: 'Not enough ore or timber.' },
+      { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
+    ]);
+  });
+
+  it("recruits and builds at the camp on screen: at Highcrag each names Highcrag, and the hub's refusal for want of resources is thrown for the hall to show (Issue-352)", async () => {
+    const { hub, game, run } = setup(playerWithHighcrag([villager]));
+    await run();
+    game.location.set('highcrag');
+    // The villager is Millbrook's: nobody is at Highcrag.
+    expect(game.heroesHere()).toEqual([]);
+
+    await expect(run(game.recruit('fighter'))).rejects.toMatchObject({ kind: 'InsufficientResources' });
+    await run(game.build('warehouse', 2));
+    const sent = (op: string) => hub.calls.find((c) => c.op === op)?.variables['input'];
+    expect(sent('RecruitHero')).toMatchObject({ location: 'highcrag', unitType: 'FIGHTER' });
+    expect(sent('BuildFacility')).toEqual({ location: 'highcrag', kind: 'WAREHOUSE', level: 2 });
   });
 
   it("reads the heroes seen at the camp's location after sign-in and again when the camp changes, not after a recruit", async () => {

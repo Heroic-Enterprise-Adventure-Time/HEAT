@@ -20,6 +20,8 @@ export function fakeBattleScene(holding = false, awaitingArt = false) {
   const scene = {
     /** The cast of each run handed over, in order. */
     prepared: [] as (readonly CastMember[])[],
+    /** The ground each run handed over is drawn on, in order. */
+    grounds: [] as string[],
     resets: [] as { field: Field; sets: ReadonlyMap<string, string>; enter: boolean }[],
     fed: [] as AdventureEvent[],
     frames: 0,
@@ -34,8 +36,9 @@ export function fakeBattleScene(holding = false, awaitingArt = false) {
     factory: (_host: HTMLElement, given: BattleSceneCallbacks) => {
       callbacks = given;
       return Promise.resolve({
-        prepare: (cast: readonly CastMember[]) => {
+        prepare: (cast: readonly CastMember[], ground: string) => {
           scene.prepared.push(cast);
+          scene.grounds.push(ground);
           return awaitingArt ? new Promise<void>((resolve) => waiting.push(resolve)) : Promise.resolve();
         },
         reset: (field: Field, sets: ReadonlyMap<string, string>, enter: boolean) => {

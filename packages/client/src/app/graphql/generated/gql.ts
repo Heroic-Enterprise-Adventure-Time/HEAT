@@ -21,7 +21,7 @@ type Documents = {
     "fragment HeroFields on Hero {\n  id\n  level\n  location\n  name\n  recruitedAt\n  retiredAt\n  spriteSet\n  status\n  unitType\n  xp\n}": typeof types.HeroFieldsFragmentDoc,
     "query HeroesSeenAt($location: ID!) {\n  heroesSeenAt(location: $location) {\n    ...SeenHeroFields\n  }\n}": typeof types.HeroesSeenAtDocument,
     "mutation JoinGame {\n  joinGame {\n    __typename\n    ... on JoinGameSuccess {\n      player {\n        id\n      }\n    }\n  }\n}": typeof types.JoinGameDocument,
-    "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n  }\n}": typeof types.MeDocument,
+    "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n    unlocks {\n      adventureId\n      unlock\n    }\n  }\n}": typeof types.MeDocument,
     "fragment RecentAdventureFields on RecentAdventure {\n  id\n  outcome\n  settledAt\n  job {\n    id\n    name\n  }\n  party {\n    died\n    level\n    name\n    unitType\n  }\n}": typeof types.RecentAdventureFieldsFragmentDoc,
     "query RecentAdventuresAt($location: ID!) {\n  recentAdventuresAt(location: $location) {\n    ...RecentAdventureFields\n  }\n}": typeof types.RecentAdventuresAtDocument,
     "mutation RecruitHero($input: RecruitHeroInput!) {\n  recruitHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RecruitHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}": typeof types.RecruitHeroDocument,
@@ -43,7 +43,7 @@ const documents: Documents = {
     "fragment HeroFields on Hero {\n  id\n  level\n  location\n  name\n  recruitedAt\n  retiredAt\n  spriteSet\n  status\n  unitType\n  xp\n}": types.HeroFieldsFragmentDoc,
     "query HeroesSeenAt($location: ID!) {\n  heroesSeenAt(location: $location) {\n    ...SeenHeroFields\n  }\n}": types.HeroesSeenAtDocument,
     "mutation JoinGame {\n  joinGame {\n    __typename\n    ... on JoinGameSuccess {\n      player {\n        id\n      }\n    }\n  }\n}": types.JoinGameDocument,
-    "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n  }\n}": types.MeDocument,
+    "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n    unlocks {\n      adventureId\n      unlock\n    }\n  }\n}": types.MeDocument,
     "fragment RecentAdventureFields on RecentAdventure {\n  id\n  outcome\n  settledAt\n  job {\n    id\n    name\n  }\n  party {\n    died\n    level\n    name\n    unitType\n  }\n}": types.RecentAdventureFieldsFragmentDoc,
     "query RecentAdventuresAt($location: ID!) {\n  recentAdventuresAt(location: $location) {\n    ...RecentAdventureFields\n  }\n}": types.RecentAdventuresAtDocument,
     "mutation RecruitHero($input: RecruitHeroInput!) {\n  recruitHero(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on RecruitHeroSuccess {\n      hero {\n        ...HeroFields\n      }\n    }\n  }\n}": types.RecruitHeroDocument,
@@ -103,7 +103,7 @@ export function graphql(source: "mutation JoinGame {\n  joinGame {\n    __typena
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n  }\n}"): (typeof documents)["query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n  }\n}"];
+export function graphql(source: "query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n    unlocks {\n      adventureId\n      unlock\n    }\n  }\n}"): (typeof documents)["query Me {\n  me {\n    id\n    camps {\n      ...CampFields\n    }\n    heroes {\n      ...HeroFields\n    }\n    openAdventure {\n      ...AdventureFields\n    }\n    unlocks {\n      adventureId\n      unlock\n    }\n  }\n}"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
