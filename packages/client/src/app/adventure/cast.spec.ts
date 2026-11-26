@@ -2,10 +2,8 @@ import { range } from 'es-toolkit';
 
 import { replay } from '@heat/engine';
 
-import { caravanTimeline, fighterOn } from '../testing/caravan';
+import { caravanTimeline, fighterOn, jobsThatDeliverNothing } from '../testing/caravan';
 import { jobCast, timelineCast } from './cast';
-
-// A lone fighter completes the first three jobs' gathers and fights it can reach, so its timeline shows who was there.
 
 describe('jobCast', () => {
   it("names everyone a job's stages set against the party, once each, by kind", () => {
@@ -53,7 +51,9 @@ describe('jobCast', () => {
 
   // The game's content has no caravan until Issue-354, so a job's cart is shown here only by its absence.
   it('names no cart for a job that delivers nothing', () => {
-    for (const jobId of ['pick-up-sticks', 'timber-from-the-near-woods', 'wolves-on-the-mill-road']) {
+    const jobIds = jobsThatDeliverNothing();
+    expect(jobIds.length).toBeGreaterThan(0);
+    for (const jobId of jobIds) {
       expect(jobCast(jobId, 'seed-1').filter((member) => member.kind === 'cart'), jobId).toEqual([]);
     }
   });

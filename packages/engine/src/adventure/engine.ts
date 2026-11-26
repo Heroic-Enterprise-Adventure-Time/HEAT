@@ -147,7 +147,11 @@ export class AdventureEngine {
       this.health.set(hero.heroId, hero.stats.maxHealth);
     }
     this.job = job;
-    if (job.deliversTo !== undefined) this.cartHealth = content.battle.cart.health;
+    if (job.deliversTo !== undefined) {
+      // The cart's id is its own on the field: a hero of that id would take the cart's outcome as its.
+      if (this.health.has(CART_UNIT_ID)) throw new Error(`Hero ${CART_UNIT_ID} has the cart's id on a job that delivers`);
+      this.cartHealth = content.battle.cart.health;
+    }
     this.stages = expandStages(job, seed);
     this.retreatRng = new SeededRng(`${seed}#retreat`);
   }

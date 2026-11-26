@@ -1,4 +1,4 @@
-import { ADVENTURE_CONTENT, type AdventureContent, type AdventureSnapshot, CART, type Job, must, replay, UNIT_PROFILES } from '@heat/engine';
+import { ADVENTURE_CONTENT, type AdventureContent, type AdventureSnapshot, CART, type Job, JOBS, must, replay, UNIT_PROFILES } from '@heat/engine';
 
 /**
  * A caravan the specs play, since the game's content has none until
@@ -26,7 +26,10 @@ export function caravanContent(cartHealth: number = CART.health): AdventureConte
   };
 }
 
-/** A lone fighter's snapshot for a job. */
+/** Every job of the game's content that delivers nothing, which is every one until Issue-354. */
+export const jobsThatDeliverNothing = (): readonly string[] => Object.values(JOBS).filter((job) => job.deliversTo === undefined).map((job) => job.id);
+
+/** A lone fighter's snapshot for a job: it completes the first three jobs' gathers and fights it can reach, so its timeline shows who was there. */
 export const fighterOn = (jobId: string): AdventureSnapshot => ({
   version: 'v1',
   jobId,

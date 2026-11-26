@@ -190,7 +190,7 @@ The owner's calls at the start of Issue-353, which built the cart in the engine 
 | 2 rangers | 500, 374 | 71, 0 |
 | 4 villagers | 500, 500 | 500, 0 |
 
-A fighter's guard covers the cart, so every party with a fighter and one more hero delivers at one bandit a fight; without a fighter the cart is lost on a third of the runs or more. At two bandits a fight the party that is safe on the road to Highcrag, a fighter with a villager, is defeated on all but one seed, and a quarter of a wolf's chance changes that little. The engine's tests hold the rule, every party with a fighter delivering on every seed and a party without delivering on more than half and arriving with the cart broken on some, not the counts.
+A fighter's guard covers the cart, so every party with a fighter and one more hero delivers at one bandit a fight; a pair without a fighter loses it on a quarter of the runs or more, and four villagers deliver on every seed. At two bandits a fight the party that is safe on the road to Highcrag, a fighter with a villager, is defeated on all but one seed, and a quarter of a wolf's chance changes that little. The engine's tests hold the rule, a fighter with a villager and a fighter with a ranger delivering on every seed, and two villagers and a ranger with a villager delivering on more than half and arriving with the cart broken on some, not the counts.
 
 **A drop with only the cart standing cannot happen in a run,** because a battle whose heroes are all down is over. The engine's test holds the rule where it is read instead: the cart carries no trait, so a fighter beside it fells a tree for nothing and a villager's timber is what it is alone.
 

@@ -94,6 +94,12 @@ describe("a caravan's cart through an adventure", () => {
     expect(lost.some((r) => !broke(r.timeline)), "a defeat with the cart standing").toBe(true);
   });
 
+  it("refuses a hero with the cart's id on a job that delivers, and not on one that does not", () => {
+    const named = [{ ...must(party("fighter")[0], "the fighter"), heroId: CART_UNIT_ID }];
+    expect(() => run(named, "seed-0")).toThrow(/cart's id/);
+    expect(() => replay(snapshot(ROAD, named), "seed-0", [])).not.toThrow();
+  });
+
   it("is not on a job that does not deliver: the road job has no cart and its result says nothing of one", () => {
     expect(JOBS[ROAD].deliversTo).toBeUndefined();
     const { result, timeline } = replay(snapshot(ROAD, party("fighter", "fighter")), "seed-0", []);

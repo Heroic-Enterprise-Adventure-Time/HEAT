@@ -1,6 +1,6 @@
 import { CART, CART_UNIT_ID, must } from '@heat/engine';
 
-import { caravanTimeline, fighterOn, SPEC_CARAVAN } from '../testing/caravan';
+import { caravanTimeline, fighterOn, jobsThatDeliverNothing, SPEC_CARAVAN } from '../testing/caravan';
 import { applyEvent, emptyField, type Field, jobCart, secondsLeft, timelineCart, waitingWords } from './field';
 
 const field = (timeLimitMs: number | null, stageStart = 4000): Field => ({
@@ -116,7 +116,9 @@ describe("a caravan's cart", () => {
 
   // The game's content has no caravan until Issue-354, so a job's cart is shown here only by its absence.
   it('is not on a job that delivers nothing, or one this build does not have', () => {
-    expect(jobCart('pick-up-sticks')).toBeNull();
+    const jobIds = jobsThatDeliverNothing();
+    expect(jobIds.length).toBeGreaterThan(0);
+    for (const jobId of jobIds) expect(jobCart(jobId), jobId).toBeNull();
     expect(jobCart('a-job-of-a-later-version')).toBeNull();
     expect(emptyField([]).cart).toBeNull();
   });
