@@ -82,8 +82,11 @@ export function targetCandidates(
   );
 
   switch (effect.kind) {
-    case "damage":
-      return pool.filter((u) => (u.kind === "resource") === (pass === "resources"));
+    case "damage": {
+      // An ability aimed at the cart reaches nothing else (decision 0059).
+      const aimed = targeting.selection === "cart" ? pool.filter((u) => u.kind === "cart") : pool;
+      return aimed.filter((u) => (u.kind === "resource") === (pass === "resources"));
+    }
     case "gather":
       // Nothing but nodes in reach, or the node waits.
       if (pass !== "units" || pool.some((u) => u.kind !== "resource")) return [];
@@ -119,6 +122,8 @@ export function pickTarget(ability: AbilityDefinition, candidates: readonly Unit
         return u.health;
       case "below-half":
         return u.health / u.stats.maxHealth;
+      case "cart":
+        return 0;
     }
   };
   const best = Math.min(...candidates.map(score));

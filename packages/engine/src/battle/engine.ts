@@ -17,7 +17,9 @@
  * never act and are hit like any other (decision 0051); an enemy that goes
  * down gives its XP and drops what the heroes standing can gather, rolled by
  * a generator of its own (decision 0058); and the adventure can end a battle
- * as a retreat (Issue-112).
+ * as a retreat (Issue-112); and a caravan's cart stands with the party, hit
+ * and guarded like a hero, while the battle is lost when the heroes are down
+ * whether it stands or not (decision 0059).
  *
  * Nothing here reads a clock. The caller decides when to step: a live client
  * paced by wall-clock time, or the hub replaying an override log as fast as it
@@ -107,6 +109,31 @@ function buildStates(setup: BattleSetup, content: BattleContent, rng: SeededRng)
       health: member.health,
       line: profile.homeLine,
       chargeTimer: firstCharge(member.stats.speed),
+      currentAction: null,
+      guard: null,
+      drops: [],
+      xp: 0,
+      alive: true,
+    });
+  }
+
+  // A caravan's cart stands with the party and never acts, so it draws no first charge (decision 0059).
+  if (setup.cart) {
+    const { unitId, health } = setup.cart;
+    if (health <= 0 || health > content.cart.health) {
+      throw new Error(`The cart ${unitId} has health ${String(health)} of ${String(content.cart.health)}`);
+    }
+    states.push({
+      unitId,
+      kind: "cart",
+      type: "cart",
+      side: "party",
+      stats: { maxHealth: content.cart.health, speed: 0, damage: 0, traits: [] },
+      actions: [],
+      acts: false,
+      health,
+      line: content.cart.homeLine,
+      chargeTimer: 0,
       currentAction: null,
       guard: null,
       drops: [],
@@ -327,8 +354,8 @@ export class CombatEngine {
    * list, or not usable then, is dropped silently and the list drives.
    */
   submitOverride(unitId: string, override: PlayerOverride): void {
-    if (this.byId.get(unitId)?.side !== "party") {
-      throw new Error(`Overrides are for party units; ${unitId} is not one`);
+    if (this.byId.get(unitId)?.kind !== "hero") {
+      throw new Error(`Overrides are for heroes; ${unitId} is not one`);
     }
     this.pendingOverrides.set(unitId, override);
   }
@@ -513,7 +540,7 @@ export class CombatEngine {
    */
   private yieldOf(enemy: UnitState): void {
     this.xp += enemy.xp;
-    const standing = this.states.filter((s) => s.side === "party" && s.alive);
+    const standing = this.states.filter((s) => s.kind === "hero" && s.alive);
     const levelOf = (trait: GatheringTrait): number => Math.max(0, ...standing.map((s) => traitLevel(s.stats, trait)));
     for (const { material, amount } of rollDrops(this.setup.seed, enemy.unitId, enemy.drops, levelOf)) {
       this.dropped[material] = (this.dropped[material] ?? 0) + amount;
@@ -538,7 +565,8 @@ export class CombatEngine {
   }
 
   private checkTermination(): BattleResult | null {
-    if (!this.states.some((s) => s.side === "party" && s.alive)) return "loss";
+    // A cart standing does not keep a party whose heroes are all down (decision 0059).
+    if (!this.states.some((s) => s.kind === "hero" && s.alive)) return "loss";
     if (!this.states.some((s) => s.side === "opponents" && s.alive)) return "win";
     return null;
   }

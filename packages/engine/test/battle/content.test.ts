@@ -1,7 +1,7 @@
 import { mapValues, uniqBy, zip } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { ABILITIES, GATHERING_TRAITS, MATERIALS, MONSTER_TYPES, MONSTERS, must, RESOURCE_NODES, RESOURCE_TYPES, UNIT_PROFILES } from "../../src/index.js";
+import { ABILITIES, BATTLE_CONTENT, CART, GATHERING_TRAITS, MATERIALS, MONSTER_TYPES, MONSTERS, must, RESOURCE_NODES, RESOURCE_TYPES, UNIT_PROFILES } from "../../src/index.js";
 
 describe("The battle's content", () => {
   const profiles = [...Object.values(UNIT_PROFILES), ...Object.values(MONSTERS)];
@@ -18,9 +18,18 @@ describe("The battle's content", () => {
     expect(UNIT_PROFILES.villager).toMatchObject({ homeLine: "near", actions: ["strike", "chop", "mine", "move-up"] });
     expect(UNIT_PROFILES.fighter).toMatchObject({ homeLine: "front", actions: ["guard", "strike"] });
     expect(MONSTERS.wolf).toMatchObject({ homeLine: "front", actions: ["bite", "move-up"] });
-    expect(MONSTERS.bandit).toMatchObject({ homeLine: "near", actions: ["strike-weakest", "move-up"] });
+    expect(MONSTERS.bandit).toMatchObject({ homeLine: "near", actions: ["strike-cart", "strike-weakest", "move-up"] });
     expect(UNIT_PROFILES.ranger).toMatchObject({ homeLine: "far", actions: ["shoot"] });
     expect(MONSTERS["goblin-rock-thrower"]).toMatchObject({ homeLine: "far", actions: ["throw-rock"] });
+  });
+
+  it("has a caravan's cart of 60 health on the near line, and a strike at it with the bandit's reach and blow (decision 0059)", () => {
+    expect(BATTLE_CONTENT.cart).toBe(CART);
+    expect(CART).toEqual({ name: "Cart", homeLine: "near", health: 60 });
+    const { abilityId: _a, name: _n, targeting, ...blow } = ABILITIES["strike-cart"];
+    const { abilityId: _b, name: _m, targeting: weakest, ...theirs } = ABILITIES["strike-weakest"];
+    expect(blow).toEqual(theirs);
+    expect(targeting).toEqual({ ...weakest, selection: "cart" });
   });
 
   it("uses positive whole numbers for stats, warmups and amounts", () => {

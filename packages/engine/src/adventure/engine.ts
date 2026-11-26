@@ -20,6 +20,12 @@
  * A retreat keeps what dropped and the XP of the enemies that went down, and
  * loses the job's pay and its bonus; a party that is all down keeps nothing
  * (decision 0058).
+ *
+ * A caravan's cart, on a job that delivers to a location, stands with the
+ * party in every fight and gather stage, as unit `cart` on the timeline, its
+ * health carried from stage to stage like a hero's; a broken cart does not
+ * end the run, and the result says whether it stood on arrival (decision
+ * 0059).
  */
 
 import { range } from "es-toolkit";
@@ -40,6 +46,9 @@ import { expandStages } from "./expand.js";
 import type { AdventureContent, ExpandedStage, Job } from "./job.js";
 import type { AdventureLogEntry, PartyOrder } from "./override.js";
 import { type AdventureSnapshot, MAX_PARTY } from "./snapshot.js";
+
+/** The cart's id on a caravan's timeline, one unit from stage to stage as a hero is. */
+export const CART_UNIT_ID = "cart";
 
 /** A battle's event on the adventure's clock: every time in it moved by `offset`. */
 export function shiftEvent(event: BattleEvent, offset: number): BattleEvent {
@@ -99,6 +108,8 @@ export class AdventureEngine {
   private readonly events: AdventureEvent[] = [];
   private readonly overrideLog: AdventureLogEntry[] = [];
   private readonly health = new Map<string, number>();
+  /** The cart's health, on a caravan; null on a job that does not deliver. */
+  private cartHealth: number | null = null;
   private readonly drops: Partial<Record<Material, number>> = {};
   /** The XP of every enemy that has gone down, in every stage so far. */
   private enemyXp = 0;
@@ -136,6 +147,7 @@ export class AdventureEngine {
       this.health.set(hero.heroId, hero.stats.maxHealth);
     }
     this.job = job;
+    if (job.deliversTo !== undefined) this.cartHealth = content.battle.cart.health;
     this.stages = expandStages(job, seed);
     this.retreatRng = new SeededRng(`${seed}#retreat`);
   }
@@ -241,6 +253,7 @@ export class AdventureEngine {
       dead: health.filter((h) => h.health <= 0).map((h) => h.heroId),
       health,
       unlocks: arrived ? [...(this.job.grants ?? [])] : [],
+      ...(this.cartHealth === null ? {} : { delivered: arrived && this.cartHealth > 0 }),
     };
   }
 
@@ -305,10 +318,12 @@ export class AdventureEngine {
         return health > 0 ? [{ unitId: h.heroId, unitType: h.unitType, health, stats: h.stats }] : [];
       });
       this.battleHeroes = new Set(party.map((p) => p.unitId));
+      const cart = this.cartHealth !== null && this.cartHealth > 0 ? { cart: { unitId: CART_UNIT_ID, health: this.cartHealth } } : {};
       this.battle = new CombatEngine(
         {
           seed: `${this.seed}#${String(index)}`,
           party,
+          ...cart,
           opponents: opponentsOf(stage, index),
           timeLimitMs: stage.timeLimitMs,
         },
@@ -365,6 +380,7 @@ export class AdventureEngine {
     const outcome = battle.getOutcome();
     for (const unit of outcome.units) {
       if (this.health.has(unit.unitId)) this.health.set(unit.unitId, unit.health);
+      else if (unit.unitId === CART_UNIT_ID && this.cartHealth !== null) this.cartHealth = unit.health;
     }
     addTo(this.drops, toRewards(outcome.drops));
     this.enemyXp += outcome.xp;

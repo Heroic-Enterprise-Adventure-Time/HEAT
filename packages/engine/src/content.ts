@@ -11,7 +11,7 @@
  */
 
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
-import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
+import type { AbilityDefinition, BattleContent, CartProfile, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
 import type { Material } from "./index.js";
 
 /** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. The list declares the union (typescript.md, rule 18). */
@@ -391,7 +391,7 @@ export function isResourceType(type: string): type is ResourceType {
   return (RESOURCE_TYPES as readonly string[]).includes(type);
 }
 
-export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "shoot" | "throw-rock" | "move-up";
+export type AbilityId = "strike" | "strike-weakest" | "strike-cart" | "bite" | "guard" | "chop" | "mine" | "shoot" | "throw-rock" | "move-up";
 
 const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
 
@@ -428,6 +428,17 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     name: "Strike the weakest",
     tags: ["melee-attack", "physical", "slashing"],
     targeting: { side: "enemy", reach: [{ actorLine: "front", targetLines: ["front", "near"] }], selection: "weakest" },
+    warmupMs: 300,
+    effect: { kind: "damage" },
+  },
+  // The bandit's: a caravan's cart first, when one is in reach, with a
+  // strike's reach from the front and its blow (decision 0059). With no cart
+  // it has no target, and the list goes on as it did.
+  "strike-cart": {
+    abilityId: "strike-cart",
+    name: "Strike the cart",
+    tags: ["melee-attack", "physical", "slashing"],
+    targeting: { side: "enemy", reach: [{ actorLine: "front", targetLines: ["front", "near"] }], selection: "cart" },
     warmupMs: 300,
     effect: { kind: "damage" },
   },
@@ -557,7 +568,7 @@ export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
     name: "Bandit",
     homeLine: "near",
     stats: { maxHealth: 30, speed: 9, damage: 5, traits: [] },
-    actions: ["strike-weakest", "move-up"],
+    actions: ["strike-cart", "strike-weakest", "move-up"],
     drops: [],
     xp: 6,
   },
@@ -606,12 +617,20 @@ export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>>
   },
 };
 
+/**
+ * A caravan's cart (decision 0059): 60 health, a working assumption, on the
+ * near line, behind a fighter and beside the villagers. Its pictures are
+ * `art/props/cart-01` (Issue-350).
+ */
+export const CART: CartProfile = { name: "Cart", homeLine: "near", health: 60 };
+
 /** The content a battle reads by default. */
 export const BATTLE_CONTENT: BattleContent = {
   abilities: ABILITIES,
   heroes: UNIT_PROFILES,
   monsters: MONSTERS,
   resources: RESOURCE_NODES,
+  cart: CART,
 };
 
 // ── Jobs and advancement ───────────────────────────────────────────

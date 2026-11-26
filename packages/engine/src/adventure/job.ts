@@ -76,8 +76,8 @@ const _everyStageKindListed: [Exclude<StageKind, (typeof STAGE_KINDS)[number]>] 
 /**
  * A job. What a retreat keeps is one rule for every job, the drops and the
  * enemies' XP and neither the pay nor the bonus, so a job states no penalty
- * of its own; one returns with caravans, whose cargo is not a drop (decision
- * 0058; Issue-292).
+ * of its own, a caravan included: its cargo is not a drop, and what a
+ * retreat does to it is the hub's (decisions 0058 and 0059).
  */
 export interface Job {
   readonly id: string;
@@ -99,6 +99,12 @@ export interface Job {
   readonly bonusXp: number;
   /** The unlocks the job grants on arrival, and not on a retreat or a defeat; most jobs grant none (decision 0059). */
   readonly grants?: readonly UnlockId[];
+  /**
+   * The location a caravan delivers to, by its id; a job with one is a
+   * caravan, and its party has a cart beside its heroes in every fight and
+   * gather stage. What the cart carries is the hub's (decision 0059).
+   */
+  readonly deliversTo?: string;
 }
 
 /**
