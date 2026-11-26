@@ -86,6 +86,8 @@ Rule 27. A candidate rule from the review of PR-359 (Issue-351), accepted by the
 
 Rule 28. A candidate rule from the review of PR-359 (Issue-351), accepted by the owner on 2026-11-24, where the check that the player holds a location's unlock was written out three times with a fourth to come (Issue-354).
 
+Rule 29. A candidate rule from the review of PR-371 (Issue-354), accepted by the owner on 2026-11-25, where the resolver of startAdventure passed two undefined arguments to reach the caravan in the request.
+
 Why. The rules for scalars, input objects and result unions were taken on 2026-10-24, when the owner weighted accepted practice over the code as it was: the hub's `GraphQLError` with a code in `extensions` was Apollo's older documented shape and still correct, but a union per mutation puts every refusal into the contract, typed. Both changes, the unions and the two tiers of error, touched the client and the stack test, which is why they were an issue of their own, Issue-155, and not a rubric's pull request. One place for each check (decision 0039) replaced checks written by hand in the verbs, correct and invisible to a reader of the contract, so that they ran after the reads they should have saved, and a test had to reach a verb to see them. Rules checked twice is the shape every transaction took from Issue-81 on. Logging lines and never bodies is the hub's observability module as first written.
 
 ## terraform.md

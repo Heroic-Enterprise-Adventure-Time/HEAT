@@ -102,7 +102,7 @@ const ids = (heroes: readonly Hero[]) => heroes.map((h) => h.id);
 
 /** Starts the caravan through the verb, on the seed given. */
 function start(r: Repository, p: string, heroes: readonly Hero[], request: CaravanRequest, seed = "caravan-0", requestId: string = randomUUID(), issuedBy = version) {
-  return startAdventure(r, p, issuedBy, requestId, home, caravan.id, ids(heroes), undefined, () => seed, request);
+  return startAdventure(r, p, issuedBy, requestId, home, caravan.id, ids(heroes), request, undefined, () => seed);
 }
 
 const submit = (r: Repository, p: string, adventureId: string, overrides: OverrideInput[] = [], timelines: Timelines = new MemoryTimelines(), content: AdventureContent = ADVENTURE_CONTENT) =>
@@ -146,7 +146,7 @@ describe("a caravan's start", () => {
     const { p, heroes } = await ready(["fighter", "villager"], { ore: 50 });
     const [fighter] = heroes;
     expect(await refusal(start(repo, p, [must(fighter, "the fighter")], { cargo: [], staying: [ids(heroes)[1] ?? ""] }))).toMatchObject(BAD_USER_INPUT);
-    const wolves = (request: CaravanRequest) => startAdventure(repo, p, version, randomUUID(), home, "wolves-on-the-mill-road", ids(heroes), undefined, undefined, request);
+    const wolves = (request: CaravanRequest) => startAdventure(repo, p, version, randomUUID(), home, "wolves-on-the-mill-road", ids(heroes), request);
     expect(await refusal(wolves({ cargo: [{ material: "ore", amount: 1 }], staying: [] }))).toMatchObject(BAD_USER_INPUT);
     expect(await refusal(wolves({ cargo: [], staying: [ids(heroes)[0] ?? ""] }))).toMatchObject(BAD_USER_INPUT);
     expect(await repo.openAdventure(p)).toBeUndefined();
@@ -284,20 +284,6 @@ describe("a caravan's start refused", () => {
       return true;
     });
     expect(races).toBeGreaterThan(0);
-  });
-
-  it("for a cargo no cart carries, by its read, as bad input, before anything of a camp is read", async () => {
-    const { p, heroes } = await ready(["fighter"], { ore: 200 });
-    const most = must(CART_CAPACITY.at(-1), "the largest cart");
-    expect(hubLevelCarrying(most + 1)).toBeUndefined();
-    const transaction = vi.spyOn(Repository.prototype, "startAdventure");
-    try {
-      expect(await refusal(start(repo, p, heroes, { cargo: [{ material: "ore", amount: most + 1 }], staying: [] }))).toMatchObject(BAD_USER_INPUT);
-      expect(transaction).not.toHaveBeenCalled();
-    } finally {
-      transaction.mockRestore();
-    }
-    await untouched(p, { ore: 200 });
   });
 
   it("holds the hub's level whose cart carries the cargo in its transaction, which refuses a hub the read wrongly found built", async () => {

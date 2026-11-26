@@ -230,7 +230,7 @@ describe("an unlock a run earned", () => {
     const p = player();
     const heroes = await putParty(db, tables, p, PAIR, home);
     // The scouting job is the wolves job with a grant, so a seed that completes the one completes the other.
-    const started = await startAdventure(repo, p, version, randomUUID(), home, "wolves-on-the-mill-road", heroes.map((h) => h.id), undefined, () => seedFor(PAIR, "complete"));
+    const started = await startAdventure(repo, p, version, randomUUID(), home, "wolves-on-the-mill-road", heroes.map((h) => h.id), undefined, undefined, () => seedFor(PAIR, "complete"));
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(settled.result).toMatchObject({ outcome: "complete", unlocks: [] });
     expect(await repo.unlocks(p)).toEqual([]);
@@ -258,7 +258,7 @@ describe("the road to Highcrag (Issue-352)", () => {
     await build(repo, p, home, hub);
     expect((await repo.camps(p)).map((c) => c.location)).toEqual([home]);
 
-    const started = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, heroes.map((h) => h.id), undefined, () => SEED);
+    const started = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, heroes.map((h) => h.id), undefined, undefined, () => SEED);
     expect(started).toMatchObject({ location: home, jobId: scoutTheRoad.id, status: "OPEN" });
     const expected = replay(started.snapshot, started.seed, []).result;
     expect(expected).toMatchObject({ outcome: "complete", dead: [], unlocks: [road] });
@@ -284,9 +284,9 @@ describe("the road to Highcrag (Issue-352)", () => {
     const heroes = await putParty(db, tables, p, PARTY, home);
     await build(repo, p, home, hub);
     const ids = heroes.map((h) => h.id);
-    const first = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, ids, undefined, () => SEED);
+    const first = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, ids, undefined, undefined, () => SEED);
     await submitAdventure(repo, new MemoryTimelines(), p, version, first.adventureId, []);
-    const second = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, ids, undefined, () => SEED);
+    const second = await startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, ids, undefined, undefined, () => SEED);
     const again = await submitAdventure(repo, new MemoryTimelines(), p, version, second.adventureId, []);
     expect(again.result).toMatchObject({ outcome: "complete", unlocks: [road] });
     expect((await repo.unlocks(p)).map((u) => u.adventureId)).toEqual([first.adventureId]);
@@ -503,7 +503,7 @@ describe("Highcrag", () => {
     const miner = await recruitHero(repo, p, highcrag.id, "miner", randomUUID());
     const before = must((await balances(repo, p, highcrag.id))["ore"], "the ore left after the recruit");
     // A seed the engine's own test of the job plays, so the run is one it holds: a lone miner completes it.
-    const started = await startAdventure(repo, p, version, randomUUID(), highcrag.id, crag.id, [miner.id], undefined, () => "seed-0");
+    const started = await startAdventure(repo, p, version, randomUUID(), highcrag.id, crag.id, [miner.id], undefined, undefined, () => "seed-0");
     expect(started).toMatchObject({ location: highcrag.id, jobId: crag.id, status: "OPEN" });
     const expected = replay(started.snapshot, started.seed, []).result;
     expect(expected.outcome).toBe("complete");

@@ -5,7 +5,7 @@ import type { Context as LambdaContext } from "aws-lambda";
 import { constantCase } from "es-toolkit";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
+import { CART_CAPACITY, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
@@ -462,6 +462,25 @@ describe("the adventure loop through the graph", () => {
         [[id, id.toUpperCase()], "a hero is in the party twice"],
       ] as const) {
         const reply = await gql(START, { requestId: randomUUID(), heroIds }, p);
+        expect(code(reply)).toBe("BAD_USER_INPUT");
+        expect(message(reply)).toContain(words);
+      }
+      expect(await repo.openAdventure(p)).toBeUndefined();
+    });
+
+    it("refuses a cargo with a resource twice, beyond the largest cart, or a hero who stays twice", async () => {
+      const p = `p-${randomUUID()}`;
+      const id = randomUUID();
+      const largest = Math.max(...CART_CAPACITY);
+      const CARAVAN_START = `mutation($requestId: UUID!, $cargo: [CargoInput!]!, $staying: [ID!]!) {
+        startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "caravan-to-highcrag", heroIds: ["${id}"], cargo: $cargo, staying: $staying }) { __typename }
+      }` as Query<{ startAdventure: { __typename: string } }>;
+      for (const [cargo, staying, words] of [
+        [[{ material: "ORE", amount: 1 }, { material: "ORE", amount: 1 }], [], "a resource is in the cargo twice"],
+        [[{ material: "ORE", amount: largest }, { material: "TIMBER", amount: 1 }], [], `a cart carries at most ${largest} in all`],
+        [[], [id, id.toUpperCase()], "a hero stays twice"],
+      ] as const) {
+        const reply = await gql(CARAVAN_START, { requestId: randomUUID(), cargo, staying }, p);
         expect(code(reply)).toBe("BAD_USER_INPUT");
         expect(message(reply)).toContain(words);
       }

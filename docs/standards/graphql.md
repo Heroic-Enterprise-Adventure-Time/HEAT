@@ -66,7 +66,11 @@ Standards for the API and `packages/hub`, beside `docs/standards/typescript.md`,
 
 ### A condition several transactions carry
 
-28. **A condition that several transactions carry is written once in the repository, and each transaction calls it.** The check that the player holds a location's unlock is `unlockHeld` in `db/repository.ts`, which start, recruit and build each call (decision 0059): a copy that differed would be a location open by one verb and closed by the others. Rule 18 says a rule is held by a condition; this says the condition has one text. (The review of PR-359, Issue-351.)
+28. **A condition that several transactions carry is written once in the repository, and each transaction calls it.** The check that the player holds a location's unlock is `unlockHeld` in `db/repository.ts`, which start, recruit and build each call (decision 0059): a copy that differed would be a location open by one verb and closed by the others. Rule 18 says a rule is held by a condition; this says the condition has one text. (The review of PR-359, Issue-351.) Since the review of PR-371 (Issue-354), the capped credit of a holding with its ledger entry is `cappedCredits`, which settlement's credits, a caravan's deliveries and a discard's returns each call, and the check of a camp's warehouse level beside it `warehouseHeld`.
+
+### What a request fills
+
+29. **A verb's parameters that a request fills come before those only a test passes, so that a resolver never passes `undefined` to reach one.** Rules 25 and 27 put a draw and the content last; what the request carries goes ahead of them, as a caravan's cargo and its heroes who stay go ahead of `now` and `issueSeed` in `startAdventure`. A resolver that stepped over two defaults to reach the request's field would be one more argument away from passing a test's parameter by mistake. (The review of PR-371, Issue-354.)
 
 ## Held back
 

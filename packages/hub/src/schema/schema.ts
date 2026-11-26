@@ -1,10 +1,11 @@
-import { constantCase, uniq } from "es-toolkit";
+import { constantCase, sumBy, uniq } from "es-toolkit";
 import { GraphQLError } from "graphql";
 import * as z from "zod/mini";
 
 import {
   ADVENTURE_OUTCOMES,
   type AdventureSnapshot,
+  CART_CAPACITY,
   FACILITY_KINDS,
   GATHERING_TRAITS,
   hallCapacity,
@@ -612,6 +613,9 @@ const RetireHeroInput = builder.inputType("RetireHeroInput", {
 
 const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
 
+/** What the cart of the caravan hub at its highest level carries in all, the most any cargo can be (decision 0059). */
+const LARGEST_CART = Math.max(0, ...CART_CAPACITY);
+
 const CargoInput = builder.inputType("CargoInput", {
   description: "An amount of one resource a caravan carries.",
   fields: (t) => ({
@@ -645,9 +649,10 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
       type: [CargoInput],
       required: true,
       defaultValue: [],
-      description: "What a caravan carries from the camp's warehouse, each resource at most once, within the caravan hub's cart. Empty for a job that delivers nothing.",
-      validate: z.array(z.object({ material: z.string() })).check(
+      description: `What a caravan carries from the camp's warehouse, each resource at most once, at most ${LARGEST_CART} in all, which the cart of the caravan hub at its highest level carries; a hub below that level carries less, which the start refuses. Empty for a job that delivers nothing.`,
+      validate: z.array(z.object({ material: z.string(), amount: z.number() })).check(
         z.refine((cargo) => uniq(cargo.map((c) => c.material)).length === cargo.length, "a resource is in the cargo twice"),
+        z.refine((cargo) => sumBy(cargo, (c) => c.amount) <= LARGEST_CART, `a cart carries at most ${LARGEST_CART} in all`),
       ),
     }),
     staying: t.idList({
@@ -796,7 +801,7 @@ builder.mutationFields((t) => ({
     ]),
     args: { input: t.arg({ type: StartAdventureInput, required: true }) },
     resolve: (_root, { input }, ctx) =>
-      startAdventure(ctx.repo, callerId(ctx), ctx.version, input.requestId, input.location, input.jobId, input.heroIds, undefined, undefined, {
+      startAdventure(ctx.repo, callerId(ctx), ctx.version, input.requestId, input.location, input.jobId, input.heroIds, {
         cargo: input.cargo,
         staying: input.staying,
       }),

@@ -4,13 +4,13 @@ import { sumBy } from "es-toolkit";
 
 import {
   type AdventureSnapshot,
-  CART_CAPACITY,
   FACILITIES,
   hallCapacity,
   hubLevelCarrying,
   type Job,
   jobOf,
   type Location,
+  must,
   type Requirement,
   type Reward,
   type SnapshotHero,
@@ -78,11 +78,12 @@ import {
  * hall for each hero who stays, in the same transaction. Its refusals are
  * InsufficientResources, a cargo the origin cannot pay, and HallFull, a
  * destination hall with no slot for everyone who stays. A destination the
- * player has no camp at, a cargo the caravan hub's cart cannot carry, a hero
- * marked to stay who is not of the party, or a cargo or a hero marked to
- * stay on a job that delivers nothing, is BAD_USER_INPUT: the page offers
- * none of them. Each resource is in the cargo once by the time it arrives
- * (`StartAdventureInput`).
+ * player has no camp at, a hero marked to stay who is not of the party, or
+ * a cargo or a hero marked to stay on a job that delivers nothing, is
+ * BAD_USER_INPUT: the page offers none of them. A cargo whose hub is below
+ * the level that carries it is Requires, as a job's facility is. Each
+ * resource is in the cargo once, and the cargo within the largest cart, by
+ * the time it arrives (`StartAdventureInput`).
  */
 
 /** What a caravan carries and who stays, as the request names them; empty for any other job. */
@@ -170,9 +171,9 @@ export function startAdventure(
   locationId: string,
   jobId: string,
   heroIds: readonly string[],
+  caravan: CaravanRequest = NO_CARAVAN,
   now = new Date(),
   issueSeed: () => string = randomUUID,
-  caravan: CaravanRequest = NO_CARAVAN,
 ): Promise<AdventureRecord> {
   return retryingConflicts("start", "the party changed while starting; no adventure was started", async () => {
     try {
@@ -322,8 +323,7 @@ async function caravanShape(
   const stray = caravan.staying.find((id) => !heroIds.includes(id));
   if (stray !== undefined) badInput(`${stray} is not of the party`);
   const destination = await campLocation(repo, playerId, job.deliversTo);
-  const load = sumBy(caravan.cargo, (c) => c.amount);
-  const hubLevel = hubLevelCarrying(load);
-  if (hubLevel === undefined) badInput(`no cart carries ${load}; the largest carries ${CART_CAPACITY.at(-1) ?? 0}`);
+  // The schema refuses a cargo larger than the largest cart (graphql.md, rule 14), so a level always carries it.
+  const hubLevel = must(hubLevelCarrying(sumBy(caravan.cargo, (c) => c.amount)), "the hub level whose cart carries the cargo");
   return { destination, hubLevel };
 }
