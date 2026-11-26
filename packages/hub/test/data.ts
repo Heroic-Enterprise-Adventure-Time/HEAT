@@ -77,12 +77,34 @@ export async function balances(repo: Repository, p: string, location: string): P
   return Object.fromEntries((await repo.holdings(p, location)).map((h) => [h.material, h.balance]));
 }
 
+/**
+ * A living villager recruited at a location just now, on no adventure: the
+ * hero the tests start from, with what a test means changed by `overrides`
+ * (typescript.md, rule 19), so that a new attribute of a hero is added here
+ * once.
+ */
+export function heroFixture(location: string, overrides: Partial<Hero> = {}): Hero {
+  return {
+    id: randomUUID(),
+    location,
+    recruitedIn: location,
+    unitType: "villager",
+    spriteSet: "villager-01",
+    name: "Wren",
+    recruitedAt: new Date().toISOString(),
+    level: 1,
+    xp: 0,
+    picks: [],
+    status: "ALIVE",
+    retiredAt: null,
+    adventureId: null,
+    ...overrides,
+  };
+}
+
 /** Living heroes of the given unit types at a location, with their sightings, and a level-1 camp there that counts them. */
 export async function putParty(db: DynamoDBDocumentClient, tables: Tables, p: string, unitTypes: readonly UnitType[], location: string): Promise<Hero[]> {
-  const heroes = unitTypes.map((unitType, i): Hero => ({
-    id: randomUUID(), location, recruitedIn: location, unitType, spriteSet: `${unitType}-01`, name: `Hero ${i}`,
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
-  }));
+  const heroes = unitTypes.map((unitType, i) => heroFixture(location, { unitType, spriteSet: `${unitType}-01`, name: `Hero ${i}` }));
   for (const hero of heroes) {
     await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
     await db.send(new PutCommand({

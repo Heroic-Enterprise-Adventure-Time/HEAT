@@ -10,7 +10,7 @@ import { configFromEnv, createDocumentClient, type Tables } from "../src/db/clie
 import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
-import { player, stock, whole } from "./data.js";
+import { heroFixture, player, stock, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -124,10 +124,7 @@ describe("recruitHero: the free villager", () => {
     await putCamp(p, 0, 0);
     const stale = await repo.camp(p, at);
     await recruitHero(repo, p, at, "villager", randomUUID());
-    const hero: Hero = {
-      id: randomUUID(), location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
-      recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
-    };
+    const hero = heroFixture(at);
     await expect(repo.recruit(p, stale, 4, hero, [], "none")).rejects.toBeInstanceOf(RecruitRefused);
     expect((await repo.heroes(p)).length).toBe(1);
   });
@@ -146,10 +143,7 @@ async function putPaidCamp(p: string, livingHeroes: number, holdings: Partial<Re
   await stock(repo, p, at, holdings);
 }
 
-const wren = (): Hero => ({
-  id: randomUUID(), location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
-  recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
-});
+const wren = (): Hero => heroFixture(at);
 
 async function ledgerDelta(p: string, heroId: string, material: string): Promise<number | undefined> {
   const r = await db.send(new GetCommand({ TableName: tables.player, Key: playerKeys.ledger(p, heroId, `debit#${material}`) }));

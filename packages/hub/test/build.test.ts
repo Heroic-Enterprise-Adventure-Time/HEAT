@@ -8,10 +8,10 @@ import type { Material } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
-import { BuildRefused, campLevels, type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
+import { BuildRefused, campLevels, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
-import { balances as balancesAt, player, stock as stockAt, whole } from "./data.js";
+import { balances as balancesAt, heroFixture, player, stock as stockAt, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -200,10 +200,7 @@ describe("buildFacility: the hall and the warehouse", () => {
     const stale = await repo.camp(p, at);
     await stock(p, { timber: 80, cloth: 20 });
     await buildFacility(repo, p, at, "heroes-hall", 2);
-    const hero: Hero = {
-      id: randomUUID(), location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
-      recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
-    };
+    const hero = heroFixture(at);
     await expect(repo.recruit(p, stale, 4, hero, [], "any")).rejects.toBeInstanceOf(RecruitRefused);
   });
 

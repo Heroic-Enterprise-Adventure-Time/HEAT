@@ -10,7 +10,7 @@ import { must, UNIT_PROFILES, UNLOCK_IDS } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
 import { type Hero, HeroChanged, Repository, TransactionConflict } from "../src/db/repository.js";
-import { emptyResult, player, putOldCampsPastAPage, settledAdventure, storedItem, whole } from "./data.js";
+import { emptyResult, heroFixture, player, putOldCampsPastAPage, settledAdventure, storedItem, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -35,10 +35,7 @@ beforeAll(() => {
 
 const at = "millbrook";
 
-const oldHero = (id: string): Hero => ({
-  id, location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Old", recruitedAt: "2026-10-21T12:00:00.000Z",
-  level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
-});
+const oldHero = (id: string): Hero => heroFixture(at, { id, name: "Old", recruitedAt: "2026-10-21T12:00:00.000Z" });
 
 async function putOldHero(p: string, id: string) {
   // An item from before Issue-354 has no recruitedIn, which the repository reads as its location.
