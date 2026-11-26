@@ -2,7 +2,7 @@ import { range } from 'es-toolkit';
 
 import { replay } from '@heat/engine';
 
-import { caravanTimeline, fighterOn, jobsThatDeliverNothing } from '../testing/caravan';
+import { caravanTimeline, fighterOn, jobsThatDeliver, jobsThatDeliverNothing } from '../testing/caravan';
 import { jobCast, timelineCast } from './cast';
 
 describe('jobCast', () => {
@@ -49,7 +49,14 @@ describe('jobCast', () => {
     expect(jobCast('toString', 'seed-1')).toEqual([]);
   });
 
-  // The game's content has no caravan until Issue-354, so a job's cart is shown here only by its absence.
+  it('names the cart for every job of the content that delivers', () => {
+    const jobIds = jobsThatDeliver();
+    expect(jobIds.length).toBeGreaterThan(0);
+    for (const jobId of jobIds) {
+      expect(jobCast(jobId, 'seed-1').filter((member) => member.kind === 'cart'), jobId).toHaveLength(1);
+    }
+  });
+
   it('names no cart for a job that delivers nothing', () => {
     const jobIds = jobsThatDeliverNothing();
     expect(jobIds.length).toBeGreaterThan(0);
