@@ -21,7 +21,6 @@ import {
   replay,
   type Reward,
   STARTING_LOCATION,
-  UNIT_PROFILES,
   type UnitType,
 } from "@heat/engine";
 
@@ -38,6 +37,7 @@ import { balances, build, player, putParty, putUnlock, stock, storedItem } from 
 import { locationKeys, playerKeys } from "./keys.js";
 import { everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
+import { seedWhere, standIn } from "./seeds.js";
 import { VERSION as version } from "./versions.js";
 
 /**
@@ -69,22 +69,10 @@ const there = must(caravan.deliversTo, "the caravan's destination");
 const road = must(location(there)?.unlock, "the destination's unlock");
 const hub = must(caravan.facility, "the facility that posts the caravan");
 
-const snapshotOf = (unitTypes: readonly UnitType[]): AdventureSnapshot => ({
-  version,
-  jobId: caravan.id,
-  heroes: unitTypes.map((unitType, i) => ({ heroId: `stand-in-${i}`, unitType, name: unitType, spriteSet: `${unitType}-01`, level: 1, stats: must(UNIT_PROFILES[unitType], `the ${unitType}'s profile`).stats })),
-});
+const snapshotOf = (unitTypes: readonly UnitType[]): AdventureSnapshot => standIn(caravan.id, unitTypes);
 
-/**
- * A seed on which a party of these unit types ends the caravan as `ends`
- * says, found by asking the engine (graphql.md, rule 26): a roll does not read
- * who the heroes are, so a stand-in party of the same types, in the same
- * order, says what the player's will do; stand-in i is the party's hero i.
- */
-function seedFor(unitTypes: readonly UnitType[], ends: (result: AdventureResult) => boolean, content: AdventureContent = ADVENTURE_CONTENT): string {
-  const standIn = snapshotOf(unitTypes);
-  return must(range(500).map((i) => `caravan-${i}`).find((seed) => ends(replay(standIn, seed, [], content).result)), `a seed on which ${unitTypes.join(" and ")} end so`);
-}
+/** A seed on which a party of these unit types ends the caravan as `ends` says. */
+const seedFor = (unitTypes: readonly UnitType[], ends: (result: AdventureResult) => boolean, content?: AdventureContent): string => seedWhere(caravan.id, unitTypes, ends, content);
 
 const deliveredWhole = (r: AdventureResult) => r.outcome === "complete" && r.delivered === true && r.dead.length === 0;
 

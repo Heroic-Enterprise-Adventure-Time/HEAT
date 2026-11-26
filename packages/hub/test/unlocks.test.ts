@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
-import { range } from "es-toolkit";
 import { getNamedType, type GraphQLInputType, isInputObjectType } from "graphql";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
@@ -35,6 +34,7 @@ import { balances, build, player, putParty, putUnlock, stock, storedItem } from 
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
+import { seedWhere } from "./seeds.js";
 import { VERSION as version } from "./versions.js";
 
 /**
@@ -86,19 +86,11 @@ const snapshotOf = (heroes: readonly { id: string; unitType: UnitType; name: str
 
 /**
  * A seed on which a party of these unit types ends a job this way, every hero
- * alive where it completes, found by asking the engine (graphql.md, rule 26):
- * a roll does not read who the heroes are, so a stand-in party of the same
- * types says what the player's will do. The job is the scouting job these
- * tests add, unless another of the same content is named.
+ * alive where it completes. The job is the scouting job these tests add,
+ * unless another of the same content is named.
  */
-function seedFor(unitTypes: readonly UnitType[], outcome: "complete" | "defeat", jobId = scouting.id): string {
-  const standIn = snapshotOf(unitTypes.map((unitType, i) => ({ id: `stand-in-${i}`, unitType, name: unitType, spriteSet: `${unitType}-01` })), jobId);
-  const ends = (seed: string): boolean => {
-    const { result } = replay(standIn, seed, [], content);
-    return result.outcome === outcome && (outcome === "defeat" || result.dead.length === 0);
-  };
-  return must(range(500).map((i) => `road-${i}`).find(ends), `a seed on which ${unitTypes.join(" and ")} end in ${outcome}`);
-}
+const seedFor = (unitTypes: readonly UnitType[], outcome: "complete" | "defeat", jobId = scouting.id): string =>
+  seedWhere(jobId, unitTypes, (result) => result.outcome === outcome && (outcome === "defeat" || result.dead.length === 0), content);
 
 /** Opens the scouting job for the party, on the seed given. */
 function startScouting(p: string, heroes: Hero[], seed: string): Promise<AdventureRecord> {
