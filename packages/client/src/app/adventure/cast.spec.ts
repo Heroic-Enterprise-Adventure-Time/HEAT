@@ -1,15 +1,11 @@
 import { range } from 'es-toolkit';
 
-import { type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
+import { replay } from '@heat/engine';
 
+import { caravanTimeline, fighterOn } from '../testing/caravan';
 import { jobCast, timelineCast } from './cast';
 
-/** A lone fighter's snapshot for a job: it completes the first three jobs' gathers and fights it can reach, so its timeline shows who was there. */
-const fighterOn = (jobId: string): AdventureSnapshot => ({
-  version: 'v1',
-  jobId,
-  heroes: [{ heroId: 'h1', name: 'Wat', unitType: 'fighter', spriteSet: 'fighter-02', level: 1, stats: must(UNIT_PROFILES.fighter, 'the fighter profile').stats }],
-});
+// A lone fighter completes the first three jobs' gathers and fights it can reach, so its timeline shows who was there.
 
 describe('jobCast', () => {
   it("names everyone a job's stages set against the party, once each, by kind", () => {
@@ -54,6 +50,13 @@ describe('jobCast', () => {
     expect(jobCast('a-job-of-a-later-version', 'seed-1')).toEqual([]);
     expect(jobCast('toString', 'seed-1')).toEqual([]);
   });
+
+  // The game's content has no caravan until Issue-354, so a job's cart is shown here only by its absence.
+  it('names no cart for a job that delivers nothing', () => {
+    for (const jobId of ['pick-up-sticks', 'timber-from-the-near-woods', 'wolves-on-the-mill-road']) {
+      expect(jobCast(jobId, 'seed-1').filter((member) => member.kind === 'cart'), jobId).toEqual([]);
+    }
+  });
 });
 
 describe('timelineCast', () => {
@@ -64,6 +67,13 @@ describe('timelineCast', () => {
     expect(cast[0]).toEqual({ kind: 'resource', type: 'tree' });
     expect(cast.filter((member) => member.kind === 'hero')).toEqual([]);
     expect(new Set(cast.map((member) => member.type)).size).toBe(cast.length);
+  });
+
+  it("names a caravan's cart beside the party once, and the bandit it met", () => {
+    expect(timelineCast(caravanTimeline().events)).toEqual([
+      { kind: 'cart', type: 'cart' },
+      { kind: 'monster', type: 'bandit' },
+    ]);
   });
 
   it('knows nobody for a timeline with no battle', () => {

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs";
 
 import { describe, expect, it } from "vitest";
 
-import { MONSTER_SPRITE_SETS, MONSTER_TYPES, must, PROP_SPRITE_SETS, RESOURCE_TYPES } from "../src/index.js";
+import { CART_SPRITE_SETS, MONSTER_SPRITE_SETS, MONSTER_TYPES, must, PROP_SPRITE_SETS, RESOURCE_TYPES } from "../src/index.js";
 
 const art = new URL("../../../art/", import.meta.url);
 
@@ -25,8 +25,8 @@ describe("monster and prop art", () => {
     expect(sorted(MONSTER_SPRITE_SETS)).toEqual(setsByProvenance("monsters"));
   });
 
-  it("lists the sprite sets of each prop exactly as the sets' provenance says", () => {
-    expect(sorted(PROP_SPRITE_SETS)).toEqual(setsByProvenance("props"));
+  it("lists the sprite sets of each prop, the cart's among them, exactly as the sets' provenance says", () => {
+    expect(sorted({ ...PROP_SPRITE_SETS, cart: CART_SPRITE_SETS })).toEqual(setsByProvenance("props"));
   });
 
   it("draws every monster and only the battle's resources", () => {

@@ -4,7 +4,7 @@ import { type AdventureEvent, type AdventureSnapshot, type AdventureTimeline, mu
 
 import { type AdventureView, Game } from '../game';
 import { spendHold } from './battle/clip-hold';
-import { applyEvent, emptyField, type Field, isEntry } from './field';
+import { applyEvent, emptyField, type Field, isEntry, jobCart, timelineCart } from './field';
 import { AdventureRun, forgetRun, loadRun, type Run, saveRun, TimelineRun } from './run';
 
 /** The speeds the player can pick (decision 0002): simulated milliseconds per wall-clock millisecond. */
@@ -79,7 +79,7 @@ export class Play {
     this.resumed.set(saved !== null);
     this.savedAt = run.simTime;
     this.savedEntries = run.log.length;
-    this.begin(run, emptyField(adventure.snapshot.heroes), false);
+    this.begin(run, emptyField(adventure.snapshot.heroes, jobCart(adventure.snapshot.jobId)), false);
     if (run.complete) void this.finish();
   }
 
@@ -88,7 +88,7 @@ export class Play {
     this.live = null;
     this.paused.set(false);
     this.resumed.set(false);
-    this.begin(new TimelineRun(timeline), emptyField(timeline.party), true);
+    this.begin(new TimelineRun(timeline), emptyField(timeline.party, timelineCart(timeline.events)), true);
   }
 
   /** Stops what was playing, the run and its field gone, until the next start or replay; a page that leaves a replay for another does. */
