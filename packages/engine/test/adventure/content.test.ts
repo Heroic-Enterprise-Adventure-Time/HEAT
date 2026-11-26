@@ -21,7 +21,7 @@ import {
   UNLOCK_IDS,
   warehouseCapacity,
 } from "../../src/index.js";
-import { atLargest, contentWithJob, enemiesXp, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { atLargest, CARAVAN, CARAVAN_BACK, contentWithJob, CRAG, enemiesXp, GOBLINS, LUMBER, ORE, QUARRY_FACE, QUARRY_GOBLINS, ROAD, SEEDS, seeds, snapshot, STICKS, TIMBER, villagers, WOLVES } from "./helpers.js";
 
 describe("The adventure's content", () => {
   it("gives every job a known location, stages that end with arrive, known opponents, counts and chances that can be rolled, and positive limits", () => {
@@ -61,53 +61,53 @@ describe("The adventure's content", () => {
   });
 
   it("has Millbrook's three jobs as the design describes them", () => {
-    expect(JOBS["pick-up-sticks"].stages.map((s) => s.kind)).toEqual(["travel", "gather", "arrive"]);
-    expect(JOBS["pick-up-sticks"].pay).toEqual([]);
-    expect(JOBS["wolves-on-the-mill-road"].stages.map((s) => s.kind)).toEqual(["travel", "fight", "arrive"]);
-    expect(JOBS["wolves-on-the-mill-road"].pay).toEqual([{ material: "cloth", amount: 10 }]);
-    expect(JOBS["timber-from-the-near-woods"].stages.map((s) => s.kind)).toEqual(["travel", "gather", "fight", "arrive"]);
-    expect(JOBS["timber-from-the-near-woods"].pay).toEqual([{ material: "cloth", amount: 3 }]);
+    expect(JOBS[STICKS].stages.map((s) => s.kind)).toEqual(["travel", "gather", "arrive"]);
+    expect(JOBS[STICKS].pay).toEqual([]);
+    expect(JOBS[WOLVES].stages.map((s) => s.kind)).toEqual(["travel", "fight", "arrive"]);
+    expect(JOBS[WOLVES].pay).toEqual([{ material: "cloth", amount: 10 }]);
+    expect(JOBS[TIMBER].stages.map((s) => s.kind)).toEqual(["travel", "gather", "fight", "arrive"]);
+    expect(JOBS[TIMBER].pay).toEqual([{ material: "cloth", amount: 3 }]);
   });
 
   it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), the ore job's 15 for the lumber camp's, for Highcrag's and for the quarry face, and the wolves job's 20 for the road's, for both caravans and for the quarry's goblins", () => {
     expect(mapValues(JOBS, (job) => job.bonusXp)).toEqual({
-      "pick-up-sticks": 2,
-      "timber-from-the-near-woods": 4,
-      "wolves-on-the-mill-road": 10,
-      "ore-from-the-hill": 4,
-      "goblins-in-the-old-workings": 6,
-      "lumber-from-the-deep-woods": 6,
-      "scout-the-road-to-highcrag": 8,
-      "caravan-to-highcrag": 8,
-      "ore-from-the-crag": 4,
-      "stone-from-the-quarry-face": 9,
-      "goblins-in-the-quarry": 6,
-      "caravan-to-millbrook": 8,
+      [STICKS]: 2,
+      [TIMBER]: 4,
+      [WOLVES]: 10,
+      [ORE]: 4,
+      [GOBLINS]: 6,
+      [LUMBER]: 6,
+      [ROAD]: 8,
+      [CARAVAN]: 8,
+      [CRAG]: 4,
+      [QUARRY_FACE]: 9,
+      [QUARRY_GOBLINS]: 6,
+      [CARAVAN_BACK]: 8,
     });
     expect(mapValues(JOBS, (job) => enemiesXp(job) + job.bonusXp)).toEqual({
-      "pick-up-sticks": 5,
-      "timber-from-the-near-woods": 15,
-      "wolves-on-the-mill-road": 20,
-      "ore-from-the-hill": 15,
-      "goblins-in-the-old-workings": 25,
-      "lumber-from-the-deep-woods": 15,
-      "scout-the-road-to-highcrag": 20,
-      "caravan-to-highcrag": 20,
-      "ore-from-the-crag": 15,
-      "stone-from-the-quarry-face": 15,
-      "goblins-in-the-quarry": 20,
-      "caravan-to-millbrook": 20,
+      [STICKS]: 5,
+      [TIMBER]: 15,
+      [WOLVES]: 20,
+      [ORE]: 15,
+      [GOBLINS]: 25,
+      [LUMBER]: 15,
+      [ROAD]: 20,
+      [CARAVAN]: 20,
+      [CRAG]: 15,
+      [QUARRY_FACE]: 15,
+      [QUARRY_GOBLINS]: 20,
+      [CARAVAN_BACK]: 20,
     });
   });
 
   it("gives 5 more XP when the first job's wolf appears: an enemy that appears by chance adds its own (decision 0058)", () => {
-    const sticks = JOBS["pick-up-sticks"];
+    const sticks = JOBS[STICKS];
     expect(enemiesXp(atLargest(sticks)) + sticks.bonusXp).toBe(10);
   });
 
   it("has five jobs that vary, the first job, the lumber camp's, both caravans and the quarry face: every other job's largest roll is the job as written", () => {
     const varying = Object.values(JOBS).filter((job) => !isEqual(largestStages(job), job.stages));
-    expect(varying.map((job) => job.id)).toEqual(["pick-up-sticks", "lumber-from-the-deep-woods", "caravan-to-highcrag", "stone-from-the-quarry-face", "caravan-to-millbrook"]);
+    expect(varying.map((job) => job.id)).toEqual([STICKS, LUMBER, CARAVAN, QUARRY_FACE, CARAVAN_BACK]);
   });
 
   for (const job of Object.values(JOBS)) {
@@ -151,8 +151,8 @@ describe("The adventure's content", () => {
   });
 
   it("says in the first job's description that timber is collected and that a hero who can cut wood is needed (decision 0058)", () => {
-    expect(JOBS["pick-up-sticks"].description).toMatch(/cut wood/);
-    expect(JOBS["pick-up-sticks"].description).toMatch(/timber/);
+    expect(JOBS[STICKS].description).toMatch(/cut wood/);
+    expect(JOBS[STICKS].description).toMatch(/timber/);
   });
 
   it("makes a retreat certain after a bounded number of attempts", () => {

@@ -92,6 +92,10 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 30. **A union a package mirrors from another is imported from the package that owns it, never spelled again.** Its type is named, `UnitKind` and not its members, or a type derived from it, so that a member added there reaches every place that reads it: rule 18 holds a list and its union together inside one package, and nothing holds two spellings in two packages together. The client's `FieldUnit` takes its kind from the engine's `UnitKind` (the review of PR-369, Issue-353).
 
+### What a test file takes from the helpers
+
+31. **A content id that a package's shared test helpers name as a constant is read from the helper by every test file, and not spelled again.** The engine's `test/adventure/helpers.ts` names each job and Highcrag, `QUARRY_FACE`, `CARAVAN_BACK`, `HIGHCRAG`; a test that spells `"caravan-to-millbrook"` instead would fail on the old id when the job is renamed while the tests that read the constant follow it, and a table keyed by every job takes the constants as its keys. Rule 24 says where a helper's values come from; this says where a test file's come from (the review of PR-373, Issue-356).
+
 ## Held back
 
 Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.

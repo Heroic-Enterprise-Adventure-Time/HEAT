@@ -30,6 +30,7 @@ import {
   WAREHOUSE_CAPACITY,
   warehouseCapacity,
 } from "../src/index.js";
+import { HIGHCRAG } from "./adventure/helpers.js";
 
 const heroes = new URL("../../../art/heroes/", import.meta.url);
 const facilities = new URL("../../../art/facilities/", import.meta.url);
@@ -89,7 +90,7 @@ describe("static content", () => {
   });
 
   it("has Highcrag behind the road's unlock, with the shared job board, the quarry and a caravan hub to build, and the miner and the fighter at Millbrook's costs", () => {
-    const highcrag = must(location("highcrag"), "Highcrag");
+    const highcrag = must(location(HIGHCRAG), "Highcrag");
     const millbrook = must(location(STARTING_LOCATION), "the starting location");
     expect(highcrag.name).toBe("Highcrag");
     expect(highcrag.unlock).toBe("road-to-highcrag");
@@ -102,8 +103,8 @@ describe("static content", () => {
   });
 
   it("recruits the knight at Highcrag alone, at hall level 1, for ore and hide: the first thing that costs hide", () => {
-    for (const l of LOCATIONS.filter((l) => l.id !== "highcrag")) expect(l.recruits.map((r) => r.unitType), l.id).not.toContain("knight");
-    const knight = must(location("highcrag")?.recruits.find((r) => r.unitType === "knight"), "Highcrag's knight");
+    for (const l of LOCATIONS.filter((l) => l.id !== HIGHCRAG)) expect(l.recruits.map((r) => r.unitType), l.id).not.toContain("knight");
+    const knight = must(location(HIGHCRAG)?.recruits.find((r) => r.unitType === "knight"), "Highcrag's knight");
     expect(knight.hallLevel).toBe(1);
     expect(knight.cost).toEqual([{ material: "ore", amount: 50 }, { material: "hide", amount: 4 }]);
     const costsHide = (cost: readonly { material: string }[]) => cost.some((c) => c.material === "hide");
@@ -116,11 +117,11 @@ describe("static content", () => {
 
   it("lets a camp build the quarry for 60 timber and 40 ore, one level, with nothing first, at Highcrag alone", () => {
     expect(FACILITIES.quarry.levels).toEqual([{ cost: [{ material: "timber", amount: 60 }, { material: "ore", amount: 40 }], requires: [] }]);
-    expect(LOCATIONS.filter((l) => l.buildableFacilities.includes("quarry")).map((l) => l.id)).toEqual(["highcrag"]);
+    expect(LOCATIONS.filter((l) => l.buildableFacilities.includes("quarry")).map((l) => l.id)).toEqual([HIGHCRAG]);
   });
 
   it("has no free hero at Highcrag: every recruit there costs its cost with no hero alive", () => {
-    for (const recruit of must(location("highcrag"), "Highcrag").recruits) {
+    for (const recruit of must(location(HIGHCRAG), "Highcrag").recruits) {
       expect(recruit.cost.length, recruit.unitType).toBeGreaterThan(0);
       expect(recruitCost(recruit, 0), recruit.unitType).toEqual(recruit.cost);
     }
