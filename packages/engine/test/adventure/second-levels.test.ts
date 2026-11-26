@@ -8,12 +8,14 @@ import {
   jobFacilityLevel,
   JOBS,
   jobsPostedBy,
+  location,
+  must,
   nextLevel,
   type SnapshotHero,
   STARTING_LOCATION,
   warehouseCapacity,
 } from "../../src/index.js";
-import { CARAVAN, GOBLINS, haul, LUMBER, ORE, party, played, RECRUITED_TYPES, rewardOf, ROAD, SEAM, SEEDS, STAND, villagers } from "./helpers.js";
+import { CARAVAN, GOBLINS, haul, HIGHCRAG, LUMBER, ORE, party, played, RECRUITED_TYPES, rewardOf, ROAD, SEAM, SEEDS, STAND, villagers } from "./helpers.js";
 
 // Millbrook's second levels (Issue-357, decision 0059): the mine, the lumber
 // camp and the caravan hub each gain a level that costs stone, which only
@@ -50,6 +52,11 @@ describe("the second levels", () => {
     expect(nextLevel("caravan-hub", 1)?.requires).toEqual([{ kind: "warehouse", level: 2 }]);
     expect(nextLevel("mine", 1)?.requires).toEqual([]);
     expect(nextLevel("lumber-camp", 1)?.requires).toEqual([]);
+  });
+
+  it("lets Highcrag's caravan hub take its second level too, a facility's levels being its kind's at every location (the owner, 2026-11-26)", () => {
+    expect(must(location(HIGHCRAG), "Highcrag").buildableFacilities).toContain("caravan-hub");
+    expect(FACILITIES["caravan-hub"].levels).toHaveLength(2);
   });
 
   it("gives the hub's second level a cart of 200 in all, twice its first", () => {
@@ -94,7 +101,10 @@ const PARTIES = {
   lumberjackAndTwoFighters: party("lumberjack", "fighter", "fighter"),
   fourVillagers: villagers(4),
 };
-const EVERY_PARTY: readonly (readonly SnapshotHero[])[] = Object.values(PARTIES);
+/** Each type Millbrook recruits, alone, which both jobs defeat or nearly so. */
+const LONE = Object.fromEntries(RECRUITED_TYPES.map((type) => [type, party(type)] as const));
+const lone = (type: string) => must(LONE[type], `a lone ${type}`);
+const EVERY_PARTY: readonly (readonly SnapshotHero[])[] = [...Object.values(PARTIES), ...Object.values(LONE)];
 const named = (heroes: readonly SnapshotHero[]) => heroes.map((h) => h.unitType).join(", ");
 const has = (heroes: readonly SnapshotHero[], type: string) => heroes.some((h) => h.unitType === type);
 
@@ -110,7 +120,7 @@ describe("The deep seam", () => {
 
   for (const type of RECRUITED_TYPES.filter((t) => t !== "ranger")) {
     it(`defeats a lone ${type} on every one of ${SEEDS} seeds`, () => {
-      for (const { seed, result } of played(SEAM, party(type))) expect(result.outcome, seed).toBe("defeat");
+      for (const { seed, result } of played(SEAM, lone(type))) expect(result.outcome, seed).toBe("defeat");
     });
   }
 
@@ -151,7 +161,7 @@ describe("The old-growth stand", () => {
 
   for (const type of RECRUITED_TYPES) {
     it(`defeats a lone ${type} on every one of ${SEEDS} seeds`, () => {
-      for (const { seed, result } of played(STAND, party(type))) expect(result.outcome, seed).toBe("defeat");
+      for (const { seed, result } of played(STAND, lone(type))) expect(result.outcome, seed).toBe("defeat");
     });
   }
 
