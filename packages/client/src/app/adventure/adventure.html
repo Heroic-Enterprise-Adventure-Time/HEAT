@@ -40,6 +40,15 @@
         }
       }
 
+      @if (caravan(); as lines) {
+        <h3 id="caravan-title">Caravan</h3>
+        <ul class="caravan" aria-labelledby="caravan-title">
+          @for (words of lines; track words) {
+            <li>{{ words }}</li>
+          }
+        </ul>
+      }
+
       <h3 id="heroes-title">Heroes</h3>
       <ul class="heroes" aria-labelledby="heroes-title">
         @for (hero of result.heroes; track hero.heroId) {
@@ -70,6 +79,9 @@
       }
     } @else {
       <p class="lost" role="alert">This adventure was lost to a game update. The party came home with nothing.</p>
+      @for (words of caravan() ?? []; track words) {
+        <p>{{ words }}</p>
+      }
       <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
     }
   } @else if (game.adventure(); as adventure) {

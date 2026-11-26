@@ -2,24 +2,28 @@ import { LowerCasePipe } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { sumBy } from 'es-toolkit';
 
-import { FACILITIES, type FacilityKind, MAX_PARTY } from '@heat/engine';
+import { FACILITIES, type FacilityKind, type Material, MAX_PARTY } from '@heat/engine';
 
 import { replayLine } from '../../adventure/replay-words';
 import { Game, type StartRefusal } from '../../game';
 import { Refusal, refusalWords } from '../../hub';
 import { CampState } from '../camp-state';
-import { bonusWords, jobAt, NO_PAY, retreatWords, rewardWords } from './job-words';
+import { caravanReason, cargoLines, cartCapacityAt, loadWords, noWayBackWords, roomWords } from './caravan-words';
+import { bonusWords, jobAt, lockedWords, NO_PAY, retreatWords, rewardWords } from './job-words';
 import { ReplayList } from './replay-list';
 
 /**
  * The hub's refusals of a start, by type, in the player's words; any other is
  * shown as the hub put it. A job the location does not post, a party of the
  * wrong size or a hero that is not the player's are the client's own
- * defects, refused as BAD_USER_INPUT, and this panel never sends them.
- * A caravan's two, a cargo the camp cannot pay and a destination hall with
- * no room for who stays, cannot come back while the panel sends no cargo and
- * nobody to stay; the caravan's page is Issue-355.
+ * defects, refused as BAD_USER_INPUT, and this panel never sends them; so
+ * are a caravan's cargo over its cart and a destination the player has no
+ * camp at, which the page checks before asking. A caravan's two, a cargo the
+ * camp cannot pay and a destination hall with no room for who stays, come
+ * back where another start or a build took the balance or the slot since the
+ * page last read the camp.
  */
 const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
   AdventureOpen: 'An adventure is already under way. Only one can be open at a time.',
@@ -47,6 +51,17 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
  * place, under Depart. Last, the job's replays, anyone's and every outcome,
  * each opening its replay page, read when the page opens (Issue-290,
  * decision 0053).
+ *
+ * A caravan's page is a job's page with two more picks (Issue-355; game.md,
+ * "Caravans"): the cargo, an amount of each resource the camp holds, up to
+ * what the cart carries, each beside the camp's balance and the
+ * destination's room for it; and who of the party stays at the destination,
+ * beside its hall's free slots. Under them, what cannot be undone: that a
+ * retreat abandons the cargo, which the retreat's line says, and where the
+ * destination has no caravan hub, that a hero who stays cannot come back
+ * until it has one. Depart is disabled with the reason while the picks break
+ * a rule the hub checks again. A caravan to a location the player has not
+ * unlocked says what it needs in place of the picks.
  */
 @Component({
   selector: 'heat-job-panel',
@@ -102,11 +117,60 @@ export class JobPanel {
     return job ? retreatWords(job) : '';
   });
 
+  /** The camp a caravan delivers to, or null for a job that delivers nothing and for a destination the player has no camp at. */
+  protected readonly destination = computed(() => {
+    const to = this.job()?.deliversTo;
+    return (to && this.game.player()?.camps.find((c) => c.location === to)) ?? null;
+  });
+  /** What a caravan to a location the player has not unlocked needs, once the player is read (`lockedWords`). */
+  protected readonly locked = computed(() => {
+    const job = this.job();
+    const player = this.game.player();
+    return job && player ? lockedWords(job, player.camps.map((c) => c.location)) : null;
+  });
+  /** Each resource the camp can load, beside its balance and the destination's room for it. */
+  protected readonly cargoLines = computed(() => {
+    const origin = this.game.camp();
+    const destination = this.destination();
+    return origin && destination ? cargoLines(origin, destination) : [];
+  });
+  private readonly amounts = signal<ReadonlyMap<Material, number>>(new Map());
+  /** The cargo as the start sends it: each resource still offered, at the amount picked, and none at 0. */
+  private readonly cargo = computed(() =>
+    this.cargoLines().flatMap(({ material }) => {
+      const amount = this.amounts().get(material) ?? 0;
+      return amount === 0 ? [] : [{ material, amount }];
+    }),
+  );
+  protected readonly load = computed(() => {
+    const origin = this.game.camp();
+    return origin ? loadWords(sumBy(this.cargo(), (c) => (Number.isFinite(c.amount) ? c.amount : 0)), cartCapacityAt(origin)) : '';
+  });
+  protected readonly room = computed(() => {
+    const destination = this.destination();
+    return destination ? roomWords(destination) : '';
+  });
+  protected readonly noWayBack = computed(() => {
+    const destination = this.destination();
+    return destination && noWayBackWords(destination);
+  });
+
   private readonly chosen = signal<ReadonlySet<string>>(new Set());
   /** The heroes picked who are still alive here: a refusal reloads the camp, and one may have gone. */
   protected readonly picked = computed(() => {
     const living = new Set(this.game.livingHere().map((h) => h.id));
     return new Set([...this.chosen()].filter((id) => living.has(id)));
+  });
+  /** The party's heroes, in the camp's order, who may be marked to stay. */
+  protected readonly partyHeroes = computed(() => this.game.livingHere().filter((h) => this.picked().has(h.id)));
+  private readonly marked = signal<ReadonlySet<string>>(new Set());
+  /** The heroes marked to stay who are still of the party. */
+  protected readonly staying = computed(() => new Set([...this.marked()].filter((id) => this.picked().has(id))));
+  /** Why the caravan cannot depart as picked, or null; always null for a job that delivers nothing. */
+  protected readonly caravanReason = computed(() => {
+    const origin = this.game.camp();
+    const destination = this.destination();
+    return origin && destination ? caravanReason(origin, destination, this.cargo(), this.staying().size) : null;
   });
   /** Whether the party is setting out, while the hub answers. */
   protected readonly pending = signal(false);
@@ -119,11 +183,31 @@ export class JobPanel {
     this.chosen.set(next);
   }
 
+  /**
+   * An amount as typed. A field the player cleared is 0; text the field cannot
+   * read as a number, "1e" or a lone "-", which it also reports as empty, is
+   * NaN, so that Depart waits with the reason rather than carrying none.
+   */
+  protected setAmount(material: Material, event: Event): void {
+    const field = event.target as HTMLInputElement;
+    const next = new Map(this.amounts());
+    next.set(material, field.validity.badInput ? Number.NaN : field.value === '' ? 0 : field.valueAsNumber);
+    this.amounts.set(next);
+  }
+
+  protected toggleStay(id: string): void {
+    const next = new Set(this.staying());
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    this.marked.set(next);
+  }
+
   protected async depart(jobId: string): Promise<void> {
     this.refusal.set(null);
     this.pending.set(true);
     try {
-      await this.game.startAdventure(this.game.location(), jobId, [...this.picked()]);
+      const caravan = this.destination() ? { cargo: this.cargo(), staying: [...this.staying()] } : undefined;
+      await this.game.startAdventure(this.game.location(), jobId, [...this.picked()], caravan);
       await this.router.navigate(['/adventure']);
     } catch (e) {
       const facility = this.job()?.facility;

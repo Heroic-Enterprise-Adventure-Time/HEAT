@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 
 import { ABILITIES, type AbilityId, isPlayableTimeline, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
+import { cargoWords, stayedWords } from '../camp/panels/caravan-words';
 import { rewardWords } from '../camp/panels/job-words';
 import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
@@ -24,7 +25,8 @@ const UNREAD = 'Your camp could not be read again, so anything this run opened i
  * retreat, and in a stage's last ten seconds the time left before the party
  * turns back. When the run ends it is submitted, and the result takes the
  * controls' place, with each unlock the run earned that the player did not
- * hold (Issue-352), the replay, which plays the stored timeline in the
+ * hold (Issue-352), and for a caravan what became of its cargo and who
+ * stayed (Issue-355), the replay, which plays the stored timeline in the
  * same scene with no engine, and Back to camp. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
  * to load, and for the art of everyone this adventure sets against the party, so
@@ -54,6 +56,21 @@ export class Adventure {
   protected readonly unlocked = computed(() => {
     const settled = this.game.settled();
     return settled?.result ? earnedWords(this.game.player()?.unlocks ?? [], settled.adventure.id) : [];
+  });
+  /**
+   * What a caravan's result says of its cargo and of who stays, one line for
+   * each row of decision 0059's table, from what the caravan set out with
+   * and the result's own delivered and lost (`cargoWords`, `stayedWords`);
+   * null for a job that delivers nothing, or a caravan with nothing to say.
+   */
+  protected readonly caravan = computed(() => {
+    const settled = this.game.settled();
+    const caravan = settled?.adventure.caravan;
+    if (!settled || !caravan) return null;
+    const destination = location(caravan.destination)?.name ?? caravan.destination;
+    const stayed = stayedWords(caravan, settled.result, destination, (id) => this.heroName(id));
+    const lines = [...cargoWords(caravan, settled.result, this.from(), destination), ...(stayed ? [stayed] : [])];
+    return lines.length > 0 ? lines : null;
   });
   /**
    * What the result says where the player could not be read again after the

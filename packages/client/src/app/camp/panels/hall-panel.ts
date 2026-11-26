@@ -20,7 +20,9 @@ const REFUSALS: Readonly<Record<RecruitRefusal, string>> = {
  * heroes hall" and "The page"): the hall's count against its cap; the
  * roster grouped living, dead and retired, the retired collapsed, and at a
  * camp with nobody alive whose location offers no hero for nothing, why it
- * is empty and that a hero comes by caravan (Issue-352); and every
+ * is empty and that a hero comes by caravan (Issue-352); the heroes on
+ * their way by caravan, each holding a slot the count includes, so a hall
+ * that looks to have room and refuses a recruit says why (Issue-355); every
  * unit type the location recruits, its price beside the camp's balance and
  * why it cannot be had now. A refusal from the hub is shown in place, on
  * the recruit it refused. Last, the hall's next level (Issue-93).

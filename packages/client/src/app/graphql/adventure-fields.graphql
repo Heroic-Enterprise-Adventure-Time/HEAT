@@ -4,6 +4,14 @@ fragment AdventureFields on Adventure {
   seed
   startedAt
   version
+  caravan {
+    destination
+    staying
+    cargo {
+      amount
+      material
+    }
+  }
   job {
     id
     description

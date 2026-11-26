@@ -66,7 +66,7 @@ Rule 15. The test rule, decision 0044, was the owner's call of 2026-11-03; Angul
 
 Rule 17. The pixel constants that copied the tokens were true only at the default font size, which the review of PR-189 found.
 
-Rule 19. Added on 2026-11-24 (Issue-352). The result page first asked the submit's result for the unlocks the run earned, a field the hub gained one pull request earlier: on `dev` the previous deploy already had it, and on `prod`, which had neither, the next release would have left every adventure open across it unsettled until the release after. Decision 0038 met the same limit once and accepted it; nothing said that the next field would meet it too.
+Rule 19. Added on 2026-11-24 (Issue-352). The result page first asked the submit's result for the unlocks the run earned, a field the hub gained one pull request earlier: on `dev` the previous deploy already had it, and on `prod`, which had neither, the next release would have left every adventure open across it unsettled until the release after. Decision 0038 met the same limit once and accepted it; nothing said that the next field would meet it too. Rewritten on 2026-11-25 (Issue-355), by the owner's call: the rule of Issue-352 was that a field joins the submit's selection only once every environment's previous deploy has it, and what a result needed from a newer schema was read from an operation the current route alone answers. Issue-355's result needed what a caravan delivered; the agent proposed that second read, and the owner chose the cleaner shape, the fields on the submit's own result, with the break of the previous route said in the pull request. The rule now puts the cleanest shape first and makes the second read the exception.
 
 ## graphql.md
 
