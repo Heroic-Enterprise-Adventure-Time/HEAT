@@ -248,6 +248,13 @@ async function startOnce(
   const heroes = await checkParty();
 
   // A caravan's cargo against the origin's holdings, and its heroes who stay against the destination's hall.
+  // Another start that committed since the first read took the balance or the slot with its own adventure,
+  // so before either refusal the open item is read again, as a hero on an adventure is answered above.
+  const refuseCaravan = async (refusal: Refusal): Promise<never> => {
+    const winner = await repo.openAdventure(playerId);
+    if (winner) refuseOpen(winner.adventureId);
+    throw refusal;
+  };
   const checkCaravan = async (): Promise<CaravanStart | undefined> => {
     if (destination === undefined) return undefined;
     const origin = await repo.camp(playerId, at.id);
@@ -256,11 +263,11 @@ async function startOnce(
       .filter((c) => c.balance < c.amount);
     if (short.length > 0) {
       const words = short.map((c) => `${c.amount} ${c.material}, and the camp has ${c.balance}`).join("; ");
-      throw new InsufficientResources(`the cargo needs ${words}`, short);
+      return refuseCaravan(new InsufficientResources(`the cargo needs ${words}`, short));
     }
     const there = await repo.camp(playerId, destination.id);
     const capacity = hallCapacity(there.hallLevel);
-    if (there.activeHeroes + caravan.staying.length > capacity) throw new HallFull(`the heroes hall at ${destination.name} has no room for everyone who stays`);
+    if (there.activeHeroes + caravan.staying.length > capacity) return refuseCaravan(new HallFull(`the heroes hall at ${destination.name} has no room for everyone who stays`));
     return { caravan: { destination: destination.id, cargo: [...caravan.cargo], staying: [...caravan.staying] }, destination: there, capacity };
   };
   const carrying = await checkCaravan();
@@ -277,12 +284,9 @@ async function startOnce(
       startedAt: now.toISOString(),
     }, needs, carrying);
   } catch (e) {
-    // The transaction's own check of an unlock, the origin's or the destination's, which the reads above passed:
-    // an unlock is never taken away, so nothing explains it but a read, which is made again to say which.
-    if (e instanceof LocationLocked) {
-      if (destination !== undefined) await campLocation(repo, playerId, destination.id);
-      refuseNoCamp(at.id);
-    }
+    // The transaction's own check of an unlock, which the reads above passed: an unlock is never taken away, so
+    // nothing explains it but a read. The one that failed is the destination's where the origin needs none.
+    if (e instanceof LocationLocked) refuseNoCamp(destination !== undefined && at.unlock === undefined ? destination.id : at.id);
     // AlreadyApplied: the record exists with no open item, a repeat after the adventure ended.
     const raced = [AdventureAlreadyOpen, AlreadyApplied, HeroChanged, FacilityMissing, InsufficientBalance, DestinationFull].some((t) => e instanceof t);
     if (!raced) throw e;
