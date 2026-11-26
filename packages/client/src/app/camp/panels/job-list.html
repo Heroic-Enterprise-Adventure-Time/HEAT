@@ -1,9 +1,10 @@
 @if (jobs().length > 0) {
   <ul class="jobs" aria-label="Jobs">
     @for (job of jobs(); track job.id) {
-      <li>
+      @let lock = locked(job);
+      <li [class.locked]="lock !== null">
         <a class="link" [routerLink]="['jobs', job.id]">{{ job.name }}</a>
-        <span>{{ brings(job) }}</span>
+        <span>{{ lock ?? pays(job) }}</span>
       </li>
     }
   </ul>

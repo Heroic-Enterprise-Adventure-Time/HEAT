@@ -1,6 +1,6 @@
 # 0051: Resource nodes as obstacles: health, a difficulty and a maximum yield, harvested by a gather rating per resource
 
-- **Status:** Decided; the numbers are working assumptions in the engine's static content.
+- **Status:** Decided; the numbers are working assumptions in the engine's static content. The gather rating, a node's difficulty and maximum yield, the per-hit harvest and the waste are replaced by 0058 (Issue-336, 2026-11-20), built by Issue-339: the engine no longer does what this record says of them, and `harvested` and the `harvest` effect are gone. A node as an obstacle, one list of opponents and a stage that ends when all of it is down stand. Amended by Issue-341 on 2026-11-22 (decision 0058, its second amendment): chop and mine have no target while a monster is on a line they reach, where "Chop and mine stay as abilities for their look" has each a strike at a node of its resource with no such condition.
 - **Date:** 2026-11-10
 - **Settles:** Issue-283: how a resource node is fought and harvested, before any more gathering jobs are added, so that a better gatherer is worth bringing on a resource run. The shape was agreed with the owner in the step 3 design session (Issue-282); the arithmetic and the numbers in the Issue-283 session.
 - **Amends:** 0030, "Stages and time limits": a fight or a gather lists nodes and monsters together and ends when all of them are down; and the timeline's schema version, which the first cut left to be decided when it first moved. 0031, "Checked with the engine": the gather jobs' hauls and the table below replace its rows for them; its costs stand.
@@ -85,4 +85,4 @@ The longest gather in those runs is 31 s, a lone villager on two nodes, against 
 
 ## Where it is described
 
-`docs/design/game.md`, "The battle". `docs/architecture/adventure-loop.md`, "The loop", the schema version and the item built by Issue-283. The rule is in `packages/engine/src/battle/unit.ts` (`harvested`), `engine.ts` and `resolution.ts`; the numbers and the jobs in `packages/engine/src/content.ts`.
+`docs/design/battle.md`. `docs/architecture/adventure-loop.md`, "The loop", the schema version and the item built by Issue-283. The rule is in `packages/engine/src/battle/unit.ts` (`harvested`), `engine.ts` and `resolution.ts`; the numbers and the jobs in `packages/engine/src/content.ts`.

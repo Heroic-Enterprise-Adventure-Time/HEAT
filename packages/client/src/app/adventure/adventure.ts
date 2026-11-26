@@ -1,15 +1,21 @@
 import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { ABILITIES, type AbilityId, isPlayableTimeline, type JobId, JOBS, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
+import { ABILITIES, type AbilityId, isPlayableTimeline, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
-import { stageWords } from '../camp/panels/job-words';
+import { cargoWords, stayedWords } from '../camp/panels/caravan-words';
+import { rewardWords } from '../camp/panels/job-words';
+import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
 import { BattleView } from './battle-view';
+import { jobCast, timelineCast } from './cast';
 import { secondsLeft, waitingWords } from './field';
 import { Play } from './play';
 import { Playback } from './playback';
-import { outcomeWords, stageResultWords } from './result-words';
+import { earnedWords, outcomeWords, stageResultWords } from './result-words';
+
+/** What a result says while the player could not be read again after the run was sent. */
+const UNREAD = 'Your camp could not be read again, so anything this run opened is not shown yet.';
 
 /**
  * The open adventure, `/adventure` (Issue-15): the battle in the stage, and
@@ -18,10 +24,13 @@ import { outcomeWords, stageResultWords } from './result-words';
  * abilities to force its next action, the party's orders, press on and
  * retreat, and in a stage's last ten seconds the time left before the party
  * turns back. When the run ends it is submitted, and the result takes the
- * controls' place, with the replay, which plays the stored timeline in the
+ * controls' place, with each unlock the run earned that the player did not
+ * hold (Issue-352), and for a caravan what became of its cargo and who
+ * stayed (Issue-355), the replay, which plays the stored timeline in the
  * same scene with no engine, and Back to camp. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
- * to load, so that the party can run on from the start.
+ * to load, and for the art of everyone this adventure sets against the party, so
+ * that the party is seen running on from the start.
  */
 @Component({
   selector: 'heat-adventure',
@@ -37,6 +46,41 @@ export class Adventure {
   protected readonly outcomeWords = outcomeWords;
   /** Each stage of the settled result in words, "fight: won". */
   protected readonly stages = computed(() => stageResultWords(this.game.settled()?.result?.stages ?? []));
+  /**
+   * What the player is told for each unlock this run earned that they did
+   * not hold, in the content's words (game.md, "Unlocks"): those of the
+   * player's own unlocks that name this adventure as the one that first
+   * earned them, once the player has been read again after the submit
+   * (decision 0059).
+   */
+  protected readonly unlocked = computed(() => {
+    const settled = this.game.settled();
+    return settled?.result ? earnedWords(this.game.player()?.unlocks ?? [], settled.adventure.id) : [];
+  });
+  /**
+   * What a caravan's result says of its cargo and of who stays, one line for
+   * each row of decision 0059's table, from what the caravan set out with
+   * and the result's own delivered and lost (`cargoWords`, `stayedWords`);
+   * null for a job that delivers nothing, or a caravan with nothing to say.
+   */
+  protected readonly caravan = computed(() => {
+    const settled = this.game.settled();
+    const caravan = settled?.adventure.caravan;
+    if (!settled || !caravan) return null;
+    const destination = location(caravan.destination)?.name ?? caravan.destination;
+    const stayed = stayedWords(caravan, settled.result, destination, (id) => this.heroName(id));
+    const lines = [...cargoWords(caravan, settled.result, this.from(), destination), ...(stayed ? [stayed] : [])];
+    return lines.length > 0 ? lines : null;
+  });
+  /**
+   * What the result says where the player could not be read again after the
+   * submit: an unlock the run earned is told from that read alone, and it is
+   * told once, here, so the page says that it does not know yet and offers
+   * the read again (the review of PR-361).
+   */
+  protected readonly unread = computed(() => (this.game.error() === null ? null : UNREAD));
+  /** Whether the player is being read again, from the result. */
+  protected readonly reading = signal(false);
 
   private readonly view = viewChild.required(BattleView);
   private startedId: string | null = null;
@@ -47,22 +91,22 @@ export class Adventure {
     const at = (this.game.settled()?.adventure ?? this.game.adventure())?.location ?? '';
     return location(at)?.name ?? at;
   });
-  /** The stage under way in words, "Stage 2 of 3: Fight 2 wolves". */
-  protected readonly stageName = computed(() => {
-    const field = this.play.field();
-    const jobId = this.game.adventure()?.snapshot.jobId;
-    const job = jobId && Object.hasOwn(JOBS, jobId) ? JOBS[jobId as JobId] : undefined;
-    const stage = field && job?.stages[field.stage];
-    return field && job && stage ? `Stage ${field.stage + 1} of ${job.stages.length}: ${stageWords(stage)}` : null;
-  });
   protected readonly countdown = computed(() => {
     const field = this.play.field();
     return field ? secondsLeft(field, this.play.simTime()) : null;
   });
-  /** What the party carries in words, "5 timber, 3 ore", or null when it carries nothing. */
-  protected readonly cargo = computed(() => {
-    const cargo = this.play.field()?.cargo ?? [];
-    return cargo.length > 0 ? cargo.map((load) => `${load.amount} ${load.material}`).join(', ') : null;
+  /**
+   * What has dropped to the party in words, "Carrying 34 timber, 22 ore", or
+   * nothing while nothing has: it counts up the moment an enemy falls, which
+   * is how the page shows a drop (the owner, 2026-11-20, Issue-339; the
+   * scene's own picture of one is Issue-344). Its element is a live region
+   * that is in the page from the start and empty until then, because one that
+   * arrives already holding its words is not reliably spoken (the review of
+   * PR-345).
+   */
+  protected readonly carrying = computed(() => {
+    const drops = this.play.field()?.drops ?? [];
+    return drops.length > 0 ? `Carrying ${drops.map(rewardWords).join(', ')}` : '';
   });
   /** Whether a hero can be told what to do: in a fight or a gather, before the end. */
   protected readonly inBattle = computed(() => {
@@ -84,7 +128,7 @@ export class Adventure {
       untracked(() => {
         this.startedId = adventure.id;
         this.play.start(adventure);
-        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])));
+        this.view().reset(new Map(adventure.snapshot.heroes.map((h) => [h.heroId, h.spriteSet])), jobCast(adventure.snapshot.jobId, adventure.seed), groundAt(adventure.location));
       });
     });
     effect(() => {
@@ -93,6 +137,16 @@ export class Adventure {
         void this.router.navigate(['/camp', this.game.location()], { replaceUrl: true });
       }
     });
+  }
+
+  /** Reads the player again from the result, where the read after the submit failed. */
+  protected async readAgain(): Promise<void> {
+    this.reading.set(true);
+    try {
+      await this.game.reload();
+    } finally {
+      this.reading.set(false);
+    }
   }
 
   /** Plays the stored timeline of the adventure just settled, read through the hub, in the same scene. */
@@ -111,7 +165,7 @@ export class Adventure {
     }
     this.replayState.set('idle');
     this.play.replay(timeline);
-    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])));
+    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events), groundAt(settled.adventure.location));
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */

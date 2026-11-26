@@ -13,8 +13,22 @@
       </li>
     }
   </ul>
+} @else if (byCaravan(); as words) {
+  <p class="note">{{ words }}</p>
 } @else {
   <p>No living heroes.</p>
+}
+
+@if (game.onTheWay().length > 0) {
+  <h3 id="on-the-way-title">On the way</h3>
+  <ul class="roster" aria-labelledby="on-the-way-title">
+    @for (hero of game.onTheWay(); track hero.id) {
+      <li>
+        <strong>{{ hero.name }}</strong>
+        <span>{{ hero.unitType }}, level {{ hero.level }}, coming by caravan: a slot is held here.</span>
+      </li>
+    }
+  </ul>
 }
 
 @if (dead().length > 0) {

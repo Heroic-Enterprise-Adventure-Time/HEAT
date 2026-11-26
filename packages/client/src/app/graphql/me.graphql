@@ -14,5 +14,9 @@ query Me {
     openAdventure {
       ...AdventureFields
     }
+    unlocks {
+      adventureId
+      unlock
+    }
   }
 }

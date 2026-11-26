@@ -11,10 +11,15 @@ import {
   type AdventureOutcome,
   type AdventureTimeline,
   buildRefusal,
+  cartCapacity,
   FACILITY_KINDS,
   type FacilityKind,
+  GATHERING_TRAITS,
   hallCapacity,
+  jobFacilityLevel,
+  jobsPostedBy,
   location,
+  type Material,
   MATERIALS,
   must,
   nextLevel,
@@ -24,6 +29,7 @@ import {
   STARTING_LOCATION,
   UNIT_TYPES,
   type UnitType,
+  UNLOCK_IDS,
   warehouseCapacity,
 } from '@heat/engine';
 
@@ -57,10 +63,12 @@ import {
   TimelineDocument,
   type AdventureOutcome as WireAdventureOutcome,
   type FacilityKind as WireFacilityKind,
+  type GatheringTrait as WireGatheringTrait,
   type Material as WireMaterial,
   type StageEnding as WireStageEnding,
   type StageKind as WireStageKind,
   type UnitType as WireUnitType,
+  type Unlock as WireUnlock,
 } from './graphql/generated/graphql';
 import { apiError, PREVIOUS, Refusal, type RefusalOf, type Route } from './hub';
 import { Session } from './session';
@@ -71,12 +79,12 @@ import { Session } from './session';
  * `graphql/generated/`): the same shape, with the engine's closed sets read
  * back from the schema's UPPER_CASE enum values into the engine's own
  * (`VILLAGER` is `villager`; docs/standards/graphql.md, rule 4). A unit
- * type, a material, a stage's kind and its ending are `string`, because a
+ * type, a material, a gathering trait, a stage's kind and its ending, and an unlock are `string`, because a
  * value this client's engine lacks passes through (`engineValues`); a
  * facility kind and an outcome keep the engine's type, which the pages
  * switch on. Nothing past this file sees a wire value.
  */
-type Engine<T> = T extends WireUnitType | WireMaterial | WireStageKind | WireStageEnding
+type Engine<T> = T extends WireUnitType | WireMaterial | WireGatheringTrait | WireStageKind | WireStageEnding | WireUnlock
   ? string
   : T extends WireFacilityKind
     ? FacilityKind
@@ -112,8 +120,14 @@ type ReplayAdventure = NonNullable<ReplayQuery['adventure']>;
 export type ReplayedView = Engine<Omit<ReplayAdventure, 'timeline'>> & { readonly timeline: AdventureTimeline | null };
 
 type MePlayer = NonNullable<MeQuery['me']>;
-/** The signed-in player: `camps` and `heroes` are nulled only for another caller (graphql.md, rule 11), never for the player's own read. */
-export type PlayerView = Engine<Omit<MePlayer, 'camps' | 'heroes'> & { readonly camps: readonly CampFieldsFragment[]; readonly heroes: readonly HeroFieldsFragment[] }>;
+/** The signed-in player: `camps`, `heroes` and `unlocks` are nulled only for another caller (graphql.md, rule 11), never for the player's own read. */
+export type PlayerView = Engine<
+  Omit<MePlayer, 'camps' | 'heroes' | 'unlocks'> & {
+    readonly camps: readonly CampFieldsFragment[];
+    readonly heroes: readonly HeroFieldsFragment[];
+    readonly unlocks: readonly NonNullable<MePlayer['unlocks']>[number][];
+  }
+>;
 
 /** The refusals each mutation can answer, by type, which the tables of the player's words are keyed by (angular.md, rule 6). */
 export type RecruitRefusal = RefusalOf<RecruitHeroMutation['recruitHero']>;
@@ -161,12 +175,15 @@ function wireNames<E extends string>(values: readonly E[]): (value: E) => Consta
 
 const unitType = engineValues(UNIT_TYPES);
 const material = engineValues(MATERIALS);
+const gatheringTrait = engineValues(GATHERING_TRAITS);
 const facilityKind = engineValues(FACILITY_KINDS);
 const outcome = engineValues(ADVENTURE_OUTCOMES);
 const stageKind = engineValues(STAGE_KINDS);
 const stageEnding = engineValues(STAGE_ENDINGS);
+const unlock = engineValues(UNLOCK_IDS);
 const wireUnitType = wireNames(UNIT_TYPES);
 const wireFacilityKind = wireNames(FACILITY_KINDS);
+const wireMaterial = wireNames(MATERIALS);
 const materials = <T extends { readonly material: string }>(items: readonly T[]) => items.map((item) => ({ ...item, material: material(item.material) }));
 
 function heroFromWire(hero: HeroFieldsFragment): HeroView {
@@ -188,9 +205,10 @@ function campFromWire(camp: CampFieldsFragment): CampView {
 function adventureFromWire(adventure: AdventureFieldsFragment): AdventureView {
   return {
     ...adventure,
+    caravan: adventure.caravan ? { ...adventure.caravan, cargo: materials(adventure.caravan.cargo) } : null,
     snapshot: {
       ...adventure.snapshot,
-      heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType), stats: { ...h.stats, gather: materials(h.stats.gather) } })),
+      heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType), stats: { ...h.stats, traits: h.stats.traits.map((t) => ({ ...t, trait: gatheringTrait(t.trait) })) } })),
     },
   };
 }
@@ -203,6 +221,8 @@ function resultFromWire(result: ResultFieldsFragment): AdventureResultView {
     rewards: materials(result.rewards),
     credited: materials(result.credited),
     lost: materials(result.lost),
+    delivered: materials(result.delivered),
+    deliveryLost: materials(result.deliveryLost),
   };
 }
 
@@ -239,6 +259,7 @@ function playerFromWire(player: MePlayer): PlayerView {
     camps: (player.camps ?? []).map(campFromWire),
     heroes: (player.heroes ?? []).map(heroFromWire),
     openAdventure: player.openAdventure ? adventureFromWire(player.openAdventure) : null,
+    unlocks: (player.unlocks ?? []).map((held) => ({ ...held, unlock: unlock(held.unlock) })),
   };
 }
 
@@ -265,6 +286,12 @@ interface Loaded {
   readonly error: unknown;
 }
 
+/** What a caravan's start sends beside its party: what it carries, each resource once, and the heroes of the party who stay at the destination. */
+export interface CaravanStart {
+  readonly cargo: readonly { readonly material: Material; readonly amount: number }[];
+  readonly staying: readonly string[];
+}
+
 /** A unit type the hall recruits, its price to the camp, and why it cannot be had now, or null when it can. */
 export interface RecruitOffer {
   readonly unitType: UnitType;
@@ -281,10 +308,25 @@ export interface RecruitOffer {
 export interface UpgradeOffer {
   readonly kind: FacilityKind;
   readonly level: number;
-  /** What the level changes, in words, where it changes a number; null for a facility's first level. */
+  /** What the level changes, in words, where it changes a number or posts a job; null for a facility's first level. */
   readonly gives: string | null;
   readonly cost: readonly { readonly material: string; readonly amount: number; readonly balance: number }[];
   readonly reason: string | null;
+}
+
+/**
+ * What a level beyond the first gives, in the panel's words: the hall's and
+ * the warehouse's room, the caravan hub's cart (decision 0059), and the jobs
+ * the level posts (Issue-357); null for a first level, which the facility's
+ * description tells.
+ */
+function levelGives(at: string, kind: FacilityKind, level: number): string | null {
+  if (level <= 1) return null;
+  if (kind === 'heroes-hall') return `Holds ${hallCapacity(level)} heroes.`;
+  if (kind === 'warehouse') return `Holds ${warehouseCapacity(level)} of each resource.`;
+  if (kind === 'caravan-hub') return `The cart carries ${cartCapacity(level)} in all.`;
+  const posted = jobsPostedBy(at, kind).filter((job) => jobFacilityLevel(job) === level);
+  return posted.length === 0 ? null : `Posts a new job: ${posted.map((job) => job.name).join(' and ')}.`;
 }
 
 /**
@@ -300,12 +342,7 @@ export function upgradeOffer(camp: CampView, kind: FacilityKind): UpgradeOffer |
     amount,
     balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0,
   }));
-  const gives =
-    kind === 'heroes-hall'
-      ? `Holds ${hallCapacity(next.level)} heroes.`
-      : kind === 'warehouse'
-        ? `Holds ${warehouseCapacity(next.level)} of each resource.`
-        : null;
+  const gives = levelGives(camp.location, kind, next.level);
   const refusal = buildRefusal({ levels, holdings: camp.holdings }, kind);
   const reason =
     refusal?.code === 'INSUFFICIENT_RESOURCES' ? `Not enough ${refusal.short.map((s) => s.material).join(' or ')}.` : (refusal?.message ?? null);
@@ -375,6 +412,19 @@ export class Game {
   readonly livingHere = computed(() => this.heroesHere().filter((h) => h.status === 'ALIVE'));
   /** The player's one open adventure, or null. */
   readonly adventure = computed(() => this.player()?.openAdventure ?? null);
+  /**
+   * The heroes on their way to the camp on screen, those of the open
+   * caravan who stay there: each holds a slot in its hall from the start
+   * until the caravan ends (game.md, "The heroes hall"), so the hall's count
+   * includes them while its roster, which lists the heroes at the camp, does
+   * not.
+   */
+  readonly onTheWay = computed(() => {
+    const caravan = this.adventure()?.caravan;
+    if (caravan?.destination !== this.location()) return [];
+    const staying = new Set(caravan.staying);
+    return (this.player()?.heroes ?? []).filter((h) => staying.has(h.id));
+  });
   /** The adventure just ended, while its result is on screen; the page does not reload under it (`Updates`). */
   readonly settled = signal<SettledView | null>(null);
   /** The camp's retired heroes, who stay on the record (game.md, "The heroes hall"). */
@@ -430,6 +480,17 @@ export class Game {
     });
   });
 
+  /**
+   * Whether the camp on screen, with nobody alive, is offered no hero for
+   * nothing: true where the location recruits no villager, as at Highcrag,
+   * whose first hero comes by caravan (decision 0059). The engine's own rule,
+   * `recruitCost` with no hero alive, read over the location's list.
+   */
+  readonly noFreeRecruit = computed(() => {
+    const at = location(this.location());
+    return !!at && !at.recruits.some((recruit) => recruitCost(recruit, 0).length === 0);
+  });
+
   /** The next level of one of the camp on screen's own facilities, or null at its highest (`upgradeOffer`). */
   upgrade(kind: FacilityKind): UpgradeOffer | null {
     const camp = this.camp();
@@ -437,15 +498,15 @@ export class Game {
   }
 
   /**
-   * Recruits a hero of the unit type, with a fresh request id; the hub
-   * draws its name and look, and debits its cost. Answers the new hero, or
+   * Recruits a hero of the unit type at the camp on screen, with a fresh
+   * request id; the hub draws its name and look, and debits its cost. Answers the new hero, or
    * throws the hub's refusal, a `Refusal` named by its type, for the hall to
    * show in place. The player is read again either way, since a refusal
    * such as `HallFull` means the view was stale.
    */
   async recruit(unitType: UnitType): Promise<HeroView> {
     try {
-      const input = { unitType: wireUnitType(unitType), requestId: crypto.randomUUID() };
+      const input = { location: this.location(), unitType: wireUnitType(unitType), requestId: crypto.randomUUID() };
       const data = await this.mutate(RecruitHeroDocument, { input });
       return heroFromWire(answered(must(data.recruitHero, 'recruitHero'), 'RecruitHeroSuccess').hero);
     } finally {
@@ -484,16 +545,25 @@ export class Game {
   }
 
   /**
-   * Starts a job from the location's job board with a party of the player's
-   * heroes there. Answers the open adventure, or throws the hub's refusal,
-   * a `Refusal` named by its type, for the job board to show in place. The
-   * player is read again either way, since a refusal such as
-   * `AdventureOpen` means the view was stale.
+   * Starts a job the location posts with a party of the player's heroes
+   * there, and for a caravan its cargo and who of the party stays at the
+   * destination (decision 0059); a job that delivers nothing sends neither.
+   * Answers the open adventure, or throws the hub's refusal, a `Refusal`
+   * named by its type, for the job's page to show in place. The player is
+   * read again either way, since a refusal such as `AdventureOpen` means the
+   * view was stale.
    */
-  async startAdventure(location: string, jobId: string, heroIds: readonly string[]): Promise<AdventureView> {
+  async startAdventure(location: string, jobId: string, heroIds: readonly string[], caravan?: CaravanStart): Promise<AdventureView> {
     try {
       // One request id per start, which becomes the adventure's id: a repeat of this request answers the adventure it started.
-      const input = { requestId: crypto.randomUUID(), location, jobId, heroIds };
+      const input = {
+        requestId: crypto.randomUUID(),
+        location,
+        jobId,
+        heroIds,
+        cargo: (caravan?.cargo ?? []).map((c) => ({ material: wireMaterial(c.material), amount: c.amount })),
+        staying: caravan?.staying ?? [],
+      };
       const data = await this.mutate(StartAdventureDocument, { input });
       return adventureFromWire(answered(must(data.startAdventure, 'startAdventure'), 'StartAdventureSuccess').adventure);
     } finally {
@@ -600,8 +670,13 @@ export class Game {
     return must(data, 'the mutation’s data');
   }
 
-  /** Reads the player again after a mutation; a failed read leaves the view as it was, since the mutation's own answer is what matters. */
-  private async reload(): Promise<void> {
+  /**
+   * Reads the player again, after a mutation and where a page asks for it. A
+   * failed read leaves the view as it was, since a mutation's own answer is
+   * what matters, and `error` says why; the result of a run offers the read
+   * again, because what the run unlocked is told from it (Issue-352).
+   */
+  async reload(): Promise<void> {
     await this.me.refetch().catch(() => undefined);
   }
 }

@@ -29,11 +29,11 @@ const ACCESS = {
   },
   "any signed-in player": {
     Query: ["adventure", "heroesSeenAt", "me", "recentAdventuresAt", "replaysOf"],
-    Adventure: ["id", "job", "location", "result", "seed", "settledAt", "snapshot", "startedAt", "status", "timeline", "version"],
-    AdventureResult: ["credited", "endedAtMs", "heroes", "lost", "outcome", "reachedStage", "rewards", "stages"],
+    Adventure: ["caravan", "id", "job", "location", "result", "seed", "settledAt", "snapshot", "startedAt", "status", "timeline", "version"],
+    AdventureResult: ["credited", "delivered", "deliveryLost", "endedAtMs", "heroes", "lost", "outcome", "reachedStage", "rewards", "stages", "unlocks"],
+    Caravan: ["cargo", "destination", "staying"],
     HeroOutcome: ["dead", "health", "heroId", "level", "xp", "xpGained"],
     Job: ["description", "facility", "id", "location", "name"],
-    GatherRating: ["material", "rating"],
     RecentAdventure: ["credited", "id", "job", "outcome", "party", "settledAt", "stages"],
     RecentAdventureHero: ["died", "level", "name", "spriteSet", "unitType"],
     Reward: ["amount", "material"],
@@ -41,10 +41,11 @@ const ACCESS = {
     Snapshot: ["heroes", "jobId", "version"],
     SnapshotHero: ["heroId", "level", "name", "spriteSet", "stats", "unitType"],
     StageResult: ["ended", "endedAtMs", "kind", "stage", "startedAtMs"],
-    UnitStats: ["damage", "gather", "maxHealth", "speed"],
+    TraitLevel: ["level", "trait"],
+    UnitStats: ["damage", "maxHealth", "speed", "traits"],
   },
   "only the owner": {
-    Player: ["camps", "heroes", "name", "openAdventure"],
+    Player: ["camps", "heroes", "name", "openAdventure", "unlocks"],
   },
 } satisfies Record<string, Record<string, readonly string[]>>;
 

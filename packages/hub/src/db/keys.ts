@@ -15,14 +15,20 @@
  *   PLAYER#<id>    | AT#<location>#FACILITY#<kind>     a facility the camp builds, and its level; the hall's and the
  *                                                       warehouse's levels are on the camp's item (decision 0032)
  *   PLAYER#<id>    | AT#<location>#HOLDING#<material>  a resource balance at that location
- *   PLAYER#<id>    | HERO#<heroId>                    a hero, its location an attribute, since a hero can move, and
- *                                                       adventureId while it is on the open adventure
+ *   PLAYER#<id>    | HERO#<heroId>                    a hero, its location an attribute, since a caravan moves it,
+ *                                                       recruitedIn, where it was recruited, which nothing changes,
+ *                                                       and adventureId while it is on the open adventure
  *   PLAYER#<id>    | OPEN                              the one open adventure: its id, seed and start time
+ *   PLAYER#<id>    | UNLOCK#<unlock>                   an unlock the player holds: when it was earned and the adventure
+ *                                                       that earned it; written once, never deleted, no TTL (decision 0059)
  *   PLAYER#<id>    | LEDGER#<causeId>#<entry>          append-only; the cause is an adventure id, a hero id or a
  *                                                       build-<location>-<kind>-<level>, and the entry can exist
- *                                                       once, which is what makes settle pay and a build charge once
+ *                                                       once, which is what makes settle pay and a build charge once;
+ *                                                       an adventure's entries are credit#<material> at its location,
+ *                                                       and a caravan's load#, deliver# and return#<material>
+ *                                                       (decision 0059)
  *
- * The keys and their reasons are decision 0026. The spike's HOLDING#<material>
+ * The keys and their reasons are decision 0026; an unlock's are decision 0059. The spike's HOLDING#<material>
  * items in dev and prod are no longer read and are left in place.
  *
  * The location table, partitioned by location, and by adventure for the one
@@ -31,7 +37,8 @@
  * scope (decision 0043).
  *
  *   ADVENTURE#<id> | RECORD                         status, the player's id, seed, location, job, the frozen snapshot,
- *                                                   the version that issued it, start time; at settlement the result
+ *                                                   the version that issued it, start time, a caravan's destination,
+ *                                                   cargo and heroes who stay; at settlement the result
  *   LOCATION#<id>  | SEEN#<heroId>                  a hero seen there: public fields only, no owner, and
  *                                                   expiresAt, the table's TTL attribute (decision 0029)
  *   LOCATION#<id>  | DONE#<settledAt>#<adventureId> an adventure completed there: public fields only, no owner, and
@@ -63,6 +70,7 @@ export const TEMPLATES = {
   holding: "AT#${location}#HOLDING#${material}",
   hero: "HERO#${id}",
   open: "OPEN",
+  unlock: "UNLOCK#${unlock}",
   ledger: "LEDGER#${cause}#${entry}",
   adventurePk: "ADVENTURE#${adventureId}",
   adventure: "RECORD",

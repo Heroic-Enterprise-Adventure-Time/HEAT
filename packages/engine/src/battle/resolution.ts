@@ -9,22 +9,31 @@
  * conditions. A unit's list is walked in order and the first usable ability
  * wins.
  *
- * Resource nodes come last, and a node the actor would waste last of all
- * (decision 0051). The list is walked twice: first with regular attacks aimed
- * at units only, gather abilities at the nodes of their material the actor
- * has a gather rating for, and guard and move up as they are; then, only if
- * nothing was usable, with regular attacks aimed at resource nodes, those the
- * actor has a rating for before those it has none for, and gather abilities
- * at the nodes of their material whatever the rating. So a unit with no
- * rating for a node hits it only when nothing else is in reach.
+ * A regular attack is aimed at a resource node last (decisions 0051 and
+ * 0058). The list is walked twice: first with regular attacks aimed at units
+ * only, gather abilities at the nodes of their kind, and guard and move up as
+ * they are; then, only if nothing was usable, with regular attacks aimed at
+ * resource nodes. So a strike or a shot hits a node only when nothing else is
+ * in reach, and chop and mine work the nodes of their kind in their place in
+ * the list. Nothing here reads a unit's gathering traits: a hit gathers
+ * nothing, and who hit a node does not matter to what it drops.
+ *
+ * A node is worked only when nothing else is in the gather ability's reach
+ * (Issue-341, amending decisions 0051 and 0058): with a monster on a line a
+ * chop reaches, the chop has no target, in the list and forced alike. It is
+ * the same rule from the node's side. A hit gathers nothing, so working a
+ * node while something bites only costs the unit the blows it takes: a
+ * lumberjack, whose list chops before it strikes, turned its back on a wolf
+ * beside its tree and died of it on every seed, and one forced chop lost a
+ * lone villager the first job.
  */
 
 import type { AbilityDefinition } from "./ability.js";
 import type { SeededRng } from "./rng.js";
 import type { ActionContext, ActionSelection, UnitState } from "./state.js";
-import { gatherRating, type Line, lineAhead, lineIndex } from "./unit.js";
+import { type Line, lineAhead, lineIndex } from "./unit.js";
 
-/** The first walk of the list, or the second, which aims regular attacks at resource nodes and lets a hit waste one. */
+/** The first walk of the list, or the second, which aims regular attacks at resource nodes. */
 export type SelectionPass = "units" | "resources";
 
 /**
@@ -41,11 +50,6 @@ export function getReachableLines(ability: AbilityDefinition, actorLine: Line): 
 
 function belowHalf(unit: UnitState): boolean {
   return unit.health * 2 < unit.stats.maxHealth;
-}
-
-/** Whether the actor harvests anything from the node: it has a gather rating for the node's material. */
-function harvests(actor: UnitState, node: UnitState): boolean {
-  return node.node !== undefined && gatherRating(actor.stats, node.node.material) > 0;
 }
 
 function holdsGuard(actor: UnitState, clock: number): boolean {
@@ -79,13 +83,14 @@ export function targetCandidates(
 
   switch (effect.kind) {
     case "damage": {
-      if (pass === "units") return pool.filter((u) => u.kind !== "resource");
-      const nodes = pool.filter((u) => u.kind === "resource");
-      const rated = nodes.filter((u) => harvests(actor, u));
-      return rated.length > 0 ? rated : nodes;
+      // An ability aimed at the cart reaches nothing else (decision 0059).
+      const aimed = targeting.selection === "cart" ? pool.filter((u) => u.kind === "cart") : pool;
+      return aimed.filter((u) => (u.kind === "resource") === (pass === "resources"));
     }
     case "gather":
-      return pool.filter((u) => u.node?.material === effect.material && harvests(actor, u) === (pass === "units"));
+      // Nothing but nodes in reach, or the node waits.
+      if (pass !== "units" || pool.some((u) => u.kind !== "resource")) return [];
+      return pool.filter((u) => u.drops.some((drop) => drop.trait === effect.trait));
     case "guard":
       if (pass !== "units" || holdsGuard(actor, clock)) return [];
       return pool.filter((u) => u.kind !== "resource" && belowHalf(u));
@@ -117,6 +122,8 @@ export function pickTarget(ability: AbilityDefinition, candidates: readonly Unit
         return u.health;
       case "below-half":
         return u.health / u.stats.maxHealth;
+      case "cart":
+        return 0;
     }
   };
   const best = Math.min(...candidates.map(score));

@@ -9,6 +9,7 @@ import { must, UNIT_PROFILES } from '@heat/engine';
 import { type AdventureResultView, type AdventureView, Game, type HeroView, overrideInput, type PlayerView, type SeenHeroView } from './game';
 import possibleTypes from './graphql/generated/possible-types';
 import { Session, type SessionUser } from './session';
+import { withHighcrag } from './testing/with-highcrag';
 
 /** The cache as the application builds it: with the schema's unions and interfaces, so `... on Error` is matched (app.config.ts). */
 const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCache(possibleTypes) });
@@ -22,16 +23,17 @@ const cache = () => ({ provide: APOLLO_TESTING_CACHE, useValue: new InMemoryCach
  */
 const wireHero = (hero: HeroView) => ({ __typename: 'Hero', ...hero, unitType: constantCase(hero.unitType) });
 const wireSeen = (hero: SeenHeroView) => ({ __typename: 'SeenHero', ...hero, unitType: constantCase(hero.unitType) });
-const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number; rating?: number }[]) =>
+const wireAmounts = (typename: string, amounts: readonly { material: string; amount?: number; balance?: number }[]) =>
   amounts.map((a) => ({ __typename: typename, ...a, material: constantCase(a.material) }));
 const wireAdventure = (a: AdventureView) => ({
   __typename: 'Adventure',
   ...a,
+  caravan: a.caravan && { __typename: 'Caravan', ...a.caravan, cargo: wireAmounts('Reward', a.caravan.cargo) },
   job: { __typename: 'Job', ...a.job },
   snapshot: {
     __typename: 'Snapshot',
     ...a.snapshot,
-    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, gather: wireAmounts('GatherRating', h.stats.gather) } })),
+    heroes: a.snapshot.heroes.map((h) => ({ __typename: 'SnapshotHero', ...h, unitType: constantCase(h.unitType), stats: { __typename: 'UnitStats', ...h.stats, traits: h.stats.traits.map((t) => ({ __typename: 'TraitLevel', ...t, trait: constantCase(t.trait) })) } })),
   },
 });
 const wirePlayer = (p: PlayerView) => ({
@@ -45,6 +47,7 @@ const wirePlayer = (p: PlayerView) => ({
   })),
   heroes: p.heroes.map(wireHero),
   openAdventure: p.openAdventure && wireAdventure(p.openAdventure),
+  unlocks: p.unlocks.map((held) => ({ __typename: 'EarnedUnlock', ...held, unlock: constantCase(held.unlock) })),
 });
 const wireResult = (r: AdventureResultView) => ({
   __typename: 'AdventureResult',
@@ -54,6 +57,8 @@ const wireResult = (r: AdventureResultView) => ({
   rewards: wireAmounts('Reward', r.rewards),
   credited: wireAmounts('Reward', r.credited),
   lost: wireAmounts('Reward', r.lost),
+  delivered: wireAmounts('Reward', r.delivered),
+  deliveryLost: wireAmounts('Reward', r.deliveryLost),
 });
 
 const villager: HeroView = {
@@ -80,8 +85,12 @@ function playerWith(
     camps: [{ location: 'millbrook', name: 'Millbrook', hallLevel: 1, heroCapacity: 4, activeHeroes, livingHeroes, holdings, resourceCapacity: 100, warehouseLevel: 1, facilities: [{ kind: 'heroes-hall', level: 1 }] }],
     heroes,
     openAdventure: null,
+    unlocks: [],
   };
 }
+
+/** The player once the road is open, with these heroes at Millbrook (`withHighcrag`). */
+const playerWithHighcrag = (heroes: HeroView[] = []): PlayerView => withHighcrag(playerWith(heroes));
 
 const moss: SeenHeroView = { id: 's1', name: 'Moss', unitType: 'villager', spriteSet: 'villager-07', level: 2 };
 
@@ -107,7 +116,9 @@ function fakeHub(start: PlayerView) {
     if (op === 'JoinGame') return { joinGame: { __typename: 'JoinGameSuccess', player: { __typename: 'Player', id: player.id } } };
     if (op === 'HeroesSeenAt') return { heroesSeenAt: variables['location'] === 'millbrook' ? [wireSeen(moss)] : [] };
     if (op === 'RecruitHero') {
-      const { unitType, requestId } = variables['input'] as { unitType: string; requestId: string };
+      const { location, unitType, requestId } = variables['input'] as { location: string; unitType: string; requestId: string };
+      // A camp elsewhere is empty and holds nothing, as Highcrag's is until a caravan reaches it: the hub refuses for the cost.
+      if (location !== 'millbrook') return { recruitHero: { __typename: 'InsufficientResources', message: `the camp at ${location} cannot pay` } };
       // The hub's price, on the fake's holdings: a villager is free with no hero alive, 20 timber otherwise.
       const camp = must(player.camps[0], 'the camp');
       const timber = camp.holdings.find((h) => h.material === 'timber')?.balance ?? 0;
@@ -130,7 +141,14 @@ function fakeHub(start: PlayerView) {
     }
     if (op === 'StartAdventure') {
       if (player.openAdventure) return { startAdventure: { __typename: 'AdventureOpen', message: 'an adventure is already open', adventureId: player.openAdventure.id } };
-      const { requestId, location, jobId, heroIds } = variables['input'] as { requestId: string; location: string; jobId: string; heroIds: string[] };
+      const { requestId, location, jobId, heroIds, cargo, staying } = variables['input'] as {
+        requestId: string;
+        location: string;
+        jobId: string;
+        heroIds: string[];
+        cargo: { material: string; amount: number }[];
+        staying: string[];
+      };
       const heroes = player.heroes.filter((h) => heroIds.includes(h.id));
       const adventure: AdventureView = {
         id: requestId,
@@ -138,6 +156,8 @@ function fakeHub(start: PlayerView) {
         location,
         seed: 's1',
         version: 'v1',
+        // The one job that delivers, as the hub answers its caravan; any other job has none.
+        caravan: jobId === 'caravan-to-highcrag' ? { destination: 'highcrag', cargo: cargo.map((c) => ({ ...c, material: c.material.toLowerCase() })), staying } : null,
         job: { id: jobId, name: 'Wolves on the mill road', description: 'Two wolves.' },
         snapshot: {
           version: 'v1',
@@ -147,6 +167,10 @@ function fakeHub(start: PlayerView) {
       };
       player = { ...player, openAdventure: adventure };
       return { startAdventure: { __typename: 'StartAdventureSuccess', adventure: wireAdventure(adventure) } };
+    }
+    if (op === 'BuildFacility') {
+      const { location } = variables['input'] as { location: string };
+      return { buildFacility: { __typename: 'BuildFacilitySuccess', camp: { __typename: 'Camp', location } } };
     }
     if (op === 'Me') return { me: wirePlayer(player) };
     throw new Error(`the fake hub does not answer ${op}`);
@@ -231,6 +255,43 @@ describe('Game', () => {
     expect(game.camp()?.holdings).toMatchObject([{ material: 'gold', balance: 1 }]);
   });
 
+  it("reads the player's unlocks back as the engine's own, each with the adventure that first earned it, and a camp for each location the hub answers", async () => {
+    const { game, run } = setup(playerWithHighcrag());
+    await run();
+    expect(game.player()?.unlocks).toMatchObject([{ unlock: 'road-to-highcrag', adventureId: 'a0' }]);
+    expect(game.player()?.camps.map((c) => c.location)).toEqual(['millbrook', 'highcrag']);
+  });
+
+  it('offers no hero for nothing at Highcrag, where Millbrook offers the free villager: each recruit there at its cost with nobody alive', async () => {
+    const { game, run } = setup(playerWithHighcrag());
+    await run();
+    expect(game.noFreeRecruit()).toBe(false);
+    expect(game.recruits()[0]).toEqual({ unitType: 'villager', cost: [], reason: null });
+
+    game.location.set('highcrag');
+    expect(game.camp()?.name).toBe('Highcrag');
+    expect(game.noFreeRecruit()).toBe(true);
+    expect(game.recruits()).toEqual([
+      { unitType: 'miner', cost: [{ material: 'ore', amount: 30, balance: 0 }, { material: 'timber', amount: 20, balance: 0 }], reason: 'Not enough ore or timber.' },
+      { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
+      { unitType: 'knight', cost: [{ material: 'ore', amount: 50, balance: 0 }, { material: 'hide', amount: 4, balance: 0 }], reason: 'Not enough ore or hide.' },
+    ]);
+  });
+
+  it("recruits and builds at the camp on screen: at Highcrag each names Highcrag, and the hub's refusal for want of resources is thrown for the hall to show (Issue-352)", async () => {
+    const { hub, game, run } = setup(playerWithHighcrag([villager]));
+    await run();
+    game.location.set('highcrag');
+    // The villager is Millbrook's: nobody is at Highcrag.
+    expect(game.heroesHere()).toEqual([]);
+
+    await expect(run(game.recruit('fighter'))).rejects.toMatchObject({ kind: 'InsufficientResources' });
+    await run(game.build('warehouse', 2));
+    const sent = (op: string) => hub.calls.find((c) => c.op === op)?.variables['input'];
+    expect(sent('RecruitHero')).toMatchObject({ location: 'highcrag', unitType: 'FIGHTER' });
+    expect(sent('BuildFacility')).toEqual({ location: 'highcrag', kind: 'WAREHOUSE', level: 2 });
+  });
+
   it("reads the heroes seen at the camp's location after sign-in and again when the camp changes, not after a recruit", async () => {
     const { hub, game, run } = setup(playerWith([]));
     await run(() => game.seenHere().length > 0);
@@ -268,7 +329,9 @@ describe('Game', () => {
 
     const hero = must(await run(game.recruit('villager')), 'the hero');
     const recruit = hub.calls.find((c) => c.op === 'RecruitHero');
-    const sent = recruit?.variables['input'] as { unitType: string; requestId: string };
+    const sent = recruit?.variables['input'] as { location: string; unitType: string; requestId: string };
+    // The camp on screen, which the hub recruits at (Issue-351).
+    expect(sent.location).toBe(game.location());
     expect(sent.unitType).toBe('VILLAGER');
     expect(sent.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(hero.id).toBe(sent.requestId);
@@ -319,12 +382,26 @@ describe('Game', () => {
 
     const adventure = must(await run(game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id])), 'the adventure');
     const sent = hub.calls.find((c) => c.op === 'StartAdventure')?.variables['input'] as { requestId: string };
-    expect(sent).toEqual({ requestId: expect.any(String) as string, location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: [villager.id] });
+    expect(sent).toEqual({ requestId: expect.any(String) as string, location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: [villager.id], cargo: [], staying: [] });
     // The client names the request, and the hub makes it the adventure's id.
     expect(sent.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(adventure.id).toBe(sent.requestId);
     expect(adventure.snapshot.heroes.map((h) => h.name)).toEqual(['Wren']);
     expect(game.adventure()?.job.name).toBe('Wolves on the mill road');
+  });
+
+  it('starts a caravan with its cargo on the wire and who stays, and knows who is on the way to the destination (Issue-355)', async () => {
+    const { hub, game, run } = setup(playerWith([villager]));
+    await run();
+    await run(game.startAdventure('millbrook', 'caravan-to-highcrag', [villager.id], { cargo: [{ material: 'timber', amount: 60 }], staying: [villager.id] }));
+    const sent = hub.calls.find((c) => c.op === 'StartAdventure')?.variables['input'] as Record<string, unknown>;
+    expect(sent['cargo']).toEqual([{ material: 'TIMBER', amount: 60 }]);
+    expect(sent['staying']).toEqual([villager.id]);
+    expect(game.adventure()?.caravan).toMatchObject({ destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: [villager.id] });
+    // The hero holds a slot at Highcrag, and is on the way there, not to the camp it left.
+    expect(game.onTheWay()).toEqual([]);
+    game.location.set('highcrag');
+    expect(game.onTheWay().map((h) => h.id)).toEqual([villager.id]);
   });
 
   it("throws a start's refusal, named by its type, and reads the player again", async () => {
@@ -346,6 +423,25 @@ describe('Game', () => {
     expect(game.heroesHere().map((h) => h.status)).toEqual(['ALIVE']);
   });
 
+  it('keeps the player it holds when a later read of it fails, and says why: a tab the hub has refused can still be told it is outdated', async () => {
+    const { controller, game, run, hub } = setup(playerWith([]));
+    await run();
+    const work = game.recruit('villager');
+    for (let i = 0; i < 50; i++) {
+      TestBed.tick();
+      for (const operation of controller.match(() => true)) {
+        const call = callOf(operation);
+        if (call.op === 'Me') operation.networkError(new Error('the hub answered 400'));
+        else operation.flush({ data: hub.answer(call) });
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    await work;
+    expect(game.error()).toBe('the hub answered 400');
+    // The player as last read, before the recruit: the page keeps what it showed.
+    expect(game.player()).toMatchObject({ id: 'p1', heroes: [] });
+  });
+
   it('says why the player could not be read when the join fails, and loads nothing', async () => {
     const { controller, game } = setup(playerWith([]));
     TestBed.tick();
@@ -365,6 +461,7 @@ const open: AdventureView = {
   location: 'millbrook',
   seed: 's1',
   version: 'v1',
+  caravan: null,
   job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves.' },
   snapshot: { version: 'v1', jobId: 'wolves-on-the-mill-road', heroes: [] },
 };
@@ -375,6 +472,8 @@ const settledResult: AdventureResultView = {
   rewards: [{ material: 'cloth', amount: 10 }],
   credited: [{ material: 'cloth', amount: 10 }],
   lost: [],
+  delivered: [],
+  deliveryLost: [],
   heroes: [{ heroId: 'h1', xpGained: 20, xp: 20, level: 2, dead: false }],
 };
 

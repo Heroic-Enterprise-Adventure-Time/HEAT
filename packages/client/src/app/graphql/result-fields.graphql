@@ -4,6 +4,14 @@ fragment ResultFields on AdventureResult {
     amount
     material
   }
+  delivered {
+    amount
+    material
+  }
+  deliveryLost {
+    amount
+    material
+  }
   heroes {
     dead
     heroId

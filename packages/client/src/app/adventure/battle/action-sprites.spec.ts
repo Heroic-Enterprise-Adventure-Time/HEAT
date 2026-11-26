@@ -2,7 +2,23 @@ import { describe, expect, it } from 'vitest';
 
 import { must } from '@heat/engine';
 
-import { effectFrameAt, effectLayout, type EffectManifest, flightAt, flightPoint, heldFrame, projectileAt, projectileLayout, releaseMs, type Thrower } from './action-sprites';
+import {
+  effectFrameAt,
+  effectLayout,
+  type EffectManifest,
+  effectMs,
+  flightMs,
+  flightPoint,
+  flyingAt,
+  followFrame,
+  followMs,
+  heldPoint,
+  leadFrame,
+  nockedAt,
+  projectileLayout,
+  releaseMs,
+  type Thrower,
+} from './action-sprites';
 
 const manifest: EffectManifest = {
   frame_ms: 71,
@@ -56,32 +72,54 @@ describe('effectFrameAt', () => {
     expect(effectFrameAt(layout, 71 * 5)).toBe(4);
     expect(effectFrameAt(layout, 71 * 6)).toBeNull();
   });
+
+  it('lasts from the resolve to the end of its last frame, the wait included', () => {
+    expect(effectMs(layout)).toBe(71 * 6);
+    expect(effectFrameAt(layout, effectMs(layout) - 1)).toBe(4);
+    expect(effectFrameAt(layout, effectMs(layout))).toBeNull();
+  });
 });
 
-describe('heldFrame', () => {
-  const act = { from: 1000, resolve: 1300 };
-
-  it('plays up to the hold frame and holds it until the action resolves', () => {
-    expect(heldFrame(1000, act, 2, 5, 90)).toBe(0);
-    expect(heldFrame(1090, act, 2, 5, 90)).toBe(1);
-    expect(heldFrame(1180, act, 2, 5, 90)).toBe(2);
-    expect(heldFrame(1299, act, 2, 5, 90)).toBe(2);
+describe('an act up to its blow', () => {
+  it('plays the frames before its hold frame from the moment it begins, then waits on it', () => {
+    expect(leadFrame(0, 2, 5, 90)).toBe(0);
+    expect(leadFrame(90, 2, 5, 90)).toBe(1);
+    expect(leadFrame(180, 2, 5, 90)).toBe(2);
+    expect(leadFrame(299, 2, 5, 90)).toBe(2);
   });
 
-  it('plays the rest after it resolves, then is over', () => {
-    expect(heldFrame(1300, act, 2, 5, 90)).toBe(3);
-    expect(heldFrame(1390, act, 2, 5, 90)).toBe(4);
-    expect(heldFrame(1480, act, 2, 5, 90)).toBeNull();
+  it('keeps an actor and its weapon on their own hold frames until both are there', () => {
+    // A three-frame act held on 1 reaches its blow at 90 ms and a five-frame swing held on 2 at 180 ms: the act waits for the swing.
+    expect(releaseMs(1, 90)).toBe(90);
+    expect(releaseMs(2, 90)).toBe(180);
+    expect(leadFrame(100, 1, 3, 90)).toBe(1);
+    expect(leadFrame(100, 2, 5, 90)).toBe(1);
+    expect(leadFrame(180, 1, 3, 90)).toBe(1);
+    expect(leadFrame(180, 2, 5, 90)).toBe(2);
   });
 
-  it('keeps an actor and its weapon on their own hold frames through the same act', () => {
-    // A three-frame act held on 1 and a five-frame swing held on 2 are both at their blow while the action warms up.
-    expect(heldFrame(1250, act, 1, 3, 90)).toBe(1);
-    expect(heldFrame(1250, act, 2, 5, 90)).toBe(2);
+  it('shows nothing for a hold frame the clip does not have', () => {
+    expect(leadFrame(500, 3, 3, 90)).toBeNull();
+  });
+});
+
+describe('an act after its blow', () => {
+  it('plays the frames after its hold frame from that moment, one a frame length, and is then over', () => {
+    expect(followFrame(0, 2, 5, 90)).toBe(3);
+    expect(followFrame(89, 2, 5, 90)).toBe(3);
+    expect(followFrame(90, 2, 5, 90)).toBe(4);
+    expect(followFrame(180, 2, 5, 90)).toBeNull();
   });
 
-  it('skips the hold of an action that resolves as it is declared', () => {
-    expect(heldFrame(1000, { from: 1000, resolve: 1000 }, 1, 3, 90)).toBe(2);
+  it('lasts as long as those frames, which the clock waits for with the frames before the blow', () => {
+    expect(followMs(2, 5, 90)).toBe(180);
+    expect(followFrame(followMs(2, 5, 90) - 1, 2, 5, 90)).toBe(4);
+    expect(followFrame(followMs(2, 5, 90), 2, 5, 90)).toBeNull();
+  });
+
+  it('is nothing for an act that ends on its hold frame', () => {
+    expect(followMs(4, 5, 90)).toBe(0);
+    expect(followFrame(0, 4, 5, 90)).toBeNull();
   });
 });
 
@@ -120,6 +158,8 @@ describe('an effect with a projectile', () => {
     expect(layout.offset).toEqual({ x: -18, y: -31 });
     expect(layout.delayFrames).toBe(0);
     expect(effectFrameAt(layout, 0)).toBe(0);
+    // Its length is the impact's alone: the flight before it is waited for on its own.
+    expect(effectMs(layout)).toBe(83 * 5);
   });
 
   it('cuts its projectile, lands its middle where the pack\'s own path ends, and keeps the arc of that path', () => {
@@ -138,21 +178,21 @@ describe('an effect with a projectile', () => {
   });
 });
 
-describe('a weapon whose frames differ in length', () => {
-  const act = { from: 1000, resolve: 1700 };
-  // The bow: four frames of draw, two quick ones of release, held on the seventh.
+describe('a bow, whose frames differ in length', () => {
+  // The bow as its provenance records it: four frames of draw, two quick ones of release, and the hold on the seventh, at rest.
   const lead = [90, 90, 90, 90, 45, 45];
 
-  it('plays each frame before the hold for its own length', () => {
-    expect(heldFrame(1359, act, 6, 7, 90, lead)).toBe(3);
-    expect(heldFrame(1360, act, 6, 7, 90, lead)).toBe(4);
-    expect(heldFrame(1405, act, 6, 7, 90, lead)).toBe(5);
-    expect(heldFrame(1450, act, 6, 7, 90, lead)).toBe(6);
-    expect(heldFrame(1699, act, 6, 7, 90, lead)).toBe(6);
-    expect(heldFrame(1700, act, 6, 7, 90, lead)).toBeNull();
+  it('plays each frame before the hold for its own length, and comes to rest on it', () => {
+    expect(leadFrame(359, 6, 7, 90, lead)).toBe(3);
+    expect(leadFrame(360, 6, 7, 90, lead)).toBe(4);
+    expect(leadFrame(405, 6, 7, 90, lead)).toBe(5);
+    expect(leadFrame(450, 6, 7, 90, lead)).toBe(6);
+    expect(leadFrame(699, 6, 7, 90, lead)).toBe(6);
+    // Nothing after the hold frame: the bow is put away as its wielder's act ends.
+    expect(followFrame(0, 6, 7, 90)).toBeNull();
   });
 
-  it('reaches its hold frame after the frames before it', () => {
+  it('lets the arrow go as it reaches its hold frame, after the frames before it', () => {
     expect(releaseMs(6, 90, lead)).toBe(450);
     expect(releaseMs(3, 90)).toBe(270);
     expect(releaseMs(0, 90)).toBe(0);
@@ -160,18 +200,14 @@ describe('a weapon whose frames differ in length', () => {
 });
 
 describe('a projectile in flight', () => {
-  const act = { from: 1000, resolve: 1700 };
+  const layout = must(projectileLayout(thrown), 'the projectile clip');
+  const hand = { x: 10, y: -20 };
+  const target = { x: 300, y: 120 };
 
-  it('leaves at the release and lands as the action resolves', () => {
-    expect(flightAt(1449, act, 450)).toBeNull();
-    expect(flightAt(1450, act, 450)).toBe(0);
-    expect(flightAt(1575, act, 450)).toBe(0.5);
-    expect(flightAt(1700, act, 450)).toBeNull();
-  });
-
-  it('has no flight when the action resolves before the release', () => {
-    expect(flightAt(1100, { from: 1000, resolve: 1200 }, 450)).toBeNull();
-    expect(flightAt(1450, { from: 1000, resolve: 1200 }, 450)).toBeNull();
+  it('flies for what was left of the warmup after the wind-up, and not at all where the warmup is shorter', () => {
+    expect(flightMs(700, 450)).toBe(250);
+    expect(flightMs(600, 270)).toBe(330);
+    expect(flightMs(200, 450)).toBe(0);
   });
 
   it('flies straight with no arc, and rises in the middle with one, either way across the stage', () => {
@@ -181,53 +217,54 @@ describe('a projectile in flight', () => {
     expect(flightPoint({ x: 100, y: 50 }, { x: 200, y: 50 }, 0, 0.125)).toEqual({ x: 100, y: 50 });
     expect(flightPoint({ x: 100, y: 50 }, { x: 200, y: 50 }, 1, 0.125)).toEqual({ x: 200, y: 50 });
   });
-});
 
-describe('where a projectile is drawn', () => {
-  const layout = must(projectileLayout(thrown), 'the projectile clip');
-  const act = { from: 1000, resolve: 1700 };
-  const hand = { x: 10, y: -20 };
-  const target = { x: 300, y: 120 };
-
-  it('leaves a bare hand at the act\'s hold frame and lands, its middle on the path, where the pack drew it on the target', () => {
-    const goblin: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 3, weapon: null };
-    // Nothing in the hand before the release, at 270 ms.
-    expect(projectileAt(1269, act, 90, goblin, target, layout)).toBeNull();
+  it('leaves a bare hand and lands, its middle on the path, where the pack drew it on the target', () => {
+    const goblin: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, weapon: null };
+    const start = heldPoint(goblin, null);
+    expect(start).toEqual({ x: 110, y: 100, onString: false });
+    // Nothing in the hand before it is let go.
+    expect(nockedAt(goblin, 3)).toBeNull();
+    expect(flyingAt(-1, 330, start, 1, target, layout)).toBeNull();
     // Let go from the hand: the sprite's tail half its width behind its middle.
-    expect(projectileAt(1270, act, 90, goblin, target, layout)).toEqual({ x: 110 - 5, y: 100, frame: 0 });
+    expect(flyingAt(0, 330, start, 1, target, layout)).toEqual({ x: 110 - 5, y: 100, frame: 0 });
     // Just before it lands: its middle at the landing point, over the feet and 24 above.
-    const last = must(projectileAt(1699, act, 90, goblin, target, layout), 'the last point of the flight');
+    const last = must(flyingAt(329.5, 330, start, 1, target, layout), 'the last point of the flight');
     expect(last.x).toBeCloseTo(300 - 5, 0);
     expect(last.y).toBeCloseTo(96, 0);
-    expect(projectileAt(1700, act, 90, goblin, target, layout)).toBeNull();
+    expect(flyingAt(330, 330, start, 1, target, layout)).toBeNull();
+  });
+
+  it('has no flight to show where it flies for no time', () => {
+    expect(flyingAt(0, 0, { x: 110, y: 100 }, 1, target, layout)).toBeNull();
   });
 
   it('plays its own frames through the flight', () => {
-    const goblin: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 0, weapon: null };
-    expect(projectileAt(1000 + 83 * 2, act, 90, goblin, target, layout)?.frame).toBe(2);
-    expect(projectileAt(1000 + 83 * 6, act, 90, goblin, target, layout)?.frame).toBe(0);
+    const start = { x: 110, y: 100 };
+    expect(flyingAt(83 * 2, 700, start, 1, target, layout)?.frame).toBe(2);
+    expect(flyingAt(83 * 6, 700, start, 1, target, layout)?.frame).toBe(0);
   });
 
   it('is mirrored for the other side: let go to the left, its tail to the right', () => {
-    const goblin: Thrower = { feet: { x: 300, y: 120 }, facing: -1, hand, actHold: 3, weapon: null };
+    const goblin: Thrower = { feet: { x: 300, y: 120 }, facing: -1, hand, weapon: null };
     const hero = { x: 100, y: 120 };
-    expect(projectileAt(1270, act, 90, goblin, hero, layout)).toEqual({ x: 290 + 5, y: 100, frame: 0 });
-    expect(must(projectileAt(1699, act, 90, goblin, hero, layout), 'the last point of the flight').x).toBeCloseTo(100 + 5, 0);
+    const start = heldPoint(goblin, null);
+    expect(flyingAt(0, 330, start, -1, hero, layout)).toEqual({ x: 290 + 5, y: 100, frame: 0 });
+    expect(must(flyingAt(329.5, 330, start, -1, hero, layout), 'the last point of the flight').x).toBeCloseTo(100 + 5, 0);
   });
 
-  it('sits on a bow\'s string, its tail on the frame\'s nock, until the bow\'s hold frame, then flies', () => {
+  it("sits on a bow's string, its tail on the frame's nock, and leaves from the nock of the frame it is let go on", () => {
     const grips = [{ x: 20, y: 20 }, { x: 20, y: 20 }, { x: 20, y: 20 }];
     const nocks = [{ x: 18, y: 20 }, { x: 14, y: 21 }, { x: 18, y: 20 }];
-    const ranger: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 0, weapon: { holdFrame: 2, frames: 3, frameMs: [], grips, nocks } };
+    const ranger: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, weapon: { grips, nocks } };
     // The second frame, the string drawn 6 back and 1 down from the grip; the half pixel rounds down the screen.
-    expect(projectileAt(1100, act, 90, ranger, target, layout)).toEqual({ x: 110 - 6, y: Math.round(100 + 1 + 0.5), frame: 0 });
-    // The hold frame begins at 180 ms: off the string and into its flight.
-    expect(projectileAt(1180, act, 90, ranger, target, layout)).toEqual({ x: 110 - 2 - 5, y: Math.round(100.5), frame: 0 });
+    expect(nockedAt(ranger, 1)).toEqual({ x: 110 - 6, y: Math.round(100 + 1 + 0.5), frame: 0 });
+    // Let go on the third frame, the string 2 back: off the string and into its flight.
+    expect(flyingAt(0, 250, heldPoint(ranger, 2), 1, target, layout)).toEqual({ x: 110 - 2 - 5, y: Math.round(100.5), frame: 0 });
   });
 
-  it('shows nothing before the release for a weapon with no nock', () => {
-    const slinger: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, actHold: 0, weapon: { holdFrame: 2, frames: 3, frameMs: [], grips: [{ x: 0, y: 0 }], nocks: null } };
-    expect(projectileAt(1100, act, 90, slinger, target, layout)).toBeNull();
-    expect(projectileAt(1180, act, 90, slinger, target, layout)).not.toBeNull();
+  it('shows nothing on a weapon with no nock, and leaves from the hand', () => {
+    const slinger: Thrower = { feet: { x: 100, y: 120 }, facing: 1, hand, weapon: { grips: [{ x: 0, y: 0 }], nocks: null } };
+    expect(nockedAt(slinger, 0)).toBeNull();
+    expect(heldPoint(slinger, 0)).toEqual({ x: 110, y: 100, onString: false });
   });
 });

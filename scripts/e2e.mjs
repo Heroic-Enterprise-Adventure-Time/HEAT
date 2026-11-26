@@ -220,8 +220,23 @@ const campQuery = `{ me { camps { location livingHeroes activeHeroes } heroes { 
 const camp = await graphql(token, campQuery);
 const millbrook = camp.data?.me?.camps?.find((c) => c.location === "millbrook");
 check(!camp.errors && millbrook, `me shows the starting camp: ${JSON.stringify(millbrook)} (${camp.ms} ms)`);
+
+// Unlocks and the second location (Issue-351, decision 0059). The road's
+// unlock is granted by a job of Millbrook's caravan hub (Issue-352), and this
+// test's user never builds the hub: it builds the mine and nothing else, on a
+// sandbox stack and on dev alike. So it holds no unlock, has the starting
+// camp alone, and a recruit at Highcrag is refused as the client's defect, by
+// the read of the player's unlocks. What is behind the unlock, the job
+// settled, the camp it opens and a recruit there, is proven by the hub's
+// data-layer tests, and on a stack by hand, as a base test user whose camp
+// was played up to the hub (docs/process/development.md, rule 5).
+const unlocks = await graphql(token, `{ me { unlocks { unlock earnedAt adventureId } camps { location } } }`);
+check(!unlocks.errors && unlocks.data?.me?.unlocks?.length === 0, `me holds no unlock: ${JSON.stringify(unlocks.data?.me?.unlocks)} (${unlocks.ms} ms)`);
+check(unlocks.data.me.camps.map((c) => c.location).join() === "millbrook", `the starting camp is the player's only camp: ${JSON.stringify(unlocks.data.me.camps)}`);
+const lockedRecruit = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { location: "highcrag", unitType: FIGHTER, requestId: $id }) { __typename } }`, { id: crypto.randomUUID() });
+check(lockedRecruit.data?.recruitHero === null && lockedRecruit.errors?.[0]?.extensions?.code === "BAD_USER_INPUT", `a recruit at Highcrag, which the player has not unlocked, is BAD_USER_INPUT: ${JSON.stringify(lockedRecruit.errors?.[0]?.message)} (${lockedRecruit.ms} ms)`);
 const recruitFields = `__typename ... on Error { message } ... on InsufficientResources { short { material amount balance } } ... on RecruitHeroSuccess { hero { id unitType spriteSet name status } }`;
-const recruitMutation = `mutation($id: UUID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { ${recruitFields} } }`;
+const recruitMutation = `mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) { ${recruitFields} } }`;
 if (millbrook.livingHeroes === 0) {
   const requestId = crypto.randomUUID();
   const recruited = await graphql(token, recruitMutation, { id: requestId });
@@ -241,7 +256,7 @@ if (millbrook.livingHeroes === 0) {
 // failed between the ore and the fighter leaves the ore, and the next skips it.
 const oreAtStart = (await graphql(token, `{ me { camps { location holdings { material balance } } } }`)).data?.me?.camps?.find((c) => c.location === "millbrook")?.holdings?.find((h) => h.material === "ORE")?.balance ?? 0;
 if (oreAtStart < 40) {
-  const fighter = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
+  const fighter = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
   const refused = fighter.data?.recruitHero;
   check(!fighter.errors && refused?.__typename === "InsufficientResources" && refused.short?.[0]?.material === "ORE" && refused.short[0].amount === 40, `a fighter is refused for want of ore, as data: ${JSON.stringify(refused)} (${fighter.ms} ms)`);
 } else {
@@ -283,7 +298,7 @@ const start = await graphql(token, startMutation, { requestId: startId, heroIds:
 check(!start.errors && success(start, "startAdventure", "adventure")?.id, `startAdventure set out on the timber job: ${JSON.stringify(start.data)} (${start.ms} ms)`);
 const { id, seed } = success(start, "startAdventure", "adventure");
 
-const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gather { material rating } } } } } } }`);
+const open = await graphql(token, `{ me { openAdventure { id seed location version job { id name } snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage traits { trait level } } } } } } }`);
 const adventure = open.data?.me?.openAdventure;
 check(!open.errors && adventure?.id === id && adventure.seed === seed && adventure.job?.id === job, `me shows the open adventure: ${adventure?.job?.name} at ${adventure?.location} (${open.ms} ms)`);
 check(adventure.snapshot?.jobId === adventure.job.id && adventure.snapshot.heroes.length === 1 && adventure.snapshot.heroes[0].heroId === party.id && adventure.snapshot.heroes[0].unitType === "VILLAGER", `the snapshot holds the villager and the job: ${JSON.stringify(adventure.snapshot?.heroes)}`);
@@ -307,13 +322,13 @@ check(stale.extensions?.outdated === true, `a request carrying another version i
 // Submit with no overrides (Issue-114): the hub replays the run, stores the
 // timeline and settles. Its result must be the engine's own replay of the
 // snapshot and seed it issued, and the camp must hold what it credited.
-// The snapshot's unit types and materials are the schema's enum values; the engine replays it by its own.
+// The snapshot's unit types and gathering traits are the schema's enum values; the engine replays it by its own.
 const engineSnapshot = (snapshot) => ({
   ...snapshot,
   heroes: snapshot.heroes.map((h) => ({
     ...h,
     unitType: h.unitType.toLowerCase(),
-    stats: { ...h.stats, gather: h.stats.gather.map((g) => ({ ...g, material: g.material.toLowerCase() })) },
+    stats: { ...h.stats, traits: h.stats.traits.map((t) => ({ ...t, trait: t.trait.toLowerCase() })) },
   })),
 });
 const expected = replay(engineSnapshot(adventure.snapshot), seed, []).result;
@@ -325,7 +340,7 @@ check(result.outcome === "COMPLETE" && expected.outcome === "complete", `the hub
 
 const byMaterial = (a, b) => a.material.localeCompare(b.material);
 const sorted = (rewards) => JSON.stringify([...rewards].sort(byMaterial));
-check(sorted(engineRewards(result.rewards)) === sorted(expected.rewards), `the rewards are the job's pay and the cargo: ${sorted(result.rewards)}`);
+check(sorted(engineRewards(result.rewards)) === sorted(expected.rewards), `the rewards are the job's pay and what its trees dropped: ${sorted(result.rewards)}`);
 // The test user of dev keeps its warehouse between merges, so what the cap
 // turns away is part of the check rather than a failure.
 const added = (material) => [...result.credited, ...result.lost].filter((r) => r.material === material).reduce((n, r) => n + r.amount, 0);
@@ -400,7 +415,11 @@ check(success(dismissed, "retireHero", "hero")?.status === "RETIRED", `the paid 
 // Building (Issue-93): the mine costs one timber run, 60 timber and 3 cloth.
 // The test user keeps its camp from run to run, so a run that cannot pay yet
 // checks the refusal, the run that can builds it, and every run after checks
-// that a repeat charges nothing and that the mine has no second level here.
+// that a repeat charges nothing and that the mine's second level is refused
+// for want of stone, which only Highcrag has and the stack's own user never
+// reaches (Issue-357). A user run by hand, player1 or player2
+// (docs/process/development.md, rule 4), may hold stone or the second level
+// already, and that check is not made for it.
 const facilitiesQuery = `{ me { camps { location holdings { material balance } facilities { kind level } } } }`;
 const buildMutation = `mutation($level: PositiveInt!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename ... on Error { message } ... on BuildFacilitySuccess { camp { location holdings { material balance } facilities { kind level } } } } }`;
 const campIn = (me) => me?.camps?.find((c) => c.location === "millbrook");
@@ -424,16 +443,21 @@ if (mineLevel(campBefore) === 0 && (timberBefore < 60 || clothBefore < 3)) {
   const now = campIn((await graphql(token, facilitiesQuery)).data?.me);
   const repeat = await graphql(token, buildMutation, { level: 1 });
   check(!repeat.errors && JSON.stringify(success(repeat, "buildFacility", "camp")?.holdings) === JSON.stringify(now.holdings), `a repeat of the build answers the camp and charges nothing (${repeat.ms} ms)`);
-  const higher = await graphql(token, buildMutation, { level: 2 });
-  check(!higher.errors && higher.data?.buildFacility?.__typename === "MaxLevel", `the mine has no second level here (${higher.ms} ms)`);
+  if (mineLevel(now) >= 2 || stockOf(now, "STONE") >= 40) {
+    console.log(`the test user holds ${stockOf(now, "STONE")} stone and a level ${mineLevel(now)} mine; not checking the second level's refusal`);
+  } else {
+    const higher = await graphql(token, `mutation($level: PositiveInt!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename ... on InsufficientResources { short { material } } } }`, { level: 2 });
+    const shortOf = higher.data?.buildFacility?.short?.map((s) => s.material) ?? [];
+    check(!higher.errors && higher.data?.buildFacility?.__typename === "InsufficientResources" && shortOf.includes("STONE"), `the mine's second level is refused for want of stone: ${JSON.stringify(higher.data)} (${higher.ms} ms)`);
+  }
 }
 
 // The mine's first job (Issue-133): "Ore from the hill" is posted by the
 // mine, so it is refused while the camp has none; once the mine is built,
-// which is the second run on a new stack, the villager brings home 40 ore,
+// which is the second run on a new stack, the villager brings home 40 ore or more,
 // which pays for a fighter, retired at once so the hall never fills.
 const oreJob = "ore-from-the-hill";
-const snapshotFields = `snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage gather { material rating } } } }`;
+const snapshotFields = `snapshot { version jobId heroes { heroId unitType name spriteSet level stats { maxHealth speed damage traits { trait level } } } }`;
 const oreStartMutation = `mutation($requestId: UUID!, $heroIds: [ID!]!) { startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "${oreJob}", heroIds: $heroIds }) { ${startFields} ... on StartAdventureSuccess { adventure { id seed ${snapshotFields} } } } }`;
 const atMine = campIn((await graphql(token, facilitiesQuery)).data?.me);
 const miner = (await graphql(token, heroQuery)).data?.me?.heroes?.find((h) => h.status === "ALIVE" && h.location === "millbrook");
@@ -451,7 +475,7 @@ if (mineLevel(atMine) === 0) {
   check(!settled.errors && oreResult?.outcome === "COMPLETE" && sorted(engineRewards(oreResult.rewards)) === sorted(expectedOre.rewards), `the villager came home from the hill: ${sorted(oreResult?.rewards ?? [])} (${settled.ms} ms)`);
   const withOre = campIn((await graphql(token, facilitiesQuery)).data?.me);
   check(stockOf(withOre, "ORE") >= 40, `the camp holds ${stockOf(withOre, "ORE")} ore, enough for a fighter`);
-  const hired = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
+  const hired = await graphql(token, `mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: FIGHTER, requestId: $id }) { ${recruitFields} } }`, { id: crypto.randomUUID() });
   const fighter = success(hired, "recruitHero", "hero");
   check(!hired.errors && fighter?.unitType === "FIGHTER" && fighter.status === "ALIVE", `recruitHero sold a fighter for the ore: ${JSON.stringify(hired.data)} (${hired.ms} ms)`);
   const paidOre = campIn((await graphql(token, facilitiesQuery)).data?.me);

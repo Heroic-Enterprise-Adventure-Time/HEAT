@@ -1,15 +1,17 @@
 import { randomUUID } from "node:crypto";
 
 import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
-import type { APIGatewayProxyEventV2WithJWTAuthorizer, Context as LambdaContext } from "aws-lambda";
+import type { Context as LambdaContext } from "aws-lambda";
+import { constantCase } from "es-toolkit";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { MAX_PARTY, must } from "@heat/engine";
+import { CART_CAPACITY, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
-import { emptyResult, putRecentAdventure, putSettledAdventure, recentAdventure, settledAdventure } from "./data.js";
+import { emptyResult, putRecentAdventure, putSettledAdventure, putUnlock, recentAdventure, settledAdventure } from "./data.js";
+import { event, type Handler } from "./event.js";
 import { locationKeys } from "./keys.js";
 
 /**
@@ -23,11 +25,6 @@ import { locationKeys } from "./keys.js";
  * as the client does, a refusal being a member of the union and malformed
  * input a GraphQLError in `errors`.
  */
-type Handler = (event: APIGatewayProxyEventV2WithJWTAuthorizer, context: LambdaContext) => Promise<{
-  statusCode?: number;
-  body?: string;
-}>;
-
 let handler: Handler;
 let repo: Repository;
 
@@ -38,38 +35,6 @@ beforeAll(async () => {
   const config = configFromEnv();
   repo = new Repository(createDocumentClient(config), config.tables);
 });
-
-function event(
-  query: string,
-  variables: Record<string, unknown> = {},
-  playerId?: string,
-  headers: Record<string, string> = {},
-): APIGatewayProxyEventV2WithJWTAuthorizer {
-  return {
-    version: "2.0",
-    routeKey: "POST /graphql",
-    rawPath: "/graphql",
-    rawQueryString: "",
-    headers: { "content-type": "application/json", ...headers },
-    requestContext: {
-      accountId: "000000000000",
-      apiId: "local",
-      domainName: "localhost",
-      domainPrefix: "local",
-      http: { method: "POST", path: "/graphql", protocol: "HTTP/1.1", sourceIp: "127.0.0.1", userAgent: "vitest" },
-      requestId: randomUUID(),
-      routeKey: "POST /graphql",
-      stage: "$default",
-      time: new Date().toISOString(),
-      timeEpoch: Date.now(),
-      authorizer: playerId
-        ? { principalId: playerId, integrationLatency: 0, jwt: { claims: { sub: playerId }, scopes: [] } }
-        : (undefined as unknown as APIGatewayProxyEventV2WithJWTAuthorizer["requestContext"]["authorizer"]),
-    },
-    body: JSON.stringify({ query, variables }),
-    isBase64Encoded: false,
-  };
-}
 
 /** The handler's reply: the data the query selected, the errors, and the extensions. */
 interface Reply<T> {
@@ -98,8 +63,8 @@ async function gql(query: string, variables: Record<string, unknown> = {}, playe
 }
 
 /** A request Apollo refuses before executing it, which it answers with a 400 and the reason in `errors`. */
-async function invalid(query: string, variables: Record<string, unknown>, playerId: string): Promise<Reply<unknown>> {
-  const res = await handler(event(query, variables, playerId), {} as LambdaContext);
+async function invalid(query: string, variables: Record<string, unknown>, playerId: string, headers: Record<string, string> = {}): Promise<Reply<unknown>> {
+  const res = await handler(event(query, variables, playerId, headers), {} as LambdaContext);
   expect(res.statusCode).toBe(400);
   return JSON.parse(res.body ?? "{}") as Reply<unknown>;
 }
@@ -113,7 +78,7 @@ const START = `mutation($requestId: UUID!, $heroIds: [ID!]!) {
   }
 }` as Query<{ startAdventure: Result<"adventure", { id: string; seed: string }> }>;
 const RECRUIT = `mutation($id: UUID!) {
-  recruitHero(input: { unitType: VILLAGER, requestId: $id }) {
+  recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) {
     __typename
     ... on RecruitHeroSuccess { hero { id name unitType spriteSet status } }
     ... on Error { message }
@@ -298,6 +263,52 @@ describe("the camp through the graph", () => {
     expect(nowhere.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
   });
 
+  it("serves the unlocks a player holds to that player alone, with the camp one opens, and the unlocks a settled run earned to any signed-in player (decision 0059)", async () => {
+    const owner = `p-${randomUUID()}`;
+    const other = `p-${randomUUID()}`;
+    await gql(JOIN, {}, owner);
+    const mine = `{ me { unlocks { unlock earnedAt adventureId } camps { location name } } }` as Query<{ me: { unlocks: unknown[]; camps: unknown[] } }>;
+    const before = await gql(mine, {}, owner);
+    expect(before.errors).toBeUndefined();
+    expect(before.data?.me).toEqual({ unlocks: [], camps: [{ location: "millbrook", name: "Millbrook" }] });
+    // A location the player has not unlocked is not theirs to recruit at: the client's defect, not a refusal.
+    const HIGHCRAG = `mutation($id: UUID!) { recruitHero(input: { location: "highcrag", unitType: FIGHTER, requestId: $id }) { __typename } }` as Query<{ recruitHero: unknown }>;
+    const locked = await gql(HIGHCRAG, { id: randomUUID() }, owner);
+    expect(locked.data?.recruitHero).toBeNull();
+    expect(locked.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+
+    // As settlement leaves them: a settled record whose result lists the unlock, and the unlock's item naming that adventure.
+    const config = configFromEnv();
+    const db = createDocumentClient(config);
+    const unlock = must(UNLOCK_IDS[0], "an unlock of the content");
+    const earnedAt = "2026-11-24T12:00:00.000Z";
+    const record = await putSettledAdventure(
+      db,
+      config.tables.location,
+      settledAdventure("wolves-on-the-mill-road", new Date(earnedAt), { playerId: owner, result: { ...emptyResult("complete"), unlocks: [unlock] } }),
+    );
+    await putUnlock(db, config.tables.player, owner, unlock, { earnedAt, adventureId: record.adventureId });
+
+    const after = await gql(mine, {}, owner);
+    expect(after.errors).toBeUndefined();
+    // The engine's `road-to-highcrag` is the enum value ROAD_TO_HIGHCRAG on the wire (graphql.md, rule 4).
+    expect(after.data?.me.unlocks).toEqual([{ unlock: constantCase(unlock), earnedAt, adventureId: record.adventureId }]);
+    expect(after.data?.me.camps).toEqual([{ location: "millbrook", name: "Millbrook" }, { location: "highcrag", name: "Highcrag" }]);
+    // Now the recruit is read, and refused by a rule of the game: nothing is free at Highcrag.
+    const unlocked = await gql(HIGHCRAG, { id: randomUUID() }, owner);
+    expect(unlocked.data?.recruitHero).toEqual({ __typename: "InsufficientResources" });
+
+    const theirs = await gql(`query($id: ID!) { player(id: $id) { id unlocks { unlock } } }` as Query<{ player: { id: string; unlocks: unknown } }>, { id: owner }, other);
+    expect(theirs.data?.player).toEqual({ id: owner, unlocks: null });
+    expect(theirs.errors?.map((e) => [e.path, e.extensions?.["code"]])).toEqual([[["player", "unlocks"], "FORBIDDEN"]]);
+
+    // What the run earned is public, as its rewards are, and nothing in it says whose the run was or whether the unlock was new.
+    const run = await gql(`query($id: ID!) { adventure(id: $id) { id result { outcome unlocks } } }` as Query<{ adventure: unknown }>, { id: record.adventureId }, other);
+    expect(run.errors).toBeUndefined();
+    expect(run.data?.adventure).toEqual({ id: record.adventureId, result: { outcome: "COMPLETE", unlocks: [constantCase(unlock)] } });
+    expect(JSON.stringify(run)).not.toContain(owner);
+  });
+
   it("lists a job's replays, its settled adventures, to any signed-in player, and nothing of whose they were", async () => {
     // Settled far in the future, so that it is first whatever the other test files settle of the job meanwhile.
     const settledAt = "9999-01-01T00:00:00.000Z";
@@ -351,7 +362,7 @@ describe("the adventure loop through the graph", () => {
     const { id: adventureId, seed } = must(start.data?.startAdventure.adventure, "the start's adventure");
 
     const me = await gql(
-      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage gather { material rating } } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
+      `{ me { openAdventure { id seed location version job { id name location } snapshot { version jobId heroes { heroId unitType level stats { maxHealth speed damage traits { trait level } } } } } } }` as Query<{ me: { openAdventure: unknown } }>,
       {}, p,
     );
     expect(me.errors).toBeUndefined();
@@ -361,7 +372,7 @@ describe("the adventure loop through the graph", () => {
       job: { id: "wolves-on-the-mill-road", name: "Wolves on the mill road", location: "millbrook" },
       snapshot: {
         version, jobId: "wolves-on-the-mill-road",
-        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "TIMBER", rating: 2 }, { material: "ORE", rating: 2 }] } }],
+        heroes: [{ heroId: villager, unitType: "VILLAGER", level: 1, stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "WOODCUTTING", level: 1 }, { trait: "MINING", level: 1 }] } }],
       },
     });
 
@@ -402,11 +413,15 @@ describe("the adventure loop through the graph", () => {
     const p = `p-${randomUUID()}`;
     await gql(JOIN, {}, p);
     // A unit type outside the enum, and a mutation called with its old positional arguments.
-    const dragon = await invalid(`mutation($id: UUID!) { recruitHero(input: { unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
+    const dragon = await invalid(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
     expect(dragon.data).toBeUndefined();
     expect(dragon.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
     const positional = await invalid(`mutation { recruitHero(unitType: VILLAGER, requestId: "x") { __typename } }`, {}, p);
     expect(positional.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+    // A recruit that names no location, as a tab loaded before Issue-351 sends it.
+    const nowhere = await invalid(`mutation($id: UUID!) { recruitHero(input: { unitType: VILLAGER, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
+    expect(nowhere.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+    expect(await repo.heroes(p)).toEqual([]);
   });
 
   describe("every boundary of the contract", () => {
@@ -447,6 +462,25 @@ describe("the adventure loop through the graph", () => {
         [[id, id.toUpperCase()], "a hero is in the party twice"],
       ] as const) {
         const reply = await gql(START, { requestId: randomUUID(), heroIds }, p);
+        expect(code(reply)).toBe("BAD_USER_INPUT");
+        expect(message(reply)).toContain(words);
+      }
+      expect(await repo.openAdventure(p)).toBeUndefined();
+    });
+
+    it("refuses a cargo with a resource twice, beyond the largest cart, or a hero who stays twice", async () => {
+      const p = `p-${randomUUID()}`;
+      const id = randomUUID();
+      const largest = Math.max(...CART_CAPACITY);
+      const CARAVAN_START = `mutation($requestId: UUID!, $cargo: [CargoInput!]!, $staying: [ID!]!) {
+        startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "caravan-to-highcrag", heroIds: ["${id}"], cargo: $cargo, staying: $staying }) { __typename }
+      }` as Query<{ startAdventure: { __typename: string } }>;
+      for (const [cargo, staying, words] of [
+        [[{ material: "ORE", amount: 1 }, { material: "ORE", amount: 1 }], [], "a resource is in the cargo twice"],
+        [[{ material: "ORE", amount: largest }, { material: "TIMBER", amount: 1 }], [], `a cart carries at most ${largest} in all`],
+        [[], [id, id.toUpperCase()], "a hero stays twice"],
+      ] as const) {
+        const reply = await gql(CARAVAN_START, { requestId: randomUUID(), cargo, staying }, p);
         expect(code(reply)).toBe("BAD_USER_INPUT");
         expect(message(reply)).toContain(words);
       }
@@ -516,5 +550,30 @@ describe("the deploy's version", () => {
     const refused = await gql(START, { requestId: randomUUID(), heroIds: [] }, p, { "heat-version": "0".repeat(40) });
     expect(refused.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
     expect(refused.extensions?.["outdated"]).toBe(true);
+  });
+
+  it("flags outdated on a document refused at validation, which is how a tab loaded before a field was dropped hears of the deploy", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(JOIN, {}, p);
+    // `gather` was UnitStats' field until Issue-339; a client of that deploy still asks for it.
+    const dropped = `{ me { openAdventure { snapshot { heroes { stats { gather { material rating } } } } } } }`;
+    const stale = await invalid(dropped, {}, p, { "heat-version": "0".repeat(40) });
+    expect(stale.errors?.[0]?.extensions?.["code"]).toBe("GRAPHQL_VALIDATION_FAILED");
+    expect(stale.extensions?.["outdated"]).toBe(true);
+    // The deploy's own client is refused the same document and is not told to reload.
+    const current = await invalid(dropped, {}, p, { "heat-version": must(process.env["HEAT_VERSION"], "HEAT_VERSION") });
+    expect(current.extensions?.["outdated"]).toBeUndefined();
+  });
+
+  it("flags outdated on an input that lacks a field since required, which is how a tab loaded before a recruit named its location hears of the deploy", async () => {
+    const p = `p-${randomUUID()}`;
+    await gql(JOIN, {}, p);
+    // The client's own document, which is unchanged; until Issue-351 its input held no location.
+    const recruit = `mutation($input: RecruitHeroInput!) { recruitHero(input: $input) { __typename } }`;
+    const stale = await invalid(recruit, { input: { unitType: "VILLAGER", requestId: randomUUID() } }, p, { "heat-version": "0".repeat(40) });
+    expect(stale.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
+    expect(stale.errors?.[0]?.message).toContain("location");
+    expect(stale.extensions?.["outdated"]).toBe(true);
+    expect(await repo.heroes(p)).toEqual([]);
   });
 });

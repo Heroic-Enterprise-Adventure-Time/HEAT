@@ -11,19 +11,48 @@ import {
   type BattleSetup,
   CombatEngine,
   type CombatProfile,
-  type GatherRatings,
   type MonsterProfile,
   type MonsterType,
   type Opponent,
   type PartyMember,
+  type TraitLevel,
   UNIT_PROFILES,
+  type UnitState,
   type UnitType,
 } from "../../src/index.js";
 
-export function hero(unitId: string, unitType: UnitType, health?: number, gather?: GatherRatings): PartyMember {
+/** A hero of a unit type, at its full health and with its type's gathering traits unless others are given. */
+export function hero(unitId: string, unitType: UnitType, health?: number, traits?: readonly TraitLevel[]): PartyMember {
   const profile = UNIT_PROFILES[unitType];
   if (!profile) throw new Error(`No profile for ${unitType}`);
-  return { unitId, unitType, health: health ?? profile.stats.maxHealth, stats: gather ? { ...profile.stats, gather } : profile.stats };
+  return { unitId, unitType, health: health ?? profile.stats.maxHealth, stats: traits ? { ...profile.stats, traits } : profile.stats };
+}
+
+/**
+ * A unit as the battle holds it, for the tests of what reads that state
+ * directly, the turn order and action selection: a villager of the party on
+ * its front line, alive, at full health and a second from its turn, with
+ * whatever a test says otherwise.
+ */
+export function unitState(unitId: string, extra: Partial<UnitState> = {}): UnitState {
+  return {
+    unitId,
+    kind: "hero",
+    type: "villager",
+    side: "party",
+    stats: { maxHealth: 30, speed: 10, damage: 4, traits: [{ trait: "woodcutting", level: 1 }, { trait: "mining", level: 1 }] },
+    actions: [],
+    acts: true,
+    health: 30,
+    line: "front",
+    chargeTimer: 1000,
+    currentAction: null,
+    guard: null,
+    drops: [],
+    xp: 0,
+    alive: true,
+    ...extra,
+  };
 }
 
 export function opponent(unitId: string, type: Opponent["type"]): Opponent {

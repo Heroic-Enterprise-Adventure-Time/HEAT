@@ -6,7 +6,7 @@ import { type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engin
 import { Game, type ReplayedView } from '../game';
 import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
-import { fakeBattleScene, fakeFrameLoop } from '../testing/fake-battle';
+import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
@@ -44,6 +44,8 @@ function settled(timeline: ReplayedView['timeline'] = played.timeline): Replayed
       rewards: [],
       credited: [],
       lost: [],
+      delivered: [],
+      deliveryLost: [],
       heroes: [
         { heroId: 'x1', xpGained: 15, xp: 40, level: 3, dead: false },
         { heroId: 'x2', xpGained: 0, xp: 0, level: 1, dead: true },
@@ -101,6 +103,12 @@ describe('Replay page (Issue-290)', () => {
     expect(game.reads).toEqual(['a9']);
     expect(scene.resets[0]?.field).toMatchObject({ stage: 0, outcome: null });
     expect(scene.resets[0]?.sets).toEqual(new Map([['x1', 'fighter-02'], ['x2', 'villager-01']]));
+    // The scene was handed the replay's cast first: the party by its sprite sets, and who the timeline's battles set against it.
+    expect(scene.prepared).toHaveLength(1);
+    expect(scene.prepared[0]?.flatMap((member) => member.spriteSet ?? [])).toEqual(['fighter-02', 'villager-01']);
+    expect(scene.prepared[0]).toContainEqual({ kind: 'resource', type: 'tree' });
+    // And the ground of the location it was played from (Issue-352).
+    expect(scene.grounds).toEqual(['meadow-01']);
 
     expect(panel().getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
     expect(screen.getByRole('complementary')).toHaveAccessibleName('Timber from the near woods');
@@ -136,6 +144,18 @@ describe('Replay page (Issue-290)', () => {
     await user.click(button('Watch from the start'));
     await waitFor(() => { expect(scene.resets).toHaveLength(2); });
     expect(scene.resets[1]?.field).toMatchObject({ stage: 0, outcome: null });
+  });
+
+  it('holds the clock after a blow as a run does, for as long as the scene asks (Issue-335)', async () => {
+    const scene = fakeBattleScene();
+    scene.holdFor = (events) => (landsBlow(events) ? 3000 : 0);
+    const { run } = await renderReplay(fakeGame(() => Promise.resolve(settled())), scene);
+    await waitFor(() => { expect(scene.resets).toHaveLength(1); });
+    const fed = await runToBlow(run, scene);
+    await run(3000);
+    expect(scene.fed).toHaveLength(fed);
+    await run(3000);
+    expect(scene.fed.length).toBeGreaterThan(fed);
   });
 
   it('shows the health of each hero as the replay plays', async () => {

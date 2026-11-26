@@ -10,7 +10,7 @@ import { type Hero, HeroChanged, type HeroStatus, Repository, TransactionConflic
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
-import { player, whole } from "./data.js";
+import { heroFixture, player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -30,10 +30,7 @@ const at = "millbrook";
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths will leave them. */
 async function putCamp(p: string, statuses: HeroStatus[]): Promise<Hero[]> {
-  const heroes = statuses.map((status, i): Hero => ({
-    id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: `Hero ${i}`,
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status, retiredAt: null, adventureId: null,
-  }));
+  const heroes = statuses.map((status, i) => heroFixture(at, { name: `Hero ${i}`, status }));
   for (const hero of heroes) {
     await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
   }
@@ -61,7 +58,7 @@ async function expectCountsAgree(p: string) {
 describe("retireHero", () => {
   it("retires a living hero and counts it out of the active and the living heroes", async () => {
     const p = player();
-    const villager = await recruitHero(repo, p, "villager", randomUUID());
+    const villager = await recruitHero(repo, p, at, "villager", randomUUID());
     const now = new Date("2026-10-21T12:00:00Z");
     const retired = await retireHero(repo, p, villager.id, now);
     expect(retired).toEqual({ ...villager, status: "RETIRED", retiredAt: now.toISOString() });
@@ -130,10 +127,10 @@ describe("retireHero", () => {
 
   it("makes the villager free again when the camp's only living hero retires", async () => {
     const p = player();
-    const villager = await recruitHero(repo, p, "villager", randomUUID());
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(InsufficientResources);
+    const villager = await recruitHero(repo, p, at, "villager", randomUUID());
+    expect(await refusal(recruitHero(repo, p, at, "villager", randomUUID()))).toBeInstanceOf(InsufficientResources);
     await retireHero(repo, p, villager.id);
-    const next = await recruitHero(repo, p, "villager", randomUUID());
+    const next = await recruitHero(repo, p, at, "villager", randomUUID());
     expect(next.status).toBe("ALIVE");
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
   });
@@ -141,9 +138,9 @@ describe("retireHero", () => {
   it("frees a slot in a hall full of dead heroes", async () => {
     const p = player();
     const dead = must((await putCamp(p, ["DEAD", "DEAD", "DEAD", "DEAD"]))[0], "the dead hero");
-    expect(await refusal(recruitHero(repo, p, "villager", randomUUID()))).toBeInstanceOf(HallFull);
+    expect(await refusal(recruitHero(repo, p, at, "villager", randomUUID()))).toBeInstanceOf(HallFull);
     await retireHero(repo, p, dead.id);
-    await recruitHero(repo, p, "villager", randomUUID());
+    await recruitHero(repo, p, at, "villager", randomUUID());
     expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 4, livingHeroes: 1 });
   });
 
@@ -155,7 +152,7 @@ describe("retireHero", () => {
       const dead = must((await putCamp(p, ["DEAD", "DEAD", "DEAD", "DEAD"]))[0], "the dead hero");
       const [retire, recruit] = await Promise.allSettled([
         retireHero(repo, p, dead.id),
-        recruitHero(repo, p, "villager", randomUUID()),
+        recruitHero(repo, p, at, "villager", randomUUID()),
       ]);
       expect(retire.status).toBe("fulfilled");
       const heroes = await repo.heroes(p);
@@ -177,7 +174,7 @@ describe("retireHero", () => {
       const requestId = randomUUID();
       const [retire, recruit] = await Promise.allSettled([
         retireHero(repo, p, leaving.id),
-        recruitHero(repo, p, "villager", requestId),
+        recruitHero(repo, p, at, "villager", requestId),
       ]);
       expect(retire.status).toBe("fulfilled");
       const made = recruit.status === "fulfilled";

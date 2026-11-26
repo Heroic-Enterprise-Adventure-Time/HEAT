@@ -8,6 +8,7 @@ import { routes } from './app.routes';
 import { Config } from './config';
 import possibleTypes from './graphql/generated/possible-types';
 import { Hub } from './hub';
+import { Icons } from './icons';
 import { Session } from './session';
 
 export const appConfig: ApplicationConfig = {
@@ -19,14 +20,16 @@ export const appConfig: ApplicationConfig = {
     // chain, with the schema's unions and interfaces so the cache matches a
     // fragment on `Error` or on a result union.
     provideApollo(() => ({ link: inject(Hub).link(), cache: new InMemoryCache(possibleTypes) })),
-    // The stack's configuration, then the session, before the first render:
-    // a page opened by the sign-in redirect exchanges its code here. Both
-    // are injected before the first await, since inject() only works in
-    // the synchronous part of the initializer (NG0203).
+    // The stack's configuration and the icons' index, then the session,
+    // before the first render: a page opened by the sign-in redirect
+    // exchanges its code here. All are injected before the first await,
+    // since inject() only works in the synchronous part of the initializer
+    // (NG0203).
     provideAppInitializer(async () => {
       const config = inject(Config);
       const session = inject(Session);
-      await config.load();
+      const icons = inject(Icons);
+      await Promise.all([config.load(), icons.load()]);
       await session.start();
     }),
   ],

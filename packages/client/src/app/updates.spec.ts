@@ -12,11 +12,12 @@ const adventure: AdventureView = {
   location: 'millbrook',
   seed: 's1',
   version: 'v1',
+  caravan: null,
   job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves.' },
   snapshot: { version: 'v1', jobId: 'wolves-on-the-mill-road', heroes: [] },
 };
 
-const player = (open: AdventureView | null): PlayerView => ({ id: 'p1', camps: [], heroes: [], openAdventure: open });
+const player = (open: AdventureView | null): PlayerView => ({ id: 'p1', camps: [], heroes: [], openAdventure: open, unlocks: [] });
 
 function setup(loaded: PlayerView | null, version = 'v1') {
   const reloads = { count: 0 };

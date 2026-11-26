@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } fr
 import { type FacilityKind, STARTING_LOCATION } from '@heat/engine';
 
 import { Game, type HeroView, type SeenHeroView } from '../game';
+import { Icons } from '../icons';
 import { CampState } from './camp-state';
 import { LAYOUT_SIZES } from './layout-sizes';
 import { iconScale, isSideBySide, menuLabels, stackedStageHeight } from './page-layout';
@@ -52,6 +53,7 @@ export const CAMP_SCENE_FACTORY = new InjectionToken<CampSceneFactory>('heat.cam
 export class Camp {
   protected readonly game = inject(Game);
   protected readonly state = inject(CampState);
+  protected readonly icons = inject(Icons);
   private readonly router = inject(Router);
   private readonly createScene = inject(CAMP_SCENE_FACTORY);
   private readonly readSizes = inject(LAYOUT_SIZES);
@@ -85,11 +87,15 @@ export class Camp {
   private mounts = 0;
 
   constructor() {
-    // The address names the camp and the game follows it; a camp with no layout goes to the starting one.
+    // The address names the camp and the game follows it. A camp with no layout goes to the starting one, and so,
+    // once the player is read, does a location the player has no camp at: one whose unlock they do not hold (decision 0059).
+    // The starting location needs no unlock, so its address is never sent away.
     effect(() => {
       const location = this.location();
+      const camps = this.game.player()?.camps;
       untracked(() => {
-        if (LAYOUTS[location]) this.game.location.set(location);
+        const has = location === STARTING_LOCATION || (camps?.some((camp) => camp.location === location) ?? true);
+        if (LAYOUTS[location] && has) this.game.location.set(location);
         else void this.router.navigate(['/camp', STARTING_LOCATION], { replaceUrl: true });
       });
     });

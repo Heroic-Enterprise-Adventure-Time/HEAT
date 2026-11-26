@@ -4,6 +4,7 @@
  */
 export * from "./engine.js";
 export * from "./events.js";
+export * from "./expand.js";
 export * from "./job.js";
 export * from "./override.js";
 export * from "./replay.js";

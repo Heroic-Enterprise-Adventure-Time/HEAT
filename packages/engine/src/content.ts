@@ -1,16 +1,17 @@
 /**
- * The game's static content: the locations, what each recruits, the caps of
+ * The game's static content: the unlocks, the locations, what each recruits, the caps of
  * the hall and the warehouse per level, the hero names, the sprite sets each
  * unit type allows, and the battle's abilities, unit types, monsters and
  * resource nodes, the jobs, and the XP each level needs. TypeScript data, imported by the hub and the client alike
  * (decision 0013); a change here is a change to the rules, reviewed like
  * code. The design is docs/design/game.md, "Locations and camps", "The heroes
- * hall", "Resources" and "The battle", and the jobs, the retreat and the XP
- * table at the end; the numbers are its working assumptions.
+ * hall" and "Resources", and docs/design/battle.md; the numbers are its
+ * working assumptions. The jobs, the retreat and the XP table are at the end
+ * of this file.
  */
 
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
-import type { AbilityDefinition, BattleContent, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
+import type { AbilityDefinition, BattleContent, CartProfile, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
 import type { Material } from "./index.js";
 
 /** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. The list declares the union (typescript.md, rule 18). */
@@ -18,7 +19,7 @@ export const UNIT_TYPES = ["villager", "miner", "lumberjack", "fighter", "knight
 export type UnitType = (typeof UNIT_TYPES)[number];
 
 /** A camp's own facilities: those every camp has and those it may build. */
-export const FACILITY_KINDS = ["heroes-hall", "warehouse", "job-board", "mine", "lumber-camp", "caravan-hub"] as const;
+export const FACILITY_KINDS = ["heroes-hall", "warehouse", "job-board", "mine", "lumber-camp", "caravan-hub", "quarry"] as const;
 export type FacilityKind = (typeof FACILITY_KINDS)[number];
 
 /** A cost in resources: there is no currency (game.md, "Resources"). */
@@ -57,9 +58,10 @@ const GIVEN: FacilityLevel = { cost: [], requires: [] };
  * Every kind of facility, by name and purpose (game.md, "Locations and
  * camps"), with what each level costs (Issue-93). The mine's first level is
  * the first progression's (decision 0031). The hall and the warehouse go to
- * level 3 and the rest to level 1 at first: a camp is not meant to build
- * everything at its first location, since later levels will need what other
- * locations have (the owner, Issue-93).
+ * level 3, the mine, the lumber camp and the caravan hub to level 2, and the
+ * quarry to level 1: a camp is not meant to build everything at its first
+ * location, so later levels need what other locations have (the owner,
+ * Issue-93), and the first that do cost Highcrag's stone (Issue-357).
  */
 export const FACILITIES: Readonly<Record<FacilityKind, Facility>> = {
   "heroes-hall": {
@@ -88,26 +90,49 @@ export const FACILITIES: Readonly<Record<FacilityKind, Facility>> = {
     ],
     art: [1, 2, 3],
   },
+  // The second levels of the mine, the lumber camp and the caravan hub cost
+  // stone, which only Highcrag has (Issue-357, decision 0059): each of the
+  // first two posts a job of its own, and the hub's gives a larger cart.
   mine: {
     name: "Mine",
     description: "Sends heroes into the hill on mining runs for ore.",
-    levels: [{ cost: [{ material: "timber", amount: 60 }, { material: "cloth", amount: 3 }], requires: [] }],
+    levels: [
+      { cost: [{ material: "timber", amount: 60 }, { material: "cloth", amount: 3 }], requires: [] },
+      { cost: [{ material: "timber", amount: 100 }, { material: "stone", amount: 40 }], requires: [] },
+    ],
     art: [0, 1],
   },
   "lumber-camp": {
     name: "Lumber camp",
     description: "Sends heroes into the woods on lumber runs for timber.",
-    levels: [{ cost: [{ material: "timber", amount: 50 }, { material: "ore", amount: 20 }], requires: [] }],
+    levels: [
+      { cost: [{ material: "timber", amount: 50 }, { material: "ore", amount: 20 }], requires: [] },
+      { cost: [{ material: "timber", amount: 60 }, { material: "ore", amount: 40 }, { material: "stone", amount: 40 }], requires: [] },
+    ],
     art: [0, 1],
   },
   "caravan-hub": {
     name: "Caravan hub",
     description: "Sends caravans to other locations, carrying resources and heroes as passengers.",
     // Caravans carry stock, so a hub needs room for it first.
-    levels: [{
-      cost: [{ material: "timber", amount: 100 }, { material: "ore", amount: 60 }, { material: "cloth", amount: 20 }],
-      requires: [{ kind: "warehouse", level: 2 }],
-    }],
+    levels: [
+      {
+        cost: [{ material: "timber", amount: 100 }, { material: "ore", amount: 60 }, { material: "cloth", amount: 20 }],
+        requires: [{ kind: "warehouse", level: 2 }],
+      },
+      {
+        cost: [{ material: "timber", amount: 150 }, { material: "ore", amount: 80 }, { material: "stone", amount: 80 }],
+        requires: [{ kind: "warehouse", level: 2 }],
+      },
+    ],
+    art: [0, 1],
+  },
+  // Highcrag's own (Issue-356, decision 0059): its timber is one cartload
+  // from Millbrook, and its ore the crag's.
+  quarry: {
+    name: "Quarry",
+    description: "Sends heroes onto the rock face for stone. Only a miner's hand gets anything out of it.",
+    levels: [{ cost: [{ material: "timber", amount: 60 }, { material: "ore", amount: 40 }], requires: [] }],
     art: [0, 1],
   },
 };
@@ -177,9 +202,39 @@ export function recruitCost(recruit: Recruit, livingHeroes: number): Cost {
   return recruit.unitType === "villager" && livingHeroes === 0 ? [] : recruit.cost;
 }
 
+/**
+ * The unlocks: what a player earns once and holds for good (game.md,
+ * "Unlocks"; decision 0059). One closed list for every kind of unlock; the
+ * list declares the union (typescript.md, rule 18). What needs an unlock
+ * names it, a location first, and what grants one names it, a job first.
+ */
+export const UNLOCK_IDS = ["road-to-highcrag"] as const;
+export type UnlockId = (typeof UNLOCK_IDS)[number];
+
+export interface Unlock {
+  name: string;
+  /** The words said to the player when it is earned. */
+  earned: string;
+}
+
+/** Every unlock, by its name and the words said when it is earned. The road is granted by the caravan hub's scouting job (Issue-352). */
+export const UNLOCKS: Readonly<Record<UnlockId, Unlock>> = {
+  "road-to-highcrag": {
+    name: "The road to Highcrag",
+    earned: "The road to Highcrag is open. You have a camp there now.",
+  },
+};
+
+/** Whether a string is an unlock of this version's content, as one stored by another version may not be. */
+export function isUnlockId(id: string): id is UnlockId {
+  return (UNLOCK_IDS as readonly string[]).includes(id);
+}
+
 export interface Location {
   id: string;
   name: string;
+  /** The unlock a player must hold to have a camp here; the starting location names none (decision 0059). */
+  unlock?: UnlockId;
   /** The facilities that belong to the location and look the same to every player. */
   sharedFacilities: readonly FacilityKind[];
   /** The facilities every camp here has at level 1 or above. */
@@ -213,13 +268,43 @@ export const LOCATIONS: readonly Location[] = [
       { unitType: "ranger", hallLevel: 2, cost: [{ material: "timber", amount: 40 }, { material: "cloth", amount: 10 }] },
     ],
   },
+  // A hill fort above a quarry, supplied from Millbrook and not a second
+  // start (decision 0059): it recruits no villager, so there is no free hero
+  // here, and a camp begins empty until a caravan brings its first. The miner
+  // and the fighter cost what they cost at Millbrook; there are no trees, so
+  // the miner's timber comes by caravan. A camp may build the quarry, for
+  // stone, and a caravan hub, whose caravans go back to Millbrook (Issue-356).
+  {
+    id: "highcrag",
+    name: "Highcrag",
+    unlock: "road-to-highcrag",
+    sharedFacilities: ["job-board"],
+    ownFacilities: ["heroes-hall", "warehouse"],
+    buildableFacilities: ["quarry", "caravan-hub"],
+    recruits: [
+      { unitType: "miner", hallLevel: 1, cost: [{ material: "ore", amount: 30 }, { material: "timber", amount: 20 }] },
+      { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 40 }] },
+      // Found only here (Issue-356): the first thing that costs hide, which
+      // only Millbrook's wolves and a skinner supply, so it comes by caravan.
+      { unitType: "knight", hallLevel: 1, cost: [{ material: "ore", amount: 50 }, { material: "hide", amount: 4 }] },
+    ],
+  },
 ];
 
-/** A new player starts here, with a camp at level 1 and no heroes. */
+/** A new player starts here, with a camp at level 1 and no heroes. It needs no unlock, and it recruits the villager, so no player is ever locked out. */
 export const STARTING_LOCATION = "millbrook";
 
 export function location(id: string): Location | undefined {
   return LOCATIONS.find((l) => l.id === id);
+}
+
+/**
+ * The locations a player with these unlocks has a camp at, in the content's
+ * order: those that need none, and those whose unlock is held (decision
+ * 0059). One rule, which the hub's reads and its verbs both use.
+ */
+export function unlockedLocations(held: ReadonlySet<string>): Location[] {
+  return LOCATIONS.filter((l) => l.unlock === undefined || held.has(l.unlock));
 }
 
 /** Active heroes a camp can hold, by heroes hall level; index 0 is level 1. */
@@ -325,7 +410,7 @@ export const MONSTER_TYPES = ["wolf", "bandit", "goblin-rock-thrower"] as const;
 export type MonsterType = (typeof MONSTER_TYPES)[number];
 
 /** The resource nodes a gather stage names. */
-export const RESOURCE_TYPES = ["tree", "ore-vein"] as const;
+export const RESOURCE_TYPES = ["tree", "ore-vein", "stone-outcrop"] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
 /** Whether a stage's opponent is a resource node, not a monster: a stage lists both together (decision 0051). */
@@ -333,7 +418,7 @@ export function isResourceType(type: string): type is ResourceType {
   return (RESOURCE_TYPES as readonly string[]).includes(type);
 }
 
-export type AbilityId = "strike" | "strike-weakest" | "bite" | "guard" | "chop" | "mine" | "shoot" | "throw-rock" | "move-up";
+export type AbilityId = "strike" | "strike-weakest" | "strike-cart" | "bite" | "guard" | "chop" | "mine" | "shoot" | "throw-rock" | "move-up";
 
 const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
 
@@ -343,14 +428,18 @@ const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as cons
 }));
 
 /**
- * Every ability a unit type or monster's list names (game.md, "The battle").
+ * Every ability a unit type or monster's list names (battle.md).
  * A gather ability works the node with the least left, so a gatherer fells
  * one tree before starting the next (Issue-15). Chop and mine are a strike
  * at a node with their own look: the same damage and the same warmup, so
  * that forcing a strike at a tree gains nothing over chopping it (decision
- * 0051). A ranged attack reaches every line from every line, which is what
+ * 0051). Each is aimed at the nodes of its kind, those with a drop its trait
+ * gathers, whoever swings: no hit gathers anything (decision 0058). A node
+ * is worked only when no monster is in the ability's reach, so nobody chops
+ * with a wolf at its throat (Issue-341; battle/resolution.ts). A ranged attack reaches every line from every line, which is what
  * makes it the answer to a monster standing behind resource nodes; its
- * warmup is its wind-up and its projectile's flight together (decision 0052).
+ * warmup is longer than a blow's, and as long as the wind-up and the
+ * projectile's flight the page shows as it resolves (decisions 0052 and 0057).
  */
 export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
   strike: {
@@ -366,6 +455,17 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     name: "Strike the weakest",
     tags: ["melee-attack", "physical", "slashing"],
     targeting: { side: "enemy", reach: [{ actorLine: "front", targetLines: ["front", "near"] }], selection: "weakest" },
+    warmupMs: 300,
+    effect: { kind: "damage" },
+  },
+  // The bandit's: a caravan's cart first, when one is in reach, with a
+  // strike's reach from the front and its blow (decision 0059). With no cart
+  // it has no target, and the list goes on as it did.
+  "strike-cart": {
+    abilityId: "strike-cart",
+    name: "Strike the cart",
+    tags: ["melee-attack", "physical", "slashing"],
+    targeting: { side: "enemy", reach: [{ actorLine: "front", targetLines: ["front", "near"] }], selection: "cart" },
     warmupMs: 300,
     effect: { kind: "damage" },
   },
@@ -391,7 +491,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
     warmupMs: 300,
-    effect: { kind: "gather", material: "timber" },
+    effect: { kind: "gather", trait: "woodcutting" },
   },
   mine: {
     abilityId: "mine",
@@ -399,7 +499,7 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
     tags: ["gather", "physical"],
     targeting: { side: "enemy", reach: FRONT_ONLY, selection: "weakest" },
     warmupMs: 300,
-    effect: { kind: "gather", material: "ore" },
+    effect: { kind: "gather", trait: "mining" },
   },
   shoot: {
     abilityId: "shoot",
@@ -430,78 +530,161 @@ export const ABILITIES: Readonly<Record<AbilityId, AbilityDefinition>> = {
 /**
  * Each unit type's home line, base stats and one action list, the first
  * usable action winning. A unit type without one cannot join a battle yet.
- * A villager's gather ratings are low in both timber and ore, below a
- * node's difficulty, so it brings home a share of each; a specialized
- * gatherer meets the difficulty in one of them, and a combat unit has no
- * rating, so its hits waste a node (decision 0051). The miner and the
- * lumberjack have a villager's body and meet the difficulty in their own
- * material, harvesting a node in full; in the other they rate 1, not 0, so
- * that on a stage of nodes alone they still bring home a third of a node
- * rather than wasting it as a fighter does (Issue-287). A ranger stands at
- * the back and shoots whatever is closest, monsters before nodes like any
- * unit; with nothing else left it shoots a node and wastes its share of it
- * (the owner's call on Issue-286).
+ * A unit type's gathering traits are in its stats (decision 0058): the
+ * villager cuts wood and mines at level 1, the lumberjack cuts wood at level
+ * 2 and the miner mines at level 2, each with a villager's body (Issue-287),
+ * the ranger skins at level 1 (Issue-340), and the fighter carries none. The
+ * villager cannot skin, so hide is the first drop a party gets nothing of
+ * without its carrier. A specialist carries its own trait alone to start
+ * with; that is where the first unit types start and not a rule, and a unit
+ * type added later may carry several (the owner, 2026-11-20). One carrier
+ * standing is enough for a party, and a hit gathers nothing, so a fighter
+ * costs a resource run nothing. A ranger stands at the back and shoots
+ * whatever is closest, monsters before nodes like any unit, and a node when
+ * nothing else is left (decision 0052).
  */
 export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> = {
   villager: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 2 }, { material: "ore", rating: 2 }] },
+    stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "woodcutting", level: 1 }, { trait: "mining", level: 1 }] },
     actions: ["strike", "chop", "mine", "move-up"],
   },
   miner: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 1 }, { material: "ore", rating: 3 }] },
+    stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "mining", level: 2 }] },
     actions: ["mine", "chop", "strike", "move-up"],
   },
   lumberjack: {
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 8, damage: 4, gather: [{ material: "timber", rating: 3 }, { material: "ore", rating: 1 }] },
+    stats: { maxHealth: 30, speed: 8, damage: 4, traits: [{ trait: "woodcutting", level: 2 }] },
     actions: ["chop", "mine", "strike", "move-up"],
   },
   fighter: {
     homeLine: "front",
-    stats: { maxHealth: 50, speed: 10, damage: 6, gather: [] },
+    stats: { maxHealth: 50, speed: 10, damage: 6, traits: [] },
+    actions: ["guard", "strike"],
+  },
+  // Highcrag's (Issue-356): a heavier fighter, slower and harder to put down,
+  // with the fighter's list.
+  knight: {
+    homeLine: "front",
+    stats: { maxHealth: 70, speed: 8, damage: 7, traits: [] },
     actions: ["guard", "strike"],
   },
   ranger: {
     homeLine: "far",
-    stats: { maxHealth: 26, speed: 10, damage: 6, gather: [] },
+    stats: { maxHealth: 26, speed: 10, damage: 6, traits: [{ trait: "skinning", level: 1 }] },
     actions: ["shoot"],
   },
 };
 
+/**
+ * The monsters, each with the XP it gives the heroes who survive and what it
+ * drops (decision 0058). The wolf's hide is the first drop that is not a
+ * staple (Issue-340): one, half the time, to a party that skins at level 1,
+ * and one or two, always, at level 2, which no unit type has yet. No job's
+ * description mentions it: not every drop is told.
+ */
 export const MONSTERS: Readonly<Record<MonsterType, MonsterProfile>> = {
   wolf: {
     name: "Wolf",
     homeLine: "front",
-    stats: { maxHealth: 24, speed: 12, damage: 3, gather: [] },
+    stats: { maxHealth: 24, speed: 12, damage: 3, traits: [] },
     actions: ["bite", "move-up"],
+    drops: [{
+      material: "hide",
+      trait: "skinning",
+      levels: [{ chancePercent: 50, min: 1, max: 1 }, { chancePercent: 100, min: 1, max: 2 }],
+    }],
+    xp: 5,
   },
   bandit: {
     name: "Bandit",
     homeLine: "near",
-    stats: { maxHealth: 30, speed: 9, damage: 5, gather: [] },
-    actions: ["strike-weakest", "move-up"],
+    stats: { maxHealth: 30, speed: 9, damage: 5, traits: [] },
+    actions: ["strike-cart", "strike-weakest", "move-up"],
+    drops: [],
+    xp: 6,
   },
   // Fragile and hard-hitting, on a line melee cannot reach while anything
   // stands in front of it (decision 0052).
   "goblin-rock-thrower": {
     name: "Goblin rock thrower",
     homeLine: "far",
-    stats: { maxHealth: 12, speed: 8, damage: 5, gather: [] },
+    stats: { maxHealth: 12, speed: 8, damage: 5, traits: [] },
     actions: ["throw-rock"],
+    drops: [],
+    xp: 5,
   },
 };
 
 /**
- * The resource nodes: health, the gather rating that harvests one in full,
- * and the most it gives (decision 0051). A villager, at 2 against 3, brings
- * home two thirds: 30 timber a tree, 20 ore a vein.
+ * The resource nodes: health, XP, and what each drops when it goes down, a
+ * row for each level of the drop's trait (decision 0058). A staple drops
+ * always, within a range, so that each step of the first progression is
+ * still paid by one run of the job before it at its worst roll (decision
+ * 0031): 30 timber a tree and 20 ore a vein at level 1, a villager's, as
+ * under decision 0051.
  */
 export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>> = {
-  tree: { name: "Tree", homeLine: "front", material: "timber", health: 40, difficulty: 3, maxYield: 45 },
-  "ore-vein": { name: "Ore vein", homeLine: "front", material: "ore", health: 40, difficulty: 3, maxYield: 30 },
+  tree: {
+    name: "Tree",
+    homeLine: "front",
+    health: 40,
+    xp: 3,
+    drops: [{
+      material: "timber",
+      trait: "woodcutting",
+      levels: [{ chancePercent: 100, min: 30, max: 36 }, { chancePercent: 100, min: 42, max: 50 }],
+    }],
+  },
+  "ore-vein": {
+    name: "Ore vein",
+    homeLine: "front",
+    health: 40,
+    xp: 3,
+    drops: [{
+      material: "ore",
+      trait: "mining",
+      levels: [{ chancePercent: 100, min: 20, max: 24 }, { chancePercent: 100, min: 28, max: 32 }],
+    }],
+  },
+  // The first drop with no chance at its trait's first level (decision 0059):
+  // a villager's mining 1 brings home no stone, and is not told why.
+  "stone-outcrop": {
+    name: "Stone outcrop",
+    homeLine: "front",
+    health: 40,
+    xp: 3,
+    drops: [{
+      material: "stone",
+      trait: "mining",
+      levels: [{ chancePercent: 0, min: 0, max: 0 }, { chancePercent: 100, min: 20, max: 24 }],
+    }],
+  },
 };
+
+/**
+ * A caravan's cart (decision 0059): 60 health, a working assumption, on the
+ * near line, behind a fighter and beside the villagers. Its pictures are
+ * `art/props/cart-01` (Issue-350).
+ */
+export const CART: CartProfile = { name: "Cart", homeLine: "near", health: 60 };
+
+/** What a caravan's cart carries in all, every resource of its cargo together, by caravan hub level; index 0 is level 1 (decision 0059). */
+export const CART_CAPACITY: readonly number[] = [100, 200];
+
+/** What the cart of a hub at this level carries; nothing below level 1, the hub's highest level's above it. */
+export function cartCapacity(hubLevel: number): number {
+  if (hubLevel < 1) return 0;
+  return CART_CAPACITY[Math.min(hubLevel, CART_CAPACITY.length) - 1] ?? 0;
+}
+
+/** The least caravan hub level whose cart carries this much in all, or undefined where no level's does. */
+export function hubLevelCarrying(total: number): number | undefined {
+  const i = CART_CAPACITY.findIndex((capacity) => capacity >= total);
+  return i === -1 ? undefined : i + 1;
+}
 
 /** The content a battle reads by default. */
 export const BATTLE_CONTENT: BattleContent = {
@@ -509,37 +692,70 @@ export const BATTLE_CONTENT: BattleContent = {
   heroes: UNIT_PROFILES,
   monsters: MONSTERS,
   resources: RESOURCE_NODES,
+  cart: CART,
 };
 
 // ── Jobs and advancement ───────────────────────────────────────────
 
-export type JobId = "pick-up-sticks" | "timber-from-the-near-woods" | "wolves-on-the-mill-road" | "ore-from-the-hill" | "goblins-in-the-old-workings";
+export type JobId =
+  | "pick-up-sticks"
+  | "timber-from-the-near-woods"
+  | "wolves-on-the-mill-road"
+  | "ore-from-the-hill"
+  | "goblins-in-the-old-workings"
+  | "lumber-from-the-deep-woods"
+  | "scout-the-road-to-highcrag"
+  | "caravan-to-highcrag"
+  | "ore-from-the-crag"
+  | "stone-from-the-quarry-face"
+  | "goblins-in-the-quarry"
+  | "caravan-to-millbrook"
+  | "the-deep-seam"
+  | "the-old-growth-stand";
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
- * (game.md, "The battle"; decision 0031). A job that names a facility is
- * posted by it, not by the job board (Issue-133). A stage ends when
- * everything on the other side is down, so its nodes' maximums are the most
- * a job brings home, and what the party's gather ratings make of them is
- * what it does (decision 0051). A retreat forfeits the pay; from a gathering
- * job it keeps what was gathered. A retreat earns half the XP.
+ * (battle.md, "Millbrook's board"; decision 0031). A job that names a
+ * facility is posted by it, not by the job board (Issue-133). A stage ends when
+ * everything on the other side is down (decision 0051), and what a job
+ * brings home is what its enemies drop for the traits the party carries
+ * (decision 0058). Each job's bonus XP is what brings its XP, with the
+ * enemies that always appear, to what decision 0030 gave it: 5, 15, 20, 15
+ * and 25; the lumber camp's job and Highcrag's, written since, give the ore
+ * job's 15, and the caravan hub's scouting job the wolves job's 20. A job's
+ * description is all the page tells of it beside its pay and its bonus, so it
+ * says what its author chooses to tell. A job may grant unlocks on arrival
+ * (decision 0059): the scouting job grants the first, the road to Highcrag.
+ *
+ * An entry of a fight or a gather stage may vary (decision 0058, Issue-341):
+ * its count a range, and a chance of appearing at all, rolled from the
+ * adventure's seed by `expandStages`. Every such stage keeps an entry that
+ * always appears, its time limit fits its largest roll, and that roll brings
+ * home no more of a resource than a level-1 warehouse holds, but for the one
+ * resource of a job that the owner accepted at a higher level, which
+ * `JOB_WAREHOUSE_LEVEL` names;
+ * the content's test checks all three. A job's bonus XP counts only the
+ * enemies that always appear: one that appears by chance adds its own.
  */
 export const JOBS: Readonly<Record<JobId, Job>> = {
-  // A lone villager cannot fail it: no monster, and its time limit is beyond
-  // even a villager forced to swing at the tree every turn (decision 0031).
+  // A lone villager cannot fail it, whatever it is forced to do (decision
+  // 0031). One time in ten a wolf is beside the tree, the first use of a job
+  // that varies (Issue-341): the villager strikes the wolf first, since a node
+  // is worked only when no monster is in reach, and beats it with a little
+  // health left on every seed tried. It is 5 more XP, and a hide to a party
+  // that brought a skinner. The description does not say so.
   "pick-up-sticks": {
     id: "pick-up-sticks",
     name: "Pick up sticks",
-    description: "One old tree by the village green needs felling. Bring the wood home; nothing out there bites.",
+    description: "One old tree by the village green needs felling. Bring a hero who can cut wood and the timber is yours.",
     location: "millbrook",
     stages: [
       { kind: "travel", lengthMs: 4000 },
-      { kind: "gather", opponents: [{ type: "tree", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 1 }, { type: "wolf", count: 1, chancePercent: 10 }], timeLimitMs: 60_000 },
       { kind: "arrive" },
     ],
     pay: [],
-    xp: 5,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 2,
   },
   "timber-from-the-near-woods": {
     id: "timber-from-the-near-woods",
@@ -553,8 +769,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 3 }],
-    xp: 15,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 4,
   },
   // A lone villager dies here on every seed; a fighter with a villager, or
   // three villagers, clear it (decision 0031).
@@ -569,8 +784,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [{ material: "cloth", amount: 10 }],
-    xp: 20,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 10,
   },
   // The mine's first job, which pays for a fighter (decision 0031). It
   // mirrors the timber job; a lone villager completes it on every seed tried.
@@ -587,8 +801,7 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [],
-    xp: 15,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 4,
   },
   // The first mixed stage (Issue-286, decision 0052): the veins hold the
   // front line and the goblins throw from behind them, out of melee's reach
@@ -606,9 +819,224 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
       { kind: "arrive" },
     ],
     pay: [],
-    xp: 25,
-    retreat: { keepsPay: false, keepsCargo: true, xpPercent: 50 },
+    bonusXp: 6,
   },
+  // The lumber camp's first job (Issue-291), and the first written for
+  // decision 0058's shape, not converted to it: three trees or four, and on
+  // half its runs a wolf or two among them. The puzzle is the owner's, a
+  // woodcutter for the trees and a skinner for the wolves that may appear, in
+  // a party that survives them: two wolves come on one run in four, and then
+  // a lone villager, lumberjack, miner or ranger always falls and a lone
+  // fighter on about half; a fighter beside the cutter makes it safe. It brings
+  // home clearly more timber than the board's timber job, 90 to 144 for
+  // villagers and 126 to 200 for a lumberjack, which a level-1 warehouse
+  // cannot hold (`JOB_WAREHOUSE_LEVEL`). Its XP is 15 at its least roll, as
+  // the mine's first job, and 28 at its largest. The description names
+  // neither the wolves nor their hides.
+  "lumber-from-the-deep-woods": {
+    id: "lumber-from-the-deep-woods",
+    name: "Lumber from the deep woods",
+    description: "The old stand in the deep woods is marked for the camp's axes: three trees at least, and some days a fourth worth felling. Cutters who went out alone have not all come back.",
+    location: "millbrook",
+    facility: "lumber-camp",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      {
+        kind: "gather",
+        opponents: [{ type: "tree", count: { min: 3, max: 4 } }, { type: "wolf", count: { min: 1, max: 2 }, chancePercent: 50 }],
+        timeLimitMs: 180_000,
+      },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 6,
+  },
+  // The caravan hub's first job, and the first that grants an unlock
+  // (Issue-352, decision 0059): a plain job with no cart, the road and two
+  // bandits on it, and on arrival the road to Highcrag is the player's. It is
+  // the bandit's first job, and a step past the wolves job: no lone hero of a
+  // type Millbrook recruits comes through it, nor do two villagers; a fighter
+  // with a villager opens the road on every seed tried and loses one of the
+  // two on about one run in four; two fighters, a fighter with a ranger and a
+  // villager, and a fighter with three villagers open it with nobody lost. Its
+  // description says what it opens, and it stays listed once the road is
+  // open, a job like any other.
+  "scout-the-road-to-highcrag": {
+    id: "scout-the-road-to-highcrag",
+    name: "Scout the road to Highcrag",
+    description: "Nobody has walked the hill road to Highcrag since bandits took it. Clear it as far as the fort's gate and the way is open: you will have a camp there. One sword is not enough.",
+    location: "millbrook",
+    facility: "caravan-hub",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 2 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
+    grants: ["road-to-highcrag"],
+  },
+  // The caravan hub's caravan (Issue-354, decision 0059): the first job that
+  // delivers, so its party has the cart beside it in both fights, the cart's
+  // health carried between them. One bandit a fight, with a wolf on half the
+  // seeds, where two bandits a fight lose the cart to nearly every party
+  // (decision 0059, Issue-353's amendment). No pay: the delivery is the
+  // reward, and the bonus brings the job's XP to the road job's 20. What the
+  // cart carries, and who stays, is the hub's; the engine knows none of it.
+  "caravan-to-highcrag": {
+    id: "caravan-to-highcrag",
+    name: "Caravan to Highcrag",
+    description: "Carry goods up the hill road to Highcrag, and anyone who means to stay there. Bandits still watch the road, and they go for the cart first.",
+    location: "millbrook",
+    facility: "caravan-hub",
+    deliversTo: "highcrag",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
+  },
+  // Highcrag's one board job (Issue-351, decision 0059): the mine's first
+  // job on another hill, two veins and then a wolf, for the parties Highcrag
+  // can field. A lone miner completes it on every seed tried, with no death,
+  // and brings home 56 to 64 ore, which pays for a fighter at its worst roll;
+  // a fighter alone comes through it with no ore, having no trait to mine by.
+  "ore-from-the-crag": {
+    id: "ore-from-the-crag",
+    name: "Ore from the crag",
+    description: "Two veins run bare along the crag below the fort. Dig them out; a wolf comes down off the scree at dusk.",
+    location: "highcrag",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: 2 }], timeLimitMs: 90_000 },
+      { kind: "fight", opponents: [{ type: "wolf", count: 1 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 4,
+  },
+  // The quarry's first job (Issue-356): two outcrops or three, and a wolf on
+  // half the runs. Stone needs mining 2, so only a party with a miner brings
+  // any home.
+  "stone-from-the-quarry-face": {
+    id: "stone-from-the-quarry-face",
+    name: "Stone from the quarry face",
+    description: "The quarry face is ready for cutting: two good blocks at least, some days three. It takes a miner's eye to cut stone worth carrying, and wolves come down off the scree.",
+    location: "highcrag",
+    facility: "quarry",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      {
+        kind: "gather",
+        opponents: [{ type: "stone-outcrop", count: { min: 2, max: 3 } }, { type: "wolf", count: 1, chancePercent: 50 }],
+        timeLimitMs: 150_000,
+      },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 9,
+  },
+  // The quarry's second (Issue-356): three outcrops on the front line and a
+  // goblin throwing from behind them, out of melee's reach until they fall,
+  // as in the old workings.
+  "goblins-in-the-quarry": {
+    id: "goblins-in-the-quarry",
+    name: "Goblins in the quarry",
+    description: "A goblin has taken the upper benches and throws rocks at anyone who cuts below it. Three blocks lie ready under it. Do not send a miner alone.",
+    location: "highcrag",
+    facility: "quarry",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "stone-outcrop", count: 3 }, { type: "goblin-rock-thrower", count: 1 }], timeLimitMs: 150_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 6,
+  },
+  // Highcrag's caravan hub's route back (Issue-356, decision 0059): the road
+  // of "Caravan to Highcrag" the other way, the same two fights with the
+  // cart's health carried between them, no pay, and the same bonus.
+  "caravan-to-millbrook": {
+    id: "caravan-to-millbrook",
+    name: "Caravan to Millbrook",
+    description: "Carry goods down the hill road to Millbrook, and anyone who means to stay there. Bandits still watch the road, and they go for the cart first.",
+    location: "highcrag",
+    facility: "caravan-hub",
+    deliversTo: "millbrook",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
+  },
+  // The mine's second level's job (Issue-357): the old workings' puzzle,
+  // deeper, four veins or five with two goblins throwing from behind them.
+  // A miner with a fighter or a knight never completes it, and a ranger
+  // beside a miner and a fighter clears it with no death. Its XP is 30 at its
+  // least roll, past every first level's job.
+  "the-deep-seam": {
+    id: "the-deep-seam",
+    name: "The deep seam",
+    description: "The new shaft has opened a seam richer than anything in the old workings: four good veins, some days five. Goblins have found it too, and they throw from the dark behind the rock.",
+    location: "millbrook",
+    facility: "mine",
+    facilityLevel: 2,
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: { min: 4, max: 5 } }, { type: "goblin-rock-thrower", count: 2 }], timeLimitMs: 180_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
+  },
+  // The lumber camp's second level's job (Issue-357): four trees, and two
+  // bandits come for the timber, who strike the weakest hero first. Every
+  // lone hero Millbrook recruits falls, a lumberjack with a fighter completes
+  // it and loses one on some runs, and a third hero makes it safe. Its XP is
+  // 30, as the deep seam's.
+  "the-old-growth-stand": {
+    id: "the-old-growth-stand",
+    name: "The old-growth stand",
+    description: "The camp's new saw pit can take the old-growth timber at last: four great trees past the deep woods. Bandits have been selling that wood in the valley, and they will not give it up.",
+    location: "millbrook",
+    facility: "lumber-camp",
+    facilityLevel: 2,
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 4 }, { type: "bandit", count: 2 }], timeLimitMs: 180_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 6,
+  },
+};
+
+/**
+ * For a job whose largest roll passes a level-1 warehouse: the one resource
+ * the owner accepted that for, and the warehouse level whose cap holds it at
+ * the best row of its drop. Every other job, and every other resource of a
+ * job named here, fits level 1, and the content's test holds each to that.
+ * The lumber camp's job is the first, for its timber (the owner, 2026-11-23,
+ * Issue-291; decision 0058, its fourth amendment): the board's timber job
+ * already reaches a level-1 warehouse's 100 at a lumberjack's best roll, so a
+ * job with clearly more timber passes it. A level-1 warehouse loses what it
+ * cannot hold, the result says how much, and the job is what makes the second
+ * level worth building. The second levels' jobs are the next (Issue-357): a
+ * camp that has built a level with stone has the warehouse's second level
+ * already, since its caravan hub needs it.
+ */
+export const JOB_WAREHOUSE_LEVEL: Readonly<Partial<Record<JobId, { readonly material: Material; readonly level: number }>>> = {
+  "lumber-from-the-deep-woods": { material: "timber", level: 2 },
+  "the-deep-seam": { material: "ore", level: 2 },
+  "the-old-growth-stand": { material: "timber", level: 2 },
 };
 
 /** The job with this id, or undefined for an id this version's content does not know, as an adventure of another version may carry. */
@@ -623,6 +1051,15 @@ export function jobOf(id: string): Job | undefined {
  */
 export function jobsPostedBy(locationId: string, poster: FacilityKind): Job[] {
   return Object.values(JOBS).filter((job) => job.location === locationId && (job.facility ?? "job-board") === poster);
+}
+
+/**
+ * The level of its facility that a job needs to be started: its own where it
+ * names one, as a second level's job does (Issue-357), level 1 for any other
+ * facility's job, and none for the job board's.
+ */
+export function jobFacilityLevel(job: Job): number {
+  return job.facility === undefined ? 0 : (job.facilityLevel ?? 1);
 }
 
 /** A retreat in a fight: an attempt every 2 s, 30% at first, 20 points more after each failure. */

@@ -1,4 +1,4 @@
-import { type AdventureEvent, type Line, MONSTERS, RESOURCE_NODES, type Side } from '@heat/engine';
+import { type AdventureEvent, type AdventureOutcome, CART, CART_UNIT_ID, jobOf, type Line, MONSTERS, RESOURCE_NODES, type Side, type UnitKind } from '@heat/engine';
 
 /**
  * Where everyone stands and how they are, read from the adventure's events
@@ -10,7 +10,7 @@ import { type AdventureEvent, type Line, MONSTERS, RESOURCE_NODES, type Side } f
 export interface FieldUnit {
   readonly unitId: string;
   readonly side: Side;
-  readonly kind: 'hero' | 'monster' | 'resource';
+  readonly kind: UnitKind;
   /** The unit type, monster type or resource type. */
   readonly type: string;
   readonly name: string;
@@ -29,17 +29,49 @@ export interface Field {
   readonly timeLimitMs: number | null;
   /** The party: every hero, by the snapshot's order, standing or down. */
   readonly party: readonly FieldUnit[];
+  /**
+   * A caravan's cart beside the party (decision 0059): there from the start,
+   * broken where it fell until the next stage begins, and null from then on,
+   * or on a job that delivers nothing. It is not in `party`, which is the
+   * heroes the controls show.
+   */
+  readonly cart: FieldUnit | null;
   /** The other side of the stage under way; empty outside a fight or a gather. */
   readonly opponents: readonly FieldUnit[];
-  /** What the party carries so far. */
-  readonly cargo: readonly { readonly material: string; readonly amount: number }[];
+  /** What has dropped to the party so far, counted up as each enemy falls (decision 0058). */
+  readonly drops: readonly { readonly material: string; readonly amount: number }[];
   readonly order: 'press-on' | 'retreat';
-  readonly outcome: 'complete' | 'retreat' | 'defeat' | null;
+  readonly outcome: AdventureOutcome | null;
 }
 
-/** The party as the snapshot gives it, before the first event. */
-export function emptyField(party: readonly { readonly heroId: string; readonly name: string; readonly unitType: string; readonly stats: { readonly maxHealth: number } }[]): Field {
+/** A cart's health as it sets out, and the most it has. */
+export interface CartStart {
+  readonly health: number;
+  readonly maxHealth: number;
+}
+
+/** The cart a run of this job sets out with: the content's, on a job that delivers; null on any other, or a job this build does not have. */
+export function jobCart(jobId: string): CartStart | null {
+  return jobOf(jobId)?.deliversTo === undefined ? null : { health: CART.health, maxHealth: CART.health };
+}
+
+/** The cart a stored timeline set out with, read from the first battle it stood in; null where it stood in none. */
+export function timelineCart(events: readonly AdventureEvent[]): CartStart | null {
+  for (const event of events) {
+    if (event.kind !== 'battle-start') continue;
+    const cart = event.participants.find((p) => p.kind === 'cart');
+    if (cart) return { health: cart.health, maxHealth: cart.maxHealth };
+  }
+  return null;
+}
+
+/** The party as the snapshot gives it, and its cart if it has one, before the first event. */
+export function emptyField(
+  party: readonly { readonly heroId: string; readonly name: string; readonly unitType: string; readonly stats: { readonly maxHealth: number } }[],
+  cart: CartStart | null = null,
+): Field {
   return {
+    cart: cart && { unitId: CART_UNIT_ID, side: 'party', kind: 'cart', type: 'cart', name: CART.name, line: CART.homeLine, ...cart },
     stage: -1,
     stageKind: null,
     stageStart: 0,
@@ -55,7 +87,7 @@ export function emptyField(party: readonly { readonly heroId: string; readonly n
       maxHealth: h.stats.maxHealth,
     })),
     opponents: [],
-    cargo: [],
+    drops: [],
     order: 'press-on',
     outcome: null,
   };
@@ -72,20 +104,29 @@ function update(units: readonly FieldUnit[], unitId: string, change: Partial<Fie
 }
 
 function updateBoth(field: Field, unitId: string, change: Partial<FieldUnit>): Field {
-  return { ...field, party: update(field.party, unitId, change), opponents: update(field.opponents, unitId, change) };
+  const cart = field.cart?.unitId === unitId ? { ...field.cart, ...change } : field.cart;
+  return { ...field, party: update(field.party, unitId, change), cart, opponents: update(field.opponents, unitId, change) };
+}
+
+/** What the party carries with one more drop: added to its resource's line, or a line of its own after the others. */
+function withDrop(drops: Field['drops'], drop: { readonly material: string; readonly amount: number }): Field['drops'] {
+  if (!drops.some((d) => d.material === drop.material)) return [...drops, { material: drop.material, amount: drop.amount }];
+  return drops.map((d) => (d.material === drop.material ? { ...d, amount: d.amount + drop.amount } : d));
 }
 
 /** The field after one event. */
 export function applyEvent(field: Field, event: AdventureEvent): Field {
   switch (event.kind) {
     case 'stage-start':
-      return { ...field, stage: event.stage, stageKind: event.stageKind, stageStart: event.timestamp, timeLimitMs: null, opponents: [] };
+      // A broken cart is left where it fell as the next stage begins.
+      return { ...field, stage: event.stage, stageKind: event.stageKind, stageStart: event.timestamp, timeLimitMs: null, cart: field.cart && field.cart.health > 0 ? field.cart : null, opponents: [] };
     case 'battle-start': {
       const lines = new Map(event.participants.map((p) => [p.unitId, p.line] as const));
       return {
         ...field,
         timeLimitMs: event.timeLimitMs,
         party: field.party.map((u) => ({ ...u, line: lines.get(u.unitId) ?? null })),
+        cart: field.cart && { ...field.cart, line: lines.get(field.cart.unitId) ?? field.cart.line },
         opponents: event.participants
           .filter((p) => p.side === 'opponents')
           .map((p) => ({
@@ -103,7 +144,7 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
     case 'action-resolved': {
       let next = field;
       for (const effect of event.effects) {
-        if (effect.kind === 'damage' || effect.kind === 'harvest') next = updateBoth(next, effect.targetId, { health: effect.newHealth });
+        if (effect.kind === 'damage') next = updateBoth(next, effect.targetId, { health: effect.newHealth });
         else if (effect.kind === 'move') next = updateBoth(next, effect.unitId, { line: effect.to });
       }
       return next;
@@ -112,6 +153,8 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
       return event.moves.reduce((next, move) => updateBoth(next, move.unitId, { line: move.to }), field);
     case 'unit-down':
       return updateBoth(field, event.unitId, { health: 0 });
+    case 'drop':
+      return { ...field, drops: withDrop(field.drops, event) };
     case 'battle-end':
       return { ...field, timeLimitMs: null };
     case 'stage-end':
@@ -119,12 +162,14 @@ export function applyEvent(field: Field, event: AdventureEvent): Field {
         ...field,
         timeLimitMs: null,
         party: event.health.reduce((party, h) => update(party, h.heroId, { health: h.health }), field.party),
-        cargo: event.cargo,
+        // The engine's own count, which the drops so far have already reached.
+        drops: event.drops,
       };
     case 'order':
       return { ...field, order: event.order };
     case 'adventure-end':
-      return { ...field, outcome: event.outcome };
+      // A party that is all down keeps nothing, so it carries nothing from here (decision 0058).
+      return { ...field, outcome: event.outcome, drops: event.outcome === 'defeat' ? [] : field.drops };
     default:
       return field;
   }

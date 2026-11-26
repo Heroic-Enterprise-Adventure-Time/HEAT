@@ -1,9 +1,24 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { range } from "es-toolkit";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
-import { type AdventureTimeline, JOBS, LEVEL_XP, levelForXp, must, replay, type UnitType, warehouseCapacity } from "@heat/engine";
+import {
+  type AdventureSnapshot,
+  type AdventureTimeline,
+  expandStages,
+  JOBS,
+  LEVEL_XP,
+  levelForXp,
+  MONSTERS,
+  must,
+  replay,
+  RESOURCE_NODES,
+  UNIT_PROFILES,
+  type UnitType,
+  warehouseCapacity,
+} from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
@@ -13,7 +28,7 @@ import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, En
 import { startAdventure } from "../src/start.js";
 import { SETTLE_ATTEMPTS, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { player, storedItem, whole } from "./data.js";
+import { player, putParty as putPartyAt, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -22,7 +37,10 @@ import { PREVIOUS_VERSION as previous, VERSION as version } from "./versions.js"
 /**
  * Submit, settlement and discard against DynamoDB Local, with the replay
  * bucket in memory (src/timelines.ts): the result is the hub's replay; XP
- * and levels; credits capped at the warehouse with the loss in the ledger;
+ * and levels; what dropped credited beside the pay, one holding and one
+ * ledger entry for each resource, and what a retreat keeps of both (decision
+ * 0058); a job that varies settled as its seed rolls it (Issue-341);
+ * credits capped at the warehouse with the loss in the ledger;
  * a death with the camp's living count and the sighting; a repeated and a
  * concurrent submit that pay once; the adventure's item in its location's
  * feed, which a discard never writes (decision 0050); a balance moved during settlement; a
@@ -47,29 +65,21 @@ beforeAll(() => {
 
 const at = "millbrook";
 const wolves = JOBS["wolves-on-the-mill-road"];
+/** What the wolves job gives a hero that arrives: its two wolves' XP and its bonus (decision 0058). */
+const WOLVES_XP = 2 * MONSTERS.wolf.xp + wolves.bonusXp;
+const timber = JOBS["timber-from-the-near-woods"];
+const sticks = JOBS["pick-up-sticks"];
 
 /** Living heroes of the given unit types and a camp that counts them, with their sightings. */
-async function putParty(p: string, unitTypes: UnitType[], warehouseLevel = 1): Promise<Hero[]> {
-  const heroes = unitTypes.map((unitType, i): Hero => ({
-    id: randomUUID(), location: at, unitType, spriteSet: `${unitType}-01`, name: `Hero ${i}`,
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
-  }));
-  for (const hero of heroes) {
-    await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
-    await db.send(new PutCommand({
-      TableName: tables.location,
-      Item: whole("sighting", { ...locationKeys.seen(at, hero.id), heroId: hero.id, level: 1, seenAt: "2026-01-01T00:00:00.000Z", expiresAt: 1 }),
-    }));
-  }
-  await db.send(new PutCommand({
-    TableName: tables.player,
-    Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel, activeHeroes: heroes.length, livingHeroes: heroes.length }),
-  }));
-  return heroes;
+const putParty = (p: string, unitTypes: UnitType[]): Promise<Hero[]> => putPartyAt(db, tables, p, unitTypes, at);
+
+/** Starts the job for the party; with `seed`, on that seed and not one the hub draws (graphql.md, rule 25). */
+async function start(p: string, heroes: Hero[], issuedBy = version, jobId: string = wolves.id, seed?: string) {
+  return startAdventure(repo, p, issuedBy, randomUUID(), at, jobId, heroes.map((h) => h.id), undefined, undefined, seed === undefined ? undefined : () => seed);
 }
 
-async function start(p: string, heroes: Hero[], issuedBy = version) {
-  return startAdventure(repo, p, issuedBy, randomUUID(), at, wolves.id, heroes.map((h) => h.id));
+async function balanceOf(p: string, material: string) {
+  return (await repo.holdings(p, at)).find((h) => h.material === material)?.balance;
 }
 
 
@@ -112,15 +122,16 @@ describe("a party that completes the job", () => {
     expect(await cloth(p)).toBe(10);
     expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
 
-    const level = levelForXp(wolves.xp);
+    expect(WOLVES_XP).toBe(20);
+    const level = levelForXp(WOLVES_XP);
     expect(level).toBeGreaterThan(1);
     for (const hero of heroes) {
-      expect(await repo.getHero(p, hero.id)).toMatchObject({ xp: wolves.xp, level, status: "ALIVE", adventureId: null });
+      expect(await repo.getHero(p, hero.id)).toMatchObject({ xp: WOLVES_XP, level, status: "ALIVE", adventureId: null });
       const seen = await storedItem(db, tables.location, locationKeys.seen(at, hero.id));
       expect(seen).toMatchObject({ level, name: hero.name });
       expect(seen?.["expiresAt"]).toBeGreaterThan(Date.now() / 1000);
     }
-    expect(settled.result?.heroes.map((h) => [h.xpGained, h.level, h.dead])).toEqual(heroes.map(() => [wolves.xp, level, false]));
+    expect(settled.result?.heroes.map((h) => [h.xpGained, h.level, h.dead])).toEqual(heroes.map(() => [WOLVES_XP, level, false]));
 
     const stored = JSON.parse(must(timelines.objects.get(started.adventureId), "the stored timeline")) as AdventureTimeline;
     expect(stored).toEqual(JSON.parse(JSON.stringify(replay(started.snapshot, started.seed, []).timeline)));
@@ -137,7 +148,7 @@ describe("a party that completes the job", () => {
 
     const key = locationKeys.done(at, now.toISOString(), started.adventureId);
     const item = await storedItem(db, tables.location, key);
-    const level = levelForXp(wolves.xp);
+    const level = levelForXp(WOLVES_XP);
     const stages = must(settled.result, "the result").stages;
     expect(stages.length).toBeGreaterThan(0);
     expect(item).toEqual({
@@ -179,7 +190,7 @@ describe("a party that completes the job", () => {
     expect(both.map((r) => r.status)).toEqual(["SETTLED", "SETTLED"]);
     expect(await inFeed(second.adventureId)).toHaveLength(1);
     expect(await cloth(p)).toBe(20);
-    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(2 * wolves.xp);
+    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(2 * WOLVES_XP);
   });
 
   /**
@@ -330,8 +341,8 @@ describe("what verifies an adventure", () => {
     const heroes = await putParty(p, ["fighter", "villager"]);
     const started = await start(p, heroes);
     // A retreat ordered at the start: the run ends at the first stage's end,
-    // paid nothing, with half the XP. Stored first, as a submit that lost
-    // its transaction would have left it.
+    // paid nothing, and with no enemy down, no XP. Stored first, as a submit
+    // that lost its transaction would have left it.
     const retreat = [{ kind: "party" as const, acceptedAtSimTime: 0, order: "retreat" as const }];
     const stored = replay(started.snapshot, started.seed, retreat);
     expect(stored.result.outcome).toBe("retreat");
@@ -341,8 +352,161 @@ describe("what verifies an adventure", () => {
     const settled = await submitAdventure(repo, timelines, p, version, started.adventureId, []);
     expect(settled.result?.outcome).toBe("retreat");
     expect(settled.result?.credited).toEqual([]);
-    const half = (wolves.xp * wolves.retreat.xpPercent) / 100;
-    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(half);
+    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(0);
+  });
+});
+
+describe("what dropped (decision 0058)", () => {
+  const tree = must(must(RESOURCE_NODES.tree.drops[0], "the tree's drop").levels[0], "its row at woodcutting 1");
+
+  it("is credited beside the pay, one holding and one ledger entry for each resource, with the enemies' XP and the bonus", async () => {
+    const p = player();
+    const heroes = await putParty(p, ["villager", "villager"]);
+    const started = await start(p, heroes, version, timber.id);
+    const expected = replay(started.snapshot, started.seed, []).result;
+    expect(expected.outcome).toBe("complete");
+
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
+    const dropped = must(settled.result?.rewards.find((r) => r.material === "timber"), "the timber").amount;
+    // Two trees, each dropping at a villager's level.
+    expect(dropped).toBeGreaterThanOrEqual(2 * tree.min);
+    expect(dropped).toBeLessThanOrEqual(2 * tree.max);
+    expect(settled.result?.rewards).toEqual([{ material: "timber", amount: dropped }, ...timber.pay]);
+    expect(settled.result?.rewards).toEqual(expected.rewards);
+    expect(settled.result?.credited).toEqual(settled.result?.rewards);
+    expect(settled.result?.lost).toEqual([]);
+    expect(await balanceOf(p, "timber")).toBe(dropped);
+    expect(await balanceOf(p, "cloth")).toBe(3);
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#timber"))).toMatchObject({ delta: dropped, lost: 0 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 3, lost: 0 });
+    // Two trees, a wolf and the bonus: what the job gave before its enemies had XP.
+    const earned = 2 * RESOURCE_NODES.tree.xp + MONSTERS.wolf.xp + timber.bonusXp;
+    expect(earned).toBe(15);
+    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(earned);
+  });
+
+  it("is kept by a retreat, with the XP of the enemies that went down, and neither the pay nor the bonus", async () => {
+    const p = player();
+    const heroes = await putParty(p, ["villager", "villager"]);
+    const started = await start(p, heroes, version, timber.id);
+    const whole = replay(started.snapshot, started.seed, []).result;
+    // Ordered a moment before the last tree falls, so the stage's end makes the retreat certain: both trees are down, and the wolf is never met.
+    const at_ = must(whole.stages[1], "the gather stage").endedAtMs - 100;
+    const expected = replay(started.snapshot, started.seed, [{ kind: "party", acceptedAtSimTime: at_, order: "retreat" }]).result;
+    expect(expected.outcome).toBe("retreat");
+
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, [{ kind: "PARTY", acceptedAtSimTime: at_, order: "RETREAT" }]);
+    expect(settled.result?.outcome).toBe("retreat");
+    const dropped = must(whole.rewards.find((r) => r.material === "timber"), "the timber").amount;
+    expect(settled.result?.credited).toEqual([{ material: "timber", amount: dropped }]);
+    expect(await balanceOf(p, "timber")).toBe(dropped);
+    expect(await balanceOf(p, "cloth")).toBeUndefined();
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toBeUndefined();
+    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(2 * RESOURCE_NODES.tree.xp);
+  });
+
+  it("is nothing for a party with no carrier of the drop's trait, which is still paid and still earns its XP", async () => {
+    const p = player();
+    const heroes = await putParty(p, ["fighter"]);
+    const started = await start(p, heroes, version, timber.id);
+    expect(replay(started.snapshot, started.seed, []).result.outcome).toBe("complete");
+
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
+    expect(settled.result?.credited).toEqual(timber.pay);
+    expect(await balanceOf(p, "timber")).toBeUndefined();
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#timber"))).toBeUndefined();
+    expect((await repo.getHero(p, must(heroes[0], "the fighter").id))?.xp).toBe(15);
+  });
+
+  it("credits the wolf's hide to a party with a ranger, a holding and a ledger entry of its own beside the cloth, and none to a party without one (Issue-340)", async () => {
+    // A wolf drops hide half the time, so the test passes a seed on which both of this job's wolves do:
+    // the roll is the wolf's own, from the seed, the stage and its id, whoever the heroes are.
+    const seed = "hide";
+    const p = player();
+    const heroes = await putParty(p, ["fighter", "ranger"]);
+    const started = await start(p, heroes, version, wolves.id, seed);
+    expect(started.seed).toBe(seed);
+    expect(started.snapshot.heroes.map((h) => h.stats.traits)).toEqual([[], [{ trait: "skinning", level: 1 }]]);
+    const expected = replay(started.snapshot, started.seed, []).result;
+    expect(expected.outcome).toBe("complete");
+    const hide = must(expected.rewards.find((r) => r.material === "hide"), "the hide").amount;
+    expect(hide).toBe(2);
+
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
+    expect(settled.result?.rewards).toEqual([...wolves.pay, { material: "hide", amount: hide }]);
+    expect(settled.result?.credited).toEqual(settled.result?.rewards);
+    expect(settled.result?.lost).toEqual([]);
+    expect(await balanceOf(p, "hide")).toBe(hide);
+    expect(await balanceOf(p, "cloth")).toBe(10);
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#hide"))).toMatchObject({ delta: hide, lost: 0 });
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#cloth"))).toMatchObject({ delta: 10, lost: 0 });
+    for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp).toBe(WOLVES_XP);
+
+    // The same job on the same seed with a villager in the ranger's place: the wolves fall, and no hide is credited.
+    const q = player();
+    const others = await putParty(q, ["fighter", "villager"]);
+    const without = await start(q, others, version, wolves.id, seed);
+    expect(replay(without.snapshot, without.seed, []).result.outcome).toBe("complete");
+    const paid = await submitAdventure(repo, new MemoryTimelines(), q, version, without.adventureId, []);
+    expect(paid.result?.credited).toEqual(wolves.pay);
+    expect(await balanceOf(q, "hide")).toBeUndefined();
+    expect(await storedItem(db, tables.player, playerKeys.ledger(q, without.adventureId, "credit#hide"))).toBeUndefined();
+  });
+
+  it("settles a job that varies as its seed rolls it: the first job's wolf, its XP and a ranger's hide on a seed that has one, and none of them on a seed that has not (Issue-341)", async () => {
+    // The record holds the job's id and the seed, and nothing of the roll: the hub's replay expands the stages again.
+    // The seeds are picked by asking the engine what each gives, not by restating how it draws (graphql.md, rule 26):
+    // who the job sets against a party is its expansion, and what a ranger and a villager bring home is a replay
+    // with a stand-in party of those two types, since a roll does not read who the heroes are.
+    const seeds = range(2000).map((i) => `varies-${String(i)}`);
+    const types = ["ranger", "villager"] as const satisfies readonly UnitType[];
+    const standIn: AdventureSnapshot = {
+      version,
+      jobId: sticks.id,
+      heroes: types.map((unitType) => ({
+        heroId: `stand-in-${unitType}`, unitType, name: unitType, spriteSet: `${unitType}-01`, level: 1, stats: must(UNIT_PROFILES[unitType], `the ${unitType}'s profile`).stats,
+      })),
+    };
+    const wolfIn = (seed: string) => expandStages(sticks, seed).some((stage) => "opponents" in stage && stage.opponents.some((o) => o.type === "wolf"));
+    // A wolf's hide falls half the time at skinning 1, so the seed with the wolf is one where it does.
+    const hideOn = (seed: string) => replay(standIn, seed, []).result.rewards.some((r) => r.material === "hide");
+    const withWolf = must(seeds.find((seed) => wolfIn(seed) && hideOn(seed)), "a seed with the wolf and its hide");
+    const quiet = must(seeds.find((seed) => !wolfIn(seed)), "a seed without the wolf");
+
+    for (const [seed, wolf] of [[withWolf, true], [quiet, false]] as const) {
+      const p = player();
+      const heroes = await putParty(p, [...types]);
+      const started = await start(p, heroes, version, sticks.id, seed);
+      expect(started.snapshot.jobId, seed).toBe(sticks.id);
+      const timelines = new MemoryTimelines();
+      const settled = await submitAdventure(repo, timelines, p, version, started.adventureId, []);
+      expect(settled.result?.outcome, seed).toBe("complete");
+
+      const stored = JSON.parse(must(timelines.objects.get(started.adventureId), "the stored timeline")) as AdventureTimeline;
+      const met = stored.events.flatMap((e) => (e.kind === "battle-start" ? e.participants.filter((x) => x.side === "opponents").map((x) => x.type) : []));
+      expect(met, seed).toEqual(wolf ? ["tree", "wolf"] : ["tree"]);
+
+      const xp = RESOURCE_NODES.tree.xp + sticks.bonusXp + (wolf ? MONSTERS.wolf.xp : 0);
+      expect(xp, seed).toBe(wolf ? 10 : 5);
+      for (const hero of heroes) expect((await repo.getHero(p, hero.id))?.xp, seed).toBe(xp);
+      expect(settled.result?.credited.map((r) => r.material), seed).toEqual(wolf ? ["timber", "hide"] : ["timber"]);
+      expect(await balanceOf(p, "hide"), seed).toBe(wolf ? 1 : undefined);
+      expect(await balanceOf(p, "timber"), seed).toBeGreaterThanOrEqual(30);
+    }
+  });
+
+  it("is capped by the warehouse like the pay, each resource on its own balance", async () => {
+    const p = player();
+    const heroes = await putParty(p, ["villager", "villager"]);
+    const cap = warehouseCapacity(1);
+    await repo.setBalance(p, at, "timber", cap - 10);
+    const started = await start(p, heroes, version, timber.id);
+    const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
+    const dropped = must(settled.result?.rewards.find((r) => r.material === "timber"), "the timber").amount;
+    expect(settled.result?.credited).toEqual([{ material: "timber", amount: 10 }, ...timber.pay]);
+    expect(settled.result?.lost).toEqual([{ material: "timber", amount: dropped - 10 }]);
+    expect(await balanceOf(p, "timber")).toBe(cap);
+    expect(await storedItem(db, tables.player, playerKeys.ledger(p, started.adventureId, "credit#timber"))).toMatchObject({ delta: 10, lost: dropped - 10 });
   });
 });
 

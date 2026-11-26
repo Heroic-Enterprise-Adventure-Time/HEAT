@@ -1,12 +1,13 @@
-import { constantCase, uniq } from "es-toolkit";
+import { constantCase, sumBy, uniq } from "es-toolkit";
 import { GraphQLError } from "graphql";
 import * as z from "zod/mini";
 
 import {
   ADVENTURE_OUTCOMES,
   type AdventureSnapshot,
+  CART_CAPACITY,
   FACILITY_KINDS,
-  type GatherRating,
+  GATHERING_TRAITS,
   hallCapacity,
   type Job,
   jobOf,
@@ -19,14 +20,16 @@ import {
   STAGE_ENDINGS,
   STAGE_KINDS,
   type StageResult,
+  type TraitLevel,
   UNIT_TYPES,
   type UnitStats,
+  UNLOCK_IDS,
   warehouseCapacity,
 } from "@heat/engine";
 
 import { buildFacility } from "../build.js";
 import { callerId } from "../context.js";
-import { type AdventureRecord, type Camp, campLevels, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
+import { type AdventureRecord, type Camp, campLevels, type Caravan, type EarnedUnlock, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "../db/statuses.js";
 import { discardAdventure } from "../discard.js";
 import { readAdventure } from "../read.js";
@@ -85,6 +88,7 @@ function enumOf<T extends string>(name: string, description: string, values: rea
 
 const UnitTypeRef = enumOf("UnitType", "The unit types, the engine's `UnitType`: what a hero is and what the hall recruits.", UNIT_TYPES);
 const MaterialRef = enumOf("Material", "The resources, the engine's `Material`: there is no currency.", MATERIALS);
+const GatheringTraitRef = enumOf("GatheringTrait", "The gathering traits, the engine's `GatheringTrait`, each named for its craft: what a party must carry for an enemy's drop to fall to it.", GATHERING_TRAITS);
 const FacilityKindRef = enumOf("FacilityKind", "A camp's own facilities, the engine's `FacilityKind`, those every camp has and those it may build.", FACILITY_KINDS);
 const AdventureOutcomeRef = enumOf(
   "AdventureOutcome",
@@ -93,6 +97,11 @@ const AdventureOutcomeRef = enumOf(
 );
 const StageKindRef = enumOf("StageKind", "What a stage of a job is, the engine's `StageKind`.", STAGE_KINDS);
 const StageEndingRef = enumOf("StageEnding", "How a stage ended, the engine's `StageEnding`: DONE for travel and arrive; the rest are a battle's.", STAGE_ENDINGS);
+const UnlockRef = enumOf(
+  "Unlock",
+  "The unlocks, the engine's `UnlockId`: what a player earns once and holds for good. The client reads each one's name, and the words said when it is earned, from the engine it loaded.",
+  UNLOCK_IDS,
+);
 
 const HeroStatusRef = builder.enumType("HeroStatus", {
   description: "Alive or dead at the camp, or retired for good.",
@@ -195,11 +204,11 @@ const JobRef = builder.objectRef<Job>("Job").implement({
   }),
 });
 
-const GatherRatingRef = builder.objectRef<GatherRating>("GatherRating").implement({
-  description: "How well a unit harvests the resource nodes of one material, the engine's `GatherRating`.",
+const TraitLevelRef = builder.objectRef<TraitLevel>("TraitLevel").implement({
+  description: "One gathering trait a unit carries and its level in it, the engine's `TraitLevel`.",
   fields: (t) => ({
-    material: t.expose("material", { type: MaterialRef }),
-    rating: t.exposeInt("rating", { description: "Set against a node's difficulty: a hit's yield is its share of the node's maximum, and a rating above the difficulty yields no more." }),
+    trait: t.expose("trait", { type: GatheringTraitRef }),
+    level: t.exposeInt("level", { description: "A whole number from 1. When an enemy goes down, the highest level of its drop's trait among the heroes standing says how much of the drop falls." }),
   }),
 });
 
@@ -209,9 +218,9 @@ const UnitStatsRef = builder.objectRef<UnitStats>("UnitStats").implement({
     maxHealth: t.exposeInt("maxHealth"),
     speed: t.exposeInt("speed", { description: "Turns per ten seconds." }),
     damage: t.exposeInt("damage"),
-    gather: t.expose("gather", {
-      type: [GatherRatingRef],
-      description: "The unit's gather rating for each material it harvests; a material with no entry is 0, and a hit on a node of it yields nothing.",
+    traits: t.expose("traits", {
+      type: [TraitLevelRef],
+      description: "The unit's gathering traits, one entry a trait at most; a trait with no entry is not carried, and a party with no carrier of a drop's trait gets none of that drop.",
     }),
   }),
 });
@@ -269,8 +278,13 @@ const HeroOutcomeRef = builder.objectRef<HeroOutcome>("HeroOutcome").implement({
 });
 
 const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").implement({
-  description: "What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, and each hero's XP and fate.",
+  description: "What the hub's replay found and settlement wrote: how each stage ended, the rewards, what the warehouse took and what its cap lost, each hero's XP and fate, and the unlocks the run earned.",
   fields: (t) => ({
+    unlocks: t.expose("unlocks", {
+      type: [UnlockRef],
+      description:
+        "The unlocks the run earned, whether or not the player held them already: what the run did, and nothing of what the player held before. Which were new is the owner's alone to read, from me.unlocks, where each names the adventure that first earned it.",
+    }),
     outcome: t.expose("outcome", { type: AdventureOutcomeRef }),
     endedAtMs: t.exposeInt("endedAtMs"),
     reachedStage: t.exposeInt("reachedStage"),
@@ -278,7 +292,21 @@ const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").i
     rewards: t.expose("rewards", { type: [RewardRef], description: "What the run yielded." }),
     credited: t.expose("credited", { type: [RewardRef], description: "What went into the warehouse." }),
     lost: t.expose("lost", { type: [RewardRef], description: "What the warehouse's cap turned away." }),
+    delivered: t.expose("delivered", {
+      type: [RewardRef],
+      description: "What a caravan's cargo put into the destination's warehouse. Empty for a job that delivers nothing, a cart that broke, a retreat or a defeat.",
+    }),
+    deliveryLost: t.expose("deliveryLost", { type: [RewardRef], description: "What the destination warehouse's cap turned away of a caravan's cargo." }),
     heroes: t.expose("heroes", { type: [HeroOutcomeRef] }),
+  }),
+});
+
+const CaravanRef = builder.objectRef<Caravan>("Caravan").implement({
+  description: "A caravan as it set out (decision 0059): where it delivers, what it carries, and who of the party stays there on arrival.",
+  fields: (t) => ({
+    destination: t.exposeID("destination", { description: "The location the job delivers to." }),
+    cargo: t.expose("cargo", { type: [RewardRef], description: "What the start took from the origin's warehouse, each resource once." }),
+    staying: t.exposeIDList("staying", { description: "The heroes of the party who stay at the destination if the caravan arrives." }),
   }),
 });
 
@@ -303,6 +331,12 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     version: t.exposeString("version", { description: "The deploy that issued the adventure, and the only one that verifies it." }),
     status: t.field({ type: AdventureStatusRef, resolve: (adventure) => adventure.status }),
     result: t.field({ type: AdventureResultRef, nullable: true, resolve: (adventure) => adventure.result }),
+    caravan: t.field({
+      type: CaravanRef,
+      nullable: true,
+      description: "The caravan, on a job that delivers; null on any other. Read as the adventure is: by its player while it is open, by anyone once it is settled.",
+      resolve: (adventure) => adventure.caravan,
+    }),
     timeline: t.field({
       type: "JSON",
       nullable: true,
@@ -341,8 +375,17 @@ const RecentAdventureRef = builder.objectRef<RecentAdventure>("RecentAdventure")
   }),
 });
 
+const EarnedUnlockRef = builder.objectRef<EarnedUnlock>("EarnedUnlock").implement({
+  description: "An unlock the player holds, as it was first earned. It is never taken away, and earning it again changes nothing here.",
+  fields: (t) => ({
+    unlock: t.expose("unlock", { type: UnlockRef }),
+    earnedAt: t.expose("earnedAt", { type: "DateTime" }),
+    adventureId: t.exposeID("adventureId", { description: "The adventure that first earned it, so an unlock in that adventure's result was new to the player, and one in a later result was not." }),
+  }),
+});
+
 const PlayerRef = builder.objectRef<Player>("Player").implement({
-  description: "A player: the id anyone may read, and the name, camps, heroes and open adventure only the player may.",
+  description: "A player: the id anyone may read, and the name, camps, heroes, unlocks and open adventure only the player may.",
   fields: (t) => ({
     id: t.exposeID("id"),
     name: t.exposeString("name", {
@@ -353,9 +396,17 @@ const PlayerRef = builder.objectRef<Player>("Player").implement({
     camps: t.field({
       type: [CampRef],
       nullable: true,
-      description: "Private: only the player may read their own camps. Null, with an error on this field, for anyone else.",
+      description:
+        "Private: only the player may read their own camps, one at the starting location and one at each location whose unlock they hold. Null, with an error on this field, for anyone else.",
       authScopes: (player) => ({ self: player.id }),
       resolve: (player, _args, ctx) => ctx.repo.camps(player.id),
+    }),
+    unlocks: t.field({
+      type: [EarnedUnlockRef],
+      nullable: true,
+      description: "Private: only the player may read the unlocks they hold. Null, with an error on this field, for anyone else.",
+      authScopes: (player) => ({ self: player.id }),
+      resolve: (player, _args, ctx) => ctx.repo.unlocks(player.id),
     }),
     heroes: t.field({
       type: [HeroRef],
@@ -531,8 +582,9 @@ const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implem
 });
 
 const RecruitHeroInput = builder.inputType("RecruitHeroInput", {
-  description: "What to recruit, and the request's id.",
+  description: "Where to recruit and what, and the request's id.",
   fields: (t) => ({
+    location: t.id({ required: true, description: "The camp's location, whose heroes hall recruits." }),
     unitType: t.field({ type: UnitTypeRef, required: true, description: "A unit type on the location's recruitment list." }),
     requestId: t.field({
       type: "UUID",
@@ -561,6 +613,17 @@ const RetireHeroInput = builder.inputType("RetireHeroInput", {
 
 const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
 
+/** What the cart of the caravan hub at its highest level carries in all, the most any cargo can be (decision 0059). */
+const LARGEST_CART = Math.max(0, ...CART_CAPACITY);
+
+const CargoInput = builder.inputType("CargoInput", {
+  description: "An amount of one resource a caravan carries.",
+  fields: (t) => ({
+    material: t.field({ type: MaterialRef, required: true }),
+    amount: t.field({ type: "PositiveInt", required: true }),
+  }),
+});
+
 const StartAdventureInput = builder.inputType("StartAdventureInput", {
   description: "Which job to start, where, and with whom, and the request's id.",
   fields: (t) => ({
@@ -572,7 +635,7 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
       validate: z.uuid("a request id is a UUID").check(z.toLowerCase()),
     }),
     location: t.id({ required: true, description: "The camp's location, which posts the job." }),
-    jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built." }),
+    jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built to the level the job needs." }),
     heroIds: t.idList({
       required: true,
       description: "The party: one to four of the player's living heroes at that camp.",
@@ -581,6 +644,22 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
         z.maxLength(MAX_PARTY, PARTY_SIZE),
         z.refine((ids) => uniq(ids).length === ids.length, "a hero is in the party twice"),
       ),
+    }),
+    cargo: t.field({
+      type: [CargoInput],
+      required: true,
+      defaultValue: [],
+      description: `What a caravan carries from the camp's warehouse, each resource at most once, at most ${LARGEST_CART} in all, which the cart of the caravan hub at its highest level carries; a hub below that level carries less, which the start refuses. Empty for a job that delivers nothing.`,
+      validate: z.array(z.object({ material: z.string(), amount: z.number() })).check(
+        z.refine((cargo) => uniq(cargo.map((c) => c.material)).length === cargo.length, "a resource is in the cargo twice"),
+        z.refine((cargo) => sumBy(cargo, (c) => c.amount) <= LARGEST_CART, `a cart carries at most ${LARGEST_CART} in all`),
+      ),
+    }),
+    staying: t.idList({
+      required: true,
+      defaultValue: [],
+      description: "The heroes of the party who stay at a caravan's destination if it arrives. Empty for a job that delivers nothing.",
+      validate: z.array(z.string().check(z.toLowerCase())).check(z.refine((ids) => uniq(ids).length === ids.length, "a hero stays twice")),
     }),
   }),
 });
@@ -678,10 +757,10 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Recruits a hero of the unit type at the heroes hall of the starting camp, paid in resources from the camp's holdings; a villager is free when no hero at the camp is alive. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a unit type the location does not recruit, or a request id reused for another unit type, is BAD_USER_INPUT.",
+      "Recruits a hero of the unit type at the heroes hall of the player's camp at the location, paid in resources from that camp's holdings; a villager is free when no hero at the camp is alive, where the location recruits one. The request id becomes the hero's id, so a repeat answers with the hero already made. Refused with HallLevel, HallFull, InsufficientResources or Conflict; a location the player has no camp at, a unit type the location does not recruit, or a request id reused for another location or unit type, is BAD_USER_INPUT.",
     errors: answers("RecruitHero", { field: "hero", what: "the hero recruited, or already made by this request" }, [HallLevel, HallFull, InsufficientResources, Conflict]),
     args: { input: t.arg({ type: RecruitHeroInput, required: true }) },
-    resolve: (_root, { input }, ctx) => recruitHero(ctx.repo, callerId(ctx), input.unitType, input.requestId),
+    resolve: (_root, { input }, ctx) => recruitHero(ctx.repo, callerId(ctx), input.location, input.unitType, input.requestId),
   }),
   buildFacility: t.field({
     type: CampRef,
@@ -708,17 +787,31 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location or job the hub does not know, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.",
-    errors: answers("StartAdventure", { field: "adventure", what: "the adventure opened" }, [AdventureOpen, Requires, HeroDead, HeroRetired, HeroNotHere, HeroAdventuring, Conflict]),
+      "Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.",
+    errors: answers("StartAdventure", { field: "adventure", what: "the adventure opened" }, [
+      AdventureOpen,
+      Requires,
+      HeroDead,
+      HeroRetired,
+      HeroNotHere,
+      HeroAdventuring,
+      InsufficientResources,
+      HallFull,
+      Conflict,
+    ]),
     args: { input: t.arg({ type: StartAdventureInput, required: true }) },
-    resolve: (_root, { input }, ctx) => startAdventure(ctx.repo, callerId(ctx), ctx.version, input.requestId, input.location, input.jobId, input.heroIds),
+    resolve: (_root, { input }, ctx) =>
+      startAdventure(ctx.repo, callerId(ctx), ctx.version, input.requestId, input.location, input.jobId, input.heroIds, {
+        cargo: input.cargo,
+        staying: input.staying,
+      }),
   }),
   submitAdventure: t.field({
     type: AdventureRef,
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths. A settled adventure answers as it is; nothing is paid twice. Refused with EngineUpdated when another version issued it, AdventureDiscarded, or Conflict; an adventure that is not the player's, or a malformed log, is BAD_USER_INPUT.",
+      "Submits the caller's open adventure with its override log. The hub replays the log with the engine of the version that issued the adventure, stores the timeline, and settles: XP and levels, the rewards up to the warehouse's cap, the deaths, and the unlocks the run earned. A settled adventure answers as it is; nothing is paid twice. Refused with EngineUpdated when another version issued it, AdventureDiscarded, or Conflict; an adventure that is not the player's, or a malformed log, is BAD_USER_INPUT.",
     errors: answers("SubmitAdventure", { field: "adventure", what: "the adventure, settled, with its result" }, [EngineUpdated, AdventureDiscarded, Conflict]),
     args: { input: t.arg({ type: SubmitAdventureInput, required: true }) },
     resolve: (_root, { input }, ctx) => submitAdventure(ctx.repo, ctx.timelines, callerId(ctx), ctx.version, input.adventureId, input.overrides),

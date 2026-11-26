@@ -1,0 +1,99 @@
+# The stack's report, read under a role after the stack test: the cold start
+# from the function's log, and what each request did from its traces (decision
+# 0056). One copy for sandbox.yml and deploy.yml, because deploy.yml's runs only
+# on main. It runs nothing downloaded: the AWS CLI, gh, and this repository's
+# scripts, which import nothing but Node's own modules; the job names the
+# environment and grants id-token (decision 0046). The last report kept from
+# main is another run's artifact, read as data and checked before any of it is
+# written (scripts/trace-report.mjs, parseReport). Expects the repository
+# checked out and Node set up.
+name: Stack report
+description: Assumes a role and reports the function's cold start and what each request did since the stack test began.
+
+inputs:
+  role-arn:
+    description: The role that reads the function's log and its traces
+    required: true
+  session-name:
+    description: The role session's name
+    required: true
+  stack:
+    description: The stack, heat-sb<issue> or heat-dev, whose function logs to /aws/lambda/<stack>-hub
+    required: true
+  since:
+    description: When the stack test began, in epoch milliseconds
+    required: true
+  test-result:
+    description: The result of the stack test's job; on failure the report names the last request's trace
+    required: true
+  comment:
+    description: "'true' to keep the report as one comment on the branch's pull request, which needs pull-requests: write"
+    required: false
+    default: "false"
+  keep-days:
+    description: Days to keep the report as the run's trace-report artifact, which a later run sets beside its own; empty keeps nothing
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Assume the role through GitHub's OIDC provider
+      uses: aws-actions/configure-aws-credentials@v6.3.0
+      with:
+        role-to-assume: ${{ inputs.role-arn }}
+        role-session-name: ${{ inputs.session-name }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Report the cold start
+      shell: bash
+      env:
+        STACK: ${{ inputs.stack }}
+        SINCE: ${{ inputs.since }}
+      run: |
+        set -eu
+        mkdir -p "$RUNNER_TEMP/stack-report"
+        sh scripts/report-cold-start.sh "/aws/lambda/$STACK-hub" "$SINCE" | tee "$RUNNER_TEMP/stack-report/cold-start.md"
+
+    # Needs actions: read. No kept report is no failure: the first run after
+    # this job reached main has none, and an artifact is kept ninety days.
+    - name: Fetch the last report kept from main
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: sh scripts/fetch-trace-baseline.sh "$RUNNER_TEMP/stack-report/baseline"
+
+    - name: Report what each request did
+      shell: bash
+      env:
+        STACK: ${{ inputs.stack }}
+        SINCE: ${{ inputs.since }}
+        FAILED: ${{ inputs.test-result == 'failure' && '--failed' || '' }}
+      run: |
+        set -eu
+        {
+          echo
+          # FAILED is one flag or nothing, so it is left to split.
+          # shellcheck disable=SC2086
+          node scripts/trace-report.mjs --stack "$STACK" --since "$SINCE" --version "$GITHUB_SHA" \
+            --markdown "$RUNNER_TEMP/stack-report/traces.md" \
+            --out "$RUNNER_TEMP/stack-report/trace-report.json" \
+            --baseline "$RUNNER_TEMP/stack-report/baseline/trace-report.json" $FAILED
+        } | tee -a "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment the report on the branch's pull request, if one is open
+      if: ${{ inputs.comment == 'true' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        STACK: ${{ inputs.stack }}
+      run: sh scripts/post-stack-report.sh "$STACK" "$RUNNER_TEMP/stack-report/cold-start.md" "$RUNNER_TEMP/stack-report/traces.md"
+
+    - name: Keep the report for a later run to read beside its own
+      if: ${{ inputs.keep-days != '' }}
+      uses: actions/upload-artifact@v7.0.2
+      with:
+        name: trace-report
+        path: ${{ runner.temp }}/stack-report/trace-report.json
+        if-no-files-found: error
+        retention-days: ${{ inputs.keep-days }}

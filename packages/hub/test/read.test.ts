@@ -30,7 +30,7 @@ const wolves = "wolves-on-the-mill-road";
 
 /** A player's adventure, open, with the free villager. */
 async function opened(p: string) {
-  const villager = await recruitHero(repo, p, "villager", randomUUID());
+  const villager = await recruitHero(repo, p, at, "villager", randomUUID());
   return startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id]);
 }
 

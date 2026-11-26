@@ -1,6 +1,6 @@
 /** Builders for the adventure tests. */
 
-import { range } from "es-toolkit";
+import { range, sum } from "es-toolkit";
 
 import {
   ADVENTURE_CONTENT,
@@ -8,9 +8,21 @@ import {
   type AdventureEvent,
   type AdventureResult,
   type AdventureSnapshot,
+  dropRow,
+  expandStages,
+  isResourceType,
   type Job,
+  largestStages,
+  leastStages,
+  location,
   type Material,
+  MONSTERS,
+  must,
+  replay,
+  RESOURCE_NODES,
+  type ResourceType,
   type SnapshotHero,
+  STARTING_LOCATION,
   UNIT_PROFILES,
   type UnitStats,
   type UnitType,
@@ -37,6 +49,41 @@ export function rewardOf(result: AdventureResult, material: Material): number {
   return result.rewards.find((r) => r.material === material)?.amount ?? 0;
 }
 
+/** How many hides a result brings home; none is 0. */
+export function hideOf(result: AdventureResult): number {
+  return rewardOf(result, "hide");
+}
+
+/** What Millbrook's hall recruits, each with its hall level and its cost, read from the content (typescript.md, rule 25). */
+export const MILLBROOK_RECRUITS = must(location(STARTING_LOCATION), "Millbrook").recruits;
+
+/** Every unit type Millbrook recruits, read from the content. */
+export const RECRUITED_TYPES = MILLBROOK_RECRUITS.map((r) => r.unitType);
+
+/** Highcrag, the second location, and what its hall recruits, read from the content. */
+export const HIGHCRAG = "highcrag";
+export const HIGHCRAG_RECRUITS = must(location(HIGHCRAG), "Highcrag").recruits;
+
+/**
+ * The least and the most that `count` of a resource node drop for a party
+ * whose highest level in the node's trait is `level`, from the content's rows
+ * (decision 0058).
+ */
+export function haul(type: ResourceType, level: number, count = 1): { readonly min: number; readonly max: number } {
+  const drop = must(RESOURCE_NODES[type].drops[0], `the drop of a ${type}`);
+  const row = must(dropRow(drop, level), `its row at level ${level}`);
+  return { min: row.min * count, max: row.max * count };
+}
+
+/** The XP of the enemies a job always sets against a party, every stage's together: its least roll. */
+export function enemiesXp(job: Job): number {
+  return sum(
+    leastStages(job).flatMap((stage) =>
+      stage.kind === "fight" || stage.kind === "gather" ? stage.opponents.map((o) => o.count * (isResourceType(o.type) ? RESOURCE_NODES[o.type].xp : MONSTERS[o.type].xp)) : [],
+    ),
+  );
+}
+
 export function snapshot(jobId: string, heroes: readonly SnapshotHero[]): AdventureSnapshot {
   return { version: "test-version", jobId, heroes };
 }
@@ -44,6 +91,20 @@ export function snapshot(jobId: string, heroes: readonly SnapshotHero[]): Advent
 /** The game's content with one more job, or a job replaced. */
 export function contentWithJob(job: Job): AdventureContent {
   return { ...ADVENTURE_CONTENT, jobs: { ...ADVENTURE_CONTENT.jobs, [job.id]: job } };
+}
+
+/**
+ * The job at its largest roll, as a job with no variance: every entry
+ * appears, at its most. What a time limit has to fit, and the hardest the
+ * job can be for a party.
+ */
+export function atLargest(job: Job): Job {
+  return { ...job, id: `${job.id}-at-its-largest`, stages: largestStages(job) };
+}
+
+/** Whether this adventure of the job meets the type in any stage. */
+export function meets(job: Job, seed: string, type: string): boolean {
+  return expandStages(job, seed).some((stage) => (stage.kind === "fight" || stage.kind === "gather") && stage.opponents.some((o) => o.type === type));
 }
 
 export function ofKind<K extends AdventureEvent["kind"]>(events: readonly AdventureEvent[], kind: K): Extract<AdventureEvent, { kind: K }>[] {
@@ -54,8 +115,50 @@ export function ofKind<K extends AdventureEvent["kind"]>(events: readonly Advent
 export const SEEDS = 500;
 export const seeds = range(SEEDS).map((i) => `seed-${i}`);
 
+/** The job played by this party on every seed with nothing overridden: each seed and its result. */
+export function played(jobId: string, heroes: readonly SnapshotHero[]): { readonly seed: string; readonly result: AdventureResult }[] {
+  return seeds.map((seed) => ({ seed, result: replay(snapshot(jobId, heroes), seed, []).result }));
+}
+
 export const STICKS = "pick-up-sticks";
 export const WOLVES = "wolves-on-the-mill-road";
 export const TIMBER = "timber-from-the-near-woods";
 export const ORE = "ore-from-the-hill";
 export const GOBLINS = "goblins-in-the-old-workings";
+export const LUMBER = "lumber-from-the-deep-woods";
+export const ROAD = "scout-the-road-to-highcrag";
+export const CRAG = "ore-from-the-crag";
+export const CARAVAN = "caravan-to-highcrag";
+export const QUARRY_FACE = "stone-from-the-quarry-face";
+export const QUARRY_GOBLINS = "goblins-in-the-quarry";
+export const CARAVAN_BACK = "caravan-to-millbrook";
+export const SEAM = "the-deep-seam";
+export const STAND = "the-old-growth-stand";
+
+/**
+ * A caravan of the tests' own (Issue-353), kept apart from the content's
+ * "Caravan to Highcrag" (Issue-354) so that the cart's rules are held apart
+ * from the road's numbers. Millbrook's hub to Highcrag, two fights with a bandit in
+ * each and a wolf on half of them, so a cart stands beside the party in two
+ * stages and carries its health from the first to the second.
+ */
+export const CARAVAN_JOB: Job = {
+  id: "test-caravan",
+  name: "Test caravan",
+  description: "A caravan the engine's tests play.",
+  location: STARTING_LOCATION,
+  facility: "caravan-hub",
+  deliversTo: HIGHCRAG,
+  stages: [
+    { kind: "travel", lengthMs: 3000 },
+    { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+    { kind: "travel", lengthMs: 3000 },
+    { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+    { kind: "arrive" },
+  ],
+  pay: [],
+  bonusXp: 0,
+};
+
+/** The game's content with the tests' caravan in it. */
+export const CARAVAN_CONTENT = contentWithJob(CARAVAN_JOB);

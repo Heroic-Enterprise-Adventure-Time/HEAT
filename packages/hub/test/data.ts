@@ -1,12 +1,15 @@
 import { randomUUID } from "node:crypto";
 
 import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { range } from "es-toolkit";
 import { vi } from "vitest";
 
-import { type AdventureOutcome, must } from "@heat/engine";
+import { type AdventureOutcome, FACILITIES, type FacilityKind, type Material, must, type UnitType, type UnlockId } from "@heat/engine";
 
+import { buildFacility } from "../src/build.js";
+import type { Tables } from "../src/db/client.js";
 import { ITEM_VERSION } from "../src/db/keys.js";
-import type { AdventureRecord, SettledResult } from "../src/db/repository.js";
+import type { AdventureRecord, Hero, Repository, SettledResult } from "../src/db/repository.js";
 import { RECENT_TTL_SECONDS, type RecentAdventure } from "../src/recent.js";
 import { locationKeys, playerKeys, replayKeys } from "./keys.js";
 import { VERSION } from "./versions.js";
@@ -47,8 +50,83 @@ export async function putRecentAdventure(db: DynamoDBDocumentClient, table: stri
   return item;
 }
 
+/** Puts stock into a player's camp at a location directly, as a settlement would credit it or a caravan deliver it. */
+export async function stock(repo: Repository, p: string, location: string, holdings: Partial<Record<Material, number>>): Promise<void> {
+  for (const [material, balance] of Object.entries(holdings) as [Material, number][]) await repo.setBalance(p, location, material, balance);
+}
+
+/**
+ * A facility built up to a level as a player builds it, through the verb:
+ * each level it lacks paid for with what that level costs, after whatever the
+ * level needs first is built the same way, as the caravan hub needs a level-2
+ * warehouse. It leaves the camp's stock at whatever the last build left.
+ */
+export async function build(repo: Repository, p: string, location: string, kind: FacilityKind, level = 1): Promise<void> {
+  const camp = await repo.camp(p, location);
+  const built = kind === "heroes-hall" ? camp.hallLevel : kind === "warehouse" ? camp.warehouseLevel : (camp.facilities[kind] ?? 0);
+  for (const next of range(built + 1, level + 1)) {
+    const step = must(FACILITIES[kind].levels[next - 1], `level ${next} of the ${kind}`);
+    for (const need of step.requires) await build(repo, p, location, need.kind, need.level);
+    for (const { material, amount } of step.cost) await repo.setBalance(p, location, material, amount);
+    await buildFacility(repo, p, location, kind, next);
+  }
+}
+
+/** A camp's balances by material, as the repository reads them. */
+export async function balances(repo: Repository, p: string, location: string): Promise<Record<string, number>> {
+  return Object.fromEntries((await repo.holdings(p, location)).map((h) => [h.material, h.balance]));
+}
+
+/**
+ * A living villager recruited at a location just now, on no adventure: the
+ * hero the tests start from, with what a test means changed by `overrides`
+ * (typescript.md, rule 19), so that a new attribute of a hero is added here
+ * once.
+ */
+export function heroFixture(location: string, overrides: Partial<Hero> = {}): Hero {
+  return {
+    id: randomUUID(),
+    location,
+    recruitedIn: location,
+    unitType: "villager",
+    spriteSet: "villager-01",
+    name: "Wren",
+    recruitedAt: new Date().toISOString(),
+    level: 1,
+    xp: 0,
+    picks: [],
+    status: "ALIVE",
+    retiredAt: null,
+    adventureId: null,
+    ...overrides,
+  };
+}
+
+/** Living heroes of the given unit types at a location, with their sightings, and a level-1 camp there that counts them. */
+export async function putParty(db: DynamoDBDocumentClient, tables: Tables, p: string, unitTypes: readonly UnitType[], location: string): Promise<Hero[]> {
+  const heroes = unitTypes.map((unitType, i) => heroFixture(location, { unitType, spriteSet: `${unitType}-01`, name: `Hero ${i}` }));
+  for (const hero of heroes) {
+    await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
+    await db.send(new PutCommand({
+      TableName: tables.location,
+      Item: whole("sighting", { ...locationKeys.seen(location, hero.id), heroId: hero.id, level: 1, seenAt: "2026-01-01T00:00:00.000Z", expiresAt: 1 }),
+    }));
+  }
+  await db.send(new PutCommand({
+    TableName: tables.player,
+    Item: whole("camp", { ...playerKeys.camp(p, location), location, hallLevel: 1, warehouseLevel: 1, activeHeroes: heroes.length, livingHeroes: heroes.length }),
+  }));
+  return heroes;
+}
+
 /** A result of the given outcome with nothing else in it. */
-export const emptyResult = (outcome: AdventureOutcome): SettledResult => ({ outcome, endedAtMs: 1000, reachedStage: 0, stages: [], rewards: [], credited: [], lost: [], heroes: [] });
+export const emptyResult = (outcome: AdventureOutcome): SettledResult => ({ outcome, endedAtMs: 1000, reachedStage: 0, stages: [], rewards: [], credited: [], lost: [], heroes: [], unlocks: [], delivered: [], deliveryLost: [] });
+
+/** Puts an unlock past the repository, as settlement leaves one the player earned, so that a test starts with a location unlocked. */
+export async function putUnlock(db: DynamoDBDocumentClient, table: string, p: string, unlock: UnlockId, earned: { earnedAt: string; adventureId: string } = { earnedAt: "2026-11-24T12:00:00.000Z", adventureId: randomUUID() }) {
+  await db.send(new PutCommand({ TableName: table, Item: whole("unlock", { ...playerKeys.unlock(p, unlock), playerId: p, unlock, ...earned }) }));
+  return { unlock, ...earned };
+}
 
 /** A settled record of the job as settlement leaves it, settled at the given time: nobody's party home with nothing, unless overridden. */
 export function settledAdventure(jobId: string, at: Date, overrides: Partial<AdventureRecord> = {}): AdventureRecord {

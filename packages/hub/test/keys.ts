@@ -10,6 +10,7 @@ export const playerKeys = {
   holding: (id: string, location: string, material: string) => ({ PK: `PLAYER#${id}`, SK: `AT#${location}#HOLDING#${material}` }),
   hero: (id: string, heroId: string) => ({ PK: `PLAYER#${id}`, SK: `HERO#${heroId}` }),
   open: (id: string) => ({ PK: `PLAYER#${id}`, SK: "OPEN" }),
+  unlock: (id: string, unlock: string) => ({ PK: `PLAYER#${id}`, SK: `UNLOCK#${unlock}` }),
   ledger: (id: string, causeId: string, entry: string) => ({ PK: `PLAYER#${id}`, SK: `LEDGER#${causeId}#${entry}` }),
 };
 

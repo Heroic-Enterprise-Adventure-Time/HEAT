@@ -4,6 +4,14 @@ fragment AdventureFields on Adventure {
   seed
   startedAt
   version
+  caravan {
+    destination
+    staying
+    cargo {
+      amount
+      material
+    }
+  }
   job {
     id
     description
@@ -22,9 +30,9 @@ fragment AdventureFields on Adventure {
         damage
         maxHealth
         speed
-        gather {
-          material
-          rating
+        traits {
+          level
+          trait
         }
       }
     }

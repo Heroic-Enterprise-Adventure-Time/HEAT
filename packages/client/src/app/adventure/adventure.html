@@ -7,6 +7,15 @@
       <button type="button" (click)="play.endReplay()">Back to the result</button>
     } @else if (settled.result; as result) {
       <p class="outcome">{{ outcomeWords(result.outcome) }}.</p>
+      <div class="unlocked" role="status">
+        @for (words of unlocked(); track words) {
+          <p>{{ words }}</p>
+        }
+      </div>
+      @if (unread(); as words) {
+        <p class="lost" role="alert">{{ words }}</p>
+        <button type="button" [disabled]="reading()" (click)="readAgain()">Read again</button>
+      }
 
       <h3 id="stages-title">Stages</h3>
       <ol class="stages" aria-labelledby="stages-title">
@@ -29,6 +38,15 @@
             <p class="lost">{{ lost.amount }} {{ lost.material }} lost: the warehouse was full.</p>
           }
         }
+      }
+
+      @if (caravan(); as lines) {
+        <h3 id="caravan-title">Caravan</h3>
+        <ul class="caravan" aria-labelledby="caravan-title">
+          @for (words of lines; track words) {
+            <li>{{ words }}</li>
+          }
+        </ul>
       }
 
       <h3 id="heroes-title">Heroes</h3>
@@ -61,13 +79,13 @@
       }
     } @else {
       <p class="lost" role="alert">This adventure was lost to a game update. The party came home with nothing.</p>
+      @for (words of caravan() ?? []; track words) {
+        <p>{{ words }}</p>
+      }
       <button type="button" (click)="backToCamp()">Back to {{ from() }}</button>
     }
   } @else if (game.adventure(); as adventure) {
     <h2 id="panel-title">{{ adventure.job.name }}</h2>
-    @if (stageName(); as stage) {
-      <p class="stage-name">{{ stage }}</p>
-    }
     @if (countdown(); as seconds) {
       <p class="countdown" role="timer">Turning back in {{ seconds }}</p>
     }
@@ -128,9 +146,7 @@
         </button>
       </div>
 
-      @if (cargo(); as cargo) {
-        <p class="cargo">Carrying {{ cargo }}</p>
-      }
+      <p class="carrying" role="status">{{ carrying() }}</p>
     }
 
     @if (play.submit().state === 'submitting') {

@@ -84,12 +84,4 @@ marker="<!-- heat-plan:$root -->"
   echo "</details>"
 } > "$work/comment.md"
 
-existing="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr_number/comments" --paginate \
-  --jq "[.[] | select(.body | startswith(\"$marker\"))] | first | .id // empty")"
-if [ -n "$existing" ]; then
-  gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -F "body=@$work/comment.md" > /dev/null
-  echo "updated the plan comment $existing on pull request $pr_number"
-else
-  gh api --method POST "repos/$GITHUB_REPOSITORY/issues/$pr_number/comments" -F "body=@$work/comment.md" > /dev/null
-  echo "posted the plan comment on pull request $pr_number"
-fi
+sh "$(dirname "$0")/upsert-pr-comment.sh" "$pr_number" "$marker" "$work/comment.md" "the plan comment"

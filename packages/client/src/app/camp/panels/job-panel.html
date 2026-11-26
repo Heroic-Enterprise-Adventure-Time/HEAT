@@ -3,27 +3,24 @@
   <h2 id="panel-title">{{ job.name }}</h2>
   <p>{{ job.description }}</p>
 
-  <h3 id="stages-title">Stages</h3>
-  <ol class="stages" aria-labelledby="stages-title">
-    @for (stage of job.stages; track $index) {
-      <li>{{ words(stage) }}</li>
-    }
-  </ol>
-
   <h3 id="reward-title">Reward</h3>
   <ul class="credits" aria-labelledby="reward-title">
-    @for (credit of reward(); track credit.material) {
+    @for (credit of pay(); track credit.material) {
       <li>
         {{ credit.words }}. {{ game.camp()?.name }} holds {{ credit.balance }}, with room for {{ credit.room }} more.
       </li>
+    } @empty {
+      <li>{{ noPay }}.</li>
     }
-    <li>{{ job.xp }} XP to each hero who comes back.</li>
+    <li>{{ bonus() }}</li>
   </ul>
   <p class="retreat">{{ retreat() }}</p>
 
   <h3 id="party-title">Party</h3>
   @if (!game.player()) {
     <p>Loading…</p>
+  } @else if (locked(); as words) {
+    <p class="note">{{ words }}</p>
   } @else if (game.adventure(); as adventure) {
     <p class="note">An adventure is under way: <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>.</p>
   } @else if (game.livingHere().length === 0) {
@@ -51,7 +48,52 @@
         }
       </ul>
     </div>
-    <button type="button" [disabled]="picked().size === 0 || pending()" (click)="depart(job.id)">Depart</button>
+    @if (destination(); as destination) {
+      <h3 id="cargo-title">Cargo</h3>
+      <div role="group" aria-labelledby="cargo-title" aria-describedby="cargo-load">
+        <p id="cargo-load">{{ load() }}</p>
+        @if (cargoLines().length > 0) {
+          <ul class="cargo">
+            @for (line of cargoLines(); track line.material) {
+              <li>
+                <label>
+                  {{ line.material }}
+                  <!-- Written once and then left to the player: a binding would write 0 back into a field they are still typing in. -->
+                  <input type="number" min="0" step="1" value="0" [max]="line.balance" (input)="setAmount(line.material, $event)" />
+                </label>
+                <span>{{ game.camp()?.name }} holds {{ line.balance }}. {{ destination.name }} has room for {{ line.room }} more.</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p>{{ game.camp()?.name }} holds nothing to carry.</p>
+        }
+      </div>
+
+      <h3 id="staying-title">Who stays</h3>
+      <div role="group" aria-labelledby="staying-title" aria-describedby="staying-room">
+        <p id="staying-room">{{ room() }}</p>
+        <ul class="party">
+          @for (hero of partyHeroes(); track hero.id) {
+            <li>
+              <label>
+                <input type="checkbox" [checked]="staying().has(hero.id)" (change)="toggleStay(hero.id)" />
+                {{ hero.name }} stays at {{ destination.name }}
+              </label>
+            </li>
+          } @empty {
+            <li>Pick the party first.</li>
+          }
+        </ul>
+      </div>
+      @if (noWayBack(); as words) {
+        <p class="note">{{ words }}</p>
+      }
+      @if (caravanReason(); as reason) {
+        <p class="note">{{ reason }}</p>
+      }
+    }
+    <button type="button" [disabled]="picked().size === 0 || caravanReason() !== null || pending()" (click)="depart(job.id)">Depart</button>
   }
   @if (refusal(); as refusal) {
     <p class="refusal" role="alert">{{ refusal }}</p>

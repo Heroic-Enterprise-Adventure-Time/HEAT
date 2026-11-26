@@ -1,6 +1,6 @@
 # 0026: Camps, heroes and resources, and the camp ahead of the core loop
 
-- **Status:** Decided; the keys are written through ElectroDB's templates per 0041
+- **Status:** Decided; the keys are written through ElectroDB's templates per 0041; "every location offers villagers" amended by 0059, built by Issue-351: Highcrag offers none, and the guarantee is the starting location's; `recruitHero(unitType, requestId)` amended by 0059, built by Issue-351: its input names the camp's location; how a location unlocks designed by 0059 and built by Issue-351; a caravan's cargo, held slots and moved hero designed by 0059, built by Issue-354, which adds to the hero's item where it was recruited, `recruitedIn`, since its location no longer says so
 - **Date:** 2026-10-19
 - **Settles:** Issue-78: how locations and camps relate, recruitment end to end, the keys of the camp and the hero, and where the camp goes in the build order.
 

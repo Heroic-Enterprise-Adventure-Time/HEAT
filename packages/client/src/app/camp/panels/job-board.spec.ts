@@ -1,7 +1,7 @@
 import { computed, signal } from '@angular/core';
 import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
-import { must, UNIT_PROFILES } from '@heat/engine';
+import { JOBS, jobsPostedBy, must, UNIT_PROFILES } from '@heat/engine';
 
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/battle-view';
 import { routes } from '../../app.routes';
@@ -9,6 +9,7 @@ import { type AdventureView, Game, type HeroView, type RecentAdventureView, type
 import { Refusal } from '../../hub';
 import { Session } from '../../session';
 import { fakeCampScene } from '../../testing/fake-camp-scene';
+import { fakeIcons } from '../../testing/fake-icons';
 import { fakeSession, PLAYER } from '../../testing/fake-session';
 import { testLayoutSizes } from '../../testing/layout-sizes';
 import { itemHolding, listItems, menu, panel, panelBox } from '../../testing/page';
@@ -67,12 +68,14 @@ const party = [hero('h1', 'Wren'), hero('h2', 'Moss'), hero('h3', 'Lark'), hero(
 function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => AdventureView | Refusal = adventureOf) {
   const all = signal(heroes);
   const open = signal<AdventureView | null>(null);
+  const camps = signal<{ location: string }[]>([]);
   const here = computed(() => all().filter((h) => h.status !== 'RETIRED'));
   const fake = {
     heroesHere: here,
     livingHere: computed(() => here().filter((h) => h.status === 'ALIVE')),
     seenHere: signal([]),
     retiredHere: computed(() => all().filter((h) => h.status === 'RETIRED')),
+    onTheWay: signal<readonly HeroView[]>([]),
     camp: signal({
       location: 'millbrook',
       name: 'Millbrook',
@@ -87,7 +90,9 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     recruits: signal([]),
     upgrade: () => null,
     location: signal('millbrook'),
-    player: computed(() => ({ id: 'p1', camps: [], heroes: all(), openAdventure: open() })),
+    /** The locations the player has a camp at; a camp is sent away from an address the player has none at. */
+    camps,
+    player: computed(() => ({ id: 'p1', camps: camps(), heroes: all(), openAdventure: open() })),
     adventure: open,
     settled: signal(null),
     error: signal<string | null>(null),
@@ -124,6 +129,7 @@ function adventureOf(heroIds: readonly string[]): AdventureView {
     location: 'millbrook',
     seed: 's1',
     version: 'v1',
+    caravan: null,
     job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves have been at the carts.' },
     snapshot: {
       version: 'v1',
@@ -143,38 +149,41 @@ function renderJobs(game: ReturnType<typeof fakeGame>, url: string) {
     { provide: FRAME_LOOP, useValue: () => () => undefined },
     { provide: BATTLE_SCENE_FACTORY, useValue: async () => Promise.reject(new Error('no WebGL in jsdom')) },
     { provide: CAMP_SCENE_FACTORY, useValue: fakeCampScene },
+    fakeIcons,
     testLayoutSizes,
   ]);
 }
 
 const WOLVES = '/camp/millbrook/job-board/jobs/wolves-on-the-mill-road';
+/** What Highcrag's job board posts, read from the content. */
+const HIGHCRAG_BOARD = jobsPostedBy('highcrag', 'job-board');
 
 const box = (name: string) => screen.getByRole('checkbox', { name });
 const depart = () => screen.getByRole('button', { name: 'Depart' });
 const job = (name: string) => within(itemHolding('Jobs', 'link', name));
 
 describe('Job board', () => {
-  it("lists the board's jobs, easiest first, with what each brings home, each linked to its detail", async () => {
+  it("lists the board's jobs, easiest first, each with its pay and its bonus XP and nothing of what it drops, each linked to its detail", async () => {
     await renderJobs(fakeGame([]), '/camp/millbrook/job-board');
     expect(panel().getByRole('heading', { name: 'Job board', level: 2 })).toBeInTheDocument();
     expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Pick up sticks', 'Timber from the near woods', 'Wolves on the mill road']);
-    expect(job('Pick up sticks').getByText('up to 45 timber')).toBeInTheDocument();
-    expect(job('Timber from the near woods').getByText('3 cloth and up to 90 timber')).toBeInTheDocument();
-    expect(job('Wolves on the mill road').getByText('10 cloth')).toBeInTheDocument();
+    expect(job('Pick up sticks').getByText('No pay, 2 bonus XP')).toBeInTheDocument();
+    expect(job('Timber from the near woods').getByText('3 cloth, 4 bonus XP')).toBeInTheDocument();
+    expect(job('Wolves on the mill road').getByText('10 cloth, 10 bonus XP')).toBeInTheDocument();
+    expect(panel().queryByText(/timber$|up to/)).not.toBeInTheDocument();
     expect(panel().getByRole('link', { name: 'Pick up sticks' })).toHaveAttribute('href', '/camp/millbrook/job-board/jobs/pick-up-sticks');
     expect(menu().getByRole('link', { name: 'Job board', current: 'page' })).toBeInTheDocument();
   });
 
-  it("shows a job's stages in order, its credits beside the camp's balance and room, and its retreat penalty", async () => {
+  it("shows a job's description, its pay beside the camp's balance and room, its bonus XP and what a retreat keeps, and neither its stages nor what it drops (decision 0058)", async () => {
     await renderJobs(fakeGame([must(party[0], 'the first of the party')]), '/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
     expect(panel().getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
-    expect(textsOf(listItems('Stages'))).toEqual(['Travel', 'Gather timber from 2 trees', 'Fight a wolf', 'Arrive']);
-    expect(textsOf(listItems('Reward'))).toEqual([
-      '3 cloth. Millbrook holds 0, with room for 100 more.',
-      'Up to 90 timber. Millbrook holds 90, with room for 10 more.',
-      '15 XP to each hero who comes back.',
-    ]);
-    expect(panel().getByText('A retreat forfeits the pay, keeps the timber gathered, and earns half the XP.')).toBeInTheDocument();
+    expect(panel().getByText(JOBS['timber-from-the-near-woods'].description)).toBeInTheDocument();
+    // The camp holds 90 timber of 100, and the page does not say so: the room for a drop would name the drop.
+    expect(textsOf(listItems('Reward'))).toEqual(['3 cloth. Millbrook holds 0, with room for 100 more.', 'Bonus: 4 XP to each hero who arrives.']);
+    expect(panel().getByText('A retreat keeps what dropped and the XP earned, and loses the pay and the bonus.')).toBeInTheDocument();
+    expect(panel().queryByRole('list', { name: 'Stages' })).not.toBeInTheDocument();
+    expect(panel().queryByText(/Travel|Gather|Fight a wolf/)).not.toBeInTheDocument();
     expect(menu().getByRole('link', { name: 'Job board', current: 'page' })).toBeInTheDocument();
     expect(panel().getByRole('link', { name: '← Job board' })).toHaveAttribute('href', '/camp/millbrook/job-board');
   });
@@ -215,6 +224,22 @@ describe('Job board', () => {
     expect(heroes).toHaveLength(2);
     expect(heroes[0]).toHaveAccessibleName('Wren next action');
     expect(heroes[1]).toHaveAccessibleName('Lark next action');
+  });
+
+  it("lists Highcrag's own board at Highcrag, and Departs from the camp it is opened in (Issue-352)", async () => {
+    const game = fakeGame(party);
+    game.camps.set([{ location: 'millbrook' }, { location: 'highcrag' }]);
+    const { router, user } = await renderJobs(game, '/camp/highcrag/job-board');
+    expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(HIGHCRAG_BOARD.map((j) => j.name));
+    expect(HIGHCRAG_BOARD.map((j) => j.id)).toEqual(['ore-from-the-crag']);
+
+    await user.click(panel().getByRole('link', { name: 'Ore from the crag' }));
+    await waitFor(() => { expect(router.url).toBe('/camp/highcrag/job-board/jobs/ore-from-the-crag'); });
+    await user.click(await screen.findByRole('checkbox', { name: 'Wren' }));
+    await waitFor(() => { expect(depart()).toBeEnabled(); });
+    await user.click(depart());
+    await waitFor(() => { expect(router.url).toBe('/adventure'); });
+    expect(game.started).toEqual([{ location: 'highcrag', jobId: 'ore-from-the-crag', heroIds: ['h1'] }]);
   });
 
   it("shows a start's refusal in place, in the player's words", async () => {
@@ -262,7 +287,7 @@ describe('Job board', () => {
     expect(panel().getByRole('link', { name: 'Wolves on the mill road' })).toHaveAttribute('href', '/adventure');
     const entry = menu().getByRole('link', { name: 'Adventure' });
     expect(entry).toHaveAttribute('href', '/adventure');
-    expect(within(entry).getByRole('presentation')).toHaveAttribute('src', 'art/icons/adventure.png');
+    expect(within(entry).getByRole('presentation')).toHaveAttribute('src', '/art/icons/adventure.test.png');
   });
 
   it('has no adventure entry in the menu while none is open', async () => {

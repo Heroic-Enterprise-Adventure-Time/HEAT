@@ -2,6 +2,7 @@ import { range } from 'es-toolkit';
 
 import type { FacilityKind } from '@heat/engine';
 
+import type { GroundSet } from '../../ground-sets';
 import type { Terrain } from './ground';
 
 /**
@@ -13,7 +14,10 @@ import type { Terrain } from './ground';
  * of the mock-up the first art was chosen in (`art/mockups/first-camp-4x.png`):
  * a road across the camp, a square of packed dirt in the middle, the hall at
  * its head, the job board by the road on the left and the warehouse on the
- * right; the facilities a camp builds stand around them.
+ * right; the facilities a camp builds stand around them. Highcrag keeps the
+ * shape of its own (`art/mockups/highcrag-400x225-3x.png`, Issue-350): a yard
+ * of packed earth cut into bare rock, the hall at its head, the warehouse on
+ * the left, the job board by the way down, and the road leaving at the foot.
  */
 
 export const MAP_WIDTH = 400;
@@ -46,7 +50,7 @@ export interface FacilitySpot {
 }
 
 export interface CampLayout {
-  readonly ground: string;
+  readonly ground: GroundSet;
   /** The terrain at every corner of the tile grid, rows of columns. */
   readonly corners: readonly (readonly Terrain[])[];
   readonly facilities: readonly FacilitySpot[];
@@ -82,12 +86,48 @@ export const MILLBROOK: CampLayout = {
   hallDoor: { x: 210, y: 88 },
 };
 
-export const LAYOUTS: Readonly<Record<string, CampLayout>> = { millbrook: MILLBROOK };
+/**
+ * Highcrag, as the owner chose it in the mock-up (2026-11-24, Issue-350):
+ * the earth runs under every building, and a site the camp works stands on
+ * the rock: the caravan hub on the earth at the foot of the yard, and the
+ * quarry on the rock to the east (Issue-356). Where heroes walk and the
+ * hall's door were not the owner's choice in the mock-up: the yard in front
+ * of the hall and the way down, which passes left of the hub.
+ */
+export const HIGHCRAG: CampLayout = {
+  ground: 'crag-01',
+  // Packed earth is the tileset's lower terrain, rock its upper.
+  corners: corners(
+    (col, row) =>
+      (col >= 5 && col <= 18 && row >= 4 && row <= 10) || (col >= 8 && col <= 19 && row >= 10 && row <= 13) || ((col === 12 || col === 13) && row >= 13),
+  ),
+  facilities: [
+    { kind: 'heroes-hall', at: { x: 200, y: 98 } },
+    { kind: 'warehouse', at: { x: 108, y: 132 } },
+    { kind: 'job-board', at: { x: 160, y: 200 } },
+    { kind: 'caravan-hub', at: { x: 264, y: 214 } },
+    { kind: 'quarry', at: { x: 336, y: 128 } },
+  ],
+  walkable: [
+    { x0: 140, y0: 104, x1: 288, y1: 164 },
+    { x0: 184, y0: 164, x1: 224, y1: 208 },
+  ],
+  hallDoor: { x: 210, y: 104 },
+};
+
+/** Every location's layout, by the location's id in the engine's content; the spec holds the two lists together. */
+export const LAYOUTS: Readonly<Record<string, CampLayout>> = { millbrook: MILLBROOK, highcrag: HIGHCRAG };
+
+/** The ground a location is drawn on, in its camp and in the battles of its jobs; the meadow for a location this client has no layout for. */
+export function groundAt(location: string): GroundSet {
+  return LAYOUTS[location]?.ground ?? MILLBROOK.ground;
+}
 
 /**
  * The corners for any window of the tile grid, the map's own where the window
- * overlaps it and grass beyond, so the ground runs on past the map's edge to
- * fill whatever the scene's box shows around it.
+ * overlaps it and the upper terrain beyond, grass at Millbrook and rock at
+ * Highcrag, so the ground runs on past the map's edge to fill whatever the
+ * scene's box shows around it.
  */
 export function cornersAround(layout: CampLayout, col0: number, row0: number, cols: number, rows: number): Terrain[][] {
   return range(rows + 1).map((r) => range(cols + 1).map((c): Terrain => layout.corners[row0 + r]?.[col0 + c] ?? 'upper'));

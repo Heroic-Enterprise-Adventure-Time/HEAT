@@ -50,7 +50,10 @@
     },
     "candidates": 64,
     "candidatesNote": "Indices 0 to 23 follow itemDescriptions; 24 to 63 were drawn by the service from the description alone.",
-    "generations": 10
+    "generations": 10,
+    "chosenBy": "The owner, 2026-10-20, from a numbered sheet of the 64 candidates at 3×, taking the agent's recommendation for each slot (Issue-89).",
+    "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20.",
+    "rejects": "The 59 candidates not kept stay in the review object 251e2a4f-72ff-46d8-bef1-42d423985479, tagged heat, ui-icon and rejected."
   },
   "icons": {
     "heroes-hall": {
@@ -59,6 +62,7 @@
         32,
         32
       ],
+      "pack": "call",
       "candidate": 0,
       "pixellab": {
         "objectId": "499d1a9b-3b7d-462d-bd03-8e1e8e7d5517",
@@ -75,6 +79,7 @@
         32,
         32
       ],
+      "pack": "call",
       "candidate": 4,
       "pixellab": {
         "objectId": "1231988a-f5f8-429f-a388-9fd71d43c455",
@@ -91,6 +96,7 @@
         32,
         32
       ],
+      "pack": "call",
       "candidate": 8,
       "pixellab": {
         "objectId": "6c4cf483-0c60-4902-b0a5-95286505e86e",
@@ -107,6 +113,7 @@
         32,
         32
       ],
+      "pack": "call",
       "candidate": 12,
       "pixellab": {
         "objectId": "adb1ff29-7023-4761-b1e1-e121cf1704d5",
@@ -123,6 +130,7 @@
         32,
         32
       ],
+      "pack": "call",
       "candidate": 16,
       "pixellab": {
         "objectId": "82c494c6-6fa4-4a08-bb60-3d82233f947f",
@@ -183,11 +191,93 @@
           "caravan-hub"
         ]
       }
+    },
+    "hide": {
+      "file": "hide.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "thirdPack",
+      "candidate": 0,
+      "pixellab": {
+        "objectId": "d3f09edd-4cdb-4d9f-8765-3aeeadaef5e2",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "hide"
+        ]
+      }
+    },
+    "timber": {
+      "file": "timber.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "thirdPack",
+      "candidate": 6,
+      "pixellab": {
+        "objectId": "40a0c1c7-9065-47bf-9e71-879fab4555c5",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "timber"
+        ]
+      }
+    },
+    "ore": {
+      "file": "ore.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "thirdPack",
+      "candidate": 14,
+      "pixellab": {
+        "objectId": "08cc5c94-929e-4a1f-8a6e-995be3b00a63",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "ore"
+        ]
+      }
+    },
+    "stone": {
+      "file": "stone.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fourthPack",
+      "candidate": 0,
+      "pixellab": {
+        "objectId": "7b705d26-72e3-4640-80a5-6880115a2c4a",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "stone"
+        ]
+      }
+    },
+    "quarry": {
+      "file": "quarry.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fourthPack",
+      "candidate": 7,
+      "pixellab": {
+        "objectId": "db867ea7-fabc-4022-80fa-c72b99e1190f",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "quarry"
+        ]
+      }
     }
   },
-  "rejectedTags": "The 59 candidates not kept stay in the review object 251e2a4f-72ff-46d8-bef1-42d423985479, tagged heat, ui-icon and rejected.",
-  "chosenBy": "The owner, 2026-10-20, from a numbered sheet of the 64 candidates at 3×, taking the agent's recommendation for each slot (Issue-89). The second pack's three (mine 2, lumber camp 6, caravan hub 10) are the agent's picks, 2026-10-20, for the owner to review on PR-92.",
-  "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20.",
   "secondPack": {
     "tool": "create_1_direction_object",
     "via": "MCP",
@@ -230,6 +320,90 @@
     },
     "candidates": 64,
     "generations": 10,
-    "note": "Ideas for later facilities were rolled in the same pack; the ones not kept stay in the review object, tagged rejected, and can be promoted when their facility is added."
+    "note": "Ideas for later facilities were rolled in the same pack; the ones not kept stay in the review object, tagged rejected, and can be promoted when their facility is added.",
+    "chosenBy": "The agent's picks (mine 2, lumber camp 6, caravan hub 10), 2026-10-20, for the owner to review on PR-92.",
+    "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20.",
+    "rejects": "The candidates not kept stay in the review object e5f78cf5-6d73-4be5-98da-ef94d365e89b, tagged rejected."
+  },
+  "thirdPack": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-20",
+    "reviewObjectId": "68098ce5-1ff2-4019-920d-cb8eb3f76920",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 03",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "hide icon: tan animal hide stretched flat, legs splayed",
+        "hide icon: rolled bundle of brown fur pelts tied with cord",
+        "hide icon: grey wolf pelt laid flat",
+        "hide icon: folded brown leather hide",
+        "hide icon: animal skin stretched on a wooden drying frame",
+        "hide icon: stack of folded fur pelts",
+        "timber icon: stack of three cut logs",
+        "timber icon: single log with a pale cut end",
+        "timber icon: bundle of wooden planks tied with rope",
+        "timber icon: two crossed logs",
+        "timber icon: pile of split firewood",
+        "ore icon: lump of grey rock with rust-brown ore flecks",
+        "ore icon: pile of three ore chunks",
+        "ore icon: grey stone with glinting metal veins",
+        "ore icon: rough iron ore nugget",
+        "ore icon: small heap of dark ore rocks",
+        "cloth icon: folded bolt of woven cloth",
+        "cloth icon: roll of beige fabric",
+        "cloth icon: stack of folded linen",
+        "cloth icon: bolt of cloth with a loose end",
+        "cloth icon: bundle of cloth tied with string"
+      ]
+    },
+    "candidates": 64,
+    "candidatesNote": "Indices 0 to 20 follow itemDescriptions; 21 to 63 were drawn by the service from the description alone.",
+    "generations": 10,
+    "note": "The resource icons. Ideas for hide, timber, ore and cloth were rolled in one pack (Issue-340), so that the resources' icons share one roll's style. The battle scene draws them where an enemy dropped something (Issue-344); cloth has no pick yet, and its ideas are candidates 16 to 20.",
+    "chosenBy": "The owner's picks from a numbered sheet of the candidates at 3×: hide 0 on 2026-11-20, taking the agent's recommendation (Issue-340); timber 6 and ore 14 on 2026-11-23, timber the agent's recommendation and ore the owner's own choice over the agent's 11 (Issue-344).",
+    "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download, to its rotation's file and to its candidate frame in the review object: hide.png on 2026-11-20, timber.png and ore.png on 2026-11-23.",
+    "rejects": "The 61 candidates not kept stay in the review object 68098ce5-1ff2-4019-920d-cb8eb3f76920, tagged heat, ui-icon and rejected, with their indices as rolled."
+  },
+  "fourthPack": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-26",
+    "reviewObjectId": "1e46b7d4-375d-4144-9bbf-6062668fea72",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 04",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "stone icon: two cut pale grey stone blocks stacked",
+        "stone icon: single squared block of grey stone",
+        "stone icon: pile of rough grey stones",
+        "stone icon: cut stone brick with chisel marks",
+        "stone icon: three grey stone blocks in a small pyramid",
+        "stone icon: grey stone slab leaning on a block",
+        "quarry icon: grey rock face with stepped cut ledges",
+        "quarry icon: pickaxe and a chisel over a grey stone block",
+        "quarry icon: stone block hanging from a wooden hoist",
+        "quarry icon: cut rock face with a wooden plank ramp",
+        "quarry icon: mallet and chisel crossed over stone",
+        "quarry icon: grey rock outcrop with a squared cut opening"
+      ]
+    },
+    "candidates": 64,
+    "candidatesNote": "Indices 0 to 11 follow itemDescriptions; 12 to 63 were drawn by the service from the description alone.",
+    "generations": 10,
+    "note": "Stone and the quarry's icons (Issue-356). No earlier pack held an idea for either, so a pack of their own was rolled with the same style image as the others.",
+    "chosenBy": "The owner's picks from a numbered sheet of candidates 0 to 11 at 3×, 2026-11-26 (Issue-356): stone 0, the agent's recommendation, and quarry 7, the owner's own choice over the agent's 6.",
+    "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download and to its candidate frame in the review object, saved before it was promoted: stone.png and quarry.png on 2026-11-26.",
+    "rejects": "The 62 candidates not kept stay in the review object 1e46b7d4-375d-4144-9bbf-6062668fea72, tagged heat, ui-icon and rejected, with their indices as rolled."
   }
 }

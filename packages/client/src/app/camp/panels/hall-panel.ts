@@ -18,7 +18,11 @@ const REFUSALS: Readonly<Record<RecruitRefusal, string>> = {
 /**
  * The heroes hall's panel, `/camp/<location>/heroes-hall` (game.md, "The
  * heroes hall" and "The page"): the hall's count against its cap; the
- * roster grouped living, dead and retired, the retired collapsed; and every
+ * roster grouped living, dead and retired, the retired collapsed, and at a
+ * camp with nobody alive whose location offers no hero for nothing, why it
+ * is empty and that a hero comes by caravan (Issue-352); the heroes on
+ * their way by caravan, each holding a slot the count includes, so a hall
+ * that looks to have room and refuses a recruit says why (Issue-355); every
  * unit type the location recruits, its price beside the camp's balance and
  * why it cannot be had now. A refusal from the hub is shown in place, on
  * the recruit it refused. Last, the hall's next level (Issue-93).
@@ -33,6 +37,20 @@ export class HallPanel {
   protected readonly game = inject(Game);
   private readonly camp = inject(CampState);
   protected readonly dead = computed(() => this.game.heroesHere().filter((h) => h.status === 'DEAD'));
+  /**
+   * Why nobody is alive here and how a hero gets here, at a camp whose
+   * location offers no hero for nothing (game.md, "The heroes hall"; decision
+   * 0059): it comes by caravan. Null where the free villager answers the
+   * same question, or while anyone is alive. A camp whose heroes are dead or
+   * retired has had heroes, and is told of the next and not of a first.
+   */
+  protected readonly byCaravan = computed(() => {
+    const camp = this.game.camp();
+    if (!camp || !this.game.noFreeRecruit() || this.game.livingHere().length > 0) return null;
+    return this.dead().length > 0 || this.game.retiredHere().length > 0
+      ? `No living hero is here. Nobody at ${camp.name} joins for nothing: the next comes by caravan from another camp.`
+      : `No hero is here yet. Nobody at ${camp.name} joins for nothing: its first hero comes by caravan from another camp.`;
+  });
   /** The unit type being recruited while the hub answers; every recruit waits for it. */
   protected readonly pending = signal<string | null>(null);
   /** The hub's last refusal, on the recruit it refused; cleared by the next try. */

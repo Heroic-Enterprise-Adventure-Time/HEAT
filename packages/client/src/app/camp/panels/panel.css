@@ -28,6 +28,7 @@ h3 {
 
 .jobs,
 .party,
+.cargo,
 .recruits,
 .replays {
   list-style: none;
@@ -37,6 +38,7 @@ h3 {
 
 .jobs li,
 .party li,
+.cargo li,
 .recruits li,
 .replays li {
   display: flex;
@@ -44,7 +46,6 @@ h3 {
   column-gap: var(--space-md);
 }
 
-.stages,
 .credits {
   margin: 0 0 var(--space-md);
   padding-left: var(--space-2xl);
@@ -59,6 +60,16 @@ h3 {
 .link {
   color: inherit;
   font-weight: bold;
+}
+
+/*
+ * A job that cannot be started yet is listed greyed out, its name quieter
+ * and its reason in full ink, so the reason stays as readable as a job's pay
+ * (the owner, 2026-11-26, Issue-357).
+ */
+.jobs li.locked .link {
+  color: #4f4433;
+  font-weight: normal;
 }
 
 button {
@@ -131,4 +142,15 @@ dd {
 .replay-party {
   flex-basis: 100%;
   font-size: var(--text-sm);
+}
+
+.cargo li {
+  align-items: baseline;
+  margin-bottom: var(--space-sm);
+}
+
+/* An amount of a few digits, beside what the camp holds and the destination's room. */
+.cargo input {
+  width: 5em;
+  font: inherit;
 }

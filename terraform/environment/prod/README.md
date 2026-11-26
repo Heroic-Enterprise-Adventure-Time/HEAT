@@ -2,18 +2,18 @@
 
 HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, in one root and one apply, the shape of the `dev` root: the `base` module (the hosted zone, the certificate for the zone name and its wildcard, the account's one user pool with Google as its identity provider), the `environment` module on top of it (the two tables, the function, the HTTP API, the site at the zone apex, the browser client, the alarms) and the `login-domain` module last (`auth.heat.dcg-games.com`). Applied by the pipeline on every merge to `release`, through the release pull request, followed by the smoke test, the tag and the GitHub Release (decisions 0016 as confirmed, 0017, 0018 as amended, 0020, 0021 as amended; the overview's "Environments"). History: Issue-41.
 
-**Status: at `v2026.11.17` (f361a3a), the thirteenth release, applied by the pipeline on 2026-11-17 by the `Release` run on the merge of PR-314 (Issue-313), run 44004872840, under the `prod` GitHub environment.** The run:
-- guarded the merge as pull request 314 from `main`
+**Status: at `v2026.11.17.1` (cd012d5), the fourteenth release and the second of its day, applied by the pipeline on 2026-11-17 by the `Release` run on the merge of PR-324 (Issue-323), run 44184929185, under the `prod` GitHub environment.** The run:
+- guarded the merge as pull request 324 from `main`
 - applied 0 added, 3 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code and both aliases moved
 - passed the allow-list check (33 resource types)
 - published the client and `config.json`
 - passed the anonymous smoke test
-- wrote the tag `v2026.11.17` and its GitHub Release
+- wrote the tag `v2026.11.17.1` and its GitHub Release
 
-It is the first release with the AWS provider at 6.73.0, which changed nothing in prod, and the first with the hub's SDK clients set to 3 attempts (`packages/hub/src/sdk.ts`). Read back at about 02:46 UTC:
-- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` f361a3a and `HEAT_PREVIOUS_VERSION` c72f06e (`v2026.11.12`), on `nodejs24.x`; `live` points at version 13 and `previous` at 12.
-- **From the laptop:** `/config.json` reports version f361a3a, and an anonymous `POST /graphql` is 401.
-- **The owner** signed in at `https://heat.dcg-games.com`, saw "Recently here" on the job board and opened a replay from it.
+It is the first release with the `@graphql-tools/utils` that Apollo Server nests overridden to 12.1.0 (PR-317, Dependabot alert 8), the one change in it that reaches what prod runs; the rest is documents and the agent's hooks and skills. Read back at about 22:00 UTC:
+- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` cd012d5 and `HEAT_PREVIOUS_VERSION` f361a3a (`v2026.11.17`), on `nodejs24.x`, with the code hash the release pull request's plan showed; `live` points at version 14 and `previous` at 13.
+- **From the laptop:** `/config.json` reports version cd012d5, and an anonymous `POST /graphql` is 401.
+- **The owner** signed in at `https://heat.dcg-games.com` after the apply and reported that it works. That is the one signed-in request this status records: the 401 is the API's authorizer refusing before the function runs, and the smoke test signs in nowhere, so without it nothing here would show the function's new code answering in prod.
 
 The first apply, below, is kept as the record of that apply and its read-back. Later releases have changed the root since.
 

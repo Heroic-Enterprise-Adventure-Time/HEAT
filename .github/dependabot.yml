@@ -22,15 +22,22 @@ updates:
       graphql-codegen-major:
         patterns: ["@graphql-codegen/*"]
         update-types: [major]
-    # The majors the standards hold back, each with its reason under
-    # "Held back" in docs/standards/typescript.md. A major leaves this list
-    # and that list in the same pull request.
+    # What the standards hold back, majors and one minor, each with its
+    # reason under "Held back" in docs/standards/typescript-dependencies.md.
+    # An entry leaves this list and that list in the same pull request.
     ignore:
       - dependency-name: graphql
         update-types: ["version-update:semver-major"]
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
       - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Held at the version AWS's OpenTelemetry layer carries, a minor and
+      # not a major, with the context manager of the test's SDK (decision
+      # 0055).
+      - dependency-name: "@opentelemetry/api"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      - dependency-name: "@opentelemetry/context-async-hooks"
         update-types: ["version-update:semver-major"]
       # Not held back: Angular's packages move together, by `ng update` on a
       # branch of their own (standards rule 13), so their majors are not

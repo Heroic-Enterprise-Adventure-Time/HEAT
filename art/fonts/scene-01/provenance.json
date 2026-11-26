@@ -1,0 +1,59 @@
+{
+  "set": "scene-01",
+  "kind": "font",
+  "madeFor": "The battle scene's digits: the amount beside a drop's icon (Issue-344). The scene draws the glyphs it asks for as sprites at its own scale, never as a font the browser scales.",
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "jobId": "6ee85315-99e9-400a-b286-0a0f38e2182a",
+    "assetId": "9d116d5f-3a06-5015-b349-aad8cceb47d3",
+    "name": "heat scene digits 02",
+    "tags": "A font takes no tags; it is found in the gallery by its name."
+  },
+  "call": {
+    "tool": "create_font",
+    "via": "MCP",
+    "createdAt": "2026-11-23",
+    "parameters": {
+      "description": "clean NES-era retro pixel font, thin one pixel strokes, clear open digits, for numbers in a game scene",
+      "font_name": "heat scene digits 02",
+      "glyph_px": 8,
+      "weight": "Regular",
+      "seed": 2
+    },
+    "generations": 15
+  },
+  "atlas": {
+    "file": "atlas.png",
+    "canvas": [64, 80],
+    "glyphPx": 8,
+    "columns": 8,
+    "characters": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz.,!?:;'\"-+()0123456789/%*=_$",
+    "note": "One cell of glyphPx by glyphPx for each character, row by row in this order, which is the service's own; black on transparent, one bit. There is no space glyph."
+  },
+  "notCommitted": "The service's TrueType file of the same font, /mcp/font/<jobId>/download_ttf: the scene draws sprites cut from the atlas, and no page loads a font file.",
+  "replaced": [
+    {
+      "jobId": "6eef1e23-3ae5-40ee-a431-feed480133b0",
+      "assetId": "5e3b3adc-bec1-55ed-b90c-8bc5ec905434",
+      "name": "heat scene digits 01",
+      "parameters": {
+        "description": "chunky NES-era retro pixel font, cream white letters with a black outline, few colors, for numbers in a game scene",
+        "font_name": "heat scene digits 01",
+        "glyph_px": 8,
+        "weight": "Bold",
+        "seed": null
+      },
+      "generations": 15,
+      "why": "At 8 px the Bold weight's two-pixel strokes closed the digits' counters: its 0 did not read as a zero, and its 8 and 9 read alike. The description's colours and outline were not drawn; an atlas is one bit whatever is asked."
+    }
+  ],
+  "generations": 30,
+  "chosenBy": "The owner, 2026-11-23, on the dev server, where the digits were seen beside a drop's icon in a battle; the agent had put the second roll forward over the first after reading every digit enlarged on the meadow's green (Issue-344).",
+  "verified": "atlas.png is byte-identical to a second download from /mcp/font/<jobId>/download, 2026-11-23."
+}

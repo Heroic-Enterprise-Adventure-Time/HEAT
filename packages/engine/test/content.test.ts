@@ -11,6 +11,7 @@ import {
   hallCapacity,
   HERO_NAMES,
   heroNames,
+  isUnlockId,
   jobOf,
   JOBS,
   location,
@@ -23,9 +24,13 @@ import {
   SPRITE_SETS,
   STARTING_LOCATION,
   UNIT_TYPES,
+  UNLOCK_IDS,
+  unlockedLocations,
+  UNLOCKS,
   WAREHOUSE_CAPACITY,
   warehouseCapacity,
 } from "../src/index.js";
+import { HIGHCRAG } from "./adventure/helpers.js";
 
 const heroes = new URL("../../../art/heroes/", import.meta.url);
 const facilities = new URL("../../../art/facilities/", import.meta.url);
@@ -48,11 +53,77 @@ describe("static content", () => {
     for (const p of Object.values(SPRITE_SET_PRESENTATION)) expect(PRESENTATIONS).toContain(p);
   });
 
-  it("offers the villager at hall level 1 at every location, which the free villager needs", () => {
+  it("offers the villager at hall level 1 at the starting location, which the free villager needs, and gives every location's camp a hall and a warehouse", () => {
+    expect(location(STARTING_LOCATION)?.recruits.find((r) => r.unitType === "villager")?.hallLevel).toBe(1);
     for (const l of LOCATIONS) {
-      expect(l.recruits.find((r) => r.unitType === "villager")?.hallLevel).toBe(1);
       expect(l.ownFacilities).toContain("heroes-hall");
       expect(l.ownFacilities).toContain("warehouse");
+    }
+  });
+
+  it("names every unlock once, each with a name and the words said when it is earned", () => {
+    expect(Object.keys(UNLOCKS)).toEqual([...UNLOCK_IDS]);
+    expect(new Set(UNLOCK_IDS).size).toBe(UNLOCK_IDS.length);
+    for (const id of UNLOCK_IDS) {
+      expect(UNLOCKS[id].name.length, id).toBeGreaterThan(0);
+      expect(UNLOCKS[id].earned.length, id).toBeGreaterThan(0);
+      expect(isUnlockId(id)).toBe(true);
+    }
+    expect(isUnlockId("an-unlock-of-another-version")).toBe(false);
+  });
+
+  it("needs no unlock for the starting location, and for any other a known unlock that no second location needs", () => {
+    expect(location(STARTING_LOCATION)?.unlock).toBeUndefined();
+    const needed = LOCATIONS.filter((l) => l.id !== STARTING_LOCATION).map((l) => l.unlock);
+    for (const unlock of needed) expect(UNLOCK_IDS).toContain(unlock);
+    expect(new Set(needed).size).toBe(needed.length);
+    expect(new Set(LOCATIONS.map((l) => l.id)).size).toBe(LOCATIONS.length);
+  });
+
+  it("gives a player a camp at the starting location alone until an unlock is held, and then at its location too", () => {
+    expect(unlockedLocations(new Set()).map((l) => l.id)).toEqual([STARTING_LOCATION]);
+    expect(unlockedLocations(new Set(["an-unlock-of-another-version"])).map((l) => l.id)).toEqual([STARTING_LOCATION]);
+    expect(unlockedLocations(new Set(UNLOCK_IDS))).toEqual(LOCATIONS);
+    for (const l of LOCATIONS) {
+      if (l.unlock) expect(unlockedLocations(new Set([l.unlock])).map((u) => u.id)).toEqual([STARTING_LOCATION, l.id]);
+    }
+  });
+
+  it("has Highcrag behind the road's unlock, with the shared job board, the quarry and a caravan hub to build, and the miner and the fighter at Millbrook's costs", () => {
+    const highcrag = must(location(HIGHCRAG), "Highcrag");
+    const millbrook = must(location(STARTING_LOCATION), "the starting location");
+    expect(highcrag.name).toBe("Highcrag");
+    expect(highcrag.unlock).toBe("road-to-highcrag");
+    expect(highcrag.sharedFacilities).toEqual(["job-board"]);
+    expect(highcrag.buildableFacilities).toEqual(["quarry", "caravan-hub"]);
+    expect(highcrag.recruits.map((r) => r.unitType)).toEqual(["miner", "fighter", "knight"]);
+    for (const recruit of highcrag.recruits.filter((r) => r.unitType !== "knight")) {
+      expect(recruit).toEqual(millbrook.recruits.find((r) => r.unitType === recruit.unitType));
+    }
+  });
+
+  it("recruits the knight at Highcrag alone, at hall level 1, for ore and hide: the first thing that costs hide", () => {
+    for (const l of LOCATIONS.filter((l) => l.id !== HIGHCRAG)) expect(l.recruits.map((r) => r.unitType), l.id).not.toContain("knight");
+    const knight = must(location(HIGHCRAG)?.recruits.find((r) => r.unitType === "knight"), "Highcrag's knight");
+    expect(knight.hallLevel).toBe(1);
+    expect(knight.cost).toEqual([{ material: "ore", amount: 50 }, { material: "hide", amount: 4 }]);
+    const costsHide = (cost: readonly { material: string }[]) => cost.some((c) => c.material === "hide");
+    const others = [
+      ...LOCATIONS.flatMap((l) => l.recruits.filter((r) => r !== knight).map((r) => r.cost)),
+      ...Object.values(FACILITIES).flatMap((f) => f.levels.map((level) => level.cost)),
+    ];
+    expect(others.filter(costsHide)).toEqual([]);
+  });
+
+  it("lets a camp build the quarry for 60 timber and 40 ore, one level, with nothing first, at Highcrag alone", () => {
+    expect(FACILITIES.quarry.levels).toEqual([{ cost: [{ material: "timber", amount: 60 }, { material: "ore", amount: 40 }], requires: [] }]);
+    expect(LOCATIONS.filter((l) => l.buildableFacilities.includes("quarry")).map((l) => l.id)).toEqual([HIGHCRAG]);
+  });
+
+  it("has no free hero at Highcrag: every recruit there costs its cost with no hero alive", () => {
+    for (const recruit of must(location(HIGHCRAG), "Highcrag").recruits) {
+      expect(recruit.cost.length, recruit.unitType).toBeGreaterThan(0);
+      expect(recruitCost(recruit, 0), recruit.unitType).toEqual(recruit.cost);
     }
   });
 
@@ -103,7 +174,6 @@ describe("static content", () => {
 
   it("prices the mine's first level by the first progression, and keeps every level-1 cost within a level-1 warehouse", () => {
     expect(nextLevel("mine", 0)).toEqual({ level: 1, cost: [{ material: "timber", amount: 60 }, { material: "cloth", amount: 3 }], requires: [] });
-    expect(nextLevel("mine", 1)).toBeUndefined();
     for (const kind of Object.keys(FACILITIES) as FacilityKind[]) {
       for (const { amount } of FACILITIES[kind].levels[0]?.cost ?? []) expect(amount).toBeLessThanOrEqual(warehouseCapacity(1));
     }
@@ -111,7 +181,7 @@ describe("static content", () => {
 
   it("refuses a build at the highest level, then for a missing facility, then for the cost", () => {
     const poor = { levels: { "heroes-hall": 1, warehouse: 1 }, holdings: [{ material: "timber", balance: 60 }] };
-    expect(buildRefusal({ ...poor, levels: { mine: 1 } }, "mine")?.code).toBe("MAX_LEVEL");
+    expect(buildRefusal({ ...poor, levels: { mine: 2 } }, "mine")?.code).toBe("MAX_LEVEL");
     expect(buildRefusal(poor, "caravan-hub")).toMatchObject({ code: "REQUIRES", missing: [{ kind: "warehouse", level: 2 }] });
     expect(buildRefusal(poor, "mine")).toMatchObject({ code: "INSUFFICIENT_RESOURCES", short: [{ material: "cloth", amount: 3, balance: 0 }] });
     expect(buildRefusal({ ...poor, holdings: [{ material: "timber", balance: 60 }, { material: "cloth", balance: 3 }] }, "mine")).toBeNull();

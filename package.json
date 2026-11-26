@@ -10,8 +10,9 @@
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
-    "test": "npm run test:hooks && npm run build --workspace @heat/engine && npm run test --workspaces --if-present",
+    "test": "npm run test:hooks && npm run test:scripts && npm run build --workspace @heat/engine && npm run test --workspaces --if-present",
     "test:hooks": "node --test \".claude/hooks/*.test.mjs\"",
+    "test:scripts": "node --test \"scripts/*.test.mjs\"",
     "typecheck": "npm run build --workspace @heat/engine && npm run typecheck --workspaces --if-present",
     "lint": "npm run build --workspace @heat/engine && eslint . --max-warnings 0",
     "bundle": "npm run build --workspace @heat/engine && node scripts/bundle.mjs",
@@ -25,6 +26,7 @@
     "@graphql-codegen/fragment-matcher": "8.0.0",
     "@graphql-eslint/eslint-plugin": "4.4.2",
     "@types/node": "24.19.2",
+    "@vercel/nft": "1.11.7",
     "angular-eslint": "22.6.0",
     "esbuild": "0.28.2",
     "eslint": "10.15.0",
@@ -33,6 +35,7 @@
     "eslint-plugin-testing-library": "7.16.2",
     "globals": "17.14.0",
     "jsdom": "31.0.1",
+    "sharp": "0.35.5",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2",
     "vitest": "5.1.0"

@@ -3,9 +3,12 @@
  * caller.
  *
  * New in HEAT (architecture overview, "Engine provenance"): the outer loop
- * of stages, carry-over, cargo, retreat and the stage time limits. Each fight
+ * of stages, carry-over, drops, retreat and the stage time limits. Each fight
  * and gather stage runs Issue-110's `CombatEngine`, seeded `<seed>#<stage>`,
- * and its events are shifted onto the adventure's clock. The stepping API is
+ * and its events are shifted onto the adventure's clock. The stages it runs
+ * are the job's as `expandStages` rolls them from the seed, before the first
+ * one begins (decision 0058): a live run and `replay` both construct this
+ * class, so the two cannot expand differently. The stepping API is
  * the battle's: a live client steps whatever is due by wall-clock time, and
  * `replay` steps event by event; both get the same timeline.
  *
@@ -14,7 +17,15 @@
  * random number generator, `<seed>#retreat`, so the battle's own draws do not
  * depend on it; when a stage completes with it selected, the party retreats
  * for certain. Reaching a stage's time limit ends the adventure as a retreat.
- * The job's penalty says what a retreat keeps.
+ * A retreat keeps what dropped and the XP of the enemies that went down, and
+ * loses the job's pay and its bonus; a party that is all down keeps nothing
+ * (decision 0058).
+ *
+ * A caravan's cart, on a job that delivers to a location, stands with the
+ * party in every fight and gather stage, as unit `cart` on the timeline, its
+ * health carried from stage to stage like a hero's; a broken cart does not
+ * end the run, and the result says whether it stood on arrival (decision
+ * 0059).
  */
 
 import { range } from "es-toolkit";
@@ -31,9 +42,13 @@ import {
   type StageEnding,
   type StageResult,
 } from "./events.js";
-import type { AdventureContent, Job, Stage } from "./job.js";
+import { expandStages } from "./expand.js";
+import type { AdventureContent, ExpandedStage, Job } from "./job.js";
 import type { AdventureLogEntry, PartyOrder } from "./override.js";
 import { type AdventureSnapshot, MAX_PARTY } from "./snapshot.js";
+
+/** The cart's id on a caravan's timeline, one unit from stage to stage as a hero is. */
+export const CART_UNIT_ID = "cart";
 
 /** A battle's event on the adventure's clock: every time in it moved by `offset`. */
 export function shiftEvent(event: BattleEvent, offset: number): BattleEvent {
@@ -68,7 +83,7 @@ function addTo(amounts: Partial<Record<Material, number>>, rewards: readonly Rew
  * whole timeline. Each type is numbered across the stage's whole list, so a
  * list that names a type twice still gives every unit its own id.
  */
-function opponentsOf(stage: Stage, index: number): Opponent[] {
+function opponentsOf(stage: ExpandedStage, index: number): Opponent[] {
   const groups = stage.kind === "fight" || stage.kind === "gather" ? stage.opponents : [];
   const numbered = new Map<string, number>();
   return groups.flatMap(({ type, count }) =>
@@ -87,11 +102,17 @@ function opponentsOf(stage: Stage, index: number): Opponent[] {
  */
 export class AdventureEngine {
   private readonly job: Job;
+  /** The job's stages as this adventure meets them, rolled from its seed. */
+  private readonly stages: readonly ExpandedStage[];
   private readonly retreatRng: SeededRng;
   private readonly events: AdventureEvent[] = [];
   private readonly overrideLog: AdventureLogEntry[] = [];
   private readonly health = new Map<string, number>();
-  private readonly cargo: Partial<Record<Material, number>> = {};
+  /** The cart's health, on a caravan; null on a job that does not deliver. */
+  private cartHealth: number | null = null;
+  private readonly drops: Partial<Record<Material, number>> = {};
+  /** The XP of every enemy that has gone down, in every stage so far. */
+  private enemyXp = 0;
   private readonly stageResults: StageResult[] = [];
   private clock = 0;
 
@@ -126,6 +147,12 @@ export class AdventureEngine {
       this.health.set(hero.heroId, hero.stats.maxHealth);
     }
     this.job = job;
+    if (job.deliversTo !== undefined) {
+      // The cart's id is its own on the field: a hero of that id would take the cart's outcome as its.
+      if (this.health.has(CART_UNIT_ID)) throw new Error(`Hero ${CART_UNIT_ID} has the cart's id on a job that delivers`);
+      this.cartHealth = content.battle.cart.health;
+    }
+    this.stages = expandStages(job, seed);
     this.retreatRng = new SeededRng(`${seed}#retreat`);
   }
 
@@ -210,14 +237,14 @@ export class AdventureEngine {
   getResult(): AdventureResult {
     const outcome = this.outcome;
     if (outcome === null) throw new Error("AdventureEngine.getResult() called before the adventure completed");
-    const { pay, xp, retreat } = this.job;
-    const keepsPay = outcome === "complete" || (outcome === "retreat" && retreat.keepsPay);
-    const keepsCargo = outcome === "complete" || (outcome === "retreat" && retreat.keepsCargo);
-    const earned = outcome === "complete" ? xp : outcome === "retreat" ? Math.floor((xp * retreat.xpPercent) / 100) : 0;
+    const { pay, bonusXp } = this.job;
+    const arrived = outcome === "complete";
+    // A retreat keeps what was won on the way and loses what arriving pays; a defeat keeps nothing.
+    const earned = outcome === "defeat" ? 0 : this.enemyXp + (arrived ? bonusXp : 0);
 
     const rewards: Partial<Record<Material, number>> = {};
-    if (keepsPay) addTo(rewards, pay);
-    if (keepsCargo) addTo(rewards, toRewards(this.cargo));
+    if (outcome !== "defeat") addTo(rewards, toRewards(this.drops));
+    if (arrived) addTo(rewards, pay);
 
     const health = this.snapshot.heroes.map((h) => ({ heroId: h.heroId, health: this.health.get(h.heroId) ?? 0 }));
     return {
@@ -229,6 +256,8 @@ export class AdventureEngine {
       xp: health.filter((h) => h.health > 0).map((h) => ({ heroId: h.heroId, xp: earned })),
       dead: health.filter((h) => h.health <= 0).map((h) => h.heroId),
       health,
+      unlocks: arrived ? [...(this.job.grants ?? [])] : [],
+      ...(this.cartHealth === null ? {} : { delivered: arrived && this.cartHealth > 0 }),
     };
   }
 
@@ -259,8 +288,8 @@ export class AdventureEngine {
 
   // ── Internal ─────────────────────────────────────────────────────
 
-  private currentStage(): Stage {
-    const stage = this.job.stages[this.stageIndex];
+  private currentStage(): ExpandedStage {
+    const stage = this.stages[this.stageIndex];
     if (!stage) throw new Error(`No stage ${String(this.stageIndex)}`);
     return stage;
   }
@@ -293,10 +322,12 @@ export class AdventureEngine {
         return health > 0 ? [{ unitId: h.heroId, unitType: h.unitType, health, stats: h.stats }] : [];
       });
       this.battleHeroes = new Set(party.map((p) => p.unitId));
+      const cart = this.cartHealth !== null && this.cartHealth > 0 ? { cart: { unitId: CART_UNIT_ID, health: this.cartHealth } } : {};
       this.battle = new CombatEngine(
         {
           seed: `${this.seed}#${String(index)}`,
           party,
+          ...cart,
           opponents: opponentsOf(stage, index),
           timeLimitMs: stage.timeLimitMs,
         },
@@ -348,13 +379,15 @@ export class AdventureEngine {
     }
   }
 
-  /** Carry the battle's health and cargo over, then end the stage as it ended. */
+  /** Carry the battle's health, its drops and its enemies' XP over, then end the stage as it ended. */
   private endBattle(battle: CombatEngine): void {
     const outcome = battle.getOutcome();
     for (const unit of outcome.units) {
       if (this.health.has(unit.unitId)) this.health.set(unit.unitId, unit.health);
+      else if (unit.unitId === CART_UNIT_ID && this.cartHealth !== null) this.cartHealth = unit.health;
     }
-    addTo(this.cargo, toRewards(outcome.gathered));
+    addTo(this.drops, toRewards(outcome.drops));
+    this.enemyXp += outcome.xp;
     this.nextAttemptAt = null;
     switch (outcome.result) {
       case "win":
@@ -387,7 +420,7 @@ export class AdventureEngine {
       stage: this.stageIndex,
       ended,
       health: this.snapshot.heroes.map((h) => ({ heroId: h.heroId, health: this.health.get(h.heroId) ?? 0 })),
-      cargo: toRewards(this.cargo),
+      drops: toRewards(this.drops),
     });
     this.stageResults.push({ stage: this.stageIndex, kind: stage.kind, ended, startedAtMs: this.stageStart, endedAtMs: this.clock });
   }

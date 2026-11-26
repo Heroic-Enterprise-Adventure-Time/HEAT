@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
 
-import { FACILITIES, JOBS, jobsPostedBy, location, replay, STARTING_LOCATION } from "../../src/index.js";
-import { ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { FACILITIES, JOBS, jobsPostedBy, replay, STARTING_LOCATION } from "../../src/index.js";
+import { haul, MILLBROOK_RECRUITS, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
-// The mine's first job (Issue-133, decision 0031, as retuned by decision
-// 0051): posted by the mine, not the job board, and one run of it by
-// villagers pays for a fighter.
+// The mine's first job (Issue-133, decision 0031, with the hauls of decision
+// 0058): posted by the mine, not the job board, and one run of it by
+// villagers pays for a fighter, at its worst roll.
 
 const ore = JOBS[ORE];
 const gather = ore.stages[1];
 if (gather?.kind !== "gather") throw new Error("The ore job gathers second");
-/** What villagers bring home from the two veins: a rating of 2 against 3, two thirds of each vein's 30. */
-const VILLAGERS_ORE = 40;
+/** What villagers bring home from the two veins: each vein's drop at mining 1. */
+const VILLAGERS_ORE = haul("ore-vein", 1, 2);
 
 describe("Ore from the hill", () => {
   it("is posted by Millbrook's mine and not by its job board", () => {
@@ -25,36 +25,45 @@ describe("Ore from the hill", () => {
     expect(ore.stages.map((s) => s.kind)).toEqual(["travel", "gather", "fight", "arrive"]);
     expect(gather.opponents).toEqual([{ type: "ore-vein", count: 2 }]);
     expect(ore.pay).toEqual([]);
-    expect(ore.xp).toBe(15);
   });
 
   for (const count of [1, 2]) {
-    it(`is completed by ${count} villager(s) on every one of ${SEEDS} seeds, with 40 ore and no death`, () => {
+    it(`is completed by ${count} villager(s) on every one of ${SEEDS} seeds, with 40 to 48 ore, 15 XP and no death`, () => {
+      expect(VILLAGERS_ORE).toEqual({ min: 40, max: 48 });
       const heroes = villagers(count);
       for (const seed of seeds) {
         const { result } = replay(snapshot(ORE, heroes), seed, []);
         expect(result.outcome, seed).toBe("complete");
         expect(result.dead, seed).toEqual([]);
-        expect(result.rewards, seed).toEqual([{ material: "ore", amount: VILLAGERS_ORE }]);
-        expect(result.xp.every((x) => x.xp === ore.xp), seed).toBe(true);
+        expect(result.rewards.map((r) => r.material), seed).toEqual(["ore"]);
+        expect(rewardOf(result, "ore"), seed).toBeGreaterThanOrEqual(VILLAGERS_ORE.min);
+        expect(rewardOf(result, "ore"), seed).toBeLessThanOrEqual(VILLAGERS_ORE.max);
+        expect(result.xp.every((x) => x.xp === 15), seed).toBe(true);
       }
     });
   }
 
-  it(`is completed by a fighter with a villager on every one of ${SEEDS} seeds with no death, for less ore: the fighter's hits waste the veins`, () => {
+  it(`is completed by a fighter with a villager on every one of ${SEEDS} seeds with no death, for the ore villagers bring: a fighter is not wasted on a resource run (decision 0058)`, () => {
     const heroes = party("fighter", "villager");
     for (const seed of seeds) {
       const { result } = replay(snapshot(ORE, heroes), seed, []);
       expect(result.outcome, seed).toBe("complete");
       expect(result.dead, seed).toEqual([]);
-      const amount = rewardOf(result, "ore");
-      expect(amount, seed).toBeGreaterThan(0);
-      expect(amount, seed).toBeLessThan(VILLAGERS_ORE);
+      expect(result.rewards, seed).toEqual(replay(snapshot(ORE, villagers(2)), seed, []).result.rewards);
     }
   });
 
-  it("pays for a fighter in one run", () => {
-    const fighter = location(STARTING_LOCATION)?.recruits.find((r) => r.unitType === "fighter");
-    expect(fighter?.cost).toEqual([{ material: "ore", amount: VILLAGERS_ORE }]);
+  it(`brings a fighter alone no ore, and the XP all the same, on every one of ${SEEDS} seeds: with no carrier there is no drop`, () => {
+    for (const seed of seeds) {
+      const { result } = replay(snapshot(ORE, party("fighter")), seed, []);
+      expect(result.outcome, seed).toBe("complete");
+      expect(result.rewards, seed).toEqual([]);
+      expect(result.xp, seed).toEqual([{ heroId: "fighter-1", xp: 15 }]);
+    }
+  });
+
+  it("pays for a fighter in one run, at its worst roll", () => {
+    const fighter = MILLBROOK_RECRUITS.find((r) => r.unitType === "fighter");
+    expect(fighter?.cost).toEqual([{ material: "ore", amount: VILLAGERS_ORE.min }]);
   });
 });

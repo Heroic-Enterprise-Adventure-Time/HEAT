@@ -1,6 +1,6 @@
 # 0052: Ranged units: an attack that reaches every line, a shot that hits a node last, and a projectile let go at the hold frame
 
-- **Status:** Decided; the numbers are working assumptions in the engine's static content.
+- **Status:** Decided; the numbers are working assumptions in the engine's static content. When a projectile is let go and lands, "let go at the hold frame and lands as the action resolves", and whom it flies at, "whoever the action was declared at", are superseded by 0057 (Issue-335): the wind-up and the flight play as the action resolves, for the same lengths, at whoever took the hit. That a shot at a node "wastes what it takes" is replaced by 0058 (Issue-336, 2026-11-20), built by Issue-339: no hit gathers, so a shot at a node costs the party nothing; a shot that hits a node only when nothing else is in reach stands.
 - **Date:** 2026-11-11
 - **Settles:** Issue-286: what a ranged unit is, on each side; whether a ranged attack ever hits a resource node; where a ranger is recruited and for what; the first job with a mixed stage; and when a projectile leaves and lands, which the asset rules said two ways. The picture was the owner's in the step 3 design session (Issue-282); the numbers and the timing were agreed at the start of the Issue-286 session.
 
@@ -69,4 +69,4 @@ Four villagers can force the goblins job and lose one of them on most runs; a ra
 
 ## Where it is described
 
-`docs/design/game.md`, "The battle" and "The heroes hall". `docs/process/assets.md`, rules 33 and 35. `docs/architecture/adventure-loop.md`, "The loop", the item built by Issue-286. The abilities, the two profiles, the recruit and the job are in `packages/engine/src/content.ts`; the flight's arithmetic in `packages/client/src/app/adventure/battle/action-sprites.ts` and its drawing in `battle-scene.ts`; the bow's frame lengths and nocks in `art/weapons/bow-01/provenance.json`.
+`docs/design/battle.md`. `docs/design/game.md`, "The heroes hall". `docs/process/assets.md`, rules 33 and 35. `docs/architecture/adventure-loop.md`, "The loop", the item built by Issue-286. The abilities, the two profiles, the recruit and the job are in `packages/engine/src/content.ts`; the flight's arithmetic in `packages/client/src/app/adventure/battle/action-sprites.ts` and its drawing in `battle-scene.ts`; the bow's frame lengths and nocks in `art/weapons/bow-01/provenance.json`.

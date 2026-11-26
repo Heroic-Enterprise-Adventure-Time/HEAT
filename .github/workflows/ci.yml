@@ -57,6 +57,11 @@ jobs:
       - name: Run every package's tests (integration tests start containers)
         run: npm test
 
+      # What every session loads is held to a size, so that a rule added to
+      # it is a rule someone made room for (docs/README.md, rule 3).
+      - name: Check the size of the documents every session loads
+        run: node scripts/check-loaded-documents.mjs
+
       # The output a stack's bucket serves (Issue-39); the log shows the
       # bundle sizes against the budgets in packages/client/angular.json.
       - name: Build the client for production

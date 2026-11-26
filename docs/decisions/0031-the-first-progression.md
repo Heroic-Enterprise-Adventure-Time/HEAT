@@ -1,6 +1,6 @@
 # 0031: The first progression: a first job a villager cannot fail, and one run per step
 
-- **Status:** Decided; the numbers are working assumptions in the engine's static content. The gather jobs' hauls, the timber job's trees and the table's rows for them are replaced by 0051 (Issue-283, 2026-11-10); the costs and the one run per step stand.
+- **Status:** Decided; the numbers are working assumptions in the engine's static content. The gather jobs' hauls, the timber job's trees and the table's rows for them are replaced by 0051 (Issue-283, 2026-11-10); the costs and the one run per step stand. Amended by 0058 on 2026-11-20 (Issue-336): the hauls are ranges whose worst roll still pays each step, built by Issue-339 and checked over 500 seeds per party; and "Pick up sticks" meets a wolf one time in ten, built by Issue-341 on 2026-11-22, where this record says "No monster, so a lone villager cannot be hurt": it stays a job a lone villager cannot fail, whatever it is forced to do, checked with the wolf on every one of 5,000 seeds, because a node is worked only when no monster is in reach (decision 0058, its second amendment).
 - **Date:** 2026-10-22
 - **Settles:** Issue-126: the first job a new player can take, and the costs from there to a fighter, which Issue-82 (paid recruitment), Issue-93 (building facilities) and Issue-133 (the mine's first job) build to.
 
@@ -56,4 +56,4 @@ The engine's test replays the sticks job with a lone villager over 500 seeds, wi
 
 ## Where it is described
 
-`docs/design/game.md`, "The battle", "The heroes hall" and "Resources". The numbers are in `packages/engine/src/content.ts`. Issue-82, Issue-93 and Issue-133 carry the numbers each builds to.
+`docs/design/battle.md`. `docs/design/game.md`, "The heroes hall" and "Resources". The numbers are in `packages/engine/src/content.ts`. Issue-82, Issue-93 and Issue-133 carry the numbers each builds to.

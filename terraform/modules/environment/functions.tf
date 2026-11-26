@@ -9,6 +9,16 @@ locals {
   # The service each function names itself in its logs, traces and metrics. One
   # expression, because an alarm reads it (alarms.tf; terraform.md, rule 19).
   service_names = { for name, _ in var.functions : name => "heat-${name}" }
+
+  # The AWS Lambda Layer for OpenTelemetry, which AWS recommends in place of
+  # the X-Ray SDK ("Migrating from X-Ray instrumentation to OpenTelemetry
+  # instrumentation", X-Ray developer guide, read 2026-11-17; decision 0055). The
+  # ARN is AWS's own, its publisher's account and the version included, as
+  # the ADOT documentation lists it for us-east-1 ("ADOT Lambda Layer ARNs",
+  # read 2026-11-17, where Node.js 24.x on arm64 is a supported runtime). A
+  # layer version never changes, so the number is the pin; it moves by a
+  # change to this line, since nothing tracks it.
+  otel_layer_arn = "arn:aws:lambda:us-east-1:615299751070:layer:AWSOpenTelemetryDistroJs:16"
 }
 
 data "archive_file" "function" {
@@ -126,9 +136,12 @@ data "aws_iam_policy_document" "function" {
     sid    = "WriteTraces"
     effect = "Allow"
 
+    # One action. xray:PutTelemetryRecords, which the role held for the X-Ray
+    # SDK's daemon, went with the SDK: without it the layer's spans arrive
+    # whole through Lambda's own agent and the function's log shows no
+    # denial (heat-sb326, 2026-11-17; decision 0055).
     actions = [
       "xray:PutTraceSegments",
-      "xray:PutTelemetryRecords",
     ]
 
     resources = ["*"]
@@ -150,7 +163,8 @@ resource "aws_lambda_function" "function" {
   description   = "${each.key} of ${var.name_prefix}: ${each.value.export} from dist/${each.key}/index.mjs"
   role          = aws_iam_role.function[each.key].arn
 
-  # The bundle is one ESM file; the export name comes from the manifest.
+  # The bundle is one ESM file, with the AWS SDK's packages beside it
+  # (scripts/bundle.mjs); the export name comes from the manifest.
   # code_sha256, not source_code_hash: it is compared with what Lambda holds,
   # so a change made outside Terraform shows in the plan too (decision 0017,
   # facts checked; optional and computed in provider 6.69.1, read from its
@@ -174,8 +188,18 @@ resource "aws_lambda_function" "function" {
     mode = "Active"
   }
 
+  layers = [local.otel_layer_arn]
+
   environment {
     variables = {
+      # The layer's wrapper starts the runtime with OpenTelemetry loaded, and
+      # traces only: Application Signals, its metrics and its managed policy,
+      # stays off ("Manually Add AWS Distro for OpenTelemetry (ADOT) Lambda
+      # Layers", read 2026-11-17).
+      AWS_LAMBDA_EXEC_WRAPPER              = "/opt/otel-instrument"
+      OTEL_AWS_APPLICATION_SIGNALS_ENABLED = "false"
+      OTEL_SERVICE_NAME                    = local.service_names[each.key]
+
       HEAT_PLAYER_TABLE       = aws_dynamodb_table.player.name
       HEAT_LOCATION_TABLE     = aws_dynamodb_table.location.name
       POWERTOOLS_SERVICE_NAME = local.service_names[each.key]
@@ -199,6 +223,17 @@ resource "aws_lambda_function" "function" {
     aws_cloudwatch_log_group.function,
     aws_iam_role_policy.function,
   ]
+
+  # The layer's ARN is us-east-1's, publisher and version included, and
+  # Lambda refuses a layer from another region. Every environment is in
+  # us-east-1 today; a root composed elsewhere fails here, at the plan, with
+  # the reason, not at the apply.
+  lifecycle {
+    precondition {
+      condition     = data.aws_region.current.region == "us-east-1"
+      error_message = "The OpenTelemetry layer's ARN in functions.tf is us-east-1's. In another region the ARN, its publisher's account and its version are different: take them from the ADOT documentation's layer table."
+    }
+  }
 }
 
 # What the routes point at. Rollback is this alias moved back to an earlier

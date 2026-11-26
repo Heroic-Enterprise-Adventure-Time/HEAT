@@ -1,6 +1,8 @@
-import { clamp } from "es-toolkit";
+import { clamp, uniq } from "es-toolkit";
 
 import {
+  ADVENTURE_CONTENT,
+  type AdventureContent,
   type AdventureLogEntry,
   type AdventureResult,
   type AdventureTimeline,
@@ -15,7 +17,11 @@ import { countingConflicts, pause } from "./conflict.js";
 import {
   AdventureClosed,
   type AdventureRecord,
+  type Camp,
   CampChanged,
+  type CappedCredit,
+  type Caravan,
+  type CaravanSettlement,
   type Hero,
   type HeroOutcome,
   type Repository,
@@ -55,8 +61,15 @@ import type { Timelines } from "./timelines.js";
  *    instead, so the record's result and the stored replay agree.
  * 5. Settlement reads the camp, its holdings and the party, computes the
  *    capped credits, the XP and the deaths, and writes them in one
- *    conditional transaction; a balance that moved in between is read again,
- *    up to SETTLE_ATTEMPTS times, then the refusal is Conflict.
+ *    conditional transaction, with the unlocks the replay says the run
+ *    earned, and for a caravan its destination camp's writes: the cargo
+ *    delivered up to its cap and the heroes who land (decision 0059); a balance that moved in between is read again, up to
+ *    SETTLE_ATTEMPTS times, then the refusal is Conflict.
+ *
+ * The content the replay reads is the engine's, as the engine of the issuing
+ * version has it; a test passes its own, as it passes a store or a version,
+ * to settle a job the game does not have: no caller outside a test passes
+ * one, and nothing of a request reaches it.
  */
 
 /** The most entries a log may have: far beyond what a person can click in a stage's time limits. */
@@ -121,7 +134,9 @@ function byMaterial(rewards: readonly Reward[]): Map<Material, number> {
  * Settlement's writes from what was read: each reward credited up to the
  * warehouse's cap, the rest lost (overview, "Camps, heroes and resources");
  * each survivor's XP added and its level from the content's thresholds,
- * never lowered; the dead.
+ * never lowered; the dead; and the unlocks the run earned, as the engine's
+ * result lists them, with nothing read of what the player holds (decision
+ * 0059).
  */
 export function settlement(
   record: AdventureRecord,
@@ -129,13 +144,11 @@ export function settlement(
   warehouseLevel: number,
   balances: ReadonlyMap<string, number>,
   heroes: readonly Hero[],
+  destination?: Camp,
 ): Settlement {
-  const cap = warehouseCapacity(warehouseLevel);
-  const holdings = [...byMaterial(result.rewards)].map(([material, amount]) => {
-    const read = balances.get(material) ?? null;
-    const credit = clamp(cap - (read ?? 0), 0, amount);
-    return { material, read, credit, lost: amount - credit };
-  });
+  const holdings = cappedCredits(result.rewards, warehouseLevel, balances);
+  if (record.caravan && !destination) throw new Error("a caravan is settled with its destination camp as read");
+  const caravan =record.caravan && destination ? caravanSettlement(record.caravan, result, destination) : undefined;
   const dead = new Set(result.dead);
   const gained = new Map(result.xp.map((x) => [x.heroId, x.xp]));
   const health = new Map(result.health.map((h) => [h.heroId, h.health]));
@@ -173,7 +186,42 @@ export function settlement(
       credited: holdings.filter((h) => h.credit > 0).map((h) => ({ material: h.material, amount: h.credit })),
       lost: holdings.filter((h) => h.lost > 0).map((h) => ({ material: h.material, amount: h.lost })),
       heroes: outcomes,
+      // Each once: settlement writes an item for each, and a transaction touches an item once.
+      unlocks: uniq(result.unlocks),
+      delivered: (caravan?.deliveries ?? []).filter((d) => d.credit > 0).map((d) => ({ material: d.material, amount: d.credit })),
+      deliveryLost: (caravan?.deliveries ?? []).filter((d) => d.lost > 0).map((d) => ({ material: d.material, amount: d.lost })),
     },
+    caravan,
+  };
+}
+
+/** Each resource credited up to the warehouse's cap at a level, from the balances read, the rest lost. */
+export function cappedCredits(rewards: readonly Reward[], warehouseLevel: number, balances: ReadonlyMap<string, number>): CappedCredit[] {
+  const cap = warehouseCapacity(warehouseLevel);
+  return [...byMaterial(rewards)].map(([material, amount]) => {
+    const read = balances.get(material) ?? null;
+    const credit = clamp(cap - (read ?? 0), 0, amount);
+    return { material, read, credit, lost: amount - credit };
+  });
+}
+
+/**
+ * A caravan's part of settlement (decision 0059), from the destination camp
+ * as read. On arrival the heroes marked to stay land, alive or dead, and the
+ * cargo is credited there up to its warehouse's cap if the cart stands; a
+ * broken cart's cargo is lost whole and credits nothing, and a retreat or a
+ * defeat lands nobody and lets go of the slots held for them.
+ */
+export function caravanSettlement(caravan: Caravan, result: AdventureResult, destination: Camp): CaravanSettlement {
+  const arrived = result.outcome === "complete";
+  const balances = new Map(destination.holdings.map((h) => [h.material, h.balance]));
+  return {
+    destination: caravan.destination,
+    warehouseLevel: destination.warehouseLevel,
+    stored: destination.stored,
+    deliveries: arrived && result.delivered === true ? cappedCredits(caravan.cargo, destination.warehouseLevel, balances) : [],
+    landed: arrived ? [...caravan.staying] : [],
+    released: arrived ? 0 : caravan.staying.length,
   };
 }
 
@@ -193,18 +241,28 @@ export function submitAdventure(
   adventureId: string,
   overrides: readonly OverrideInput[],
   now = new Date(),
+  content: AdventureContent = ADVENTURE_CONTENT,
 ): Promise<AdventureRecord> {
-  return countingConflicts("settle", () => submitOnce(repo, timelines, playerId, version, adventureId, overrides, now));
+  return countingConflicts("settle", () => submitOnce(repo, timelines, playerId, version, adventureId, overrides, now, content));
 }
 
-async function submitOnce(repo: Repository, timelines: Timelines, playerId: string, version: string, adventureId: string, overrides: readonly OverrideInput[], now: Date): Promise<AdventureRecord> {
+async function submitOnce(
+  repo: Repository,
+  timelines: Timelines,
+  playerId: string,
+  version: string,
+  adventureId: string,
+  overrides: readonly OverrideInput[],
+  now: Date,
+  content: AdventureContent,
+): Promise<AdventureRecord> {
   const record = await ownAdventure(repo, playerId, adventureId);
   if (record.status === "SETTLED") return record;
   if (record.status === "DISCARDED") throw new AdventureDiscarded("the adventure was discarded");
   if (record.version !== version) throw new EngineUpdated("the adventure was issued by another version of the game", version);
 
   const log = toLog(record, overrides);
-  const verified = replay(record.snapshot, record.seed, log);
+  const verified = replay(record.snapshot, record.seed, log, content);
   if (JSON.stringify(verified.timeline.overrideLog) !== JSON.stringify(log)) {
     logger.warn("submitted log differs from the replay's", {
       adventureId,
@@ -218,15 +276,16 @@ async function submitOnce(repo: Repository, timelines: Timelines, playerId: stri
     const body = await timelines.get(adventureId);
     if (body === undefined) throw new Conflict("the stored timeline could not be read; nothing was settled");
     const stored = JSON.parse(body) as AdventureTimeline;
-    result = replay(record.snapshot, record.seed, stored.overrideLog).result;
+    result = replay(record.snapshot, record.seed, stored.overrideLog, content).result;
   }
 
   for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
     const camp = await repo.camp(playerId, record.location);
+    const destination = record.caravan ? await repo.camp(playerId, record.caravan.destination) : undefined;
     const balances = new Map(camp.holdings.map((h) => [h.material, h.balance]));
     const heroes = await Promise.all(record.snapshot.heroes.map((h) => repo.getHero(playerId, h.heroId)));
     if (heroes.some((h) => h?.adventureId !== adventureId)) return closed(repo, adventureId);
-    const writes = settlement(record, result, camp.warehouseLevel, balances, heroes as Hero[]);
+    const writes = settlement(record, result, camp.warehouseLevel, balances, heroes as Hero[], destination);
     try {
       await repo.settle(playerId, writes, now);
       return { ...record, status: "SETTLED", result: writes.result, settledAt: now.toISOString() };

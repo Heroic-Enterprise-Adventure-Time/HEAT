@@ -7,6 +7,7 @@ import { routes } from '../app.routes';
 import { type CampView, Game, type HeroView, type RecruitOffer, type SeenHeroView, upgradeOffer } from '../game';
 import { Refusal } from '../hub';
 import { Session } from '../session';
+import { fakeIcons } from '../testing/fake-icons';
 import { fakeSession, PLAYER } from '../testing/fake-session';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { itemHolding, listItems, menu, panel, panelBox } from '../testing/page';
@@ -14,6 +15,7 @@ import { renderAt } from '../testing/render-at';
 import { textsOf } from '../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from './camp';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
+import { type CampLayout, HIGHCRAG } from './scene/layout';
 
 const wren: HeroView = {
   id: 'h1',
@@ -42,6 +44,8 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
     recentAdventuresAt: () => Promise.resolve([]),
     replaysOf: () => Promise.resolve([]),
     retiredHere: computed(() => all().filter((h) => h.status === 'RETIRED')),
+    /** The heroes on their way here by caravan, none unless a test sets them. */
+    onTheWay: signal<readonly HeroView[]>([]),
     camp: signal({
       location: 'millbrook',
       name: 'Millbrook',
@@ -76,7 +80,11 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
       return Promise.resolve();
     },
     livingHere: computed(() => here().filter((h) => h.status === 'ALIVE')),
-    recruits: computed((): RecruitOffer[] => [
+    /** Whether the camp on screen offers no hero for nothing, as Highcrag does not. */
+    noFreeRecruit: signal(false),
+    /** What the hall offers in place of Millbrook's two, where a test sets it. */
+    offers: signal<RecruitOffer[] | null>(null),
+    recruits: computed((): RecruitOffer[] => fake.offers() ?? [
       {
         unitType: 'villager',
         cost: here().some((h) => h.status === 'ALIVE') ? [{ material: 'timber', amount: 20, balance: 60 }] : [],
@@ -86,7 +94,7 @@ function fakeGame(heroes: HeroView[], seen: SeenHeroView[] = []) {
     ]),
     location: signal('millbrook'),
     // Not read yet: a job's detail waits for it before offering the party.
-    player: signal(null),
+    player: signal<{ camps: { location: string }[] } | null>(null),
     adventure: signal<{ snapshot: { heroes: { heroId: string }[] } } | null>(null),
     error: signal<string | null>(null),
     recruited: [] as string[],
@@ -116,7 +124,10 @@ function fakeScene() {
     callbacks: null as SceneCallbacks | null,
     shown: [] as { heroes: readonly SceneHero[]; arriving: string | undefined; leaving?: string | undefined }[],
     levels: null as Readonly<Record<string, number>> | null,
-    factory: (_host: HTMLElement, _layout: unknown, levels: Readonly<Record<string, number>>, callbacks: SceneCallbacks) => {
+    /** The layout the scene was last made with. */
+    layout: null as CampLayout | null,
+    factory: (_host: HTMLElement, layout: CampLayout, levels: Readonly<Record<string, number>>, callbacks: SceneCallbacks) => {
+      scene.layout = layout;
       scene.levels = levels;
       scene.callbacks = callbacks;
       return Promise.resolve({
@@ -138,10 +149,35 @@ async function renderCamp(game: ReturnType<typeof fakeGame>, url = '/camp/millbr
     { provide: Game, useValue: game },
     { provide: Session, useValue: fakeSession(PLAYER) },
     { provide: CAMP_SCENE_FACTORY, useValue: scene.factory },
+    fakeIcons,
     testLayoutSizes,
   ]);
   await waitFor(() => { expect(scene.callbacks).not.toBeNull(); });
   return { router, scene, user };
+}
+
+/**
+ * The game with Highcrag's camp as the hub answers it once the road is open
+ * (decision 0059): empty, with nothing in stock, its two recruits at their
+ * cost and no hero for nothing.
+ */
+function atHighcrag(game: ReturnType<typeof fakeGame>) {
+  game.camp.set({
+    ...game.camp(),
+    location: 'highcrag',
+    name: 'Highcrag',
+    holdings: [],
+    facilities: [
+      { kind: 'heroes-hall', level: 1 },
+      { kind: 'warehouse', level: 1 },
+    ] as CampView['facilities'],
+  });
+  game.noFreeRecruit.set(true);
+  game.offers.set([
+    { unitType: 'miner', cost: [{ material: 'ore', amount: 30, balance: 0 }, { material: 'timber', amount: 20, balance: 0 }], reason: 'Not enough ore or timber.' },
+    { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
+  ]);
+  return game;
 }
 
 const marked = (name: string) => menu().getByRole('link', { name, current: 'page' });
@@ -309,7 +345,7 @@ describe('Camp', () => {
     expect(mine).toHaveAttribute('href', '/camp/millbrook/mine');
     expect(mine).toHaveClass('unbuilt');
     expect(hall).not.toHaveClass('unbuilt');
-    expect(within(hall).getByRole('presentation')).toHaveAttribute('src', 'art/icons/heroes-hall.png');
+    expect(within(hall).getByRole('presentation')).toHaveAttribute('src', '/art/icons/heroes-hall.test.png');
   });
 
   it('hands the scene each facility level: 0 for the ones not built', async () => {
@@ -334,7 +370,9 @@ describe('Camp', () => {
     await user.click(within(build).getByRole('button', { name: 'Build' }));
     expect(await panel().findByText('Level 1.')).toBeInTheDocument();
     expect(game.built).toEqual([['mine', 1]]);
-    expect(panel().getByText('At its highest level here.')).toBeInTheDocument();
+    const upgrade = section('Upgrade to level 2');
+    expect(within(upgrade).getByText('Posts a new job: The deep seam.')).toBeInTheDocument();
+    expect(within(upgrade).getByText('Not enough timber or stone.')).toBeInTheDocument();
     await waitFor(() => { expect(scene.levels?.['mine']).toBe(1); });
   });
 
@@ -345,9 +383,14 @@ describe('Camp', () => {
     await user.click(panel().getByRole('button', { name: 'Build' }));
     const job = await panel().findByRole('link', { name: 'Ore from the hill' });
     expect(job).toHaveAttribute('href', '/camp/millbrook/mine/jobs/ore-from-the-hill');
-    expect(listItems('Jobs')).toHaveLength(2);
-    expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('up to 60 ore')).toBeInTheDocument();
-    expect(within(itemHolding('Jobs', 'link', 'Goblins in the old workings')).getByText('up to 90 ore')).toBeInTheDocument();
+    expect(listItems('Jobs')).toHaveLength(3);
+    expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('No pay, 4 bonus XP')).toBeInTheDocument();
+    expect(within(itemHolding('Jobs', 'link', 'Goblins in the old workings')).getByText('No pay, 6 bonus XP')).toBeInTheDocument();
+    // The second level's job is listed with what it needs, as a caravan not unlocked is (Issue-357).
+    expect(within(itemHolding('Jobs', 'link', 'The deep seam')).getByText('Needs a level 2 mine.')).toBeInTheDocument();
+    // Greyed out, as every job that cannot be started yet is; the others are not (the owner, 2026-11-26).
+    expect(itemHolding('Jobs', 'link', 'The deep seam')).toHaveClass('locked');
+    expect(itemHolding('Jobs', 'link', 'Ore from the hill')).not.toHaveClass('locked');
     expect(game.built).toEqual([['mine', 1]]);
   });
 
@@ -357,7 +400,7 @@ describe('Camp', () => {
     game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'mine' ? { kind: 'mine', level: 1 } : f)) });
     await renderCamp(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
     expect(panel().getByRole('heading', { name: 'Ore from the hill', level: 2 })).toBeInTheDocument();
-    expect(textsOf(listItems('Stages'))).toContain('Gather ore from 2 ore veins');
+    expect(textsOf(listItems('Reward'))).toEqual(['No pay.', 'Bonus: 4 XP to each hero who arrives.']);
     expect(backTo('Mine')).toHaveAttribute('href', '/camp/millbrook/mine');
     expect(marked('Mine')).toBeInTheDocument();
   });
@@ -401,6 +444,15 @@ describe('Camp', () => {
     expect(within(upgrade).getByText('Not enough timber or cloth.')).toBeInTheDocument();
   });
 
+  it("offers the caravan hub's next level, with what its cart carries (Issue-357)", async () => {
+    const game = fakeGame([]);
+    const built = game.camp();
+    game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'caravan-hub' ? { kind: 'caravan-hub', level: 1 } : f)) });
+    await renderCamp(game, '/camp/millbrook/caravan-hub');
+    const upgrade = section('Upgrade to level 2');
+    expect(within(upgrade).getByText('The cart carries 200 in all.')).toBeInTheDocument();
+  });
+
   it('sends a facility the camp does not have back to the hall', async () => {
     const { router } = await renderCamp(fakeGame([]), '/camp/millbrook/forge');
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
@@ -409,5 +461,117 @@ describe('Camp', () => {
   it('sends a camp with no layout to the starting camp', async () => {
     const { router } = await renderCamp(fakeGame([]), '/camp/atlantis');
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
+  });
+
+  it("lists the caravan hub's jobs once the hub is built, the caravan to a location not unlocked with what it needs (Issue-355), and the road's page says what it opens (Issue-352)", async () => {
+    const game = fakeGame([wren]);
+    const built = game.camp();
+    game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'caravan-hub' ? { kind: 'caravan-hub', level: 1 } : f)) });
+    game.player.set({ camps: [{ location: 'millbrook' }] });
+    const { user } = await renderCamp(game, '/camp/millbrook/caravan-hub');
+    const job = panel().getByRole('link', { name: 'Scout the road to Highcrag' });
+    expect(job).toHaveAttribute('href', '/camp/millbrook/caravan-hub/jobs/scout-the-road-to-highcrag');
+    expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Scout the road to Highcrag', 'Caravan to Highcrag']);
+    expect(within(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).getByText('No pay, 8 bonus XP')).toBeInTheDocument();
+    expect(within(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).getByText('Needs the road to Highcrag.')).toBeInTheDocument();
+    expect(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).toHaveClass('locked');
+    expect(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).not.toHaveClass('locked');
+
+    await user.click(job);
+    expect(await panel().findByRole('heading', { name: 'Scout the road to Highcrag', level: 2 })).toBeInTheDocument();
+    expect(panel().getByText(/the way is open: you will have a camp there/)).toBeInTheDocument();
+    expect(textsOf(listItems('Reward'))).toEqual(['No pay.', 'Bonus: 8 XP to each hero who arrives.']);
+    expect(backTo('Caravan hub')).toHaveAttribute('href', '/camp/millbrook/caravan-hub');
+  });
+});
+
+describe('The camp at Highcrag (Issue-352)', () => {
+  it("is a scene like Millbrook's on Highcrag's own ground and layout: the hall, the warehouse, the job board, the caravan hub and the quarry, in the menu and in the scene", async () => {
+    // The player is not read yet, as on a reload of this address: the camp stays, and is drawn.
+    const { router, scene } = await renderCamp(atHighcrag(fakeGame([])), '/camp/highcrag');
+    expect(router.url).toBe('/camp/highcrag/heroes-hall');
+    expect(scene.layout).toBe(HIGHCRAG);
+    expect(textsOf(menu().getAllByRole('link'))).toEqual(['Heroes hall', 'Warehouse', 'Job board', 'Caravan hub', 'Quarry']);
+    expect(menu().getByRole('link', { name: 'Warehouse' })).toHaveAttribute('href', '/camp/highcrag/warehouse');
+    expect(scene.levels).toEqual({ 'heroes-hall': 1, warehouse: 1, 'job-board': 1, 'caravan-hub': 0, quarry: 0 });
+  });
+
+  it('says why its empty hall is empty and how a hero gets there, and offers its recruits at their cost, with no villager and nobody for nothing', async () => {
+    await renderCamp(atHighcrag(fakeGame([])), '/camp/highcrag');
+    expect(panel().getByText('No hero is here yet. Nobody at Highcrag joins for nothing: its first hero comes by caravan from another camp.')).toBeInTheDocument();
+    expect(panel().queryByText('No living heroes.')).not.toBeInTheDocument();
+    expect(textsOf(panel().getAllByRole('button', { name: /^Recruit a / }))).toEqual(['Recruit a miner', 'Recruit a fighter']);
+    expect(recruit('miner').getByText('30 ore, you have 0; 20 timber, you have 0')).toBeInTheDocument();
+    expect(recruit('miner').getByText('Not enough ore or timber.')).toBeInTheDocument();
+    expect(recruit('fighter').getByText('40 ore, you have 0')).toBeInTheDocument();
+    expect(recruitButton('miner')).toBeDisabled();
+    expect(recruitButton('fighter')).toBeDisabled();
+    expect(panel().queryByText('free')).not.toBeInTheDocument();
+  });
+
+  it('says the next hero comes by caravan when every hero there is dead', async () => {
+    await renderCamp(atHighcrag(fakeGame([{ ...wren, status: 'DEAD', location: 'highcrag' }])), '/camp/highcrag');
+    expect(panel().getByText('No living hero is here. Nobody at Highcrag joins for nothing: the next comes by caravan from another camp.')).toBeInTheDocument();
+    expect(textsOf(listItems('Dead').map((item) => within(item).getByRole('link')))).toEqual(['Wren']);
+  });
+
+  it('says the same of a camp whose heroes have all retired: it has had heroes, and none is its first', async () => {
+    await renderCamp(atHighcrag(fakeGame([{ ...wren, status: 'RETIRED', retiredAt: '2026-11-24T12:00:00.000Z', location: 'highcrag' }])), '/camp/highcrag');
+    expect(panel().getByText('No living hero is here. Nobody at Highcrag joins for nothing: the next comes by caravan from another camp.')).toBeInTheDocument();
+    expect(panel().queryByText(/No hero is here yet/)).not.toBeInTheDocument();
+    expect(panel().getByText('Retired (1)')).toBeInTheDocument();
+  });
+
+  it('shows a hero on its way by caravan in the roster, holding a slot that the count includes (Issue-355)', async () => {
+    const game = atHighcrag(fakeGame([]));
+    game.camp.set({ ...game.camp(), activeHeroes: 1 });
+    game.onTheWay.set([wren]);
+    await renderCamp(game, '/camp/highcrag');
+    expect(panel().getByText('Level 1: 1 of 4 heroes.')).toBeInTheDocument();
+    const [onTheWay, ...others] = listItems('On the way');
+    expect(others).toEqual([]);
+    expect(within(must(onTheWay, 'the hero on the way')).getByText('Wren')).toBeInTheDocument();
+    expect(within(must(onTheWay, 'the hero on the way')).getByText('villager, level 1, coming by caravan: a slot is held here.')).toBeInTheDocument();
+  });
+
+  it('has no list of heroes on the way while none is', async () => {
+    await renderCamp(atHighcrag(fakeGame([])), '/camp/highcrag');
+    expect(panel().queryByRole('heading', { name: 'On the way' })).not.toBeInTheDocument();
+  });
+
+  it('says nothing of a caravan while a hero is alive there', async () => {
+    await renderCamp(atHighcrag(fakeGame([{ ...wren, location: 'highcrag' }])), '/camp/highcrag');
+    expect(textsOf(listItems('Living').map((item) => within(item).getByRole('link')))).toEqual(['Wren']);
+    expect(panel().queryByText(/by caravan/)).not.toBeInTheDocument();
+  });
+
+  it("builds at the camp it is opened in: the warehouse's next level against Highcrag's own stock, which is empty", async () => {
+    await renderCamp(atHighcrag(fakeGame([])), '/camp/highcrag/warehouse');
+    expect(panel().getByText('The warehouse is empty.')).toBeInTheDocument();
+    const upgrade = section('Upgrade to level 2');
+    expect(within(upgrade).getByText('80 timber, you have 0; 40 ore, you have 0')).toBeInTheDocument();
+    expect(within(upgrade).getByRole('button', { name: 'Upgrade' })).toBeDisabled();
+  });
+
+  it('has no facility of Millbrook: the address of one goes back to the hall', async () => {
+    const { router } = await renderCamp(atHighcrag(fakeGame([])), '/camp/highcrag/mine');
+    await waitFor(() => { expect(router.url).toBe('/camp/highcrag/heroes-hall'); });
+  });
+
+  it('is kept at its address for a player who has a camp there', async () => {
+    const game = atHighcrag(fakeGame([]));
+    game.player.set({ camps: [{ location: 'millbrook' }, { location: 'highcrag' }] });
+    const { router } = await renderCamp(game, '/camp/highcrag');
+    expect(router.url).toBe('/camp/highcrag/heroes-hall');
+    expect(game.location()).toBe('highcrag');
+  });
+
+  it('is not shown to a player who has no camp there: once the player is read, its address goes to the starting camp', async () => {
+    const game = fakeGame([]);
+    game.player.set({ camps: [{ location: 'millbrook' }] });
+    const { router } = await renderCamp(game, '/camp/highcrag');
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
+    expect(game.location()).toBe('millbrook');
+    expect(textsOf(menu().getAllByRole('link'))).toContain('Mine');
   });
 });

@@ -27,7 +27,7 @@
               },
               {
                 "glob": "favicon.png",
-                "input": "generated/art/icons",
+                "input": "generated/favicon",
                 "output": "/"
               }
             ],
