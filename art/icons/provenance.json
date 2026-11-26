@@ -242,6 +242,40 @@
           "ore"
         ]
       }
+    },
+    "stone": {
+      "file": "stone.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fourthPack",
+      "candidate": 0,
+      "pixellab": {
+        "objectId": "7b705d26-72e3-4640-80a5-6880115a2c4a",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "stone"
+        ]
+      }
+    },
+    "quarry": {
+      "file": "quarry.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fourthPack",
+      "candidate": 7,
+      "pixellab": {
+        "objectId": "db867ea7-fabc-4022-80fa-c72b99e1190f",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "quarry"
+        ]
+      }
     }
   },
   "secondPack": {
@@ -335,5 +369,41 @@
     "chosenBy": "The owner's picks from a numbered sheet of the candidates at 3×: hide 0 on 2026-11-20, taking the agent's recommendation (Issue-340); timber 6 and ore 14 on 2026-11-23, timber the agent's recommendation and ore the owner's own choice over the agent's 11 (Issue-344).",
     "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download, to its rotation's file and to its candidate frame in the review object: hide.png on 2026-11-20, timber.png and ore.png on 2026-11-23.",
     "rejects": "The 61 candidates not kept stay in the review object 68098ce5-1ff2-4019-920d-cb8eb3f76920, tagged heat, ui-icon and rejected, with their indices as rolled."
+  },
+  "fourthPack": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-26",
+    "reviewObjectId": "1e46b7d4-375d-4144-9bbf-6062668fea72",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 04",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "stone icon: two cut pale grey stone blocks stacked",
+        "stone icon: single squared block of grey stone",
+        "stone icon: pile of rough grey stones",
+        "stone icon: cut stone brick with chisel marks",
+        "stone icon: three grey stone blocks in a small pyramid",
+        "stone icon: grey stone slab leaning on a block",
+        "quarry icon: grey rock face with stepped cut ledges",
+        "quarry icon: pickaxe and a chisel over a grey stone block",
+        "quarry icon: stone block hanging from a wooden hoist",
+        "quarry icon: cut rock face with a wooden plank ramp",
+        "quarry icon: mallet and chisel crossed over stone",
+        "quarry icon: grey rock outcrop with a squared cut opening"
+      ]
+    },
+    "candidates": 64,
+    "candidatesNote": "Indices 0 to 11 follow itemDescriptions; 12 to 63 were drawn by the service from the description alone.",
+    "generations": 10,
+    "note": "Stone and the quarry's icons (Issue-356). No earlier pack held an idea for either, so a pack of their own was rolled with the same style image as the others.",
+    "chosenBy": "The owner's picks from a numbered sheet of candidates 0 to 11 at 3×, 2026-11-26 (Issue-356): stone 0, the agent's recommendation, and quarry 7, the owner's own choice over the agent's 6.",
+    "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download and to its candidate frame in the review object, saved before it was promoted: stone.png and quarry.png on 2026-11-26.",
+    "rejects": "The 62 candidates not kept stay in the review object 1e46b7d4-375d-4144-9bbf-6062668fea72, tagged heat, ui-icon and rejected, with their indices as rolled."
   }
 }

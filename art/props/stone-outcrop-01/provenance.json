@@ -1,0 +1,85 @@
+{
+  "set": "stone-outcrop-01",
+  "kind": "prop sprite set",
+  "props": ["stone-outcrop"],
+  "service": {
+    "name": "PixelLab",
+    "plan": "Tier 1: Pixel Apprentice",
+    "terms": "https://www.pixellab.ai/termsofservice",
+    "termsLastUpdated": "2025-11-23",
+    "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
+  },
+  "pixellab": {
+    "objectId": "ebba5323-b2dc-4ef6-b6c7-5178d4f945fd",
+    "name": "Stone outcrop 01",
+    "tags": ["heat", "prop", "stone-outcrop"]
+  },
+  "object": {
+    "tool": "create_map_object",
+    "via": "MCP",
+    "createdAt": "2026-11-26T16:36Z",
+    "parameters": {
+      "description": "large rough boulder of pale grey building stone with flat cleaved faces and a few chisel marks, no ore, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "view": "low top-down",
+      "outline": "single color outline",
+      "shading": "flat shading",
+      "detail": "low detail"
+    },
+    "canvas": [48, 48],
+    "generations": 1
+  },
+  "files": {
+    "standing": {
+      "file": "standing.png",
+      "canvas": [48, 48],
+      "from": "the object's one rotation"
+    }
+  },
+  "animations": {
+    "hit": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "942fefcf-2711-43c0-b477-562bebf435cf",
+      "animationDescription": "the stone boulder shudders slightly from a pick blow and settles still, the stone staying in place, no particles, no effects",
+      "frameCount": 6,
+      "frames": 7,
+      "canvas": [48, 48],
+      "files": "hit-<0..6>.png",
+      "generations": 1
+    },
+    "down": {
+      "tool": "animate_object",
+      "mode": "v3",
+      "via": "MCP",
+      "groupId": "c4ccb92c-fcd1-458f-a278-22513f131b0c",
+      "animationDescription": "the stone boulder slowly crumbles and settles down into a low flat scatter of broken pale grey stone chips on the ground, the stone keeping its colour, no flash, no particles, no effects",
+      "frameCount": 8,
+      "frames": 9,
+      "canvas": [48, 48],
+      "endFrame": {
+        "objectId": "91e25309-c7c0-43f7-9ece-93018cdfda11",
+        "stateName": "rubble",
+        "editDescription": "the boulder has been quarried away: only a low flat scatter of broken pale grey stone chips and a few small cut blocks remains on the ground; empty transparent space above it",
+        "generations": 10
+      },
+      "heldLast": true,
+      "fadeAboveEnd": true,
+      "files": "down-<0..8>.png",
+      "generations": 1
+    }
+  },
+  "animationGenerations": 12,
+  "rejected": [
+    {
+      "name": "slabs",
+      "objectId": "341580b8-1128-45e3-9dcd-c70d9b4c5871",
+      "description": "low outcrop of pale grey layered stone slabs jutting from the ground, squared edges, no ore, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "generations": 1,
+      "parameters": "create_map_object, 48×48, with the parameters above",
+      "why": "Read as stone already cut, on a sand patch of its own that sits oddly on the battle's ground."
+    }
+  ],
+  "chosenBy": "The owner, 2026-11-26 (Issue-356), from the two looks at 4× on the battle's green beside the kept ore vein and its rubble, taking the agent's recommendation: the boulder, unlike the dark vein at a glance.",
+  "verified": "Every PNG here is byte-identical to the same file in PixelLab's own export of the object, downloaded 2026-11-26."
+}
