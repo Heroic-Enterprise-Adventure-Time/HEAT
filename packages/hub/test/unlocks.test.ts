@@ -310,8 +310,8 @@ describe("the player's camps", () => {
   });
 });
 
-/** Enough of everything a fighter and a warehouse's second level cost. */
-const PLENTY = { ore: 100, timber: 100 } as const;
+/** Enough of everything a fighter, a knight and a warehouse's second level cost. */
+const PLENTY = { ore: 100, timber: 100, hide: 10 } as const;
 
 /**
  * A repository whose read says the player holds every unlock, as no read can
