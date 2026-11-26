@@ -2,18 +2,22 @@
 
 HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, in one root and one apply, the shape of the `dev` root: the `base` module (the hosted zone, the certificate for the zone name and its wildcard, the account's one user pool with Google as its identity provider), the `environment` module on top of it (the two tables, the function, the HTTP API, the site at the zone apex, the browser client, the alarms) and the `login-domain` module last (`auth.heat.dcg-games.com`). Applied by the pipeline on every merge to `release`, through the release pull request, followed by the smoke test, the tag and the GitHub Release (decisions 0016 as confirmed, 0017, 0018 as amended, 0020, 0021 as amended; the overview's "Environments"). History: Issue-41.
 
-**Status: at `v2026.11.17.1` (cd012d5), the fourteenth release and the second of its day, applied by the pipeline on 2026-11-17 by the `Release` run on the merge of PR-324 (Issue-323), run 44184929185, under the `prod` GitHub environment.** The run:
-- guarded the merge as pull request 324 from `main`
-- applied 0 added, 3 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code and both aliases moved
+**Status: at `v2026.11.26` (262abd3), the fifteenth release, applied by the pipeline on 2026-11-26 by the `Release` run on the merge of PR-381 (Issue-380), run 45904669736, under the `prod` GitHub environment.** The run:
+- guarded the merge as pull request 381 from `main`
+- applied 0 added, 4 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code, layer and settings, its role's policy, and both aliases moved
 - passed the allow-list check (33 resource types)
 - published the client and `config.json`
 - passed the anonymous smoke test
-- wrote the tag `v2026.11.17.1` and its GitHub Release
+- wrote the tag `v2026.11.26` and its GitHub Release
 
-It is the first release with the `@graphql-tools/utils` that Apollo Server nests overridden to 12.1.0 (PR-317, Dependabot alert 8), the one change in it that reaches what prod runs; the rest is documents and the agent's hooks and skills. Read back at about 22:00 UTC:
-- **Through `audit-heat-prod`:** `heat-prod-hub` has `HEAT_VERSION` cd012d5 and `HEAT_PREVIOUS_VERSION` f361a3a (`v2026.11.17`), on `nodejs24.x`, with the code hash the release pull request's plan showed; `live` points at version 14 and `previous` at 13.
-- **From the laptop:** `/config.json` reports version cd012d5, and an anonymous `POST /graphql` is 401.
-- **The owner** signed in at `https://heat.dcg-games.com` after the apply and reported that it works. That is the one signed-in request this status records: the 401 is the API's authorizer refusing before the function runs, and the smoke test signs in nowhere, so without it nothing here would show the function's new code answering in prod.
+It is the first release since step 3 began: unlocks, Highcrag as a second location, caravans, and what an adventure yields (PR-334 to PR-374). It is also the first in prod with the AWS Lambda Layer for OpenTelemetry (PR-331, decision 0055). The function now runs the layer's wrapper and carries the AWS SDK beside its bundle, and its role holds `xray:PutTraceSegments` alone. Read back at about 22:35 UTC:
+- **Through `audit-heat-prod`:** `heat-prod-hub` is on `nodejs24.x`, with the code hash the release pull request's plan showed. It has:
+  - `HEAT_VERSION` 262abd3 and `HEAT_PREVIOUS_VERSION` cd012d5 (`v2026.11.17.1`);
+  - the layer `AWSOpenTelemetryDistroJs:16`, with `AWS_LAMBDA_EXEC_WRAPPER` `/opt/otel-instrument`, `OTEL_SERVICE_NAME` `heat-hub` and `OTEL_AWS_APPLICATION_SIGNALS_ENABLED` `false`;
+  - `live` at version 15 and `previous` at 14.
+- **From the laptop:** `/config.json` reports version 262abd3, and an anonymous `POST /graphql` is 401.
+- **The owner** signed in at `https://heat.dcg-games.com` after the apply, played an adventure and saw the second location.
+- **The first traces from prod:** `scripts/trace-report.mjs --stack heat-prod`, through `plan-heat-prod` under decision 0055's standing yes, found 10 of the 10 requests the hub logged after the apply traced. These were the owner's session: `joinGame`, `me`, a start and a submit, and the location's reads.
 
 The first apply, below, is kept as the record of that apply and its read-back. Later releases have changed the root since.
 
