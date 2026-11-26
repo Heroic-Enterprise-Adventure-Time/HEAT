@@ -23,8 +23,8 @@ updates:
         patterns: ["@graphql-codegen/*"]
         update-types: [major]
     # What the standards hold back, majors and one minor, each with its
-    # reason under "Held back" in docs/standards/typescript.md. An entry
-    # leaves this list and that list in the same pull request.
+    # reason under "Held back" in docs/standards/typescript-dependencies.md.
+    # An entry leaves this list and that list in the same pull request.
     ignore:
       - dependency-name: graphql
         update-types: ["version-update:semver-major"]

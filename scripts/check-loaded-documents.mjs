@@ -32,8 +32,9 @@ export const LIMITS = {
   "AGENTS.md": 45_000,
   // Each area's loader, with its standard, in every session that works in the area (Issue-364).
   // A session in the client or the hub loads `packages/AGENTS.md` too, so pays for both.
-  // Raised from 35_000 for typescript.md's rule 32 (the review of PR-374).
-  "packages/AGENTS.md": 36_000,
+  // Lowered from 36_000 when typescript.md's detail on dependencies and lint moved to
+  // typescript-dependencies.md, which nothing loads, leaving room for new rules (Issue-375).
+  "packages/AGENTS.md": 30_000,
   "packages/client/AGENTS.md": 25_000,
   "packages/hub/AGENTS.md": 28_000,
   "terraform/AGENTS.md": 14_000,

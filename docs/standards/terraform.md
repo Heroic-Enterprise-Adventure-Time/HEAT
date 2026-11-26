@@ -49,7 +49,7 @@ Standards for every stack under `terraform/`: `backend`, `bootstrap` and `enviro
 
 ### Pins nothing tracks
 
-20. **A pin that no Dependabot ecosystem tracks is checked by the checkup against the latest release,** as the Node and Terraform pins are (`docs/runbooks/checkup.md`, rule 12), and the checkup's report names the pin, the version it holds and the latest. A resource that carries such a pin says in its comment that nothing tracks it. `otel_layer_arn` in `terraform/modules/environment/functions.tf` is one: a layer's version is a number in an ARN AWS publishes, and it is also what releases the `@opentelemetry/api` hold in `docs/standards/typescript.md`, "Held back" (the review of PR-331, Issue-326).
+20. **A pin that no Dependabot ecosystem tracks is checked by the checkup against the latest release,** as the Node and Terraform pins are (`docs/runbooks/checkup.md`, rule 12), and the checkup's report names the pin, the version it holds and the latest. A resource that carries such a pin says in its comment that nothing tracks it. `otel_layer_arn` in `terraform/modules/environment/functions.tf` is one: a layer's version is a number in an ARN AWS publishes, and it is also what releases the `@opentelemetry/api` hold in `docs/standards/typescript-dependencies.md`, "Held back" (the review of PR-331, Issue-326).
 
 ## Held back
 

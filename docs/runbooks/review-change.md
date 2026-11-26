@@ -12,6 +12,7 @@ How a pull request is reviewed against the standards before the owner reads it: 
    | Path touched | Documents |
    | --- | --- |
    | `packages/**`, and any `.ts`, `.mjs` or `.js` file, `package.json`, `tsconfig*.json`, `eslint.config.mjs` or `manifest.json` elsewhere | `docs/standards/typescript.md` |
+   | `package.json`, `package-lock.json`, `.github/dependabot.yml`, `eslint.config.mjs` | `docs/standards/typescript-dependencies.md` as well, which holds the detail of `typescript.md`'s rules 16, 17 and 21 and its "Held back" (Issue-375) |
    | `.github/**`, `.claude/settings.json`, `.claude/hooks/**`, `terraform/allowed-resource-types.txt` | `docs/process/code-changes.md` and `docs/process/best-practices.md`, which hold the guardrails, and `docs/process/enforcement.md`, which says what holds them |
    | `scripts/**/*.sh` | `docs/process/code-changes.md` and `docs/process/best-practices.md`, as for `.github/**`, because the workflows run them with their roles and tokens (Issue-255) |
    | `art/**` | `docs/process/assets.md`, whose numbered rules say what a set holds, its provenance, its checks and its waivers (Issue-284) |
