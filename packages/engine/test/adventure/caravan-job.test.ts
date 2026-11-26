@@ -72,11 +72,11 @@ describe("Caravan to Highcrag", () => {
     });
   }
 
-  it(`is delivered by a fighter with three more heroes, or by a fighter with a ranger, with nobody lost on any of ${SEEDS} seeds`, () => {
-    for (const heroes of [PARTIES.fighterAndRanger, PARTIES.twoFighters, PARTIES.fighterRangerAndVillager, PARTIES.fighterAndThreeVillagers]) {
-      for (const { seed, result } of played(CARAVAN, heroes)) expect(result.dead, `${named(heroes)} ${seed}`).toEqual([]);
-    }
-  });
+  for (const heroes of [PARTIES.fighterAndRanger, PARTIES.twoFighters, PARTIES.fighterRangerAndVillager, PARTIES.fighterAndThreeVillagers]) {
+    it(`is delivered by ${named(heroes)} with nobody lost on any of ${SEEDS} seeds`, () => {
+      for (const { seed, result } of played(CARAVAN, heroes)) expect(result.dead, seed).toEqual([]);
+    });
+  }
 
   for (const heroes of NO_FIGHTER) {
     it(`is delivered by ${named(heroes)} on more than half of ${SEEDS} seeds, and arrives with the cart broken on some`, () => {

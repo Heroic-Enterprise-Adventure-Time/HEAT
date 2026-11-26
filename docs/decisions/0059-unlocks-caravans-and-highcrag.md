@@ -114,7 +114,7 @@ Every hero earns 15 XP, and the limits are 90 s and 60 s. One run by a lone mine
 
 **A locked location is `BAD_USER_INPUT`.** A verb that takes a location refuses one the player has not unlocked by its read and by a condition check on the unlock's item in its transaction, as the Decision has it, and answers as building already answered "no such camp": the player's own camps never list a locked location and an unlock is never taken away, so a request that names one is the client's defect and not a rule of the game the page has to explain. The check and its read are made only where the location needs an unlock, so what the three verbs read and write at Millbrook is what it was; a test holds that for each of them. `me.camps` costs a second Query, of the `UNLOCK#` items.
 
-**`recruitHero` requires its location.** The page's one recruit sends the camp on screen. A tab loaded before the deploy sends none: the hub refuses it before any resolver runs, the refusal carries the `outdated` flag, and the tab reloads. A tab with an adventure open, or a result showing, holds its reload until the adventure is over (decision 0030), so for those minutes it cannot recruit; the owner accepted that window on the review of PR-359, where an optional location for one deploy would have closed it. A request id reused for another location is `BAD_USER_INPUT`, as one reused for another unit type is; the location is compared with where the hero is, which is where it was recruited until a caravan moves a hero, and Issue-354 has to say what a repeat finds then (it compares where the hero was recruited, in its amendment below).
+**`recruitHero` requires its location.** The page's one recruit sends the camp on screen. A tab loaded before the deploy sends none: the hub refuses it before any resolver runs, the refusal carries the `outdated` flag, and the tab reloads. A tab with an adventure open, or a result showing, holds its reload until the adventure is over (decision 0030), so for those minutes it cannot recruit; the owner accepted that window on the review of PR-359, where an optional location for one deploy would have closed it. A request id reused for another location is `BAD_USER_INPUT`, as one reused for another unit type is; the location is compared with where the hero is, which is where it was recruited until a caravan moves a hero, and Issue-354 has to say what a repeat finds then.
 
 **A location's public reads stay open.** `heroesSeenAt` and `recentAdventuresAt` answer any signed-in player for Highcrag, unlocked or not: the location table is public (decisions 0029 and 0043), and a recruit there puts a sighting as it does at Millbrook.
 
@@ -265,7 +265,7 @@ Read on 2026-11-23, in the DynamoDB API reference, `TransactWriteItems`:
 - "no two actions can target the same item. For example, you cannot both `ConditionCheck` and `Update` the same item."
 - "These actions can target items in different tables, but not in different AWS accounts or Regions."
 
-Not checked here, and for the build issues to check: how ElectroDB writes an item only if it is absent inside a transaction without cancelling it when the item exists (Issue-351), and the item count of the largest settlement as the code makes it (Issue-354, which measured 34).
+Not checked here, and for the build issues to check: how ElectroDB writes an item only if it is absent inside a transaction without cancelling it when the item exists (Issue-351), and the item count of the largest settlement as the code makes it (Issue-354).
 
 ## Where it is described
 

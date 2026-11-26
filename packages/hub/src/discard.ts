@@ -55,7 +55,9 @@ async function discardOnce(
       await repo.discard(playerId, record, now, await caravanReturn(repo, playerId, record));
       return { ...record, status: "DISCARDED", discardedAt: now.toISOString() };
     } catch (e) {
-      // A balance or the warehouse moved since the read: read the camp again. A TransactionConflict runs the verb again (conflict.ts).
+      // A balance or the warehouse moved since the read: read the camp again at once, as settlement does, since the write that moved it
+      // has committed and the next read sees it. Only a TransactionConflict, a write still committing, is waited for, by running the
+      // verb again (conflict.ts).
       if (e instanceof CampChanged) continue;
       if (!(e instanceof AdventureClosed || e instanceof HeroChanged)) throw e;
       const after = await repo.getAdventure(adventureId);
