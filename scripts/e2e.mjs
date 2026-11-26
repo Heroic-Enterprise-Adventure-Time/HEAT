@@ -415,7 +415,11 @@ check(success(dismissed, "retireHero", "hero")?.status === "RETIRED", `the paid 
 // Building (Issue-93): the mine costs one timber run, 60 timber and 3 cloth.
 // The test user keeps its camp from run to run, so a run that cannot pay yet
 // checks the refusal, the run that can builds it, and every run after checks
-// that a repeat charges nothing and that the mine has no second level here.
+// that a repeat charges nothing and that the mine's second level is refused
+// for want of stone, which only Highcrag has and the stack's own user never
+// reaches (Issue-357). A user run by hand, player1 or player2
+// (docs/process/development.md, rule 4), may hold stone or the second level
+// already, and that check is not made for it.
 const facilitiesQuery = `{ me { camps { location holdings { material balance } facilities { kind level } } } }`;
 const buildMutation = `mutation($level: PositiveInt!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename ... on Error { message } ... on BuildFacilitySuccess { camp { location holdings { material balance } facilities { kind level } } } } }`;
 const campIn = (me) => me?.camps?.find((c) => c.location === "millbrook");
@@ -439,8 +443,13 @@ if (mineLevel(campBefore) === 0 && (timberBefore < 60 || clothBefore < 3)) {
   const now = campIn((await graphql(token, facilitiesQuery)).data?.me);
   const repeat = await graphql(token, buildMutation, { level: 1 });
   check(!repeat.errors && JSON.stringify(success(repeat, "buildFacility", "camp")?.holdings) === JSON.stringify(now.holdings), `a repeat of the build answers the camp and charges nothing (${repeat.ms} ms)`);
-  const higher = await graphql(token, buildMutation, { level: 2 });
-  check(!higher.errors && higher.data?.buildFacility?.__typename === "MaxLevel", `the mine has no second level here (${higher.ms} ms)`);
+  if (mineLevel(now) >= 2 || stockOf(now, "STONE") >= 40) {
+    console.log(`the test user holds ${stockOf(now, "STONE")} stone and a level ${mineLevel(now)} mine; not checking the second level's refusal`);
+  } else {
+    const higher = await graphql(token, `mutation($level: PositiveInt!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename ... on InsufficientResources { short { material } } } }`, { level: 2 });
+    const shortOf = higher.data?.buildFacility?.short?.map((s) => s.material) ?? [];
+    check(!higher.errors && higher.data?.buildFacility?.__typename === "InsufficientResources" && shortOf.includes("STONE"), `the mine's second level is refused for want of stone: ${JSON.stringify(higher.data)} (${higher.ms} ms)`);
+  }
 }
 
 // The mine's first job (Issue-133): "Ore from the hill" is posted by the

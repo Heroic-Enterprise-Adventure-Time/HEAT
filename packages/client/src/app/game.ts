@@ -11,10 +11,13 @@ import {
   type AdventureOutcome,
   type AdventureTimeline,
   buildRefusal,
+  cartCapacity,
   FACILITY_KINDS,
   type FacilityKind,
   GATHERING_TRAITS,
   hallCapacity,
+  jobFacilityLevel,
+  jobsPostedBy,
   location,
   type Material,
   MATERIALS,
@@ -305,10 +308,25 @@ export interface RecruitOffer {
 export interface UpgradeOffer {
   readonly kind: FacilityKind;
   readonly level: number;
-  /** What the level changes, in words, where it changes a number; null for a facility's first level. */
+  /** What the level changes, in words, where it changes a number or posts a job; null for a facility's first level. */
   readonly gives: string | null;
   readonly cost: readonly { readonly material: string; readonly amount: number; readonly balance: number }[];
   readonly reason: string | null;
+}
+
+/**
+ * What a level beyond the first gives, in the panel's words: the hall's and
+ * the warehouse's room, the caravan hub's cart (decision 0059), and the jobs
+ * the level posts (Issue-357); null for a first level, which the facility's
+ * description tells.
+ */
+function levelGives(at: string, kind: FacilityKind, level: number): string | null {
+  if (level <= 1) return null;
+  if (kind === 'heroes-hall') return `Holds ${hallCapacity(level)} heroes.`;
+  if (kind === 'warehouse') return `Holds ${warehouseCapacity(level)} of each resource.`;
+  if (kind === 'caravan-hub') return `The cart carries ${cartCapacity(level)} in all.`;
+  const posted = jobsPostedBy(at, kind).filter((job) => jobFacilityLevel(job) === level);
+  return posted.length === 0 ? null : `Posts a new job: ${posted.map((job) => job.name).join(' and ')}.`;
 }
 
 /**
@@ -324,12 +342,7 @@ export function upgradeOffer(camp: CampView, kind: FacilityKind): UpgradeOffer |
     amount,
     balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0,
   }));
-  const gives =
-    kind === 'heroes-hall'
-      ? `Holds ${hallCapacity(next.level)} heroes.`
-      : kind === 'warehouse'
-        ? `Holds ${warehouseCapacity(next.level)} of each resource.`
-        : null;
+  const gives = levelGives(camp.location, kind, next.level);
   const refusal = buildRefusal({ levels, holdings: camp.holdings }, kind);
   const reason =
     refusal?.code === 'INSUFFICIENT_RESOURCES' ? `Not enough ${refusal.short.map((s) => s.material).join(' or ')}.` : (refusal?.message ?? null);

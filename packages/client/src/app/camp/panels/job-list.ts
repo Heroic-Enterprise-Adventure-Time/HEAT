@@ -12,7 +12,8 @@ import { boardWords, lockedWords } from './job-words';
  * what it drops (decision 0058), linked to its detail under the poster's
  * panel, `<panel>/jobs/<id>`. A caravan to a location the player has not
  * unlocked is listed with the reason in place of its pay, not hidden
- * (Issue-355).
+ * (Issue-355), and so is a job its facility's level does not post yet
+ * (Issue-357); each is greyed out (the owner, 2026-11-26).
  */
 @Component({
   selector: 'heat-job-list',
@@ -28,6 +29,7 @@ export class JobList {
   private readonly campsAt = computed(() => this.game.player()?.camps.map((c) => c.location) ?? null);
   protected locked(job: Job): string | null {
     const campsAt = this.campsAt();
-    return campsAt && lockedWords(job, campsAt);
+    const camp = this.game.camp();
+    return camp ? lockedWords(job, campsAt, camp.facilities) : null;
   }
 }

@@ -95,6 +95,7 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 ### What a test file takes from the helpers
 
 31. **A content id that a package's shared test helpers name as a constant is read from the helper by every test file, and not spelled again.** The engine's `test/adventure/helpers.ts` names each job and Highcrag, `QUARRY_FACE`, `CARAVAN_BACK`, `HIGHCRAG`; a test that spells an id instead keeps the old one when the job is renamed, and a table keyed by every job takes the constants as its keys. Rule 24 says where a helper's values come from; this, where a test file's do (the review of PR-373).
+32. **A block of set-up that one test file repeats is a function of that file.** Rule 19 shares a helper across files; within one file, two tests that build the same stub, proxy or fixture call one function with what differs as its arguments, as `staleFacility(kind, level)` in the hub's `test/start.test.ts` does for a camp read stale once, so a fix to the stub is made once (the review of PR-374).
 
 ## Held back
 

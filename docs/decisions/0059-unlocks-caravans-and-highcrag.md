@@ -1,6 +1,6 @@
 # 0059: More locations: general unlocks, caravans with a cart, and Highcrag
 
-- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Built by Issue-353: the cart in the engine and the battle scene, with the owner's calls of 2026-11-25 on its shape and the numbers its tests play, in its amendment below. Built by Issue-354: the hub's caravan, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-355: the caravan hub's panel, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-356: Highcrag's quarry, stone, the knight and the route back, with their art, with the owner's calls of 2026-11-26, in its amendment below. Not built: Millbrook's second levels, Issue-357.
+- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Built by Issue-353: the cart in the engine and the battle scene, with the owner's calls of 2026-11-25 on its shape and the numbers its tests play, in its amendment below. Built by Issue-354: the hub's caravan, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-355: the caravan hub's panel, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-356: Highcrag's quarry, stone, the knight and the route back, with their art, with the owner's calls of 2026-11-26, in its amendment below. Built by Issue-357: Millbrook's second levels, with the owner's calls of 2026-11-26, in its amendment below.
 - **Date:** 2026-11-23
 - **Settles:** Issue-292: the second location, how a location unlocks, caravans with their cargo and their passengers, what a caravan risks, the caravan hub's jobs, and the keys all of it needs, which the overview's "Open" and decision 0013 left to be designed before they are built. The owner's calls of 2026-11-23, made in the Issue-292 session.
 - **Amends:** 0026, "every location offers villagers, so no player is ever locked out": Highcrag offers none, and the guarantee is the starting location's; and 0026, "Recruitment", `recruitHero(unitType, requestId)`, which names no location: recruiting takes its location from Issue-351 on. 0032, "The first numbers", which give the mine, the lumber camp and the caravan hub one level each: each gains a second at Millbrook, costing stone (Issue-357). 0058, "a job's own penalty returns with caravans": no job states a penalty, and what a caravan loses is its cargo, by the one table below.
@@ -263,6 +263,41 @@ A party with a miner brings home 40 to 72 stone from the face and 60 to 72 from 
 **The art** is the owner's picks of 2026-11-26: the quarry's two levels from a mock-up of Highcrag at 3× (`art/mockups/highcrag-quarry-400x225-3x.png`), the stone outcrop beside the ore vein, stone's and the quarry's icons from a fourth pack, and the longsword from the first weapon pack's swords. Each set's provenance says what it cost and what was not kept.
 
 Not chosen in Issue-356: **a heavier knight, 80 health, speed 7 and damage 6,** which did worse than the knight built on every job of the probe, the goblins and the route back above all.
+
+## Amendment: Millbrook's second levels (Issue-357, 2026-11-26)
+
+The owner's calls at the start of Issue-357, which built a second level of the mine, the lumber camp and the caravan hub at Millbrook, each costing stone. The agent put one shape to the owner, from a probe of the engine with the candidate content, and the owner took it as recommended.
+
+**The costs.** The mine's level 2 costs 100 timber and 40 stone; the lumber camp's 60 timber, 40 ore and 40 stone; the caravan hub's 150 timber, 80 ore and 80 stone, and needs the warehouse at level 2, since 150 timber is more than a level-1 warehouse holds. The first levels' costs do not change, and nothing goes to a third level.
+
+**What each gives.** The hub's level 2 gives the cart of 200, as the Decision has it. A facility's levels are its kind's, the same at every location that builds it, so Highcrag's caravan hub takes the second level too, at the same cost, paid there in Highcrag's own stone, and its cart carries 200 back to Millbrook. The Decision says "at Millbrook"; the owner's call, on the review of PR-374, is that Highcrag has it as well, rather than a highest level for each location, which would be machinery no other facility needs. The mine's and the lumber camp's each post a job of their own, which a camp whose facility is at level 1 sees listed greyed out with what it needs, "Needs a level 2 mine.", and which the hub refuses to start there with `Requires`, by the same two checks as a facility not built. A job says the level it needs as `facilityLevel`, which is 1 where it says none. The page's words for each level 2 are "Posts a new job: The deep seam.", "Posts a new job: The old-growth stand." and "The cart carries 200 in all." Every job that cannot be started yet is greyed out on its poster's list, its name quieter and its reason in full ink, the caravan to a location not unlocked of Issue-355 among them (the owner, 2026-11-26, on looking at the stack).
+
+**The two jobs,** each a travel, one gather of 180 seconds and an arrival, with no pay:
+
+- "The deep seam", at the mine: four ore veins or five, with two goblin rock throwers behind them, and a bonus of 8, for 30 XP at its least roll. A miner beside a fighter or a knight never completes it; a ranger beside them clears it.
+- "The old-growth stand", at the lumber camp: four trees with two bandits, and a bonus of 6, for 30 XP. Every hero alone falls; a lumberjack with a fighter completes it, losing one on some runs, and a third hero makes it safe.
+
+Each brings home more than a level-1 warehouse holds, so each needs a level-2 warehouse for its largest roll, which a camp that has paid stone for its facility has already built.
+
+**The numbers,** over 500 seeds, `seed-0` to `seed-499`, with nothing forced, measured by a probe of the engine against `main` at 211b6a7 with the content as built. The engine's tests hold the outcomes, the deaths that are none and the hauls; the counts of deaths where there are some are the probe's.
+
+| Party | The deep seam: complete, runs with a death | The old-growth stand: complete, runs with a death |
+| --- | --- | --- |
+| Any lone melee hero | 0, 500 | 0, — (a knight completes 2) |
+| 1 ranger | 489, — | 0, — |
+| Miner and fighter, or miner and knight | 0, — | not played |
+| Miner and ranger | 500, 16 | not played |
+| Miner, fighter and ranger | 500, 0 | not played |
+| Miner and 2 fighters | 333, — | not played |
+| Lumberjack and fighter | not played | 500, 20 |
+| Lumberjack, fighter and ranger | not played | 500, 0 |
+| Lumberjack and 2 fighters | not played | 500, 0 |
+| Fighter, ranger and 2 villagers | 500, 0 | 500, 0 |
+| 4 villagers | 100, — | —, 391 |
+
+A dash is a count the probe did not take. The seam brings home 112 to 157 ore with a miner and 80 to 117 without; the stand 170 to 199 timber with a lumberjack and 121 to 144 without.
+
+Not chosen in Issue-357: **a wolf on half the seam's runs,** which cost a miner, a fighter and a ranger a hero on two runs; **one goblin in the seam,** which a miner and a fighter cleared, leaving the second level nothing a first-level party could not do; **a picture for each second level,** which the agreed shape left out, so a level 2 is drawn as its level 1.
 
 ## Considered and not chosen
 

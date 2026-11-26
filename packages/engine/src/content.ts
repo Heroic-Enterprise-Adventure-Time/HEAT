@@ -58,9 +58,10 @@ const GIVEN: FacilityLevel = { cost: [], requires: [] };
  * Every kind of facility, by name and purpose (game.md, "Locations and
  * camps"), with what each level costs (Issue-93). The mine's first level is
  * the first progression's (decision 0031). The hall and the warehouse go to
- * level 3 and the rest to level 1 at first: a camp is not meant to build
- * everything at its first location, since later levels will need what other
- * locations have (the owner, Issue-93).
+ * level 3, the mine, the lumber camp and the caravan hub to level 2, and the
+ * quarry to level 1: a camp is not meant to build everything at its first
+ * location, so later levels need what other locations have (the owner,
+ * Issue-93), and the first that do cost Highcrag's stone (Issue-357).
  */
 export const FACILITIES: Readonly<Record<FacilityKind, Facility>> = {
   "heroes-hall": {
@@ -89,26 +90,41 @@ export const FACILITIES: Readonly<Record<FacilityKind, Facility>> = {
     ],
     art: [1, 2, 3],
   },
+  // The second levels of the mine, the lumber camp and the caravan hub cost
+  // stone, which only Highcrag has (Issue-357, decision 0059): each of the
+  // first two posts a job of its own, and the hub's gives a larger cart.
   mine: {
     name: "Mine",
     description: "Sends heroes into the hill on mining runs for ore.",
-    levels: [{ cost: [{ material: "timber", amount: 60 }, { material: "cloth", amount: 3 }], requires: [] }],
+    levels: [
+      { cost: [{ material: "timber", amount: 60 }, { material: "cloth", amount: 3 }], requires: [] },
+      { cost: [{ material: "timber", amount: 100 }, { material: "stone", amount: 40 }], requires: [] },
+    ],
     art: [0, 1],
   },
   "lumber-camp": {
     name: "Lumber camp",
     description: "Sends heroes into the woods on lumber runs for timber.",
-    levels: [{ cost: [{ material: "timber", amount: 50 }, { material: "ore", amount: 20 }], requires: [] }],
+    levels: [
+      { cost: [{ material: "timber", amount: 50 }, { material: "ore", amount: 20 }], requires: [] },
+      { cost: [{ material: "timber", amount: 60 }, { material: "ore", amount: 40 }, { material: "stone", amount: 40 }], requires: [] },
+    ],
     art: [0, 1],
   },
   "caravan-hub": {
     name: "Caravan hub",
     description: "Sends caravans to other locations, carrying resources and heroes as passengers.",
     // Caravans carry stock, so a hub needs room for it first.
-    levels: [{
-      cost: [{ material: "timber", amount: 100 }, { material: "ore", amount: 60 }, { material: "cloth", amount: 20 }],
-      requires: [{ kind: "warehouse", level: 2 }],
-    }],
+    levels: [
+      {
+        cost: [{ material: "timber", amount: 100 }, { material: "ore", amount: 60 }, { material: "cloth", amount: 20 }],
+        requires: [{ kind: "warehouse", level: 2 }],
+      },
+      {
+        cost: [{ material: "timber", amount: 150 }, { material: "ore", amount: 80 }, { material: "stone", amount: 80 }],
+        requires: [{ kind: "warehouse", level: 2 }],
+      },
+    ],
     art: [0, 1],
   },
   // Highcrag's own (Issue-356, decision 0059): its timber is one cartload
@@ -656,7 +672,7 @@ export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>>
 export const CART: CartProfile = { name: "Cart", homeLine: "near", health: 60 };
 
 /** What a caravan's cart carries in all, every resource of its cargo together, by caravan hub level; index 0 is level 1 (decision 0059). */
-export const CART_CAPACITY: readonly number[] = [100];
+export const CART_CAPACITY: readonly number[] = [100, 200];
 
 /** What the cart of a hub at this level carries; nothing below level 1, the hub's highest level's above it. */
 export function cartCapacity(hubLevel: number): number {
@@ -693,7 +709,9 @@ export type JobId =
   | "ore-from-the-crag"
   | "stone-from-the-quarry-face"
   | "goblins-in-the-quarry"
-  | "caravan-to-millbrook";
+  | "caravan-to-millbrook"
+  | "the-deep-seam"
+  | "the-old-growth-stand";
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
@@ -959,6 +977,46 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     pay: [],
     bonusXp: 8,
   },
+  // The mine's second level's job (Issue-357): the old workings' puzzle,
+  // deeper, four veins or five with two goblins throwing from behind them.
+  // A miner with a fighter or a knight never completes it, and a ranger
+  // beside a miner and a fighter clears it with no death. Its XP is 30 at its
+  // least roll, past every first level's job.
+  "the-deep-seam": {
+    id: "the-deep-seam",
+    name: "The deep seam",
+    description: "The new shaft has opened a seam richer than anything in the old workings: four good veins, some days five. Goblins have found it too, and they throw from the dark behind the rock.",
+    location: "millbrook",
+    facility: "mine",
+    facilityLevel: 2,
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "ore-vein", count: { min: 4, max: 5 } }, { type: "goblin-rock-thrower", count: 2 }], timeLimitMs: 180_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
+  },
+  // The lumber camp's second level's job (Issue-357): four trees, and two
+  // bandits come for the timber, who strike the weakest hero first. Every
+  // lone hero Millbrook recruits falls, a lumberjack with a fighter completes
+  // it and loses one on some runs, and a third hero makes it safe. Its XP is
+  // 30, as the deep seam's.
+  "the-old-growth-stand": {
+    id: "the-old-growth-stand",
+    name: "The old-growth stand",
+    description: "The camp's new saw pit can take the old-growth timber at last: four great trees past the deep woods. Bandits have been selling that wood in the valley, and they will not give it up.",
+    location: "millbrook",
+    facility: "lumber-camp",
+    facilityLevel: 2,
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "tree", count: 4 }, { type: "bandit", count: 2 }], timeLimitMs: 180_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 6,
+  },
 };
 
 /**
@@ -971,10 +1029,14 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
  * already reaches a level-1 warehouse's 100 at a lumberjack's best roll, so a
  * job with clearly more timber passes it. A level-1 warehouse loses what it
  * cannot hold, the result says how much, and the job is what makes the second
- * level worth building.
+ * level worth building. The second levels' jobs are the next (Issue-357): a
+ * camp that has built a level with stone has the warehouse's second level
+ * already, since its caravan hub needs it.
  */
 export const JOB_WAREHOUSE_LEVEL: Readonly<Partial<Record<JobId, { readonly material: Material; readonly level: number }>>> = {
   "lumber-from-the-deep-woods": { material: "timber", level: 2 },
+  "the-deep-seam": { material: "ore", level: 2 },
+  "the-old-growth-stand": { material: "timber", level: 2 },
 };
 
 /** The job with this id, or undefined for an id this version's content does not know, as an adventure of another version may carry. */
@@ -989,6 +1051,15 @@ export function jobOf(id: string): Job | undefined {
  */
 export function jobsPostedBy(locationId: string, poster: FacilityKind): Job[] {
   return Object.values(JOBS).filter((job) => job.location === locationId && (job.facility ?? "job-board") === poster);
+}
+
+/**
+ * The level of its facility that a job needs to be started: its own where it
+ * names one, as a second level's job does (Issue-357), level 1 for any other
+ * facility's job, and none for the job board's.
+ */
+export function jobFacilityLevel(job: Job): number {
+  return job.facility === undefined ? 0 : (job.facilityLevel ?? 1);
 }
 
 /** A retreat in a fight: an attempt every 2 s, 30% at first, 20 points more after each failure. */

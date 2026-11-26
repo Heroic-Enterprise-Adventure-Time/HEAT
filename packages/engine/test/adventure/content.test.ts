@@ -21,7 +21,7 @@ import {
   UNLOCK_IDS,
   warehouseCapacity,
 } from "../../src/index.js";
-import { atLargest, CARAVAN, CARAVAN_BACK, contentWithJob, CRAG, enemiesXp, GOBLINS, LUMBER, ORE, QUARRY_FACE, QUARRY_GOBLINS, ROAD, SEEDS, seeds, snapshot, STICKS, TIMBER, villagers, WOLVES } from "./helpers.js";
+import { atLargest, CARAVAN, CARAVAN_BACK, contentWithJob, CRAG, enemiesXp, GOBLINS, LUMBER, ORE, QUARRY_FACE, QUARRY_GOBLINS, ROAD, SEAM, SEEDS, seeds, snapshot, STAND, STICKS, TIMBER, villagers, WOLVES } from "./helpers.js";
 
 describe("The adventure's content", () => {
   it("gives every job a known location, stages that end with arrive, known opponents, counts and chances that can be rolled, and positive limits", () => {
@@ -69,7 +69,7 @@ describe("The adventure's content", () => {
     expect(JOBS[TIMBER].pay).toEqual([{ material: "cloth", amount: 3 }]);
   });
 
-  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), the ore job's 15 for the lumber camp's, for Highcrag's and for the quarry face, and the wolves job's 20 for the road's, for both caravans and for the quarry's goblins", () => {
+  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), the ore job's 15 for the lumber camp's, for Highcrag's and for the quarry face, and the wolves job's 20 for the road's, for both caravans and for the quarry's goblins, and 30 for each second level's job", () => {
     expect(mapValues(JOBS, (job) => job.bonusXp)).toEqual({
       [STICKS]: 2,
       [TIMBER]: 4,
@@ -83,6 +83,8 @@ describe("The adventure's content", () => {
       [QUARRY_FACE]: 9,
       [QUARRY_GOBLINS]: 6,
       [CARAVAN_BACK]: 8,
+      [SEAM]: 8,
+      [STAND]: 6,
     });
     expect(mapValues(JOBS, (job) => enemiesXp(job) + job.bonusXp)).toEqual({
       [STICKS]: 5,
@@ -97,6 +99,8 @@ describe("The adventure's content", () => {
       [QUARRY_FACE]: 15,
       [QUARRY_GOBLINS]: 20,
       [CARAVAN_BACK]: 20,
+      [SEAM]: 30,
+      [STAND]: 30,
     });
   });
 
@@ -105,9 +109,9 @@ describe("The adventure's content", () => {
     expect(enemiesXp(atLargest(sticks)) + sticks.bonusXp).toBe(10);
   });
 
-  it("has five jobs that vary, the first job, the lumber camp's, both caravans and the quarry face: every other job's largest roll is the job as written", () => {
+  it("has six jobs that vary, the first job, the lumber camp's, both caravans, the quarry face and the deep seam: every other job's largest roll is the job as written", () => {
     const varying = Object.values(JOBS).filter((job) => !isEqual(largestStages(job), job.stages));
-    expect(varying.map((job) => job.id)).toEqual([STICKS, LUMBER, CARAVAN, QUARRY_FACE, CARAVAN_BACK]);
+    expect(varying.map((job) => job.id)).toEqual([STICKS, LUMBER, CARAVAN, QUARRY_FACE, CARAVAN_BACK, SEAM]);
   });
 
   for (const job of Object.values(JOBS)) {

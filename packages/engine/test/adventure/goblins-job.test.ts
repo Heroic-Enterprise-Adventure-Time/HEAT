@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type AdventureResult, JOBS, jobsPostedBy, replay, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { GOBLINS, haul, MILLBROOK_RECRUITS, ORE, party, played, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { GOBLINS, haul, MILLBROOK_RECRUITS, ORE, party, played, rewardOf, SEAM, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The first mixed stage (Issue-286, decision 0052): three ore veins hold the
 // front line and two goblin rock throwers stand behind them. Its numbers are
@@ -18,7 +18,7 @@ const oreOf = (result: AdventureResult) => rewardOf(result, "ore");
 
 describe("Goblins in the old workings", () => {
   it("is the mine's second job: three veins with two goblins behind them, and nothing after", () => {
-    expect(jobsPostedBy(STARTING_LOCATION, "mine").map((j) => j.id)).toEqual([ORE, GOBLINS]);
+    expect(jobsPostedBy(STARTING_LOCATION, "mine").map((j) => j.id)).toEqual([ORE, GOBLINS, SEAM]);
     expect(goblins.stages.map((s) => s.kind)).toEqual(["travel", "gather", "arrive"]);
     expect(stage.opponents).toEqual([{ type: "ore-vein", count: 3 }, { type: "goblin-rock-thrower", count: 2 }]);
     expect(goblins.pay).toEqual([]);

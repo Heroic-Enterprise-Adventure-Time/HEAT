@@ -8,6 +8,7 @@ import {
   hallCapacity,
   hubLevelCarrying,
   type Job,
+  jobFacilityLevel,
   jobOf,
   type Location,
   must,
@@ -65,7 +66,8 @@ import {
  * reads again and answers with the reason it finds.
  *
  * The refusals, answered as data (`refusals.ts`): AdventureOpen, Requires
- * (the facility that posts the job, not built), HeroDead, HeroRetired,
+ * (the facility that posts the job, not built to the level the job needs:
+ * level 1, or level 2 for a second level's job, Issue-357), HeroDead, HeroRetired,
  * HeroNotHere and HeroAdventuring for a hero of the party, and Conflict. A
  * location the player has no camp at (locations.ts, decision 0059), a job the
  * location does not post, or a hero that is not the player's, is
@@ -212,9 +214,10 @@ async function startOnce(
   if (!job) badInput(`${at.name} has no job ${jobId}`);
   const { destination, hubLevel } = await caravanShape(repo, playerId, job, heroIds, caravan);
 
-  // A facility's job needs the facility built (game.md, "Locations and camps"),
-  // and a caravan's hub the level whose cart carries its cargo (decision 0059).
-  const needs: Requirement[] = job.facility ? [{ kind: job.facility, level: hubLevel }] : [];
+  // A facility's job needs the facility built to the level that posts it
+  // (game.md, "Locations and camps"; Issue-357), and a caravan's hub the level
+  // whose cart carries its cargo (decision 0059).
+  const needs: Requirement[] = job.facility ? [{ kind: job.facility, level: Math.max(jobFacilityLevel(job), hubLevel) }] : [];
   const checkFacilities = async (): Promise<void> => {
     if (needs.length === 0) return;
     const levels = campLevels(await repo.camp(playerId, at.id));
@@ -306,8 +309,7 @@ async function startOnce(
  * the destination, which must be a camp of the player's, and the least hub
  * level whose cart carries the cargo, which the start holds as the hub's
  * requirement (decision 0059). A job that delivers nothing takes no cargo
- * and leaves nobody, and needs its facility at level 1, as every facility's
- * job does.
+ * and leaves nobody, and asks nothing more of its hub than the job does.
  */
 async function caravanShape(
   repo: Repository,

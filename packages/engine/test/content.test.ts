@@ -174,7 +174,6 @@ describe("static content", () => {
 
   it("prices the mine's first level by the first progression, and keeps every level-1 cost within a level-1 warehouse", () => {
     expect(nextLevel("mine", 0)).toEqual({ level: 1, cost: [{ material: "timber", amount: 60 }, { material: "cloth", amount: 3 }], requires: [] });
-    expect(nextLevel("mine", 1)).toBeUndefined();
     for (const kind of Object.keys(FACILITIES) as FacilityKind[]) {
       for (const { amount } of FACILITIES[kind].levels[0]?.cost ?? []) expect(amount).toBeLessThanOrEqual(warehouseCapacity(1));
     }
@@ -182,7 +181,7 @@ describe("static content", () => {
 
   it("refuses a build at the highest level, then for a missing facility, then for the cost", () => {
     const poor = { levels: { "heroes-hall": 1, warehouse: 1 }, holdings: [{ material: "timber", balance: 60 }] };
-    expect(buildRefusal({ ...poor, levels: { mine: 1 } }, "mine")?.code).toBe("MAX_LEVEL");
+    expect(buildRefusal({ ...poor, levels: { mine: 2 } }, "mine")?.code).toBe("MAX_LEVEL");
     expect(buildRefusal(poor, "caravan-hub")).toMatchObject({ code: "REQUIRES", missing: [{ kind: "warehouse", level: 2 }] });
     expect(buildRefusal(poor, "mine")).toMatchObject({ code: "INSUFFICIENT_RESOURCES", short: [{ material: "cloth", amount: 3, balance: 0 }] });
     expect(buildRefusal({ ...poor, holdings: [{ material: "timber", balance: 60 }, { material: "cloth", balance: 3 }] }, "mine")).toBeNull();

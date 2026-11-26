@@ -370,7 +370,9 @@ describe('Camp', () => {
     await user.click(within(build).getByRole('button', { name: 'Build' }));
     expect(await panel().findByText('Level 1.')).toBeInTheDocument();
     expect(game.built).toEqual([['mine', 1]]);
-    expect(panel().getByText('At its highest level here.')).toBeInTheDocument();
+    const upgrade = section('Upgrade to level 2');
+    expect(within(upgrade).getByText('Posts a new job: The deep seam.')).toBeInTheDocument();
+    expect(within(upgrade).getByText('Not enough timber or stone.')).toBeInTheDocument();
     await waitFor(() => { expect(scene.levels?.['mine']).toBe(1); });
   });
 
@@ -381,9 +383,14 @@ describe('Camp', () => {
     await user.click(panel().getByRole('button', { name: 'Build' }));
     const job = await panel().findByRole('link', { name: 'Ore from the hill' });
     expect(job).toHaveAttribute('href', '/camp/millbrook/mine/jobs/ore-from-the-hill');
-    expect(listItems('Jobs')).toHaveLength(2);
+    expect(listItems('Jobs')).toHaveLength(3);
     expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('No pay, 4 bonus XP')).toBeInTheDocument();
     expect(within(itemHolding('Jobs', 'link', 'Goblins in the old workings')).getByText('No pay, 6 bonus XP')).toBeInTheDocument();
+    // The second level's job is listed with what it needs, as a caravan not unlocked is (Issue-357).
+    expect(within(itemHolding('Jobs', 'link', 'The deep seam')).getByText('Needs a level 2 mine.')).toBeInTheDocument();
+    // Greyed out, as every job that cannot be started yet is; the others are not (the owner, 2026-11-26).
+    expect(itemHolding('Jobs', 'link', 'The deep seam')).toHaveClass('locked');
+    expect(itemHolding('Jobs', 'link', 'Ore from the hill')).not.toHaveClass('locked');
     expect(game.built).toEqual([['mine', 1]]);
   });
 
@@ -437,6 +444,15 @@ describe('Camp', () => {
     expect(within(upgrade).getByText('Not enough timber or cloth.')).toBeInTheDocument();
   });
 
+  it("offers the caravan hub's next level, with what its cart carries (Issue-357)", async () => {
+    const game = fakeGame([]);
+    const built = game.camp();
+    game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'caravan-hub' ? { kind: 'caravan-hub', level: 1 } : f)) });
+    await renderCamp(game, '/camp/millbrook/caravan-hub');
+    const upgrade = section('Upgrade to level 2');
+    expect(within(upgrade).getByText('The cart carries 200 in all.')).toBeInTheDocument();
+  });
+
   it('sends a facility the camp does not have back to the hall', async () => {
     const { router } = await renderCamp(fakeGame([]), '/camp/millbrook/forge');
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
@@ -458,6 +474,8 @@ describe('Camp', () => {
     expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Scout the road to Highcrag', 'Caravan to Highcrag']);
     expect(within(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).getByText('No pay, 8 bonus XP')).toBeInTheDocument();
     expect(within(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).getByText('Needs the road to Highcrag.')).toBeInTheDocument();
+    expect(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).toHaveClass('locked');
+    expect(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).not.toHaveClass('locked');
 
     await user.click(job);
     expect(await panel().findByRole('heading', { name: 'Scout the road to Highcrag', level: 2 })).toBeInTheDocument();
