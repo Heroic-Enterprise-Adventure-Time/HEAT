@@ -31,7 +31,7 @@ describe("the knight", () => {
   });
 });
 
-/** Every party this file plays on the route back (typescript.md, rule 26): the parties Highcrag can field. */
+/** Every party this file plays on the route back (typescript.md, rule 26): five of the eight the probe of decision 0059's amendment of Issue-356 played, not every party Highcrag can field. */
 const PARTIES = {
   minerAndKnight: party("miner", "knight"),
   minerAndFighter: party("miner", "fighter"),

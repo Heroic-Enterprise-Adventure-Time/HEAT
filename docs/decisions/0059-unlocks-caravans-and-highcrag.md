@@ -240,7 +240,7 @@ The owner's calls at the start of Issue-356, which built Highcrag's quarry, ston
 
 **The quarry** has one level, 60 timber and 40 ore with nothing needed first, and posts two jobs, each a travel, one gather of 150 seconds and an arrival, with no pay:
 
-- "Stone from the quarry face": two outcrops or three, with a wolf on half the runs, and a bonus of 9. Every party Highcrag can field completes it with no death, and a lone miner too.
+- "Stone from the quarry face": two outcrops or three, with a wolf on half the runs, and a bonus of 9. Every party the probe played completes it with no death: each of the eight in the table below, a lone miner among them.
 - "Goblins in the quarry": three outcrops with a goblin rock thrower behind them, and a bonus of 6. It defeats any hero alone, and a miner with a knight clears it with no death.
 
 **The route back** is Highcrag's caravan hub, at the one price a facility kind has, posting "Caravan to Millbrook": the stages, pay and bonus of "Caravan to Highcrag", the other way. Highcrag's layout places the hub on the earth at the foot of the yard and the quarry on the rock to the east, the sites the owner chose in Issue-350's mock-up. This replaces the layout of Issue-352's amendment, and ends the price that Issue-351's amendment shared between the camps for a unit type: Highcrag's miner and fighter still cost what Millbrook's do, and the knight is Highcrag's alone.
