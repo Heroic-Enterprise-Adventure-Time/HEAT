@@ -128,3 +128,30 @@ export const GOBLINS = "goblins-in-the-old-workings";
 export const LUMBER = "lumber-from-the-deep-woods";
 export const ROAD = "scout-the-road-to-highcrag";
 export const CRAG = "ore-from-the-crag";
+
+/**
+ * A caravan of the tests' own (Issue-353): no caravan job is in the content
+ * until Issue-354. Millbrook's hub to Highcrag, two fights with a bandit in
+ * each and a wolf on half of them, so a cart stands beside the party in two
+ * stages and carries its health from the first to the second.
+ */
+export const CARAVAN_JOB: Job = {
+  id: "test-caravan",
+  name: "Test caravan",
+  description: "A caravan the engine's tests play.",
+  location: STARTING_LOCATION,
+  facility: "caravan-hub",
+  deliversTo: HIGHCRAG,
+  stages: [
+    { kind: "travel", lengthMs: 3000 },
+    { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+    { kind: "travel", lengthMs: 3000 },
+    { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+    { kind: "arrive" },
+  ],
+  pay: [],
+  bonusXp: 0,
+};
+
+/** The game's content with the tests' caravan in it. */
+export const CARAVAN_CONTENT = contentWithJob(CARAVAN_JOB);

@@ -27,3 +27,5 @@ Rule 15. A candidate rule from the review of PR-342 (Issue-336), accepted by the
 Rule 16. A candidate rule from the review of PR-345 (Issue-339), accepted by the owner on 2026-11-20: `GatheringTrait` was added to the engine's enums, and the lists of them in `standards/graphql.md`, rule 4, and `standards/typescript.md`, rule 18, were found by a search for `StageEnding` and by no search for what the change removed.
 
 Rule 17. Done in two steps. Issue-363 cut what the root `AGENTS.md` loads and the decision index, while the standards, the design documents and this document's own rules still carried their accounts; Issue-364 cut those, and moved "The battle" out of `design/game.md` into `design/battle.md` (decision 0060).
+
+Rule 18. A candidate rule from the review of PR-369 (Issue-353), accepted by the owner on 2026-11-25: the cart's jolt and its unfaded wreck in `process/assets.md`, rule 31, still read as unbuilt after Issue-353 built them, and the review found them by the issue's number.

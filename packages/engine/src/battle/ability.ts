@@ -27,8 +27,10 @@ export interface LineReach {
  * - `closest`: the nearest line.
  * - `weakest`: the lowest health.
  * - `below-half`: an ally below half its health, the lowest share first.
+ * - `cart`: a caravan's cart and nothing else, so an ability with it has no
+ *   target where there is no cart in reach (decision 0059).
  */
-export type TargetSelection = "closest" | "weakest" | "below-half";
+export type TargetSelection = "closest" | "weakest" | "below-half" | "cart";
 
 export type Targeting =
   | { readonly side: "self" }

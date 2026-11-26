@@ -31,7 +31,8 @@ export function lineAhead(line: Line): Line | undefined {
 
 export type Side = "party" | "opponents";
 
-export type UnitKind = "hero" | "monster" | "resource";
+/** A caravan's cart is a kind of its own: on the party's side, and not a hero (decision 0059). */
+export type UnitKind = "hero" | "cart" | "monster" | "resource";
 
 /**
  * The gathering traits, named for the craft and not for a unit type (decision
@@ -124,12 +125,25 @@ export interface ResourceNodeProfile extends EnemyYield {
   readonly health: number;
 }
 
+/**
+ * A caravan's cart: a party member with health and no actions, standing on
+ * its home line (decision 0059). It is hit like any party member and a guard
+ * covers it like any ally; it is not a hero, so it earns no XP, carries no
+ * trait and does not keep a party standing whose heroes are all down.
+ */
+export interface CartProfile {
+  readonly name: string;
+  readonly homeLine: Line;
+  readonly health: number;
+}
+
 /** The static content a battle reads; `BATTLE_CONTENT` in content.ts is the game's. */
 export interface BattleContent {
   readonly abilities: Readonly<Record<string, AbilityDefinition>>;
   readonly heroes: Readonly<Partial<Record<UnitType, CombatProfile>>>;
   readonly monsters: Readonly<Record<MonsterType, MonsterProfile>>;
   readonly resources: Readonly<Record<ResourceType, ResourceNodeProfile>>;
+  readonly cart: CartProfile;
 }
 
 /** A hero as the snapshot gives it: effective stats and the health it has now. */
@@ -147,9 +161,18 @@ export interface Opponent {
   readonly type: MonsterType | ResourceType;
 }
 
+/** A caravan's cart as a battle is set up with it: its id on the timeline and the health it has now. */
+export interface CartMember {
+  readonly unitId: string;
+  /** Current health, carried over between stages; at most the cart's `health` in the content. */
+  readonly health: number;
+}
+
 export interface BattleSetup {
   readonly seed: string;
   readonly party: readonly PartyMember[];
+  /** A caravan's cart, standing with the party; none on a job that does not deliver. */
+  readonly cart?: CartMember;
   readonly opponents: readonly Opponent[];
   /** The fight's time limit on its own clock; reaching it ends the battle as `timeout`. */
   readonly timeLimitMs: number;

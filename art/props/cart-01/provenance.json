@@ -1,7 +1,7 @@
 {
   "set": "cart-01",
   "kind": "prop sprite set",
-  "props": [],
+  "props": ["cart"],
   "madeFor": "The caravan's cart, a member of the party that is hit and goes down and never acts (decision 0059). It stands on the party's side and faces east. It has no clip for a travel: the scene is to move the still picture. Its down ends in its wreck, which is to stay on the road; the wreck's lowest row is 4 px below the standing cart's, and it is drawn by the standing picture's foot as every prop's down is, so it lies that much lower, which the owner saw and kept. Issue-353 adds the cart to the engine, draws it and names it in `props`.",
   "service": {
     "name": "PixelLab",

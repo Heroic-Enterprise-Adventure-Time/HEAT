@@ -8,16 +8,16 @@
 import { sortBy } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { AdventureEngine, type AdventureSnapshot, JOBS, type PartyOrder, type PlayerOverride, replay } from "../../src/index.js";
-import { GOBLINS, hero, meets, ofKind, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
+import { ADVENTURE_CONTENT, type AdventureContent, AdventureEngine, type AdventureSnapshot, CART_UNIT_ID, JOBS, type PartyOrder, type PlayerOverride, replay } from "../../src/index.js";
+import { CARAVAN_CONTENT, CARAVAN_JOB, GOBLINS, hero, meets, ofKind, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 type Click =
   | { readonly atWallMs: number; readonly heroId: string; readonly override: PlayerOverride }
   | { readonly atWallMs: number; readonly order: PartyOrder };
 
 /** The browser: a frame at a time, stepping every event that is due, clicks between frames. */
-function playLive(snap: AdventureSnapshot, seed: string, clicks: readonly Click[], frameMs = 16) {
-  const engine = new AdventureEngine(snap, seed);
+function playLive(snap: AdventureSnapshot, seed: string, clicks: readonly Click[], frameMs = 16, content: AdventureContent = ADVENTURE_CONTENT) {
+  const engine = new AdventureEngine(snap, seed, content);
   const pending = sortBy(clicks, ["atWallMs"]);
   let wall = 0;
   while (!engine.isComplete()) {
@@ -104,6 +104,21 @@ describe("Determinism within one version", () => {
         expect(replay(snap, seed, live.timeline.overrideLog), seed).toEqual(live);
         for (const frameMs of [1, 33, 5000]) expect(playLive(snap, seed, [], frameMs), seed).toEqual(replay(snap, seed, []));
       }
+    }
+  });
+
+  it("gives the same timeline and result live and replayed with a caravan's cart beside the party", () => {
+    const guarded: readonly Click[] = [
+      { atWallMs: 4200, heroId: "fighter-1", override: guard },
+      { atWallMs: 5200, heroId: "villager-2", override: strike },
+    ];
+    for (const seed of ["a", "b", "c", "d", "e"]) {
+      const snap = snapshot(CARAVAN_JOB.id, party);
+      const live = playLive(snap, seed, guarded, 16, CARAVAN_CONTENT);
+      expect(ofKind(live.timeline.events, "battle-start").every((e) => e.participants.some((p) => p.unitId === CART_UNIT_ID)), seed).toBe(true);
+      expect(live.result.delivered, seed).toBeTypeOf("boolean");
+      expect(replay(snap, seed, live.timeline.overrideLog, CARAVAN_CONTENT), seed).toEqual(live);
+      for (const frameMs of [1, 33, 5000]) expect(playLive(snap, seed, [], frameMs, CARAVAN_CONTENT), seed).toEqual(replay(snap, seed, [], CARAVAN_CONTENT));
     }
   });
 

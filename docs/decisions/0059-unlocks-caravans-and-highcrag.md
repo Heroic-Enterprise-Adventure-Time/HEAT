@@ -1,6 +1,6 @@
 # 0059: More locations: general unlocks, caravans with a cart, and Highcrag
 
-- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Not built: the cart in the engine, Issue-353; the hub's caravan, Issue-354; the caravan hub's panel, Issue-355; Highcrag's own content, Issue-356; Millbrook's second levels, Issue-357.
+- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Built by Issue-353: the cart in the engine and the battle scene, with the owner's calls of 2026-11-25 on its shape and the numbers its tests play, in its amendment below. Not built: the hub's caravan, Issue-354; the caravan hub's panel, Issue-355; Highcrag's own content, Issue-356; Millbrook's second levels, Issue-357.
 - **Date:** 2026-11-23
 - **Settles:** Issue-292: the second location, how a location unlocks, caravans with their cargo and their passengers, what a caravan risks, the caravan hub's jobs, and the keys all of it needs, which the overview's "Open" and decision 0013 left to be designed before they are built. The owner's calls of 2026-11-23, made in the Issue-292 session.
 - **Amends:** 0026, "every location offers villagers, so no player is ever locked out": Highcrag offers none, and the guarantee is the starting location's; and 0026, "Recruitment", `recruitHero(unitType, requestId)`, which names no location: recruiting takes its location from Issue-351 on. 0032, "The first numbers", which give the mine, the lumber camp and the caravan hub one level each: each gains a second at Millbrook, costing stone (Issue-357). 0058, "a job's own penalty returns with caravans": no job states a penalty, and what a caravan loses is its cargo, by the one table below.
@@ -156,6 +156,47 @@ The party that is safe on the wolves job, a fighter with a villager, always open
 **`submitAdventure`'s content parameter stays,** where Issue-351's hand-over had it that it "can go" once a job of the content grants: `docs/standards/graphql.md`, rule 27, accepted since, holds it as the way a test settles a job the game does not have, and the tests of the rule still use it, beside the new tests that settle the content's own job through the verbs.
 
 Not chosen in this issue: **a link from the result to the camp it opens,** since an unlock is general and the next one may open no camp, and the select is where a camp is chosen; **the unlock's words on a replay's page,** above; **the hub's and the quarry's spots in the layout before their facilities exist,** which would draw and list a caravan hub the content does not give Highcrag; and **the stack test playing its user up to the hub,** some twenty adventures on every run for one check.
+
+## Amendment: the cart in the engine and the scene (Issue-353, 2026-11-25)
+
+The owner's calls at the start of Issue-353, which built the cart in the engine and draws it in the battle scene. The agent put eight to the owner, each with one recommendation, and the owner took all eight as recommended.
+
+**The cart is a unit kind of its own,** `cart`, beside hero, monster and resource, with its profile in the engine's content: 60 health, the near line, no actions and no traits. Each rule that keeps it out, no XP, not among the heroes standing when a drop is read, not keeping a party up, is one check of its kind, where a hero with no actions would sit inside every rule about heroes that it has to be kept out of.
+
+**A job delivers when it names a location in `deliversTo`.** On such a job the engine puts the cart beside the party in every fight and gather and carries its health between them, so the hub's snapshot does not change and what makes a job a caravan is the job's content, as its grants are.
+
+**The bandit aims at the cart by an ability of its own,** `strike-cart`: `strike-weakest`'s reach, warmup and damage, with a selection only a cart answers, first in the bandit's list. Where there is no cart it has no target and the bandit chooses as it did, so a battle without a cart plays the same timeline as before, which the engine's tests hold.
+
+**The result's `delivered`** is on a caravan's result alone: true exactly when the run arrives with the cart standing, false on a broken cart, a retreat or a party all down.
+
+**The timeline's schema version stays at 3.** No event changes shape: a participant's kind gains `cart` and the result gains an optional field. Moving it would make every stored replay unavailable, since the check is exact, and no timeline with a cart can be written before Issue-354 puts a caravan in the content, by which time the client that draws one is deployed.
+
+**The client draws the cart** from `art/props/cart-01`, in the cast so that its art loads with the run, and the party panel is unchanged: the cart has nothing to force, and the caravan's page is Issue-355. The field holds it apart from the heroes the panel shows.
+
+**A caravan's road is drawn on the ground of the camp it left,** as decision 0028's amendment of 2026-11-24 has it for every battle: a road that changes ground on the way is a design of its own, with no caravan to see until Issue-355.
+
+**The numbers stay Issue-354's.** The engine's tests play a caravan of their own, one bandit a fight with a wolf on half the seeds, two fights, because the working assumption's road, "two fights, bandits in each", is too hard at two bandits with the cart's health carried between fights. Over 500 seeds, `seed-0` to `seed-499`, with nothing forced, measured by a probe of the engine as this issue built it:
+
+| Party | One bandit a fight: complete, delivered | Two bandits a fight: complete, delivered |
+| --- | --- | --- |
+| 1 fighter | 286, 286 | 0, 0 |
+| Fighter and villager | 500, 500 | 1, 0 |
+| Fighter and ranger | 500, 500 | 142, 69 |
+| 2 fighters | 500, 500 | 303, 232 |
+| Fighter, ranger, villager | 500, 500 | 464, 258 |
+| Fighter and 3 villagers | 500, 500 | 500, 434 |
+| 2 villagers | 486, 290 | 0, 0 |
+| Ranger and villager | 500, 356 | 0, 0 |
+| 2 rangers | 500, 374 | 71, 0 |
+| 4 villagers | 500, 500 | 500, 0 |
+
+A fighter's guard covers the cart, so every party with a fighter and one more hero delivers at one bandit a fight; a pair without a fighter loses it on a quarter of the runs or more, and four villagers deliver on every seed. At two bandits a fight the party that is safe on the road to Highcrag, a fighter with a villager, is defeated on all but one seed, and a quarter of a wolf's chance changes that little. The engine's tests hold the rule, a fighter with a villager and a fighter with a ranger delivering on every seed, and two villagers and a ranger with a villager delivering on more than half and arriving with the cart broken on some, not the counts.
+
+**A drop with only the cart standing cannot happen in a run,** because a battle whose heroes are all down is over. The engine's test holds the rule where it is read instead: the cart carries no trait, so a fighter beside it fells a tree for nothing and a villager's timber is what it is alone.
+
+**Not checked on a stack:** no caravan job is in the content, so the issue's stack runs nothing new. The scene with a cart was checked on the dev server with a caravan job added by an uncommitted change, as Issue-352 did for its camp.
+
+Not chosen in Issue-353: **the cart as a hero with no actions,** above; **a field in the snapshot saying a run has a cart,** which would put in the hub's input what the job already says; **moving the schema version,** above; and **the road's ground changing to the destination's on the way,** above.
 
 ## Considered and not chosen
 

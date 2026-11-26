@@ -22,7 +22,8 @@ export interface CastMember {
 const once = (cast: readonly CastMember[]) => uniqBy(cast, (member) => `${member.kind}/${member.type}`);
 
 /**
- * Everyone this adventure of a job sets against the party: the job's stages
+ * Everyone this adventure of a job sets against the party, and its cart on a
+ * job that delivers (decision 0059): the job's stages
  * as the engine expands them from the adventure's seed (decision 0058,
  * Issue-341), by the same function the run itself is about to call, so the
  * cast is who the run will meet and nobody else. A job that varies loads its
@@ -32,18 +33,20 @@ const once = (cast: readonly CastMember[]) => uniqBy(cast, (member) => `${member
 export function jobCast(jobId: string, seed: string): readonly CastMember[] {
   const job = jobOf(jobId);
   if (!job) return [];
-  return once(
-    expandStages(job, seed).flatMap((stage) =>
+  const cart: readonly CastMember[] = job.deliversTo === undefined ? [] : [{ kind: 'cart', type: 'cart' }];
+  return once([
+    ...cart,
+    ...expandStages(job, seed).flatMap((stage) =>
       'opponents' in stage ? stage.opponents.map(({ type }): CastMember => ({ kind: Object.hasOwn(MONSTERS, type) ? 'monster' : 'resource', type })) : [],
     ),
-  );
+  ]);
 }
 
-/** Everyone a stored timeline sets against the party, read from its battles: a replay shows who was there, whatever the job says now. */
+/** Everyone a stored timeline sets against the party, and the cart where it stood beside it, read from its battles: a replay shows who was there, whatever the job says now. */
 export function timelineCast(events: readonly AdventureEvent[]): readonly CastMember[] {
   return once(
     events.flatMap((event) =>
-      event.kind === 'battle-start' ? event.participants.filter((p) => p.side === 'opponents').map(({ kind, type }): CastMember => ({ kind, type })) : [],
+      event.kind === 'battle-start' ? event.participants.filter((p) => p.side === 'opponents' || p.kind === 'cart').map(({ kind, type }): CastMember => ({ kind, type })) : [],
     ),
   );
 }

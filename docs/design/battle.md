@@ -10,7 +10,7 @@ The first cut is decision 0030, with resource nodes reworked by decision 0051, r
 - **Decided.** Active time. Each unit has a charge timer that fills at its speed. When it fills, the unit picks the first usable action from its unit type's list, with the target the ability's rule chooses, warms up, resolves, and the timer resets. Nothing waits for the player: the battle plays itself, and the player watches, pauses, fast-forwards and interjects.
 - **Decided.** One action list per unit type, fixed. The list is the unit's whole intelligence, and a better unit type is a better list, which is how progression automates what the player used to do by hand (`docs/design/game.md`, "The business"). The player never edits a list.
 - **Decided.** A marching order, not a grid. Each side has four lines, front, near, far and back; a line holds any number of units, with no order within it. A unit type has a home line, where it starts; the party pick places nobody. Reach is by line: an ability says which enemy lines it reaches from which of its own. When a side's front line empties, every unit on that side moves up a line, so the nearest occupied line is always the front. Stepping up is also an action, for the unit types whose list says so.
-- **Working assumption.** The first unit types and monsters. Not very tactical, by design: a villager walks up and swings, because the player is not meant to keep villagers for long. Decision 0059 puts a caravan's cart first in the bandit's list, when the cart is in its reach: decided, not built (Issue-353; `docs/design/game.md`, "Caravans").
+- **Working assumption.** The first unit types and monsters. Not very tactical, by design: a villager walks up and swings, because the player is not meant to keep villagers for long. Decision 0059 puts a caravan's cart first in the bandit's list, when the cart is in its reach (built by Issue-353; `docs/design/game.md`, "Caravans").
 
   | Unit | Home line | Its list, first usable action wins |
   | --- | --- | --- |
@@ -20,7 +20,7 @@ The first cut is decision 0030, with resource nodes reworked by decision 0051, r
   | Fighter | front | guard an ally below half health, if not already guarding; strike the closest |
   | Ranger | far | shoot the closest, on any line |
   | Wolf | front | bite the closest; move up |
-  | Bandit | near | strike the weakest in reach; move up |
+  | Bandit | near | strike a caravan's cart if it is in reach; strike the weakest in reach; move up |
   | Goblin rock thrower | far | throw a rock at the closest, on any line |
 
 - **Decided.** Ranged units (decision 0052). A ranged attack reaches every line of the other side from every line of its own, where melee reaches only the front. So nodes hold the other side's front line and goblins stand behind them, throwing rocks at the heroes who chip at the nodes, out of reach until the nodes fall and their side moves up, unless the party brings an archer or two to deal with them. A ranger shoots monsters before nodes, like any unit; with nothing else left it shoots a node, which costs the party nothing, because no hit gathers anything and a node drops by the traits of the heroes standing when it falls (decision 0058). **Working assumption,** the numbers: a ranger has 26 health, speed 10 and damage 6, and its shot warms up for 700 ms; a goblin rock thrower has 12 health, speed 8 and damage 5, and its throw warms up for 600 ms.

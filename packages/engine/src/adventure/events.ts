@@ -137,4 +137,10 @@ export interface AdventureResult {
    * them already; the hub writes whatever the list holds (decision 0059).
    */
   readonly unlocks: readonly UnlockId[];
+  /**
+   * A caravan's alone: whether its cart was standing on arrival, false on a
+   * retreat or a defeat. The engine knows nothing of what the cart carries
+   * (decision 0059).
+   */
+  readonly delivered?: boolean;
 }

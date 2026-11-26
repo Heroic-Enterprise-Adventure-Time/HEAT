@@ -6,6 +6,7 @@ import {
   ABILITY_EFFECTS,
   type AbilityId,
   type AdventureEvent,
+  CART_SPRITE_SETS,
   type Line,
   MONSTER_SPRITE_SETS,
   MONSTERS,
@@ -14,6 +15,7 @@ import {
   PROP_SPRITE_SETS,
   RESOURCE_NODES,
   type ResourceType,
+  type Side,
   UNIT_PROFILES,
   type UnitType,
   WEAPON_SPRITES,
@@ -115,6 +117,8 @@ const DOWN_MS = 100;
 const WALK_MS = 100;
 const RUSH_WALK_MS = 50;
 const STANCE_MS = 150;
+/** How long the cart's still picture holds each of its two heights on the road, a pixel apart: it has no clip for a travel (decision 0059). */
+const CART_BOB_MS = 120;
 /**
  * The share of an action's animation that the adventure's clock waits for,
  * the swing, a flight, the hit, the effect and a fall (Issue-335): 0 for
@@ -227,9 +231,10 @@ interface DropView {
   readonly picture: Container;
 }
 
-/** Where a unit's sprite set is under `/art`: a hero's own set, anyone else's by its type; null where there is none. */
+/** Where a unit's sprite set is under `/art`: a hero's own set, a cart's the cart's, anyone else's by its type; null where there is none. */
 function artPath(kind: FieldUnit['kind'], type: string, heroSet: string | undefined): UnitArtPath | null {
   if (kind === 'hero') return heroSet ? `heroes/${heroSet}` : null;
+  if (kind === 'cart') return CART_SPRITE_SETS[0] ? `props/${CART_SPRITE_SETS[0]}` : null;
   if (kind === 'monster') {
     // A stored timeline may name a monster this build no longer has.
     const set = Object.hasOwn(MONSTER_SPRITE_SETS, type) ? MONSTER_SPRITE_SETS[type as MonsterType][0] : undefined;
@@ -252,7 +257,12 @@ function dropsOf(kind: FieldUnit['kind'], type: string): readonly string[] {
 
 /** The weapon by unit type for now; a hero's equipped weapon replaces this lookup (game.md, "Heroes"). */
 function weaponOf(kind: FieldUnit['kind'], type: string): string | undefined {
-  return kind === 'resource' ? undefined : WEAPON_SPRITES[type as UnitType | MonsterType];
+  return kind === 'resource' || kind === 'cart' ? undefined : WEAPON_SPRITES[type as UnitType | MonsterType];
+}
+
+/** The party's side of the field: its heroes and its cart, if it has one. */
+function partyOf(field: Field): readonly FieldUnit[] {
+  return field.cart ? [...field.party, field.cart] : field.party;
 }
 
 /** A hero with no line yet, before its first fight, stands on its unit type's home line. */
@@ -372,7 +382,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   let shown = 0;
   let heroSets: ReadonlyMap<string, string> = new Map();
   /** The party running on from the left, the other side rushing on from the right, or neither. */
-  let entering: 'party' | 'opponents' | null = null;
+  let entering: Side | null = null;
   /** How far right of its spots the other side still is while it rushes on. */
   let offset = 0;
   let destroyed = false;
@@ -637,12 +647,12 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
 
   /** Everyone's spot from the field: the living and the fallen keep the line they had. */
   const targets = (field: Field) =>
-    spots([...field.party, ...field.opponents].map((u) => ({ unitId: u.unitId, side: u.side, line: lineOf(u) })));
+    spots([...partyOf(field), ...field.opponents].map((u) => ({ unitId: u.unitId, side: u.side, line: lineOf(u) })));
 
   /** Brings the views in step with the field: new units added, units no longer in it left behind. */
   const sync = (field: Field) => {
     const present = new Set<string>();
-    for (const unit of [...field.party, ...field.opponents]) {
+    for (const unit of [...partyOf(field), ...field.opponents]) {
       present.add(unit.unitId);
       const unitView = units.get(unit.unitId) ?? addUnit(unit);
       unitView.unit = unit;
@@ -737,8 +747,8 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const since = unitView.clock - unitView.downAt;
       const index = Math.min(last, Math.floor(since / DOWN_MS));
       show(unitView, art.down, index, mirrored, last > 0 ? 1 - index / last : null);
-      // A fallen monster or a felled tree lies a moment, then fades away; a fallen hero stays down.
-      if (unitView.unit.kind !== 'hero') {
+      // A fallen monster or a felled tree lies a moment, then fades away; a fallen hero stays down, and a broken cart's wreck stays on the road.
+      if (unitView.unit.kind !== 'hero' && unitView.unit.kind !== 'cart') {
         unitView.body.alpha = clamp(1 - (since - last * DOWN_MS - FADE_AFTER_MS) / FADE_MS, 0, 1);
       }
       return;
@@ -762,8 +772,11 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     }
     // The walk and the stance loop; the act, the hit and the fall above stop at their last frame.
     const loop = (frames: Frames, frameMs: number) => Math.floor(unitView.clock / frameMs) % frames.textures.length;
-    if (moving) show(unitView, art.walk, loop(art.walk, rushing ? RUSH_WALK_MS : WALK_MS), mirrored);
-    else show(unitView, art.stance, loop(art.stance, STANCE_MS), mirrored);
+    if (moving) {
+      show(unitView, art.walk, loop(art.walk, rushing ? RUSH_WALK_MS : WALK_MS), mirrored);
+      // The cart's still picture jolts along the road instead.
+      if (unitView.unit.kind === 'cart') unitView.body.y -= Math.floor(unitView.clock / CART_BOB_MS) % 2;
+    } else show(unitView, art.stance, loop(art.stance, STANCE_MS), mirrored);
   };
 
   return {
@@ -806,7 +819,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       sync(field);
       const at = targets(field);
       // Running on, the party keeps its order and starts with its front hero just beyond the window's left edge.
-      const front = Math.max(...field.party.map((u) => must(at.get(u.unitId), `the spot of ${u.unitId}`).x));
+      const front = Math.max(...partyOf(field).map((u) => must(at.get(u.unitId), `the spot of ${u.unitId}`).x));
       const runOn = front + view.stageX + 16;
       for (const unitView of units.values()) {
         const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
