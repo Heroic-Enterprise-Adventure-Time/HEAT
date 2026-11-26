@@ -44,6 +44,7 @@ export type FacilityKind =
   | 'JOB_BOARD'
   | 'LUMBER_CAMP'
   | 'MINE'
+  | 'QUARRY'
   | 'WAREHOUSE';
 
 /** The gathering traits, the engine's `GatheringTrait`, each named for its craft: what a party must carry for an enemy's drop to fall to it. */
@@ -63,6 +64,7 @@ export type Material =
   | 'CLOTH'
   | 'HIDE'
   | 'ORE'
+  | 'STONE'
   | 'TIMBER';
 
 /** One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up. */

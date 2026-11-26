@@ -89,12 +89,10 @@ export const MILLBROOK: CampLayout = {
 /**
  * Highcrag, as the owner chose it in the mock-up (2026-11-24, Issue-350):
  * the earth runs under every building, and a site the camp works stands on
- * the rock. It lists the facilities Highcrag's content gives a camp today.
- * The mock-up also has a caravan hub at { x: 264, y: 214 }, on the earth at
- * the foot of the yard, and the quarry's site at { x: 336, y: 128 }, on the
- * rock to the east; they are added with the facilities themselves
- * (Issue-356). Where heroes walk and the hall's door were not the owner's
- * choice in the mock-up: the yard in front of the hall and the way down.
+ * the rock: the caravan hub on the earth at the foot of the yard, and the
+ * quarry on the rock to the east (Issue-356). Where heroes walk and the
+ * hall's door were not the owner's choice in the mock-up: the yard in front
+ * of the hall and the way down, which passes left of the hub.
  */
 export const HIGHCRAG: CampLayout = {
   ground: 'crag-01',
@@ -107,6 +105,8 @@ export const HIGHCRAG: CampLayout = {
     { kind: 'heroes-hall', at: { x: 200, y: 98 } },
     { kind: 'warehouse', at: { x: 108, y: 132 } },
     { kind: 'job-board', at: { x: 160, y: 200 } },
+    { kind: 'caravan-hub', at: { x: 264, y: 214 } },
+    { kind: 'quarry', at: { x: 336, y: 128 } },
   ],
   walkable: [
     { x0: 140, y0: 104, x1: 288, y1: 164 },

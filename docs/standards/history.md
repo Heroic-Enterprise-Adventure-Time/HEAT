@@ -36,6 +36,8 @@ Rule 29. A candidate rule from the review of PR-361 (Issue-352), accepted by the
 
 Rule 30. A candidate rule from the review of PR-369 (Issue-353), accepted by the owner on 2026-11-25: the engine added `cart` to `UnitKind` and the client's field spelled the union again by hand, so only a reader of both packages would have found the second place to add it. Applying the rule found two more copies in the client, the field's outcome and the battle scene's side running on, now `AdventureOutcome` and `Side`.
 
+Rule 31. A candidate rule from the review of PR-373 (Issue-356), accepted by the owner on 2026-11-26: the engine's test helpers named the quarry's and the route back's jobs as constants, and three test files spelled the ids again. Applying the rule converted every job id and Highcrag's id in the engine's tests, the bonus tables of `content.test.ts` among them.
+
 Held back, `@graphql-tools/utils` overridden under `@apollo/server`. Dependabot alert 8 was reopened on 2026-11-17 by PR-311.
 
 Why. Latest with LTS preferred was stated by the owner as standing policy on 2026-10-14.

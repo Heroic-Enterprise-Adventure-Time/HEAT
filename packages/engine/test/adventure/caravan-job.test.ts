@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CART_CAPACITY, cartCapacity, hubLevelCarrying, JOBS, jobsPostedBy, MONSTERS, must, type SnapshotHero, STARTING_LOCATION } from "../../src/index.js";
-import { CARAVAN, enemiesXp, HIGHCRAG, party, played, ROAD, SEEDS, villagers } from "./helpers.js";
+import { CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, party, played, ROAD, SEEDS, villagers } from "./helpers.js";
 
 // "Caravan to Highcrag" (Issue-354, decision 0059): the caravan hub's
 // caravan, the first job of the content that delivers. Its road is the one
@@ -44,8 +44,8 @@ describe("Caravan to Highcrag", () => {
     expect(jobsPostedBy(STARTING_LOCATION, "caravan-hub").map((j) => j.id)).toEqual([ROAD, CARAVAN]);
   });
 
-  it("is the one job of the content that delivers", () => {
-    expect(Object.values(JOBS).filter((job) => job.deliversTo !== undefined).map((job) => job.id)).toEqual([CARAVAN]);
+  it("is one of the two jobs of the content that deliver, with Highcrag's route back", () => {
+    expect(Object.values(JOBS).filter((job) => job.deliversTo !== undefined).map((job) => job.id)).toEqual([CARAVAN, CARAVAN_BACK]);
   });
 
   it("is two fights, one bandit in each and a wolf on half of them, between travels", () => {

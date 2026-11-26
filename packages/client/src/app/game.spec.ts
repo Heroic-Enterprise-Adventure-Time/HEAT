@@ -274,6 +274,7 @@ describe('Game', () => {
     expect(game.recruits()).toEqual([
       { unitType: 'miner', cost: [{ material: 'ore', amount: 30, balance: 0 }, { material: 'timber', amount: 20, balance: 0 }], reason: 'Not enough ore or timber.' },
       { unitType: 'fighter', cost: [{ material: 'ore', amount: 40, balance: 0 }], reason: 'Not enough ore.' },
+      { unitType: 'knight', cost: [{ material: 'ore', amount: 50, balance: 0 }, { material: 'hide', amount: 4, balance: 0 }], reason: 'Not enough ore or hide.' },
     ]);
   });
 

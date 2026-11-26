@@ -129,6 +129,9 @@ export const LUMBER = "lumber-from-the-deep-woods";
 export const ROAD = "scout-the-road-to-highcrag";
 export const CRAG = "ore-from-the-crag";
 export const CARAVAN = "caravan-to-highcrag";
+export const QUARRY_FACE = "stone-from-the-quarry-face";
+export const QUARRY_GOBLINS = "goblins-in-the-quarry";
+export const CARAVAN_BACK = "caravan-to-millbrook";
 
 /**
  * A caravan of the tests' own (Issue-353), kept apart from the content's

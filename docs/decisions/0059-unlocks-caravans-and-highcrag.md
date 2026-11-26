@@ -1,6 +1,6 @@
 # 0059: More locations: general unlocks, caravans with a cart, and Highcrag
 
-- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Built by Issue-353: the cart in the engine and the battle scene, with the owner's calls of 2026-11-25 on its shape and the numbers its tests play, in its amendment below. Built by Issue-354: the hub's caravan, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-355: the caravan hub's panel, with the owner's calls of 2026-11-25, in its amendment below. Not built: Highcrag's own content, Issue-356; Millbrook's second levels, Issue-357.
+- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Built by Issue-353: the cart in the engine and the battle scene, with the owner's calls of 2026-11-25 on its shape and the numbers its tests play, in its amendment below. Built by Issue-354: the hub's caravan, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-355: the caravan hub's panel, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-356: Highcrag's quarry, stone, the knight and the route back, with their art, with the owner's calls of 2026-11-26, in its amendment below. Not built: Millbrook's second levels, Issue-357.
 - **Date:** 2026-11-23
 - **Settles:** Issue-292: the second location, how a location unlocks, caravans with their cargo and their passengers, what a caravan risks, the caravan hub's jobs, and the keys all of it needs, which the overview's "Open" and decision 0013 left to be designed before they are built. The owner's calls of 2026-11-23, made in the Issue-292 session.
 - **Amends:** 0026, "every location offers villagers, so no player is ever locked out": Highcrag offers none, and the guarantee is the starting location's; and 0026, "Recruitment", `recruitHero(unitType, requestId)`, which names no location: recruiting takes its location from Issue-351 on. 0032, "The first numbers", which give the mine, the lumber camp and the caravan hub one level each: each gains a second at Millbrook, costing stone (Issue-357). 0058, "a job's own penalty returns with caravans": no job states a penalty, and what a caravan loses is its cargo, by the one table below.
@@ -229,6 +229,40 @@ The owner's calls at the start of Issue-355, which built the client's side of a 
 **The result's words for each row of the table above,** and the held slot at the destination, "On the way" in its hall, read from the open adventure's caravan, are the page's first words, to be changed by looking.
 
 Not chosen in Issue-355: **a second read of the settled adventure for what it delivered,** above; **capping each amount at the destination's room,** which would hide a choice the player may want to make, to carry more than fits and lose the rest knowingly.
+
+## Amendment: Highcrag's own (Issue-356, 2026-11-26)
+
+The owner's calls at the start of Issue-356, which built Highcrag's quarry, stone, the knight and the route back, with their art. The agent put one shape to the owner, from a probe of the engine with the candidate content, and the owner took it as recommended.
+
+**Stone and the outcrop** are as the Decision has them: a stone outcrop of 40 health and 3 XP, an ore vein's, whose stone has no chance at mining 1 and is 20 to 24, always, at mining 2. Stone is among `MATERIALS`, which every reward is summed over.
+
+**The knight** stands on the front line with 70 health, speed 8 and damage 7, guards and strikes, and carries no trait: a heavier fighter, slower and harder to put down. It is recruited at Highcrag alone, at hall level 1, for 50 ore and 4 hide, the first price that names hide. It acts with a longsword of its own, `longsword-01`, so that it is not drawn with the fighter's sword.
+
+**The quarry** has one level, 60 timber and 40 ore with nothing needed first, and posts two jobs, each a travel, one gather of 150 seconds and an arrival, with no pay:
+
+- "Stone from the quarry face": two outcrops or three, with a wolf on half the runs, and a bonus of 9. Every party the probe played completes it with no death: each of the eight in the table below, a lone miner among them.
+- "Goblins in the quarry": three outcrops with a goblin rock thrower behind them, and a bonus of 6. It defeats any hero alone, and a miner with a knight clears it with no death.
+
+**The route back** is Highcrag's caravan hub, at the one price a facility kind has, posting "Caravan to Millbrook": the stages, pay and bonus of "Caravan to Highcrag", the other way. Highcrag's layout places the hub on the earth at the foot of the yard and the quarry on the rock to the east, the sites the owner chose in Issue-350's mock-up. This replaces the layout of Issue-352's amendment, and ends the price that Issue-351's amendment shared between the camps for a unit type: Highcrag's miner and fighter still cost what Millbrook's do, and the knight is Highcrag's alone.
+
+**The numbers,** over 500 seeds, `seed-0` to `seed-499`, with nothing forced, measured by a probe of the engine against `main` at 237e644 with the content as built. The engine's tests hold the outcomes, the deaths that are none, the stone and the deliveries; the counts of deaths where there are some are the probe's.
+
+| Party | Quarry face: complete, deaths | Goblins: complete, runs with a death | Caravan to Millbrook: complete, delivered |
+| --- | --- | --- | --- |
+| 1 miner | 500, 0 | 0, 500 | 110, 0 |
+| 1 fighter | 500, 0 | 0, 500 | 286, 286 |
+| 1 knight | 500, 0 | 0, 500 | 230, 230 |
+| Miner and fighter | 500, 0 | 500, 7 | 500, 500 |
+| Miner and knight | 500, 0 | 500, 0 | 500, 500 |
+| 2 fighters | 500, 0 | 500, 0 | 500, 500 |
+| Knight and 2 miners | 500, 0 | 500, 0 | 500, 500 |
+| Fighter and 2 miners | 500, 0 | 500, 0 | 500, 500 |
+
+A party with a miner brings home 40 to 72 stone from the face and 60 to 72 from the goblins; a party without one brings home none. A level-1 warehouse holds the largest roll.
+
+**The art** is the owner's picks of 2026-11-26: the quarry's two levels from a mock-up of Highcrag at 3× (`art/mockups/highcrag-quarry-400x225-3x.png`), the stone outcrop beside the ore vein, stone's and the quarry's icons from a fourth pack, and the longsword from the first weapon pack's swords. Each set's provenance says what it cost and what was not kept.
+
+Not chosen in Issue-356: **a heavier knight, 80 health, speed 7 and damage 6,** which did worse than the knight built on every job of the probe, the goblins and the route back above all.
 
 ## Considered and not chosen
 

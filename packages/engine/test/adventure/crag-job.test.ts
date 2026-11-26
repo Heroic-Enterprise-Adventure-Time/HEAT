@@ -25,11 +25,10 @@ const PARTIES: readonly (readonly UnitType[])[] = [
 ];
 
 describe("Ore from the crag", () => {
-  it("is posted by Highcrag's job board, and is the only job there", () => {
+  it("is posted by Highcrag's job board, and is the only job the board posts there", () => {
     expect(crag.location).toBe(HIGHCRAG);
     expect(crag.facility).toBeUndefined();
     expect(jobsPostedBy(HIGHCRAG, "job-board").map((j) => j.id)).toEqual([CRAG]);
-    expect(Object.values(JOBS).filter((j) => j.location === HIGHCRAG).map((j) => j.id)).toEqual([CRAG]);
   });
 
   it("has the stages, the pay and the bonus of the mine's first job, and grants nothing", () => {
