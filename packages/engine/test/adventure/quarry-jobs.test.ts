@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dropRow, FACILITIES, JOBS, jobsPostedBy, must, RESOURCE_NODES, rollDrops, type SnapshotHero, warehouseCapacity } from "../../src/index.js";
+import { dropRow, FACILITIES, jobOf, JOBS, jobsPostedBy, must, RESOURCE_NODES, rollDrops, type SnapshotHero, warehouseCapacity } from "../../src/index.js";
 import { haul, HIGHCRAG, party, played, QUARRY_FACE, QUARRY_GOBLINS, rewardOf, SEEDS } from "./helpers.js";
 
 // Stone and the quarry (Issue-356, decision 0059): stone is mined at level 2
@@ -43,9 +43,10 @@ describe("the quarry's jobs", () => {
     expect(jobsPostedBy(HIGHCRAG, "quarry").map((j) => j.id)).toEqual([QUARRY_FACE, QUARRY_GOBLINS]);
     expect(FACILITIES.quarry.levels).toHaveLength(1);
     for (const id of [QUARRY_FACE, QUARRY_GOBLINS]) {
-      expect(JOBS[id].pay, id).toEqual([]);
-      expect(JOBS[id].grants, id).toBeUndefined();
-      expect(JOBS[id].deliversTo, id).toBeUndefined();
+      const job = must(jobOf(id), id);
+      expect(job.pay, id).toEqual([]);
+      expect(job.grants, id).toBeUndefined();
+      expect(job.deliversTo, id).toBeUndefined();
     }
   });
 

@@ -4,7 +4,7 @@ import { type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { range } from "es-toolkit";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { type AdventureResult, type AdventureSnapshot, JOBS, jobsPostedBy, location, LOCATIONS, must, replay, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "@heat/engine";
+import { type AdventureResult, type AdventureSnapshot, jobsPostedBy, location, LOCATIONS, must, replay, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "@heat/engine";
 
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { type Hero, Repository } from "../src/db/repository.js";
@@ -57,7 +57,7 @@ async function camped(unitTypes: readonly UnitType[], holdings: Parameters<typeo
  * the heroes are, so a stand-in party of the same types says what the
  * player's will do.
  */
-function seedFor(jobId: keyof typeof JOBS, unitTypes: readonly UnitType[], ends: (result: AdventureResult) => boolean): string {
+function seedFor(jobId: string, unitTypes: readonly UnitType[], ends: (result: AdventureResult) => boolean): string {
   const standIn: AdventureSnapshot = {
     version,
     jobId,
@@ -90,7 +90,7 @@ describe("the knight at Highcrag", () => {
     expect(await repo.heroes(p)).toEqual([]);
   });
 
-  it("is not recruited at Millbrook, which does not offer it", async () => {
+  it("is not recruited at Millbrook, which does not offer it", () => {
     expect(location(STARTING_LOCATION)?.recruits.map((r) => r.unitType)).not.toContain("knight");
   });
 });
@@ -130,11 +130,11 @@ describe("a caravan from Highcrag to Millbrook", () => {
     const seed = seedFor(back.id, party, (r) => whole(r) && r.delivered === true);
     const started = await startAdventure(repo, p, version, randomUUID(), highcrag.id, back.id, ids(heroes), { cargo: [{ material: "stone", amount: 40 }], staying: [] }, undefined, () => seed);
     expect(started.caravan).toEqual({ destination, cargo: [{ material: "stone", amount: 40 }], staying: [] });
-    expect((await balances(repo, p, highcrag.id)).stone).toBe(0);
+    expect((await balances(repo, p, highcrag.id))["stone"]).toBe(0);
 
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);
     expect(settled.result).toMatchObject({ outcome: "complete", delivered: [{ material: "stone", amount: 40 }] });
-    expect((await balances(repo, p, destination)).stone).toBe((atHome.stone ?? 0) + 40);
+    expect((await balances(repo, p, destination))["stone"]).toBe((atHome["stone"] ?? 0) + 40);
     for (const hero of heroes) expect(await repo.getHero(p, hero.id)).toMatchObject({ location: highcrag.id, status: "ALIVE", adventureId: null });
   });
 });
