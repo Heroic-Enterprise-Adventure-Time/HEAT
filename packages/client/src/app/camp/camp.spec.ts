@@ -388,6 +388,9 @@ describe('Camp', () => {
     expect(within(itemHolding('Jobs', 'link', 'Goblins in the old workings')).getByText('No pay, 6 bonus XP')).toBeInTheDocument();
     // The second level's job is listed with what it needs, as a caravan not unlocked is (Issue-357).
     expect(within(itemHolding('Jobs', 'link', 'The deep seam')).getByText('Needs a level 2 mine.')).toBeInTheDocument();
+    // Greyed out, as every job that cannot be started yet is; the others are not (the owner, 2026-11-26).
+    expect(itemHolding('Jobs', 'link', 'The deep seam')).toHaveClass('locked');
+    expect(itemHolding('Jobs', 'link', 'Ore from the hill')).not.toHaveClass('locked');
     expect(game.built).toEqual([['mine', 1]]);
   });
 
@@ -471,6 +474,8 @@ describe('Camp', () => {
     expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Scout the road to Highcrag', 'Caravan to Highcrag']);
     expect(within(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).getByText('No pay, 8 bonus XP')).toBeInTheDocument();
     expect(within(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).getByText('Needs the road to Highcrag.')).toBeInTheDocument();
+    expect(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).toHaveClass('locked');
+    expect(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).not.toHaveClass('locked');
 
     await user.click(job);
     expect(await panel().findByRole('heading', { name: 'Scout the road to Highcrag', level: 2 })).toBeInTheDocument();

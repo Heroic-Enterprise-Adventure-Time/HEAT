@@ -62,6 +62,16 @@ h3 {
   font-weight: bold;
 }
 
+/*
+ * A job that cannot be started yet is listed greyed out, its name quieter
+ * and its reason in full ink, so the reason stays as readable as a job's pay
+ * (the owner, 2026-11-26, Issue-357).
+ */
+.jobs li.locked .link {
+  color: #4f4433;
+  font-weight: normal;
+}
+
 button {
   font: inherit;
 }

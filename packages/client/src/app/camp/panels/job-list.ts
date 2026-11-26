@@ -13,7 +13,7 @@ import { boardWords, lockedWords } from './job-words';
  * panel, `<panel>/jobs/<id>`. A caravan to a location the player has not
  * unlocked is listed with the reason in place of its pay, not hidden
  * (Issue-355), and so is a job its facility's level does not post yet
- * (Issue-357).
+ * (Issue-357); each is greyed out (the owner, 2026-11-26).
  */
 @Component({
   selector: 'heat-job-list',
