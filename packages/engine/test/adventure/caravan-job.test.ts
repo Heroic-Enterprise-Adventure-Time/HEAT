@@ -44,8 +44,8 @@ describe("Caravan to Highcrag", () => {
     expect(jobsPostedBy(STARTING_LOCATION, "caravan-hub").map((j) => j.id)).toEqual([ROAD, CARAVAN]);
   });
 
-  it("is the one job of the content that delivers", () => {
-    expect(Object.values(JOBS).filter((job) => job.deliversTo !== undefined).map((job) => job.id)).toEqual([CARAVAN]);
+  it("is one of the two jobs of the content that deliver, with Highcrag's route back", () => {
+    expect(Object.values(JOBS).filter((job) => job.deliversTo !== undefined).map((job) => job.id)).toEqual([CARAVAN, "caravan-to-millbrook"]);
   });
 
   it("is two fights, one bandit in each and a wolf on half of them, between travels", () => {

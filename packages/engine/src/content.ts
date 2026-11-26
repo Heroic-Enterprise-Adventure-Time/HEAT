@@ -19,7 +19,7 @@ export const UNIT_TYPES = ["villager", "miner", "lumberjack", "fighter", "knight
 export type UnitType = (typeof UNIT_TYPES)[number];
 
 /** A camp's own facilities: those every camp has and those it may build. */
-export const FACILITY_KINDS = ["heroes-hall", "warehouse", "job-board", "mine", "lumber-camp", "caravan-hub"] as const;
+export const FACILITY_KINDS = ["heroes-hall", "warehouse", "job-board", "mine", "lumber-camp", "caravan-hub", "quarry"] as const;
 export type FacilityKind = (typeof FACILITY_KINDS)[number];
 
 /** A cost in resources: there is no currency (game.md, "Resources"). */
@@ -109,6 +109,14 @@ export const FACILITIES: Readonly<Record<FacilityKind, Facility>> = {
       cost: [{ material: "timber", amount: 100 }, { material: "ore", amount: 60 }, { material: "cloth", amount: 20 }],
       requires: [{ kind: "warehouse", level: 2 }],
     }],
+    art: [0, 1],
+  },
+  // Highcrag's own (Issue-356, decision 0059): its timber is one cartload
+  // from Millbrook, and its ore the crag's.
+  quarry: {
+    name: "Quarry",
+    description: "Sends heroes onto the rock face for stone. Only a miner's hand gets anything out of it.",
+    levels: [{ cost: [{ material: "timber", amount: 60 }, { material: "ore", amount: 40 }], requires: [] }],
     art: [0, 1],
   },
 };
@@ -248,18 +256,21 @@ export const LOCATIONS: readonly Location[] = [
   // start (decision 0059): it recruits no villager, so there is no free hero
   // here, and a camp begins empty until a caravan brings its first. The miner
   // and the fighter cost what they cost at Millbrook; there are no trees, so
-  // the miner's timber comes by caravan. Nothing can be built here but the
-  // hall's and the warehouse's levels until the quarry and its hub (Issue-356).
+  // the miner's timber comes by caravan. A camp may build the quarry, for
+  // stone, and a caravan hub, whose caravans go back to Millbrook (Issue-356).
   {
     id: "highcrag",
     name: "Highcrag",
     unlock: "road-to-highcrag",
     sharedFacilities: ["job-board"],
     ownFacilities: ["heroes-hall", "warehouse"],
-    buildableFacilities: [],
+    buildableFacilities: ["quarry", "caravan-hub"],
     recruits: [
       { unitType: "miner", hallLevel: 1, cost: [{ material: "ore", amount: 30 }, { material: "timber", amount: 20 }] },
       { unitType: "fighter", hallLevel: 1, cost: [{ material: "ore", amount: 40 }] },
+      // Found only here (Issue-356): the first thing that costs hide, which
+      // only Millbrook's wolves and a skinner supply, so it comes by caravan.
+      { unitType: "knight", hallLevel: 1, cost: [{ material: "ore", amount: 50 }, { material: "hide", amount: 4 }] },
     ],
   },
 ];
@@ -383,7 +394,7 @@ export const MONSTER_TYPES = ["wolf", "bandit", "goblin-rock-thrower"] as const;
 export type MonsterType = (typeof MONSTER_TYPES)[number];
 
 /** The resource nodes a gather stage names. */
-export const RESOURCE_TYPES = ["tree", "ore-vein"] as const;
+export const RESOURCE_TYPES = ["tree", "ore-vein", "stone-outcrop"] as const;
 export type ResourceType = (typeof RESOURCE_TYPES)[number];
 
 /** Whether a stage's opponent is a resource node, not a monster: a stage lists both together (decision 0051). */
@@ -537,6 +548,13 @@ export const UNIT_PROFILES: Readonly<Partial<Record<UnitType, CombatProfile>>> =
     stats: { maxHealth: 50, speed: 10, damage: 6, traits: [] },
     actions: ["guard", "strike"],
   },
+  // Highcrag's (Issue-356): a heavier fighter, slower and harder to put down,
+  // with the fighter's list.
+  knight: {
+    homeLine: "front",
+    stats: { maxHealth: 70, speed: 8, damage: 7, traits: [] },
+    actions: ["guard", "strike"],
+  },
   ranger: {
     homeLine: "far",
     stats: { maxHealth: 26, speed: 10, damage: 6, traits: [{ trait: "skinning", level: 1 }] },
@@ -615,6 +633,19 @@ export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>>
       levels: [{ chancePercent: 100, min: 20, max: 24 }, { chancePercent: 100, min: 28, max: 32 }],
     }],
   },
+  // The first drop with no chance at its trait's first level (decision 0059):
+  // a villager's mining 1 brings home no stone, and is not told why.
+  "stone-outcrop": {
+    name: "Stone outcrop",
+    homeLine: "front",
+    health: 40,
+    xp: 3,
+    drops: [{
+      material: "stone",
+      trait: "mining",
+      levels: [{ chancePercent: 0, min: 0, max: 0 }, { chancePercent: 100, min: 20, max: 24 }],
+    }],
+  },
 };
 
 /**
@@ -659,7 +690,10 @@ export type JobId =
   | "lumber-from-the-deep-woods"
   | "scout-the-road-to-highcrag"
   | "caravan-to-highcrag"
-  | "ore-from-the-crag";
+  | "ore-from-the-crag"
+  | "stone-from-the-quarry-face"
+  | "goblins-in-the-quarry"
+  | "caravan-to-millbrook";
 
 /**
  * The jobs, by id, in the order their poster lists them, easiest first
@@ -866,6 +900,64 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     ],
     pay: [],
     bonusXp: 4,
+  },
+  // The quarry's first job (Issue-356): two outcrops or three, and a wolf on
+  // half the runs. Stone needs mining 2, so only a party with a miner brings
+  // any home.
+  "stone-from-the-quarry-face": {
+    id: "stone-from-the-quarry-face",
+    name: "Stone from the quarry face",
+    description: "The quarry face is ready for cutting: two good blocks at least, some days three. It takes a miner's eye to cut stone worth carrying, and wolves come down off the scree.",
+    location: "highcrag",
+    facility: "quarry",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      {
+        kind: "gather",
+        opponents: [{ type: "stone-outcrop", count: { min: 2, max: 3 } }, { type: "wolf", count: 1, chancePercent: 50 }],
+        timeLimitMs: 150_000,
+      },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 9,
+  },
+  // The quarry's second (Issue-356): three outcrops on the front line and a
+  // goblin throwing from behind them, out of melee's reach until they fall,
+  // as in the old workings.
+  "goblins-in-the-quarry": {
+    id: "goblins-in-the-quarry",
+    name: "Goblins in the quarry",
+    description: "A goblin has taken the upper benches and throws rocks at anyone who cuts below it. Three blocks lie ready under it. Do not send a miner alone.",
+    location: "highcrag",
+    facility: "quarry",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "gather", opponents: [{ type: "stone-outcrop", count: 3 }, { type: "goblin-rock-thrower", count: 1 }], timeLimitMs: 150_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 6,
+  },
+  // Highcrag's caravan hub's route back (Issue-356, decision 0059): the road
+  // of "Caravan to Highcrag" the other way, the same two fights with the
+  // cart's health carried between them, no pay, and the same bonus.
+  "caravan-to-millbrook": {
+    id: "caravan-to-millbrook",
+    name: "Caravan to Millbrook",
+    description: "Carry goods down the hill road to Millbrook, and anyone who means to stay there. Bandits still watch the road, and they go for the cart first.",
+    location: "highcrag",
+    facility: "caravan-hub",
+    deliversTo: "millbrook",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
   },
 };
 

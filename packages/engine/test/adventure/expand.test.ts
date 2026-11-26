@@ -65,8 +65,9 @@ describe("A job's stages, expanded from the seed", () => {
 
   it("leave a job with no variance exactly as it is written, on every seed", () => {
     const fixed = Object.values(JOBS).filter((job) => job.stages.every((s) => !("opponents" in s) || s.opponents.every((o) => alwaysAppears(o) && typeof o.count === "number")));
-    // Every job but the first, the lumber camp's and the caravan, today.
-    expect(fixed.map((job) => job.id)).toEqual(Object.keys(JOBS).filter((id) => id !== STICKS && id !== LUMBER && id !== CARAVAN));
+    // Every job but the first, the lumber camp's, both caravans and the quarry face, today.
+    const varying = [STICKS, LUMBER, CARAVAN, "stone-from-the-quarry-face", "caravan-to-millbrook"];
+    expect(fixed.map((job) => job.id)).toEqual(Object.keys(JOBS).filter((id) => !varying.includes(id)));
     for (const job of fixed) {
       for (const seed of seeds.slice(0, 50)) expect(expandStages(job, seed), `${job.id} ${seed}`).toEqual(job.stages);
     }

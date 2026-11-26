@@ -69,7 +69,7 @@ describe("The adventure's content", () => {
     expect(JOBS["timber-from-the-near-woods"].pay).toEqual([{ material: "cloth", amount: 3 }]);
   });
 
-  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), the ore job's 15 for the lumber camp's and for Highcrag's, and the wolves job's 20 for the road's and for the caravan's", () => {
+  it("gives each job its bonus, and with the enemies that always appear the XP it is meant to give: what the first five gave before the enemies had any (decision 0058), the ore job's 15 for the lumber camp's, for Highcrag's and for the quarry face, and the wolves job's 20 for the road's, for both caravans and for the quarry's goblins", () => {
     expect(mapValues(JOBS, (job) => job.bonusXp)).toEqual({
       "pick-up-sticks": 2,
       "timber-from-the-near-woods": 4,
@@ -80,6 +80,9 @@ describe("The adventure's content", () => {
       "scout-the-road-to-highcrag": 8,
       "caravan-to-highcrag": 8,
       "ore-from-the-crag": 4,
+      "stone-from-the-quarry-face": 9,
+      "goblins-in-the-quarry": 6,
+      "caravan-to-millbrook": 8,
     });
     expect(mapValues(JOBS, (job) => enemiesXp(job) + job.bonusXp)).toEqual({
       "pick-up-sticks": 5,
@@ -91,6 +94,9 @@ describe("The adventure's content", () => {
       "scout-the-road-to-highcrag": 20,
       "caravan-to-highcrag": 20,
       "ore-from-the-crag": 15,
+      "stone-from-the-quarry-face": 15,
+      "goblins-in-the-quarry": 20,
+      "caravan-to-millbrook": 20,
     });
   });
 
@@ -99,9 +105,9 @@ describe("The adventure's content", () => {
     expect(enemiesXp(atLargest(sticks)) + sticks.bonusXp).toBe(10);
   });
 
-  it("has three jobs that vary, the first job, the lumber camp's and the caravan: every other job's largest roll is the job as written", () => {
+  it("has five jobs that vary, the first job, the lumber camp's, both caravans and the quarry face: every other job's largest roll is the job as written", () => {
     const varying = Object.values(JOBS).filter((job) => !isEqual(largestStages(job), job.stages));
-    expect(varying.map((job) => job.id)).toEqual(["pick-up-sticks", "lumber-from-the-deep-woods", "caravan-to-highcrag"]);
+    expect(varying.map((job) => job.id)).toEqual(["pick-up-sticks", "lumber-from-the-deep-woods", "caravan-to-highcrag", "stone-from-the-quarry-face", "caravan-to-millbrook"]);
   });
 
   for (const job of Object.values(JOBS)) {

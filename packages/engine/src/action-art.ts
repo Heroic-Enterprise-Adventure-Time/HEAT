@@ -21,6 +21,7 @@ export const WEAPON_SPRITES: Readonly<Partial<Record<UnitType | MonsterType, str
   miner: "pickaxe-01",
   lumberjack: "felling-axe-01",
   fighter: "sword-01",
+  knight: "longsword-01",
   bandit: "dagger-01",
   ranger: "bow-01",
 };

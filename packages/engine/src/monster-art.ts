@@ -17,6 +17,7 @@ export const MONSTER_SPRITE_SETS: Readonly<Record<MonsterType, readonly string[]
 export const PROP_SPRITE_SETS: Readonly<Partial<Record<ResourceType, readonly string[]>>> = {
   tree: ["tree-01"],
   "ore-vein": ["ore-vein-01"],
+  "stone-outcrop": ["stone-outcrop-01"],
 };
 
 /** The cart's, a prop like a resource node and not one (decision 0059). */

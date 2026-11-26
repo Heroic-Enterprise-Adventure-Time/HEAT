@@ -64,9 +64,9 @@ describe("Scout the road to Highcrag", () => {
     expect(isEqual(largestStages(road), road.stages)).toBe(true);
   });
 
-  it("is the bandit's first job: no other job sets one against a party but the caravan the hub posts after it", () => {
+  it("is the bandit's first job: no other job sets one against a party but the caravans the hubs post after it", () => {
     const withBandits = Object.values(JOBS).filter((job) => job.stages.some((s) => (s.kind === "fight" || s.kind === "gather") && s.opponents.some((o) => o.type === "bandit")));
-    expect(withBandits.map((job) => job.id)).toEqual([ROAD, CARAVAN]);
+    expect(withBandits.map((job) => job.id)).toEqual([ROAD, CARAVAN, "caravan-to-millbrook"]);
   });
 
   it("has no pay, and a bonus that brings its XP to the wolves job's 20", () => {

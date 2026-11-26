@@ -88,15 +88,35 @@ describe("static content", () => {
     }
   });
 
-  it("has Highcrag behind the road's unlock, with the shared job board, nothing to build, and the miner and the fighter at Millbrook's costs", () => {
+  it("has Highcrag behind the road's unlock, with the shared job board, the quarry and a caravan hub to build, and the miner and the fighter at Millbrook's costs", () => {
     const highcrag = must(location("highcrag"), "Highcrag");
     const millbrook = must(location(STARTING_LOCATION), "the starting location");
     expect(highcrag.name).toBe("Highcrag");
     expect(highcrag.unlock).toBe("road-to-highcrag");
     expect(highcrag.sharedFacilities).toEqual(["job-board"]);
-    expect(highcrag.buildableFacilities).toEqual([]);
-    expect(highcrag.recruits.map((r) => r.unitType)).toEqual(["miner", "fighter"]);
-    for (const recruit of highcrag.recruits) expect(recruit).toEqual(millbrook.recruits.find((r) => r.unitType === recruit.unitType));
+    expect(highcrag.buildableFacilities).toEqual(["quarry", "caravan-hub"]);
+    expect(highcrag.recruits.map((r) => r.unitType)).toEqual(["miner", "fighter", "knight"]);
+    for (const recruit of highcrag.recruits.filter((r) => r.unitType !== "knight")) {
+      expect(recruit).toEqual(millbrook.recruits.find((r) => r.unitType === recruit.unitType));
+    }
+  });
+
+  it("recruits the knight at Highcrag alone, at hall level 1, for ore and hide: the first thing that costs hide", () => {
+    for (const l of LOCATIONS.filter((l) => l.id !== "highcrag")) expect(l.recruits.map((r) => r.unitType), l.id).not.toContain("knight");
+    const knight = must(location("highcrag")?.recruits.find((r) => r.unitType === "knight"), "Highcrag's knight");
+    expect(knight.hallLevel).toBe(1);
+    expect(knight.cost).toEqual([{ material: "ore", amount: 50 }, { material: "hide", amount: 4 }]);
+    const costsHide = (cost: readonly { material: string }[]) => cost.some((c) => c.material === "hide");
+    const others = [
+      ...LOCATIONS.flatMap((l) => l.recruits.filter((r) => r !== knight).map((r) => r.cost)),
+      ...Object.values(FACILITIES).flatMap((f) => f.levels.map((level) => level.cost)),
+    ];
+    expect(others.filter(costsHide)).toEqual([]);
+  });
+
+  it("lets a camp build the quarry for 60 timber and 40 ore, one level, with nothing first, at Highcrag alone", () => {
+    expect(FACILITIES.quarry.levels).toEqual([{ cost: [{ material: "timber", amount: 60 }, { material: "ore", amount: 40 }], requires: [] }]);
+    expect(LOCATIONS.filter((l) => l.buildableFacilities.includes("quarry")).map((l) => l.id)).toEqual(["highcrag"]);
   });
 
   it("has no free hero at Highcrag: every recruit there costs its cost with no hero alive", () => {

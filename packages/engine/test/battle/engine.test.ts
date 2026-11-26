@@ -134,7 +134,7 @@ describe("CombatEngine", () => {
 
   it("refuses a setup it cannot run", () => {
     expect(() => new CombatEngine(setup([hero("k", "fighter")], [opponent("x", "dragon" as "wolf")]))).toThrow();
-    expect(() => new CombatEngine(setup([{ ...hero("k", "fighter"), unitType: "knight" }], [opponent("w", "wolf")]))).toThrow();
+    expect(() => new CombatEngine(setup([{ ...hero("k", "fighter"), unitType: "wizard" }], [opponent("w", "wolf")]))).toThrow();
     expect(() => new CombatEngine(setup([hero("a", "fighter")], [opponent("a", "wolf")]))).toThrow();
     expect(() => new CombatEngine(setup([{ ...hero("f", "fighter"), health: 0 }], [opponent("w", "wolf")]))).toThrow();
     expect(() => new CombatEngine(setup([], [opponent("w", "wolf")]))).toThrow();
