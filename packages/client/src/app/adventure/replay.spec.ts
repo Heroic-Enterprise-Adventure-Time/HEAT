@@ -44,6 +44,8 @@ function settled(timeline: ReplayedView['timeline'] = played.timeline): Replayed
       rewards: [],
       credited: [],
       lost: [],
+      delivered: [],
+      deliveryLost: [],
       heroes: [
         { heroId: 'x1', xpGained: 15, xp: 40, level: 3, dead: false },
         { heroId: 'x2', xpGained: 0, xp: 0, level: 1, dead: true },

@@ -1,4 +1,4 @@
-import { type FacilityKind, type Job, jobsPostedBy } from '@heat/engine';
+import { type FacilityKind, type Job, jobsPostedBy, location, UNLOCKS } from '@heat/engine';
 
 /**
  * A job in the player's words. The page tells a job by its description, its
@@ -8,19 +8,28 @@ import { type FacilityKind, type Job, jobsPostedBy } from '@heat/engine';
  * Issue-339, on the stages).
  */
 
-/**
- * The jobs a poster at a location lists, the job board or a facility, in the
- * content's order (Issue-133), but for a job that delivers: a caravan's page
- * picks its cargo and who stays, and until that page is built (Issue-355) the
- * page lists no caravan, rather than one whose Depart could send neither
- * (the review of PR-371, Issue-354).
- */
-export function jobsAt(location: string, poster: FacilityKind): Job[] {
-  return jobsPostedBy(location, poster).filter((job) => job.deliversTo === undefined);
+/** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133), a caravan among them (Issue-355). */
+export function jobsAt(at: string, poster: FacilityKind): Job[] {
+  return jobsPostedBy(at, poster);
 }
 
-export function jobAt(location: string, poster: FacilityKind, id: string | null | undefined): Job | undefined {
-  return jobsAt(location, poster).find((job) => job.id === id);
+export function jobAt(at: string, poster: FacilityKind, id: string | null | undefined): Job | undefined {
+  return jobsAt(at, poster).find((job) => job.id === id);
+}
+
+/**
+ * Why a job cannot be started yet, where the reason is the player's to fix
+ * and not hidden: a caravan to a location the player has no camp at, which
+ * needs that location's unlock (decision 0059). The words name the unlock
+ * and not what grants it, since a job's description chooses whether to say
+ * what it grants (game.md, "Unlocks"). Null for a job that can be started.
+ */
+export function lockedWords(job: Job, campsAt: readonly string[]): string | null {
+  if (job.deliversTo === undefined || campsAt.includes(job.deliversTo)) return null;
+  const unlock = location(job.deliversTo)?.unlock;
+  if (!unlock) return null;
+  const name = UNLOCKS[unlock].name;
+  return `Needs ${name.charAt(0).toLowerCase()}${name.slice(1)}.`;
 }
 
 /** What a job says in place of its pay when whoever posted it pays nothing. */
@@ -49,8 +58,11 @@ export function bonusWords(job: Job): string {
 /**
  * What a retreat keeps, the one rule for every job (decision 0058): what
  * dropped and the XP of what the party put down, and neither the pay nor the
- * bonus. The pay is named only where the job has some.
+ * bonus. The pay is named only where the job has some, and a caravan's
+ * cargo, which a retreat abandons (decision 0059), where the job delivers.
  */
 export function retreatWords(job: Job): string {
-  return `A retreat keeps what dropped and the XP earned, and loses ${job.pay.length > 0 ? 'the pay and the bonus' : 'the bonus'}.`;
+  const lost = [...(job.pay.length > 0 ? ['the pay'] : []), 'the bonus', ...(job.deliversTo === undefined ? [] : ['the cargo'])];
+  const words = lost.length === 1 ? lost[0] : `${lost.slice(0, -1).join(', ')} and ${lost.at(-1)}`;
+  return `A retreat keeps what dropped and the XP earned, and loses ${words}.`;
 }

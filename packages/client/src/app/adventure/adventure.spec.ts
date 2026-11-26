@@ -23,6 +23,7 @@ const adventure: AdventureView = {
   location: 'millbrook',
   seed: 'seed-1',
   version: 'v1',
+  caravan: null,
   job: { id: 'timber-from-the-near-woods', name: 'Timber from the near woods', description: 'Fell what you can carry.' },
   snapshot: {
     version: 'v1',
@@ -54,6 +55,8 @@ const result: AdventureResultView = {
     { material: 'timber', amount: 10 },
     { material: 'cloth', amount: 0 },
   ],
+  delivered: [],
+  deliveryLost: [],
   heroes: [
     { heroId: 'h1', xpGained: 15, xp: 15, level: 2, dead: false },
     { heroId: 'h2', xpGained: 0, xp: 0, level: 1, dead: true },
@@ -434,6 +437,31 @@ describe('Adventure', () => {
     await user.click(button('Back to Millbrook'));
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
     expect(game.settled()).toBeNull();
+  });
+
+  it('says what a caravan delivered, what the cap lost and who stayed (Issue-355)', async () => {
+    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 40 }], staying: ['h2'] };
+    const delivered = { ...result, delivered: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 30 }], deliveryLost: [{ material: 'timber', amount: 0 }, { material: 'ore', amount: 10 }] };
+    const { run } = await renderAdventure(fakeGame(() => delivered, { ...adventure, caravan }));
+    await run(120_000);
+    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    expect(textsOf(listItems('Caravan'))).toEqual(['Delivered to Highcrag: 60 timber and 30 ore.', "10 ore lost: Highcrag's warehouse was full.", 'Stayed at Highcrag: Wren.']);
+  });
+
+  it("says a discarded caravan's cargo went back to the camp it left", async () => {
+    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: ['h2'] };
+    const { run } = await renderAdventure(fakeGame(() => null, { ...adventure, caravan }));
+    await run(120_000);
+    expect(await screen.findByText(/lost to a game update/)).toBeInTheDocument();
+    expect(screen.getByText("The cargo went back to Millbrook's warehouse.")).toBeInTheDocument();
+    expect(screen.getByText('Nobody stayed at Highcrag: the caravan did not arrive.')).toBeInTheDocument();
+  });
+
+  it('says nothing of a caravan for a job that delivers nothing', async () => {
+    const { run } = await renderAdventure(fakeGame());
+    await run(120_000);
+    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Caravan' })).not.toBeInTheDocument();
   });
 
   it("tells the player an unlock the run earned that they did not hold, in the content's words, under how it ended (Issue-352)", async () => {

@@ -1,11 +1,12 @@
 import { JOBS } from '@heat/engine';
 
-import { boardWords, bonusWords, jobAt, jobsAt, payWords, retreatWords, rewardWords } from './job-words';
+import { boardWords, bonusWords, jobAt, jobsAt, lockedWords, payWords, retreatWords, rewardWords } from './job-words';
 
 const sticks = JOBS['pick-up-sticks'];
 const wolves = JOBS['wolves-on-the-mill-road'];
 const timber = JOBS['timber-from-the-near-woods'];
 const ore = JOBS['ore-from-the-hill'];
+const caravan = JOBS['caravan-to-highcrag'];
 
 describe('job words', () => {
   it("lists a poster's jobs and finds one only where it is posted", () => {
@@ -16,6 +17,17 @@ describe('job words', () => {
     expect(jobAt('millbrook', 'mine', 'ore-from-the-hill')).toBe(ore);
     expect(jobAt('elsewhere', 'job-board', 'timber-from-the-near-woods')).toBeUndefined();
     expect(jobAt('millbrook', 'job-board', 'nothing')).toBeUndefined();
+  });
+
+  it("lists the caravan hub's caravan beside its road job, now that its page picks a cargo and who stays (Issue-355)", () => {
+    expect(jobsAt('millbrook', 'caravan-hub').map((j) => j.id)).toEqual(['scout-the-road-to-highcrag', 'caravan-to-highcrag']);
+    expect(jobAt('millbrook', 'caravan-hub', 'caravan-to-highcrag')).toBe(caravan);
+  });
+
+  it('says what a caravan to a location the player has no camp at needs, by the unlock and not by what grants it, and nothing otherwise', () => {
+    expect(lockedWords(caravan, ['millbrook'])).toBe('Needs the road to Highcrag.');
+    expect(lockedWords(caravan, ['millbrook', 'highcrag'])).toBeNull();
+    expect(lockedWords(wolves, ['millbrook'])).toBeNull();
   });
 
   it("says a job's pay, each resource of it, or that it pays nothing", () => {
@@ -40,5 +52,7 @@ describe('job words', () => {
   it('says the one retreat rule, naming the pay only where the job has some', () => {
     expect(retreatWords(wolves)).toBe('A retreat keeps what dropped and the XP earned, and loses the pay and the bonus.');
     expect(retreatWords(sticks)).toBe('A retreat keeps what dropped and the XP earned, and loses the bonus.');
+    expect(retreatWords(caravan)).toBe('A retreat keeps what dropped and the XP earned, and loses the bonus and the cargo.');
+    expect(retreatWords({ ...caravan, pay: [{ material: 'cloth', amount: 1 }] })).toBe('A retreat keeps what dropped and the XP earned, and loses the pay, the bonus and the cargo.');
   });
 });

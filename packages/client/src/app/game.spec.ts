@@ -28,6 +28,7 @@ const wireAmounts = (typename: string, amounts: readonly { material: string; amo
 const wireAdventure = (a: AdventureView) => ({
   __typename: 'Adventure',
   ...a,
+  caravan: a.caravan && { __typename: 'Caravan', ...a.caravan, cargo: wireAmounts('Reward', a.caravan.cargo) },
   job: { __typename: 'Job', ...a.job },
   snapshot: {
     __typename: 'Snapshot',
@@ -56,6 +57,8 @@ const wireResult = (r: AdventureResultView) => ({
   rewards: wireAmounts('Reward', r.rewards),
   credited: wireAmounts('Reward', r.credited),
   lost: wireAmounts('Reward', r.lost),
+  delivered: wireAmounts('Reward', r.delivered),
+  deliveryLost: wireAmounts('Reward', r.deliveryLost),
 });
 
 const villager: HeroView = {
@@ -138,7 +141,14 @@ function fakeHub(start: PlayerView) {
     }
     if (op === 'StartAdventure') {
       if (player.openAdventure) return { startAdventure: { __typename: 'AdventureOpen', message: 'an adventure is already open', adventureId: player.openAdventure.id } };
-      const { requestId, location, jobId, heroIds } = variables['input'] as { requestId: string; location: string; jobId: string; heroIds: string[] };
+      const { requestId, location, jobId, heroIds, cargo, staying } = variables['input'] as {
+        requestId: string;
+        location: string;
+        jobId: string;
+        heroIds: string[];
+        cargo: { material: string; amount: number }[];
+        staying: string[];
+      };
       const heroes = player.heroes.filter((h) => heroIds.includes(h.id));
       const adventure: AdventureView = {
         id: requestId,
@@ -146,6 +156,8 @@ function fakeHub(start: PlayerView) {
         location,
         seed: 's1',
         version: 'v1',
+        // The one job that delivers, as the hub answers its caravan; any other job has none.
+        caravan: jobId === 'caravan-to-highcrag' ? { destination: 'highcrag', cargo: cargo.map((c) => ({ ...c, material: c.material.toLowerCase() })), staying } : null,
         job: { id: jobId, name: 'Wolves on the mill road', description: 'Two wolves.' },
         snapshot: {
           version: 'v1',
@@ -369,12 +381,26 @@ describe('Game', () => {
 
     const adventure = must(await run(game.startAdventure('millbrook', 'wolves-on-the-mill-road', [villager.id])), 'the adventure');
     const sent = hub.calls.find((c) => c.op === 'StartAdventure')?.variables['input'] as { requestId: string };
-    expect(sent).toEqual({ requestId: expect.any(String) as string, location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: [villager.id] });
+    expect(sent).toEqual({ requestId: expect.any(String) as string, location: 'millbrook', jobId: 'wolves-on-the-mill-road', heroIds: [villager.id], cargo: [], staying: [] });
     // The client names the request, and the hub makes it the adventure's id.
     expect(sent.requestId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
     expect(adventure.id).toBe(sent.requestId);
     expect(adventure.snapshot.heroes.map((h) => h.name)).toEqual(['Wren']);
     expect(game.adventure()?.job.name).toBe('Wolves on the mill road');
+  });
+
+  it('starts a caravan with its cargo on the wire and who stays, and knows who is on the way to the destination (Issue-355)', async () => {
+    const { hub, game, run } = setup(playerWith([villager]));
+    await run();
+    await run(game.startAdventure('millbrook', 'caravan-to-highcrag', [villager.id], { cargo: [{ material: 'timber', amount: 60 }], staying: [villager.id] }));
+    const sent = hub.calls.find((c) => c.op === 'StartAdventure')?.variables['input'] as Record<string, unknown>;
+    expect(sent['cargo']).toEqual([{ material: 'TIMBER', amount: 60 }]);
+    expect(sent['staying']).toEqual([villager.id]);
+    expect(game.adventure()?.caravan).toMatchObject({ destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: [villager.id] });
+    // The hero holds a slot at Highcrag, and is on the way there, not to the camp it left.
+    expect(game.onTheWay()).toEqual([]);
+    game.location.set('highcrag');
+    expect(game.onTheWay().map((h) => h.id)).toEqual([villager.id]);
   });
 
   it("throws a start's refusal, named by its type, and reads the player again", async () => {
@@ -434,6 +460,7 @@ const open: AdventureView = {
   location: 'millbrook',
   seed: 's1',
   version: 'v1',
+  caravan: null,
   job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves.' },
   snapshot: { version: 'v1', jobId: 'wolves-on-the-mill-road', heroes: [] },
 };
@@ -444,6 +471,8 @@ const settledResult: AdventureResultView = {
   rewards: [{ material: 'cloth', amount: 10 }],
   credited: [{ material: 'cloth', amount: 10 }],
   lost: [],
+  delivered: [],
+  deliveryLost: [],
   heroes: [{ heroId: 'h1', xpGained: 20, xp: 20, level: 2, dead: false }],
 };
 

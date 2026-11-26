@@ -28,6 +28,7 @@ h3 {
 
 .jobs,
 .party,
+.cargo,
 .recruits,
 .replays {
   list-style: none;
@@ -37,6 +38,7 @@ h3 {
 
 .jobs li,
 .party li,
+.cargo li,
 .recruits li,
 .replays li {
   display: flex;
@@ -130,4 +132,15 @@ dd {
 .replay-party {
   flex-basis: 100%;
   font-size: var(--text-sm);
+}
+
+.cargo li {
+  align-items: baseline;
+  margin-bottom: var(--space-sm);
+}
+
+/* An amount of a few digits, beside what the camp holds and the destination's room. */
+.cargo input {
+  width: 5em;
+  font: inherit;
 }

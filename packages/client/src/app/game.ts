@@ -16,6 +16,7 @@ import {
   GATHERING_TRAITS,
   hallCapacity,
   location,
+  type Material,
   MATERIALS,
   must,
   nextLevel,
@@ -179,6 +180,7 @@ const stageEnding = engineValues(STAGE_ENDINGS);
 const unlock = engineValues(UNLOCK_IDS);
 const wireUnitType = wireNames(UNIT_TYPES);
 const wireFacilityKind = wireNames(FACILITY_KINDS);
+const wireMaterial = wireNames(MATERIALS);
 const materials = <T extends { readonly material: string }>(items: readonly T[]) => items.map((item) => ({ ...item, material: material(item.material) }));
 
 function heroFromWire(hero: HeroFieldsFragment): HeroView {
@@ -200,6 +202,7 @@ function campFromWire(camp: CampFieldsFragment): CampView {
 function adventureFromWire(adventure: AdventureFieldsFragment): AdventureView {
   return {
     ...adventure,
+    caravan: adventure.caravan ? { ...adventure.caravan, cargo: materials(adventure.caravan.cargo) } : null,
     snapshot: {
       ...adventure.snapshot,
       heroes: adventure.snapshot.heroes.map((h) => ({ ...h, unitType: unitType(h.unitType), stats: { ...h.stats, traits: h.stats.traits.map((t) => ({ ...t, trait: gatheringTrait(t.trait) })) } })),
@@ -215,6 +218,8 @@ function resultFromWire(result: ResultFieldsFragment): AdventureResultView {
     rewards: materials(result.rewards),
     credited: materials(result.credited),
     lost: materials(result.lost),
+    delivered: materials(result.delivered),
+    deliveryLost: materials(result.deliveryLost),
   };
 }
 
@@ -276,6 +281,12 @@ interface Loaded {
   readonly data: MeQuery | undefined;
   readonly loading: boolean;
   readonly error: unknown;
+}
+
+/** What a caravan's start sends beside its party: what it carries, each resource once, and the heroes of the party who stay at the destination. */
+export interface CaravanStart {
+  readonly cargo: readonly { readonly material: Material; readonly amount: number }[];
+  readonly staying: readonly string[];
 }
 
 /** A unit type the hall recruits, its price to the camp, and why it cannot be had now, or null when it can. */
@@ -388,6 +399,19 @@ export class Game {
   readonly livingHere = computed(() => this.heroesHere().filter((h) => h.status === 'ALIVE'));
   /** The player's one open adventure, or null. */
   readonly adventure = computed(() => this.player()?.openAdventure ?? null);
+  /**
+   * The heroes on their way to the camp on screen, those of the open
+   * caravan who stay there: each holds a slot in its hall from the start
+   * until the caravan ends (game.md, "The heroes hall"), so the hall's count
+   * includes them while its roster, which lists the heroes at the camp, does
+   * not.
+   */
+  readonly onTheWay = computed(() => {
+    const caravan = this.adventure()?.caravan;
+    if (caravan?.destination !== this.location()) return [];
+    const staying = new Set(caravan.staying);
+    return (this.player()?.heroes ?? []).filter((h) => staying.has(h.id));
+  });
   /** The adventure just ended, while its result is on screen; the page does not reload under it (`Updates`). */
   readonly settled = signal<SettledView | null>(null);
   /** The camp's retired heroes, who stay on the record (game.md, "The heroes hall"). */
@@ -508,16 +532,25 @@ export class Game {
   }
 
   /**
-   * Starts a job from the location's job board with a party of the player's
-   * heroes there. Answers the open adventure, or throws the hub's refusal,
-   * a `Refusal` named by its type, for the job board to show in place. The
-   * player is read again either way, since a refusal such as
-   * `AdventureOpen` means the view was stale.
+   * Starts a job the location posts with a party of the player's heroes
+   * there, and for a caravan its cargo and who of the party stays at the
+   * destination (decision 0059); a job that delivers nothing sends neither.
+   * Answers the open adventure, or throws the hub's refusal, a `Refusal`
+   * named by its type, for the job's page to show in place. The player is
+   * read again either way, since a refusal such as `AdventureOpen` means the
+   * view was stale.
    */
-  async startAdventure(location: string, jobId: string, heroIds: readonly string[]): Promise<AdventureView> {
+  async startAdventure(location: string, jobId: string, heroIds: readonly string[], caravan?: CaravanStart): Promise<AdventureView> {
     try {
       // One request id per start, which becomes the adventure's id: a repeat of this request answers the adventure it started.
-      const input = { requestId: crypto.randomUUID(), location, jobId, heroIds };
+      const input = {
+        requestId: crypto.randomUUID(),
+        location,
+        jobId,
+        heroIds,
+        cargo: (caravan?.cargo ?? []).map((c) => ({ material: wireMaterial(c.material), amount: c.amount })),
+        staying: caravan?.staying ?? [],
+      };
       const data = await this.mutate(StartAdventureDocument, { input });
       return adventureFromWire(answered(must(data.startAdventure, 'startAdventure'), 'StartAdventureSuccess').adventure);
     } finally {

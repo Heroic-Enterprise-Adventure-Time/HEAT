@@ -75,6 +75,7 @@ function fakeGame(heroes: HeroView[], answer: (heroIds: readonly string[]) => Ad
     livingHere: computed(() => here().filter((h) => h.status === 'ALIVE')),
     seenHere: signal([]),
     retiredHere: computed(() => all().filter((h) => h.status === 'RETIRED')),
+    onTheWay: signal<readonly HeroView[]>([]),
     camp: signal({
       location: 'millbrook',
       name: 'Millbrook',
@@ -128,6 +129,7 @@ function adventureOf(heroIds: readonly string[]): AdventureView {
     location: 'millbrook',
     seed: 's1',
     version: 'v1',
+    caravan: null,
     job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves have been at the carts.' },
     snapshot: {
       version: 'v1',

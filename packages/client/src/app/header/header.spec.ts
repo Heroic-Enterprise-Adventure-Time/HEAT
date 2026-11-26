@@ -24,6 +24,7 @@ const player: PlayerView = {
     location: 'millbrook',
     seed: 's1',
     version: 'v1',
+    caravan: null,
     job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road', description: 'Two wolves.' },
     snapshot: {
       version: 'v1',
