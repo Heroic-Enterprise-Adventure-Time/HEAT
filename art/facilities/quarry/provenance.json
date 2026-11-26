@@ -14,35 +14,6 @@
     "rights": "Owned by the creator; commercial use for any purpose except training other models (terms 1.2, 3.3). No indemnity."
   },
   "levels": {
-    "1": {
-      "file": "level-1.png",
-      "canvas": [
-        48,
-        48
-      ],
-      "pixellab": {
-        "mapObjectId": "b76d3063-8fa6-403e-a2d3-5bcfa650a9e0",
-        "tags": [
-          "heat",
-          "facility",
-          "quarry"
-        ]
-      },
-      "tool": "create_map_object",
-      "via": "MCP",
-      "createdAt": "2026-11-26",
-      "parameters": {
-        "description": "small stone quarry: a grey rock outcrop with a squared cut opening and stepped ledges in its front face, cut pale stone blocks stacked beside it, a wooden plank ramp, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
-        "width": 48,
-        "height": 48,
-        "view": "low top-down",
-        "outline": "single color outline",
-        "shading": "flat shading",
-        "detail": "low detail",
-        "background_image": null
-      },
-      "generations": 1
-    },
     "0": {
       "file": "level-0.png",
       "canvas": [
@@ -71,27 +42,117 @@
         "background_image": null
       },
       "generations": 1
+    },
+    "1": {
+      "file": "level-1.png",
+      "canvas": [
+        48,
+        48
+      ],
+      "pixellab": {
+        "mapObjectId": "b76d3063-8fa6-403e-a2d3-5bcfa650a9e0",
+        "tags": [
+          "heat",
+          "facility",
+          "quarry"
+        ]
+      },
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-11-26",
+      "parameters": {
+        "description": "small stone quarry: a grey rock outcrop with a squared cut opening and stepped ledges in its front face, cut pale stone blocks stacked beside it, a wooden plank ramp, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1
     }
   },
   "rejectedTags": "Every rejected map object below is tagged heat, facility, quarry and rejected in PixelLab.",
   "rejected": [
     {
       "mapObjectId": "3ae507f3-8e6f-437a-9c9b-88a448b0c9d4",
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-11-26",
+      "parameters": {
+        "description": "small open stone quarry cut into a grey rock face, stepped ledges of cut pale stone, a wooden lifting crane with a rope, a few squared stone blocks stacked in front, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1,
       "why": "Level 1, the first description (an open quarry with a lifting crane): loose timbers with no rock, not a building."
     },
     {
       "mapObjectId": "3f37b93d-e07a-4214-8fd8-8a6ed1cfa630",
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-11-26",
+      "parameters": {
+        "description": "small open stone quarry cut into a grey rock face, stepped ledges of cut pale stone, a wooden lifting crane with a rope, a few squared stone blocks stacked in front, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1,
       "why": "Level 1, the first description: a stone arch over a dark cut, which reads as a mine's entrance beside Millbrook's mine."
     },
     {
       "mapObjectId": "2b08eb05-4ef1-490f-a347-e41822648bdd",
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-11-26",
+      "parameters": {
+        "description": "small open stone quarry cut into a grey rock face, stepped ledges of cut pale stone, a wooden lifting crane with a rope, a few squared stone blocks stacked in front, seen at a slight angle so its side wall shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 64,
+        "height": 64,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1,
       "why": "Level 1, the first description on a 64×64 canvas: a stepped pit, the largest piece on the map, with no level 0 drawn at its size."
     },
     {
       "mapObjectId": "ea121f1c-0d8f-4a42-9de0-96cc40db4ee0",
+      "tool": "create_map_object",
+      "via": "MCP",
+      "createdAt": "2026-11-26",
+      "parameters": {
+        "description": "grey rock outcrop marked for quarrying, uncut, with wooden survey stakes and a string line in front of it and a pickaxe leaning against it, seen at a slight angle so its side shows, three-quarter view, no ground patch, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+        "width": 48,
+        "height": 48,
+        "view": "low top-down",
+        "outline": "single color outline",
+        "shading": "flat shading",
+        "detail": "low detail",
+        "background_image": null
+      },
+      "generations": 1,
       "why": "Level 0, a second description (an outcrop marked for quarrying): a lone pale slab, unlike the rock of the level 1 kept."
     }
   ],
   "chosenBy": "The owner's picks, 2026-11-26 (Issue-356), from a mock-up of the 400×225 Highcrag at 3× with each candidate on the quarry's site (art/mockups/highcrag-quarry-400x225-3x.png shows the level 1 kept), taking the agent's recommendation of level 1 d and level 0 a, the two drawn on the same grey rock.",
-  "verified": "Each level-<n>.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-11-26."
+  "verified": "Each level-<n>.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-11-26.",
+  "generations": {
+    "kept": 2,
+    "rejected": 4,
+    "total": 6
+  }
 }
