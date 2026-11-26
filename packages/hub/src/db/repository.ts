@@ -443,20 +443,62 @@ function toAdventure(i: Stored<"adventure">): AdventureRecord {
 type TransactionItems = Parameters<Parameters<HeatService["transaction"]["write"]>[0]>[0];
 
 /**
- * The condition check that the player holds the unlock the location needs,
- * or none where the location needs none (decision 0059). Written once, for
+ * The condition checks that the player holds the unlocks the locations need,
+ * none where they need none (decision 0059). Written once, for
  * every transaction that takes a location (graphql.md, rule 28): one that
  * checked differently would be a location open by one verb.
  */
-function unlockHeld(items: TransactionItems, playerId: string, location: string) {
-  const unlock = locationOf(location)?.unlock;
-  if (unlock === undefined) return [];
-  return [
+function unlockHeld(items: TransactionItems, playerId: string, ...locations: string[]) {
+  // One check for each unlock: a transaction may name an item only once, and two locations may need the same one.
+  const unlocks = new Set(locations.map((location) => locationOf(location)?.unlock).filter((unlock) => unlock !== undefined));
+  return [...unlocks].map((unlock) =>
     items.unlock
       .check({ playerId, unlock })
       .where((a, op) => op.exists(a.earnedAt))
       .commit(),
-  ];
+  );
+}
+
+/**
+ * The capped credits of one camp's holdings, each on the condition that the
+ * balance is the one read, with the adventure's ledger entry
+ * `<entry>#<material>` saying the credit and what the cap lost: settlement's
+ * credits at the origin, a caravan's deliveries at the destination and a
+ * discard's returns (decisions 0030 and 0059). Written once for the three
+ * (graphql.md, rule 28). A credit of nothing writes the entry alone.
+ */
+function cappedCredits(
+  items: TransactionItems,
+  on: ReturnType<typeof failing>,
+  playerId: string,
+  adventureId: string,
+  location: string,
+  entry: "credit" | "deliver" | "return",
+  credits: readonly CappedCredit[],
+) {
+  return credits.flatMap(({ material, read, credit, lost }) => [
+    ...(credit > 0
+      ? [
+          on(
+            CampChanged,
+            items.holding
+              .update({ playerId, location, material })
+              .set({ balance: (read ?? 0) + credit })
+              .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
+              .commit(),
+          ),
+        ]
+      : []),
+    on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `${entry}#${material}`, location, material, delta: credit, lost }).commit()),
+  ]);
+}
+
+/** The check that a camp's warehouse is at the level read, which every capped credit depends on; a camp with no item has no warehouse attribute. */
+function warehouseHeld(items: TransactionItems, playerId: string, location: string, stored: boolean, warehouseLevel: number) {
+  return items.camp
+    .check({ playerId, location })
+    .where((a, op) => (stored ? op.eq(a.warehouseLevel, warehouseLevel) : op.notExists(a.warehouseLevel)))
+    .commit();
 }
 
 /**
@@ -665,7 +707,7 @@ export class Repository {
               .commit(),
           ),
         ),
-        ...unlockHeld(items, playerId, location).map((check) => on(LocationLocked, check)),
+        ...unlockHeld(items, playerId, location, ...(caravan ? [caravan.caravan.destination] : [])).map((check) => on(LocationLocked, check)),
         ...(caravan ? this.caravanStartWrites(items, on, playerId, adventureId, location, caravan) : []),
       ])
       .go();
@@ -679,8 +721,8 @@ export class Repository {
    * that the balance covers it, with a ledger entry `load` that can exist
    * once; the destination camp's count of active heroes raised by the heroes
    * marked to stay, on the condition that the hall is at the level read and
-   * its cap covers them, which is the slot held there; and the destination's
-   * unlock, which the caravan needs as any verb that names a location does.
+   * its cap covers them, which is the slot held there. The destination's
+   * unlock is checked beside the origin's, in the start's own list.
    */
   private caravanStartWrites(
     items: TransactionItems,
@@ -725,7 +767,6 @@ export class Repository {
             ),
           ]
         : []),
-      ...unlockHeld(items, playerId, location).map((check) => on(LocationLocked, check)),
     ];
   }
 
@@ -874,21 +915,7 @@ export class Repository {
           on(HeroChanged, items.sighting.delete({ location: hero.location, heroId: hero.id }).commit()),
         ]),
         ...(s.caravan ? this.caravanSettleWrites(items, on, playerId, adventureId, s.caravan, landsAlive) : []),
-        ...s.holdings.flatMap(({ material, read, credit, lost }) => [
-          ...(credit > 0
-            ? [
-                on(
-                  CampChanged,
-                  items.holding
-                    .update({ playerId, location, material })
-                    .set({ balance: (read ?? 0) + credit })
-                    .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
-                    .commit(),
-                ),
-              ]
-            : []),
-          on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `credit#${material}`, location, material, delta: credit, lost }).commit()),
-        ]),
+        ...cappedCredits(items, on, playerId, adventureId, location, "credit", s.holdings),
         on(AdventureClosed, items.recent.put(recentOf(s, now)).commit()),
         ...s.result.unlocks.map((unlock) =>
           on(
@@ -945,32 +972,10 @@ export class Repository {
           .where((a, op) => (delivering ? `${op.eq(a.warehouseLevel, c.warehouseLevel)} AND ${op.exists(a.activeHeroes)}` : op.exists(a.activeHeroes)))
           .commit();
       }
-      if (delivering) {
-        return items.camp
-          .check({ playerId, location })
-          .where((a, op) => (c.stored ? op.eq(a.warehouseLevel, c.warehouseLevel) : op.notExists(a.warehouseLevel)))
-          .commit();
-      }
+      if (delivering) return warehouseHeld(items, playerId, location, c.stored, c.warehouseLevel);
       return undefined;
     })();
-    return [
-      ...(camp ? [on(CampChanged, camp)] : []),
-      ...c.deliveries.flatMap(({ material, read, credit, lost }) => [
-        ...(credit > 0
-          ? [
-              on(
-                CampChanged,
-                items.holding
-                  .update({ playerId, location, material })
-                  .set({ balance: (read ?? 0) + credit })
-                  .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
-                  .commit(),
-              ),
-            ]
-          : []),
-        on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `deliver#${material}`, location, material, delta: credit, lost }).commit()),
-      ]),
-    ];
+    return [...(camp ? [on(CampChanged, camp)] : []), ...cappedCredits(items, on, playerId, adventureId, location, "deliver", c.deliveries)];
   }
 
   /**
@@ -1019,31 +1024,9 @@ export class Repository {
           ),
         ),
         ...(returning && returning.returns.length > 0
-          ? [
-              on(
-                CampChanged,
-                items.camp
-                  .check({ playerId, location })
-                  .where((a, op) => (returning.stored ? op.eq(a.warehouseLevel, returning.warehouseLevel) : op.notExists(a.warehouseLevel)))
-                  .commit(),
-              ),
-            ]
+          ? [on(CampChanged, warehouseHeld(items, playerId, location, returning.stored, returning.warehouseLevel))]
           : []),
-        ...(returning?.returns ?? []).flatMap(({ material, read, credit, lost }) => [
-          ...(credit > 0
-            ? [
-                on(
-                  CampChanged,
-                  items.holding
-                    .update({ playerId, location, material })
-                    .set({ balance: (read ?? 0) + credit })
-                    .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
-                    .commit(),
-                ),
-              ]
-            : []),
-          on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `return#${material}`, location, material, delta: credit, lost }).commit()),
-        ]),
+        ...cappedCredits(items, on, playerId, adventureId, location, "return", returning?.returns ?? []),
         ...(record.caravan && staying > 0
           ? [
               on(
