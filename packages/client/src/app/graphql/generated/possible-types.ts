@@ -53,10 +53,12 @@ const result: PossibleTypesResultData = {
     "StartAdventureResult": [
       "AdventureOpen",
       "Conflict",
+      "HallFull",
       "HeroAdventuring",
       "HeroDead",
       "HeroNotHere",
       "HeroRetired",
+      "InsufficientResources",
       "Requires",
       "StartAdventureSuccess"
     ],

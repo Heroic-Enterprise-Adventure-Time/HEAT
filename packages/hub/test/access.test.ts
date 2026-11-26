@@ -29,8 +29,9 @@ const ACCESS = {
   },
   "any signed-in player": {
     Query: ["adventure", "heroesSeenAt", "me", "recentAdventuresAt", "replaysOf"],
-    Adventure: ["id", "job", "location", "result", "seed", "settledAt", "snapshot", "startedAt", "status", "timeline", "version"],
-    AdventureResult: ["credited", "endedAtMs", "heroes", "lost", "outcome", "reachedStage", "rewards", "stages", "unlocks"],
+    Adventure: ["caravan", "id", "job", "location", "result", "seed", "settledAt", "snapshot", "startedAt", "status", "timeline", "version"],
+    AdventureResult: ["credited", "delivered", "deliveryLost", "endedAtMs", "heroes", "lost", "outcome", "reachedStage", "rewards", "stages", "unlocks"],
+    Caravan: ["cargo", "destination", "staying"],
     HeroOutcome: ["dead", "health", "heroId", "level", "xp", "xpGained"],
     Job: ["description", "facility", "id", "location", "name"],
     RecentAdventure: ["credited", "id", "job", "outcome", "party", "settledAt", "stages"],
