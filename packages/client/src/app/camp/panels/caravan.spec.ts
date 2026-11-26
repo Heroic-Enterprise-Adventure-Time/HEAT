@@ -8,11 +8,12 @@ import { routes } from '../../app.routes';
 import { type AdventureView, type CampView, type CaravanStart, Game, type HeroView } from '../../game';
 import { Refusal } from '../../hub';
 import { Session } from '../../session';
+import { CARAVAN_DESTINATION as highcrag, CARAVAN_ORIGIN as millbrook } from '../../testing/caravan-camps';
 import { fakeCampScene } from '../../testing/fake-camp-scene';
 import { fakeIcons } from '../../testing/fake-icons';
 import { fakeSession, PLAYER } from '../../testing/fake-session';
 import { testLayoutSizes } from '../../testing/layout-sizes';
-import { listItems, panel } from '../../testing/page';
+import { panel } from '../../testing/page';
 import { renderAt } from '../../testing/render-at';
 import { textsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
@@ -22,47 +23,6 @@ function hero(id: string, name: string): HeroView {
 }
 
 const party = [hero('h1', 'Wren'), hero('h2', 'Moss'), hero('h3', 'Lark')];
-
-/** Millbrook with its caravan hub built, holding timber and ore and no cloth. */
-const millbrook: CampView = {
-  location: 'millbrook',
-  name: 'Millbrook',
-  hallLevel: 1,
-  heroCapacity: 4,
-  activeHeroes: 3,
-  livingHeroes: 3,
-  warehouseLevel: 2,
-  resourceCapacity: 200,
-  holdings: [
-    { material: 'timber', balance: 90 },
-    { material: 'ore', balance: 40 },
-    { material: 'cloth', balance: 0 },
-  ],
-  facilities: [
-    { kind: 'heroes-hall', level: 1 },
-    { kind: 'warehouse', level: 2 },
-    { kind: 'mine', level: 1 },
-    { kind: 'lumber-camp', level: 0 },
-    { kind: 'caravan-hub', level: 1 },
-  ],
-};
-
-/** Highcrag's camp with two of its four slots taken and ore in its warehouse. */
-const highcrag: CampView = {
-  location: 'highcrag',
-  name: 'Highcrag',
-  hallLevel: 1,
-  heroCapacity: 4,
-  activeHeroes: 2,
-  livingHeroes: 2,
-  warehouseLevel: 1,
-  resourceCapacity: 100,
-  holdings: [{ material: 'ore', balance: 70 }],
-  facilities: [
-    { kind: 'heroes-hall', level: 1 },
-    { kind: 'warehouse', level: 1 },
-  ],
-};
 
 /** A game at Millbrook with the camps given, and a start that records what it was sent and answers as the test says. */
 function fakeGame(camps: readonly CampView[] = [millbrook, highcrag], answer: () => Refusal | null = () => null) {
@@ -109,7 +69,7 @@ const CARAVAN = '/camp/millbrook/caravan-hub/jobs/caravan-to-highcrag';
 const depart = () => screen.getByRole('button', { name: 'Depart' });
 const partyBox = (name: string) => within(screen.getByRole('group', { name: 'Party' })).getByRole('checkbox', { name });
 const stays = (name: string) => within(screen.getByRole('group', { name: 'Who stays' })).getByRole('checkbox', { name: `${name} stays at Highcrag` });
-const amount = (material: string) => within(panel().getByRole('list', { name: 'Cargo' })).getByRole('spinbutton', { name: material });
+const amount = (material: string) => within(panel().getByRole('group', { name: 'Cargo' })).getByRole('spinbutton', { name: material });
 
 /** Types an amount into a resource's field, replacing what was there. */
 async function load(user: Awaited<ReturnType<typeof renderCaravan>>['user'], material: string, value: string) {
@@ -122,8 +82,8 @@ describe("A caravan's page (Issue-355)", () => {
     await renderCaravan(fakeGame());
     expect(panel().getByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).toBeInTheDocument();
     expect(panel().getByText(JOBS['caravan-to-highcrag'].description)).toBeInTheDocument();
-    expect(screen.getByRole('list', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 0 of the 100 the cart carries.');
-    expect(textsOf(listItems('Cargo'))).toEqual(['timber Millbrook holds 90. Highcrag has room for 100 more.', 'ore Millbrook holds 40. Highcrag has room for 30 more.']);
+    expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 0 of the 100 the cart carries.');
+    expect(textsOf(within(screen.getByRole('group', { name: 'Cargo' })).getAllByRole('listitem'))).toEqual(['timber Millbrook holds 90. Highcrag has room for 100 more.', 'ore Millbrook holds 40. Highcrag has room for 30 more.']);
     expect(amount('timber')).toHaveValue(0);
   });
 
@@ -160,7 +120,7 @@ describe("A caravan's page (Issue-355)", () => {
     await load(user, 'timber', '60');
     await load(user, 'ore', '40');
     await user.click(await screen.findByRole('checkbox', { name: 'Wren stays at Highcrag' }));
-    await waitFor(() => { expect(screen.getByRole('list', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 100 of the 100 the cart carries.'); });
+    await waitFor(() => { expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 100 of the 100 the cart carries.'); });
     await waitFor(() => { expect(depart()).toBeEnabled(); });
     await user.click(depart());
     expect(game.started).toEqual([
@@ -220,6 +180,32 @@ describe("A caravan's page (Issue-355)", () => {
     expect(panel().getAllByText("Highcrag's heroes hall has room for 2 more.")).toHaveLength(1);
   });
 
+  it('waits with the reason while a field holds text it cannot read as a number, which it reports as empty', async () => {
+    const { user } = await renderCaravan(fakeGame());
+    await user.click(partyBox('Wren'));
+    await load(user, 'ore', '10');
+    await waitFor(() => { expect(depart()).toBeEnabled(); });
+    // jsdom does not parse "1e" as a browser does; the field says what a browser's would: empty, and bad input.
+    const field = amount('ore');
+    if (!(field instanceof HTMLInputElement)) throw new Error('the ore field is an input');
+    Object.defineProperty(field, 'validity', { value: { badInput: true } });
+    field.value = '';
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(await screen.findByText('Each amount is a whole number, 0 or more.')).toBeInTheDocument();
+    expect(depart()).toBeDisabled();
+  });
+
+  it('leaves a field the player cleared empty, carrying none of it, and writes nothing back into it', async () => {
+    const { user } = await renderCaravan(fakeGame());
+    await user.click(partyBox('Wren'));
+    await load(user, 'ore', '10');
+    await waitFor(() => { expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 10 of the 100 the cart carries.'); });
+    await user.clear(amount('ore'));
+    await waitFor(() => { expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 0 of the 100 the cart carries.'); });
+    expect(amount('ore')).toHaveDisplayValue('');
+    expect(depart()).toBeEnabled();
+  });
+
   // Another start or a build took the balance or the slot since the page read the camp.
   it.each([
     ['InsufficientResources', 'The camp cannot pay for the cargo now.'],
@@ -237,6 +223,6 @@ describe("A caravan's page (Issue-355)", () => {
     expect(panel().getByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).toBeInTheDocument();
     expect(panel().getByText('Needs the road to Highcrag.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Depart' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('list', { name: 'Cargo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Cargo' })).not.toBeInTheDocument();
   });
 });

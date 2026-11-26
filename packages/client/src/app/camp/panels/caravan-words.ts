@@ -1,3 +1,5 @@
+import { sumBy } from 'es-toolkit';
+
 import { cartCapacity, type Material, MATERIALS } from '@heat/engine';
 
 import type { AdventureResultView, AdventureView, CampView } from '../../game';
@@ -91,13 +93,13 @@ export function caravanReason(
     if (c.amount > balance) return `${origin.name} holds only ${balance} ${c.material}.`;
   }
   const capacity = cartCapacityAt(origin);
-  if (cargo.reduce((sum, c) => sum + c.amount, 0) > capacity) return `The cart carries ${capacity} in all.`;
+  if (total(cargo) > capacity) return `The cart carries ${capacity} in all.`;
   if (staying > freeSlots(destination)) return roomWords(destination);
   return null;
 }
 
 const listWords = (items: readonly string[]) => (items.length <= 1 ? (items[0] ?? '') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
-const total = (amounts: readonly Amount[]) => amounts.reduce((sum, a) => sum + a.amount, 0);
+const total = (amounts: readonly Amount[]) => sumBy(amounts, (a) => a.amount);
 
 /**
  * What became of a caravan's cargo, one line for each row of decision 0059's

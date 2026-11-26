@@ -2,6 +2,7 @@ import { LowerCasePipe } from '@angular/common';
 import { Component, computed, inject, resource, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { sumBy } from 'es-toolkit';
 
 import { FACILITIES, type FacilityKind, type Material, MAX_PARTY } from '@heat/engine';
 
@@ -143,7 +144,7 @@ export class JobPanel {
   );
   protected readonly load = computed(() => {
     const origin = this.game.camp();
-    return origin ? loadWords(this.cargo().reduce((sum, c) => sum + (Number.isFinite(c.amount) ? c.amount : 0), 0), cartCapacityAt(origin)) : '';
+    return origin ? loadWords(sumBy(this.cargo(), (c) => (Number.isFinite(c.amount) ? c.amount : 0)), cartCapacityAt(origin)) : '';
   });
   protected readonly room = computed(() => {
     const destination = this.destination();
@@ -182,15 +183,15 @@ export class JobPanel {
     this.chosen.set(next);
   }
 
-  protected amount(material: Material): number {
-    return this.amounts().get(material) ?? 0;
-  }
-
-  /** An amount as typed; an empty field is 0, and one that is not a whole number is the reason Depart waits. */
+  /**
+   * An amount as typed. A field the player cleared is 0; text the field cannot
+   * read as a number, "1e" or a lone "-", which it also reports as empty, is
+   * NaN, so that Depart waits with the reason rather than carrying none.
+   */
   protected setAmount(material: Material, event: Event): void {
     const field = event.target as HTMLInputElement;
     const next = new Map(this.amounts());
-    next.set(material, field.value === '' ? 0 : field.valueAsNumber);
+    next.set(material, field.validity.badInput ? Number.NaN : field.value === '' ? 0 : field.valueAsNumber);
     this.amounts.set(next);
   }
 

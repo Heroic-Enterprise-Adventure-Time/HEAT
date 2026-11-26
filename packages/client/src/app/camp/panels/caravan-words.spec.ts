@@ -1,40 +1,9 @@
 import type { AdventureResultView, AdventureView, CampView } from '../../game';
+import { CARAVAN_ORIGIN, CARAVAN_DESTINATION as highcrag } from '../../testing/caravan-camps';
 import { caravanReason, cargoLines, cargoWords, cartCapacityAt, freeSlots, loadWords, noWayBackWords, roomWords, stayedWords } from './caravan-words';
 
-const millbrook: CampView = {
-  location: 'millbrook',
-  name: 'Millbrook',
-  hallLevel: 1,
-  heroCapacity: 4,
-  activeHeroes: 3,
-  livingHeroes: 3,
-  warehouseLevel: 2,
-  resourceCapacity: 200,
-  holdings: [
-    { material: 'timber', balance: 90 },
-    { material: 'ore', balance: 40 },
-    { material: 'cloth', balance: 0 },
-    // A resource a newer deploy holds and this client's engine does not know: the start could not name it.
-    { material: 'stone', balance: 5 },
-  ],
-  facilities: [{ kind: 'caravan-hub', level: 1 }],
-};
-
-const highcrag: CampView = {
-  location: 'highcrag',
-  name: 'Highcrag',
-  hallLevel: 1,
-  heroCapacity: 4,
-  activeHeroes: 2,
-  livingHeroes: 2,
-  warehouseLevel: 1,
-  resourceCapacity: 100,
-  holdings: [{ material: 'ore', balance: 70 }],
-  facilities: [
-    { kind: 'heroes-hall', level: 1 },
-    { kind: 'warehouse', level: 1 },
-  ],
-};
+// A resource a newer deploy holds and this client's engine does not know: the start could not name it.
+const millbrook: CampView = { ...CARAVAN_ORIGIN, holdings: [...CARAVAN_ORIGIN.holdings, { material: 'stone', balance: 5 }] };
 
 const caravan: NonNullable<AdventureView['caravan']> = {
   destination: 'highcrag',
