@@ -114,7 +114,7 @@ describe("a caravan's cart", () => {
     expect(timelineCart([])).toBeNull();
   });
 
-  it('is on every job of the content that delivers, at the content's health', () => {
+  it('is on every job of the content that delivers, at the health of the content', () => {
     const jobIds = jobsThatDeliver();
     expect(jobIds.length).toBeGreaterThan(0);
     for (const jobId of jobIds) expect(jobCart(jobId), jobId).toEqual({ health: CART.health, maxHealth: CART.health });
