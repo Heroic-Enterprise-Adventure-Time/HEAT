@@ -31,7 +31,7 @@ const at = "millbrook";
 /** Heroes and a camp whose counts agree with them, as recruits and deaths will leave them. */
 async function putCamp(p: string, statuses: HeroStatus[]): Promise<Hero[]> {
   const heroes = statuses.map((status, i): Hero => ({
-    id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: `Hero ${i}`,
+    id: randomUUID(), location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: `Hero ${i}`,
     recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status, retiredAt: null, adventureId: null,
   }));
   for (const hero of heroes) {

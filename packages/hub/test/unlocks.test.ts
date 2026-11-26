@@ -244,7 +244,7 @@ describe("the road to Highcrag (Issue-352)", () => {
 
   it("is the job of Millbrook's caravan hub, which the camp must have built", async () => {
     expect(scoutTheRoad.location).toBe(home);
-    expect(jobsPostedBy(home, hub).map((job) => job.id)).toEqual([scoutTheRoad.id]);
+    expect(jobsPostedBy(home, hub).map((job) => job.id)).toEqual([scoutTheRoad.id, "caravan-to-highcrag"]);
     const p = player();
     const heroes = await putParty(db, tables, p, PARTY, home);
     const refused = await refusal(startAdventure(repo, p, version, randomUUID(), home, scoutTheRoad.id, heroes.map((h) => h.id)));

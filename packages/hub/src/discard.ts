@@ -1,7 +1,7 @@
 import { retryingConflicts } from "./conflict.js";
-import { AdventureClosed, type AdventureRecord, HeroChanged, type Repository } from "./db/repository.js";
+import { AdventureClosed, type AdventureRecord, CampChanged, type CaravanReturn, HeroChanged, type Repository } from "./db/repository.js";
 import { AdventureSettled, AdventureVerifiable, Conflict } from "./refusals.js";
-import { ownAdventure } from "./submit.js";
+import { cappedCredits, ownAdventure, SETTLE_ATTEMPTS } from "./submit.js";
 
 /**
  * Discarding an adventure no deploy can verify any more (decision 0030): the
@@ -20,6 +20,12 @@ import { ownAdventure } from "./submit.js";
  * one is refused with AdventureSettled. A discard that loses a race reads
  * the record again and answers the same way; Conflict when it is still open
  * and nothing explains the failure (graphql.md, rule 9).
+ *
+ * A caravan's cargo goes back to the origin's warehouse up to its cap, as a
+ * settlement's credits do, and what the cap turns away is lost; the slots
+ * held at its destination are let go (decision 0059). A balance that moves
+ * between the read and the write is read again, up to SETTLE_ATTEMPTS
+ * times, as settlement does.
  */
 export function discardAdventure(
   repo: Repository,
@@ -44,14 +50,27 @@ async function discardOnce(
   if (record.version === versions.current || record.version === versions.previous) {
     throw new AdventureVerifiable("the adventure can still be submitted", record.version);
   }
-  try {
-    await repo.discard(playerId, record, now);
-  } catch (e) {
-    if (!(e instanceof AdventureClosed || e instanceof HeroChanged)) throw e;
-    const after = await repo.getAdventure(adventureId);
-    if (after?.status === "DISCARDED") return after;
-    if (after?.status === "SETTLED") throw new AdventureSettled("the adventure is settled");
-    throw new Conflict("the adventure changed while discarding; nothing was discarded");
+  for (let attempt = 0; attempt < SETTLE_ATTEMPTS; attempt++) {
+    try {
+      await repo.discard(playerId, record, now, await caravanReturn(repo, playerId, record));
+      return { ...record, status: "DISCARDED", discardedAt: now.toISOString() };
+    } catch (e) {
+      // A balance or the warehouse moved since the read: read the camp again. A TransactionConflict runs the verb again (conflict.ts).
+      if (e instanceof CampChanged) continue;
+      if (!(e instanceof AdventureClosed || e instanceof HeroChanged)) throw e;
+      const after = await repo.getAdventure(adventureId);
+      if (after?.status === "DISCARDED") return after;
+      if (after?.status === "SETTLED") throw new AdventureSettled("the adventure is settled");
+      throw new Conflict("the adventure changed while discarding; nothing was discarded");
+    }
   }
-  return { ...record, status: "DISCARDED", discardedAt: now.toISOString() };
+  throw new Conflict("the camp kept changing while discarding; nothing was discarded");
+}
+
+/** A caravan's cargo as it goes home, from the origin camp read now; nothing for any other job. */
+async function caravanReturn(repo: Repository, playerId: string, record: AdventureRecord): Promise<CaravanReturn | undefined> {
+  if (!record.caravan) return undefined;
+  const camp = await repo.camp(playerId, record.location);
+  const balances = new Map(camp.holdings.map((h) => [h.material, h.balance]));
+  return { warehouseLevel: camp.warehouseLevel, stored: camp.stored, returns: cappedCredits(record.caravan.cargo, camp.warehouseLevel, balances) };
 }

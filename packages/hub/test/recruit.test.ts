@@ -125,7 +125,7 @@ describe("recruitHero: the free villager", () => {
     const stale = await repo.camp(p, at);
     await recruitHero(repo, p, at, "villager", randomUUID());
     const hero: Hero = {
-      id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
+      id: randomUUID(), location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
       recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
     };
     await expect(repo.recruit(p, stale, 4, hero, [], "none")).rejects.toBeInstanceOf(RecruitRefused);
@@ -147,7 +147,7 @@ async function putPaidCamp(p: string, livingHeroes: number, holdings: Partial<Re
 }
 
 const wren = (): Hero => ({
-  id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
+  id: randomUUID(), location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
   recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
 });
 

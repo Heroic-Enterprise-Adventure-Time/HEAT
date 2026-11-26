@@ -36,12 +36,13 @@ beforeAll(() => {
 const at = "millbrook";
 
 const oldHero = (id: string): Hero => ({
-  id, location: at, unitType: "villager", spriteSet: "villager-01", name: "Old", recruitedAt: "2026-10-21T12:00:00.000Z",
+  id, location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Old", recruitedAt: "2026-10-21T12:00:00.000Z",
   level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
 });
 
 async function putOldHero(p: string, id: string) {
-  const { adventureId: _none, ...written } = oldHero(id);
+  // An item from before Issue-354 has no recruitedIn, which the repository reads as its location.
+  const { adventureId: _none, recruitedIn: _since354, ...written } = oldHero(id);
   await db.send(new PutCommand({ TableName: tables.player, Item: { ...playerKeys.hero(p, id), ...written } }));
 }
 
@@ -127,7 +128,7 @@ describe("an item from before ElectroDB", () => {
     expect(sightings.map((s) => s.heroId)).toEqual(["a0", "b0"]);
   });
 
-  it("reads a settled adventure back whole, nested fields no entity declares included, and a result from before unlocks as having earned none", async () => {
+  it("reads a settled adventure back whole, nested fields no entity declares included, and a result from before unlocks and caravans as having earned and delivered none", async () => {
     const adventureId = randomUUID();
     const snapshot = { version: "v", jobId: "sticks", heroes: [{ heroId: "h", name: "Old", stats: { traits: [] }, notDeclared: { deep: [1, null] } }] };
     const result = { outcome: "won", endedAtMs: 12, reachedStage: 0, stages: [{ stage: 0, kind: "battle", ended: "cleared", startedAtMs: 0, endedAtMs: 12 }], rewards: [{ material: "timber", amount: 3 }], credited: [], lost: [], heroes: [] };
@@ -136,7 +137,7 @@ describe("an item from before ElectroDB", () => {
       status: "SETTLED", result, settledAt: "2026-10-21T12:01:00.000Z",
     };
     await db.send(new PutCommand({ TableName: tables.location, Item: whole("adventure", { ...locationKeys.adventure(adventureId), ...record }) }));
-    expect(await repo.getAdventure(adventureId)).toEqual({ ...record, result: { ...result, unlocks: [] } });
+    expect(await repo.getAdventure(adventureId)).toEqual({ ...record, result: { ...result, unlocks: [], delivered: [], deliveryLost: [] } });
   });
 
   it("reads a result's unlocks as stored, but for one this deploy's content does not know, which is left out", async () => {

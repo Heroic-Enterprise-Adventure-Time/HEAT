@@ -201,7 +201,7 @@ describe("buildFacility: the hall and the warehouse", () => {
     await stock(p, { timber: 80, cloth: 20 });
     await buildFacility(repo, p, at, "heroes-hall", 2);
     const hero: Hero = {
-      id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
+      id: randomUUID(), location: at, recruitedIn: at, unitType: "villager", spriteSet: "villager-01", name: "Wren",
       recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
     };
     await expect(repo.recruit(p, stale, 4, hero, [], "any")).rejects.toBeInstanceOf(RecruitRefused);
