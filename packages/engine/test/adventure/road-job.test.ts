@@ -2,7 +2,7 @@ import { isEqual } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { type AdventureResult, FACILITIES, JOBS, jobsPostedBy, largestStages, location, MONSTERS, must, type SnapshotHero, STARTING_LOCATION } from "../../src/index.js";
-import { enemiesXp, HIGHCRAG, party, played, RECRUITED_TYPES, ROAD, SEEDS, villagers, WOLVES } from "./helpers.js";
+import { CARAVAN, enemiesXp, HIGHCRAG, party, played, RECRUITED_TYPES, ROAD, SEEDS, villagers, WOLVES } from "./helpers.js";
 
 // "Scout the road to Highcrag" (Issue-352, decision 0059): the caravan hub's
 // first job, the first that grants an unlock, and the bandit's first job. A
@@ -50,11 +50,11 @@ function expectOpened(result: AdventureResult, seed: string): void {
 }
 
 describe("Scout the road to Highcrag", () => {
-  it("is posted by Millbrook's caravan hub, which posts nothing else, and not by the job board", () => {
+  it("is posted by Millbrook's caravan hub, first, and not by the job board", () => {
     expect(road.location).toBe(STARTING_LOCATION);
     expect(road.facility).toBe("caravan-hub");
     expect(FACILITIES["caravan-hub"].levels.length).toBeGreaterThan(0);
-    expect(jobsPostedBy(STARTING_LOCATION, "caravan-hub").map((j) => j.id)).toEqual([ROAD]);
+    expect(jobsPostedBy(STARTING_LOCATION, "caravan-hub").map((j) => j.id)[0]).toBe(ROAD);
     expect(jobsPostedBy(STARTING_LOCATION, "job-board").map((j) => j.id)).not.toContain(ROAD);
   });
 
@@ -64,9 +64,9 @@ describe("Scout the road to Highcrag", () => {
     expect(isEqual(largestStages(road), road.stages)).toBe(true);
   });
 
-  it("is the bandit's first job: no other job sets one against a party", () => {
+  it("is the bandit's first job: no other job sets one against a party but the caravan the hub posts after it", () => {
     const withBandits = Object.values(JOBS).filter((job) => job.stages.some((s) => (s.kind === "fight" || s.kind === "gather") && s.opponents.some((o) => o.type === "bandit")));
-    expect(withBandits.map((job) => job.id)).toEqual([ROAD]);
+    expect(withBandits.map((job) => job.id)).toEqual([ROAD, CARAVAN]);
   });
 
   it("has no pay, and a bonus that brings its XP to the wolves job's 20", () => {

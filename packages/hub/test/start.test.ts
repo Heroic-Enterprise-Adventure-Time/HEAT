@@ -13,7 +13,7 @@ import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { build, player, whole } from "./data.js";
+import { build, heroFixture, player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -41,10 +41,7 @@ const wolves = "wolves-on-the-mill-road";
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths leave them. */
 async function putHeroes(p: string, statuses: HeroStatus[], location = at): Promise<Hero[]> {
-  const heroes = statuses.map((status, i): Hero => ({
-    id: randomUUID(), location, unitType: "villager", spriteSet: "villager-01", name: `Hero ${i}`,
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status, retiredAt: null, adventureId: null,
-  }));
+  const heroes = statuses.map((status, i) => heroFixture(location, { name: `Hero ${i}`, status }));
   for (const hero of heroes) {
     await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
   }
@@ -68,7 +65,7 @@ describe("startAdventure", () => {
     const villager = await recruitHero(repo, p, at, "villager", randomUUID());
     const now = new Date("2026-10-22T09:00:00Z");
 
-    const started = await startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id], now);
+    const started = await startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id], undefined, now);
 
     expect(started).toMatchObject({ playerId: p, location: at, jobId: wolves, version, startedAt: now.toISOString(), status: "OPEN" });
     expect(started.seed).toMatch(/^[0-9a-f-]{36}$/);

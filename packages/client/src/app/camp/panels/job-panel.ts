@@ -17,9 +17,14 @@ import { ReplayList } from './replay-list';
  * shown as the hub put it. A job the location does not post, a party of the
  * wrong size or a hero that is not the player's are the client's own
  * defects, refused as BAD_USER_INPUT, and this panel never sends them.
+ * A caravan's two, a cargo the camp cannot pay and a destination hall with
+ * no room for who stays, cannot come back while the panel sends no cargo and
+ * nobody to stay; the caravan's page is Issue-355.
  */
 const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
   AdventureOpen: 'An adventure is already under way. Only one can be open at a time.',
+  InsufficientResources: 'The camp cannot pay for the cargo now.',
+  HallFull: 'The heroes hall at the destination has no room for everyone who stays.',
   HeroNotHere: 'A hero in the party is not at this camp.',
   HeroDead: 'A hero in the party is dead.',
   HeroRetired: 'A hero in the party has retired.',

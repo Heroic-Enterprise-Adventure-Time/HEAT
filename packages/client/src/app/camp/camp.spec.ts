@@ -445,7 +445,7 @@ describe('Camp', () => {
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook/heroes-hall'); });
   });
 
-  it("lists the caravan hub's job once the hub is built, and its page says what it opens (Issue-352)", async () => {
+  it("lists the caravan hub's job once the hub is built, but no caravan until its page (Issue-355), and the road's page says what it opens (Issue-352)", async () => {
     const game = fakeGame([wren]);
     const built = game.camp();
     game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'caravan-hub' ? { kind: 'caravan-hub', level: 1 } : f)) });
@@ -453,6 +453,7 @@ describe('Camp', () => {
     const job = panel().getByRole('link', { name: 'Scout the road to Highcrag' });
     expect(job).toHaveAttribute('href', '/camp/millbrook/caravan-hub/jobs/scout-the-road-to-highcrag');
     expect(listItems('Jobs')).toHaveLength(1);
+    expect(panel().queryByRole('link', { name: 'Caravan to Highcrag' })).toBeNull();
     expect(within(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).getByText('No pay, 8 bonus XP')).toBeInTheDocument();
 
     await user.click(job);

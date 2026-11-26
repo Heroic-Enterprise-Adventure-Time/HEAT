@@ -77,12 +77,34 @@ export async function balances(repo: Repository, p: string, location: string): P
   return Object.fromEntries((await repo.holdings(p, location)).map((h) => [h.material, h.balance]));
 }
 
+/**
+ * A living villager recruited at a location just now, on no adventure: the
+ * hero the tests start from, with what a test means changed by `overrides`
+ * (typescript.md, rule 19), so that a new attribute of a hero is added here
+ * once.
+ */
+export function heroFixture(location: string, overrides: Partial<Hero> = {}): Hero {
+  return {
+    id: randomUUID(),
+    location,
+    recruitedIn: location,
+    unitType: "villager",
+    spriteSet: "villager-01",
+    name: "Wren",
+    recruitedAt: new Date().toISOString(),
+    level: 1,
+    xp: 0,
+    picks: [],
+    status: "ALIVE",
+    retiredAt: null,
+    adventureId: null,
+    ...overrides,
+  };
+}
+
 /** Living heroes of the given unit types at a location, with their sightings, and a level-1 camp there that counts them. */
 export async function putParty(db: DynamoDBDocumentClient, tables: Tables, p: string, unitTypes: readonly UnitType[], location: string): Promise<Hero[]> {
-  const heroes = unitTypes.map((unitType, i): Hero => ({
-    id: randomUUID(), location, unitType, spriteSet: `${unitType}-01`, name: `Hero ${i}`,
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null,
-  }));
+  const heroes = unitTypes.map((unitType, i) => heroFixture(location, { unitType, spriteSet: `${unitType}-01`, name: `Hero ${i}` }));
   for (const hero of heroes) {
     await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
     await db.send(new PutCommand({
@@ -98,7 +120,7 @@ export async function putParty(db: DynamoDBDocumentClient, tables: Tables, p: st
 }
 
 /** A result of the given outcome with nothing else in it. */
-export const emptyResult = (outcome: AdventureOutcome): SettledResult => ({ outcome, endedAtMs: 1000, reachedStage: 0, stages: [], rewards: [], credited: [], lost: [], heroes: [], unlocks: [] });
+export const emptyResult = (outcome: AdventureOutcome): SettledResult => ({ outcome, endedAtMs: 1000, reachedStage: 0, stages: [], rewards: [], credited: [], lost: [], heroes: [], unlocks: [], delivered: [], deliveryLost: [] });
 
 /** Puts an unlock past the repository, as settlement leaves one the player earned, so that a test starts with a location unlocked. */
 export async function putUnlock(db: DynamoDBDocumentClient, table: string, p: string, unlock: UnlockId, earned: { earnedAt: string; adventureId: string } = { earnedAt: "2026-11-24T12:00:00.000Z", adventureId: randomUUID() }) {

@@ -1,9 +1,10 @@
 import { ADVENTURE_CONTENT, type AdventureContent, type AdventureSnapshot, CART, type Job, JOBS, must, replay, UNIT_PROFILES } from '@heat/engine';
 
 /**
- * A caravan the specs play, since the game's content has none until
- * Issue-354: one bandit on the road between two travels, delivering to
- * Highcrag (decision 0059).
+ * A caravan of the specs' own, kept apart from the content's "Caravan to
+ * Highcrag" (Issue-354) so that what the specs hold of a cart does not move
+ * with the road's numbers: one bandit on the road between two travels,
+ * delivering to Highcrag (decision 0059).
  */
 export const SPEC_CARAVAN: Job = {
   id: 'spec-caravan',
@@ -26,8 +27,11 @@ export function caravanContent(cartHealth: number = CART.health): AdventureConte
   };
 }
 
-/** Every job of the game's content that delivers nothing, which is every one until Issue-354. */
+/** Every job of the game's content that delivers nothing. */
 export const jobsThatDeliverNothing = (): readonly string[] => Object.values(JOBS).filter((job) => job.deliversTo === undefined).map((job) => job.id);
+
+/** Every job of the game's content that delivers: a caravan, whose party has a cart (Issue-354). */
+export const jobsThatDeliver = (): readonly string[] => Object.values(JOBS).filter((job) => job.deliversTo !== undefined).map((job) => job.id);
 
 /** A lone fighter's snapshot for a job: it completes the first three jobs' gathers and fights it can reach, so its timeline shows who was there. */
 export const fighterOn = (jobId: string): AdventureSnapshot => ({

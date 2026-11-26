@@ -8,9 +8,15 @@ import { type FacilityKind, type Job, jobsPostedBy } from '@heat/engine';
  * Issue-339, on the stages).
  */
 
-/** The jobs a poster at a location lists, the job board or a facility, in the content's order (Issue-133). */
+/**
+ * The jobs a poster at a location lists, the job board or a facility, in the
+ * content's order (Issue-133), but for a job that delivers: a caravan's page
+ * picks its cargo and who stays, and until that page is built (Issue-355) the
+ * page lists no caravan, rather than one whose Depart could send neither
+ * (the review of PR-371, Issue-354).
+ */
 export function jobsAt(location: string, poster: FacilityKind): Job[] {
-  return jobsPostedBy(location, poster);
+  return jobsPostedBy(location, poster).filter((job) => job.deliversTo === undefined);
 }
 
 export function jobAt(location: string, poster: FacilityKind, id: string | null | undefined): Job | undefined {

@@ -73,6 +73,8 @@ export class CampChanged extends Error {}
 export class AdventureClosed extends Error {}
 /** The location needs an unlock the player does not hold, so the player has no camp there. */
 export class LocationLocked extends Error {}
+/** The destination's hall cannot hold the heroes a caravan means to leave there, or is not at the level read. */
+export class DestinationFull extends Error {}
 
 export interface Player {
   id: string;
@@ -148,7 +150,15 @@ export type HeroStatus = (typeof HERO_STATUSES)[number];
  */
 export interface Hero {
   id: string;
+  /** Where the hero is: where it was recruited, until a caravan moves it (decision 0059). */
   location: string;
+  /**
+   * Where the hero was recruited, which nothing changes. A hero recruited
+   * before Issue-354 has no such attribute and is read as its location, which
+   * is where it was recruited, since nothing moved a hero before then; the
+   * settlement that first moves it writes the attribute from there.
+   */
+  recruitedIn: string;
   unitType: UnitType;
   spriteSet: string;
   name: string;
@@ -187,9 +197,31 @@ export interface AdventureRecord {
   version: string;
   startedAt: string;
   status: AdventureStatus;
+  /** A caravan's destination, its cargo and who stays, on a job that delivers; absent on any other (decision 0059). */
+  caravan?: Caravan | undefined;
   result?: SettledResult | undefined;
   settledAt?: string | undefined;
   discardedAt?: string | undefined;
+}
+
+/**
+ * A caravan as its start wrote it (decision 0059): the location it delivers
+ * to, each resource of the cargo once, debited from the origin's holdings,
+ * and the heroes of the party marked to stay, whose slots are held at the
+ * destination until the adventure ends.
+ */
+export interface Caravan {
+  destination: string;
+  cargo: Reward[];
+  staying: string[];
+}
+
+/** What a caravan's start writes beside the adventure: the destination camp as read, for the slots it holds there. */
+export interface CaravanStart {
+  caravan: Caravan;
+  destination: Camp;
+  /** The destination hall's cap, at the level read. */
+  capacity: number;
 }
 
 export type AdventureStatus = (typeof ADVENTURE_STATUSES)[number];
@@ -222,6 +254,43 @@ export interface SettledResult {
   lost: Reward[];
   heroes: HeroOutcome[];
   unlocks: UnlockId[];
+  /** What a caravan's cargo put into the destination's warehouse; none for a job that delivers nothing, a broken cart, a retreat or a defeat. */
+  delivered: Reward[];
+  /** What the destination warehouse's cap turned away of the cargo. */
+  deliveryLost: Reward[];
+}
+
+/** A resource credited to a holding up to its warehouse's cap: the balance read, null where there is no item, and what the cap took and turned away. */
+export interface CappedCredit {
+  material: Material;
+  read: number | null;
+  credit: number;
+  lost: number;
+}
+
+/**
+ * A caravan's part of settlement (decision 0059), from the destination camp
+ * as read: what the cargo credits there, which heroes land, and how many of
+ * the slots held there are let go.
+ */
+export interface CaravanSettlement {
+  destination: string;
+  warehouseLevel: number;
+  /** Whether the destination camp has an item, which the condition on its warehouse depends on. */
+  stored: boolean;
+  /** Each resource of the cargo up to the destination's cap; none unless the run arrived with the cart standing. */
+  deliveries: CappedCredit[];
+  /** The heroes marked to stay, on arrival, alive or dead; none on any other end. */
+  landed: string[];
+  /** The slots held at the destination that are let go: one per hero marked to stay, on any end but arrival. */
+  released: number;
+}
+
+/** A discarded caravan's cargo going home (decision 0059): the origin camp's warehouse as read, and each resource up to its cap. */
+export interface CaravanReturn {
+  warehouseLevel: number;
+  stored: boolean;
+  returns: CappedCredit[];
 }
 
 /**
@@ -234,10 +303,12 @@ export interface Settlement {
   location: string;
   jobId: string;
   warehouseLevel: number;
-  holdings: { material: Material; read: number | null; credit: number; lost: number }[];
+  holdings: CappedCredit[];
   survivors: { hero: Hero; xp: number; level: number }[];
   dead: Hero[];
   result: SettledResult;
+  /** A caravan's writes at its destination; absent for a job that delivers nothing. */
+  caravan?: CaravanSettlement | undefined;
 }
 type Failure = new (message: string) => Error;
 
@@ -307,10 +378,11 @@ function campCounts(i: MayLack<Stored<"camp">, "hallLevel" | "warehouseLevel" | 
   };
 }
 
-function toHero(i: MayLack<Stored<"hero">, "level" | "xp" | "picks" | "status">): Hero {
+function toHero(i: MayLack<Stored<"hero">, "level" | "xp" | "picks" | "status" | "recruitedIn">): Hero {
   return {
     id: i.id,
     location: i.location,
+    recruitedIn: i.recruitedIn ?? i.location,
     unitType: i.unitType,
     spriteSet: i.spriteSet,
     name: i.name,
@@ -351,39 +423,82 @@ export function withTraits(snapshot: AdventureSnapshot): AdventureSnapshot {
 const hasSnapshot = (i: MayLack<Stored<"adventure">, "snapshot">): boolean => i.snapshot !== undefined;
 
 /**
- * A result with the unlocks its run earned. One settled before unlocks
- * (Issue-351) lists none and is read as having earned none; an unlock this
- * deploy's content does not know, which the deploy after it may have written,
- * is left out, as a job it does not know is (recent.ts).
+ * A result as this deploy reads it. One settled before unlocks (Issue-351)
+ * lists none and is read as having earned none; an unlock this deploy's
+ * content does not know, which the deploy after it may have written, is left
+ * out, as a job it does not know is (recent.ts). One settled before caravans
+ * (Issue-354) delivered nothing, and is read so.
  */
-function withUnlocks(result: MayLack<SettledResult, "unlocks">): SettledResult {
-  return { ...result, unlocks: (result.unlocks ?? []).filter(isUnlockId) };
+function readResult(result: MayLack<SettledResult, "unlocks" | "delivered" | "deliveryLost">): SettledResult {
+  return { ...result, unlocks: (result.unlocks ?? []).filter(isUnlockId), delivered: result.delivered ?? [], deliveryLost: result.deliveryLost ?? [] };
 }
 
 /** A record from before Issue-113 has no snapshot and is answered as it is. */
 function toAdventure(i: Stored<"adventure">): AdventureRecord {
   const record: AdventureRecord = hasSnapshot(i) ? { ...i, snapshot: withTraits(i.snapshot) } : i;
-  return record.result ? { ...record, result: withUnlocks(record.result) } : record;
+  return record.result ? { ...record, result: readResult(record.result) } : record;
 }
 
 /** The entities as a transaction's callback is handed them. */
 type TransactionItems = Parameters<Parameters<HeatService["transaction"]["write"]>[0]>[0];
 
 /**
- * The condition check that the player holds the unlock the location needs,
- * or none where the location needs none (decision 0059). Written once, for
+ * The condition checks that the player holds the unlocks the locations need,
+ * none where they need none (decision 0059). Written once, for
  * every transaction that takes a location (graphql.md, rule 28): one that
  * checked differently would be a location open by one verb.
  */
-function unlockHeld(items: TransactionItems, playerId: string, location: string) {
-  const unlock = locationOf(location)?.unlock;
-  if (unlock === undefined) return [];
-  return [
+function unlockHeld(items: TransactionItems, playerId: string, ...locations: string[]) {
+  // One check for each unlock: a transaction may name an item only once, and two locations may need the same one.
+  const unlocks = new Set(locations.map((location) => locationOf(location)?.unlock).filter((unlock) => unlock !== undefined));
+  return [...unlocks].map((unlock) =>
     items.unlock
       .check({ playerId, unlock })
       .where((a, op) => op.exists(a.earnedAt))
       .commit(),
-  ];
+  );
+}
+
+/**
+ * The capped credits of one camp's holdings, each on the condition that the
+ * balance is the one read, with the adventure's ledger entry
+ * `<entry>#<material>` saying the credit and what the cap lost: settlement's
+ * credits at the origin, a caravan's deliveries at the destination and a
+ * discard's returns (decisions 0030 and 0059). Written once for the three
+ * (graphql.md, rule 28). A credit of nothing writes the entry alone.
+ */
+function cappedCredits(
+  items: TransactionItems,
+  on: ReturnType<typeof failing>,
+  playerId: string,
+  adventureId: string,
+  location: string,
+  entry: "credit" | "deliver" | "return",
+  credits: readonly CappedCredit[],
+) {
+  return credits.flatMap(({ material, read, credit, lost }) => [
+    ...(credit > 0
+      ? [
+          on(
+            CampChanged,
+            items.holding
+              .update({ playerId, location, material })
+              .set({ balance: (read ?? 0) + credit })
+              .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
+              .commit(),
+          ),
+        ]
+      : []),
+    on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `${entry}#${material}`, location, material, delta: credit, lost }).commit()),
+  ]);
+}
+
+/** The check that a camp's warehouse is at the level read, which every capped credit depends on; a camp with no item has no warehouse attribute. */
+function warehouseHeld(items: TransactionItems, playerId: string, location: string, stored: boolean, warehouseLevel: number) {
+  return items.camp
+    .check({ playerId, location })
+    .where((a, op) => (stored ? op.eq(a.warehouseLevel, warehouseLevel) : op.notExists(a.warehouseLevel)))
+    .commit();
 }
 
 /**
@@ -555,10 +670,11 @@ export class Repository {
    */
   async startAdventure(
     playerId: string,
-    record: Omit<AdventureRecord, "playerId" | "status">,
+    record: Omit<AdventureRecord, "playerId" | "status" | "caravan">,
     needs: readonly Requirement[] = [],
+    caravan?: CaravanStart,
   ): Promise<AdventureRecord> {
-    const started: AdventureRecord = { ...record, playerId, status: "OPEN" };
+    const started: AdventureRecord = { ...record, playerId, status: "OPEN", ...(caravan ? { caravan: caravan.caravan } : {}) };
     const { adventureId, seed, startedAt, location } = record;
     const heroIds = record.snapshot.heroes.map((h) => h.heroId);
     const failures: Failure[] = [];
@@ -567,7 +683,10 @@ export class Repository {
       .write((items) => [
         on(AdventureAlreadyOpen, items.open.create({ playerId, adventureId, seed, startedAt }).commit()),
         // A record being started has no result and no end, which an absent attribute says.
-        on(AlreadyApplied, items.adventure.create(omit(started, ["result", "settledAt", "discardedAt"])).commit()),
+        on(
+          AlreadyApplied,
+          items.adventure.create({ ...omit(started, ["result", "settledAt", "discardedAt", "caravan"]), ...(caravan ? { caravan: caravan.caravan } : {}) }).commit(),
+        ),
         ...heroIds.map((id) =>
           on(
             HeroChanged,
@@ -588,11 +707,67 @@ export class Repository {
               .commit(),
           ),
         ),
-        ...unlockHeld(items, playerId, location).map((check) => on(LocationLocked, check)),
+        ...unlockHeld(items, playerId, location, ...(caravan ? [caravan.caravan.destination] : [])).map((check) => on(LocationLocked, check)),
+        ...(caravan ? this.caravanStartWrites(items, on, playerId, adventureId, location, caravan) : []),
       ])
       .go();
     throwIfCancelled(result, failures);
     return started;
+  }
+
+  /**
+   * A caravan's writes in its start's transaction (decision 0059): each
+   * resource of the cargo debited from the origin's holding on the condition
+   * that the balance covers it, with a ledger entry `load` that can exist
+   * once; the destination camp's count of active heroes raised by the heroes
+   * marked to stay, on the condition that the hall is at the level read and
+   * its cap covers them, which is the slot held there. The destination's
+   * unlock is checked beside the origin's, in the start's own list.
+   */
+  private caravanStartWrites(
+    items: TransactionItems,
+    on: ReturnType<typeof failing>,
+    playerId: string,
+    adventureId: string,
+    origin: string,
+    { caravan, destination, capacity }: CaravanStart,
+  ) {
+    const staying = caravan.staying.length;
+    const location = caravan.destination;
+    return [
+      ...caravan.cargo.flatMap(({ material, amount }) => [
+        on(
+          InsufficientBalance,
+          items.holding
+            .update({ playerId, location: origin, material })
+            .subtract({ balance: amount })
+            .where((a, op) => op.gte(a.balance, amount))
+            .commit(),
+        ),
+        on(AlreadyApplied, items.ledger.create({ playerId, cause: adventureId, entry: `load#${material}`, location: origin, material, delta: -amount }).commit()),
+      ]),
+      ...(staying > 0
+        ? [
+            on(
+              DestinationFull,
+              items.camp
+                .update({ playerId, location })
+                .data((a, op) => {
+                  op.ifNotExists(a.hallLevel, 1);
+                  op.ifNotExists(a.warehouseLevel, 1);
+                  op.ifNotExists(a.livingHeroes, 0);
+                  op.add(a.activeHeroes, staying);
+                })
+                .where((a, op) => {
+                  // No item is a camp at level 1 with no heroes, and every camp item has a hall level.
+                  if (!destination.stored) return op.notExists(a.hallLevel);
+                  return `${op.eq(a.hallLevel, destination.hallLevel)} AND ${op.lte(a.activeHeroes, capacity - staying)}`;
+                })
+                .commit(),
+            ),
+          ]
+        : []),
+    ];
   }
 
   /**
@@ -643,6 +818,13 @@ export class Repository {
    * and cancels nothing, and a repeat of this settlement is stopped by the
    * record's condition as before. test/electrodb.test.ts holds the write.
    *
+   * A caravan (decision 0059) adds its destination's writes
+   * (`caravanSettleWrites`), and each hero marked to stay who lands moves
+   * there: its location is set, `recruitedIn` written from where it was if
+   * the item has none, its sighting moved there if it lives and deleted if it
+   * died, and the origin's counts let go of it, the active count always and
+   * the living count if it lives, beside the dead's.
+   *
    * Throws AdventureClosed when the open item or the record has moved on,
    * which is a repeat or a race with a discard; CampChanged when a balance
    * or the warehouse moved between the caller's read and this write, for the
@@ -653,6 +835,15 @@ export class Repository {
     const { adventureId, location, warehouseLevel, dead } = s;
     const failures: Failure[] = [];
     const on = failing(failures);
+    // A caravan's heroes who land (decision 0059): the origin lets go of each,
+    // and of each who lives its living count too, beside the dead's.
+    const landed = new Set(s.caravan?.landed ?? []);
+    const destination = s.caravan?.destination ?? location;
+    const landsAlive = s.survivors.filter(({ hero }) => landed.has(hero.id)).length;
+    const leaveLiving = dead.length + landsAlive;
+    const leaveActive = landed.size;
+    /** Where a hero is after settlement: the destination if it lands, and home otherwise. */
+    const at = (hero: Hero) => (landed.has(hero.id) ? destination : hero.location);
     const write = await this.service.transaction
       .write((items) => [
         on(
@@ -673,11 +864,11 @@ export class Repository {
         ),
         on(
           CampChanged,
-          dead.length > 0
+          leaveLiving > 0 || leaveActive > 0
             ? items.camp
                 .update({ playerId, location })
-                .subtract({ livingHeroes: dead.length })
-                .where((a, op) => `${op.eq(a.warehouseLevel, warehouseLevel)} AND ${op.gte(a.livingHeroes, dead.length)}`)
+                .subtract({ livingHeroes: leaveLiving, activeHeroes: leaveActive })
+                .where((a, op) => `${op.eq(a.warehouseLevel, warehouseLevel)} AND ${op.gte(a.livingHeroes, leaveLiving)} AND ${op.gte(a.activeHeroes, leaveActive)}`)
                 .commit()
             : items.camp
                 .check({ playerId, location })
@@ -689,40 +880,42 @@ export class Repository {
             HeroChanged,
             items.hero
               .update({ playerId, id: hero.id })
-              .set({ xp, level })
-              .remove(["adventureId"])
+              .data((a, op) => {
+                op.set(a.xp, xp);
+                op.set(a.level, level);
+                op.remove(a.adventureId);
+                if (!landed.has(hero.id)) return;
+                op.set(a.location, destination);
+                op.ifNotExists(a.recruitedIn, hero.location);
+              })
               .where((a, op) => op.eq(a.adventureId, adventureId))
               .commit(),
           ),
-          on(HeroChanged, items.sighting.put(sightingOf({ ...hero, xp, level }, now)).commit()),
+          on(HeroChanged, items.sighting.put(sightingOf({ ...hero, location: at(hero), xp, level }, now)).commit()),
+          // A hero who lands is no longer seen at home (decision 0029).
+          ...(landed.has(hero.id) ? [on(HeroChanged, items.sighting.delete({ location: hero.location, heroId: hero.id }).commit())] : []),
         ]),
         ...dead.flatMap((hero) => [
           on(
             HeroChanged,
             items.hero
               .update({ playerId, id: hero.id })
-              .set({ status: "DEAD" })
-              .remove(["adventureId"])
+              .data((a, op) => {
+                op.set(a.status, "DEAD");
+                op.remove(a.adventureId);
+                // A hero marked to stay lands dead, and counts at the destination as a dead hero counts at home.
+                if (!landed.has(hero.id)) return;
+                op.set(a.location, destination);
+                op.ifNotExists(a.recruitedIn, hero.location);
+              })
               .where((a, op) => `${op.eq(a.status, "ALIVE")} AND ${op.eq(a.adventureId, adventureId)}`)
               .commit(),
           ),
+          // A dead hero has no sighting, at home or where it landed.
           on(HeroChanged, items.sighting.delete({ location: hero.location, heroId: hero.id }).commit()),
         ]),
-        ...s.holdings.flatMap(({ material, read, credit, lost }) => [
-          ...(credit > 0
-            ? [
-                on(
-                  CampChanged,
-                  items.holding
-                    .update({ playerId, location, material })
-                    .set({ balance: (read ?? 0) + credit })
-                    .where((a, op) => (read === null ? op.notExists(a.balance) : op.eq(a.balance, read)))
-                    .commit(),
-                ),
-              ]
-            : []),
-          on(AdventureClosed, items.ledger.create({ playerId, cause: adventureId, entry: `credit#${material}`, location, material, delta: credit, lost }).commit()),
-        ]),
+        ...(s.caravan ? this.caravanSettleWrites(items, on, playerId, adventureId, s.caravan, landsAlive) : []),
+        ...cappedCredits(items, on, playerId, adventureId, location, "credit", s.holdings),
         on(AdventureClosed, items.recent.put(recentOf(s, now)).commit()),
         ...s.result.unlocks.map((unlock) =>
           on(
@@ -742,14 +935,64 @@ export class Repository {
   }
 
   /**
+   * A caravan's writes at its destination in the settle transaction (decision
+   * 0059). On an end that lands nobody, the slots held there are let go, on
+   * the condition that the count covers them. On arrival the slots stay, as
+   * the heroes who land now fill them, and the count of living heroes there
+   * rises by those who live; each resource of a cargo that arrived is
+   * credited up to the destination's cap on the condition that the balance
+   * and the warehouse are those read, with a ledger entry `deliver` saying
+   * the credit and what the cap lost. A destination that changes nothing
+   * here takes no item of the transaction.
+   */
+  private caravanSettleWrites(
+    items: TransactionItems,
+    on: ReturnType<typeof failing>,
+    playerId: string,
+    adventureId: string,
+    c: CaravanSettlement,
+    landsAlive: number,
+  ) {
+    const location = c.destination;
+    const delivering = c.deliveries.length > 0;
+    const camp = (() => {
+      if (c.released > 0) {
+        return items.camp
+          .update({ playerId, location })
+          .subtract({ activeHeroes: c.released })
+          .where((a, op) => op.gte(a.activeHeroes, c.released))
+          .commit();
+      }
+      // The warehouse is held only where the cargo is credited; a camp with no item is at level 1.
+      if (landsAlive > 0) {
+        // The slots the start held made the item, so it is stored whenever someone lands.
+        return items.camp
+          .update({ playerId, location })
+          .add({ livingHeroes: landsAlive })
+          .where((a, op) => (delivering ? `${op.eq(a.warehouseLevel, c.warehouseLevel)} AND ${op.exists(a.activeHeroes)}` : op.exists(a.activeHeroes)))
+          .commit();
+      }
+      if (delivering) return warehouseHeld(items, playerId, location, c.stored, c.warehouseLevel);
+      return undefined;
+    })();
+    return [...(camp ? [on(CampChanged, camp)] : []), ...cappedCredits(items, on, playerId, adventureId, location, "deliver", c.deliveries)];
+  }
+
+  /**
    * Discard: close an open adventure with nothing credited (decision 0030).
    * The open item is deleted only if it is this adventure, the record marked
    * discarded only if it is still open and the caller's, and each hero's mark
    * removed only if it is this adventure's, so the party is back at the camp
-   * as it set out. Throws AdventureClosed when the adventure has moved on.
+   * as it set out. A caravan's cargo goes back to the origin's warehouse up
+   * to its cap, each holding on the condition that its balance and the
+   * warehouse are those read, with a ledger entry `return` saying what came
+   * back and what the cap lost; the slots held at the destination are let go
+   * (decision 0059). Throws AdventureClosed when the adventure has moved on,
+   * and CampChanged when a balance or the warehouse moved since the read.
    */
-  async discard(playerId: string, record: AdventureRecord, now = new Date()): Promise<void> {
-    const { adventureId } = record;
+  async discard(playerId: string, record: AdventureRecord, now = new Date(), returning?: CaravanReturn): Promise<void> {
+    const { adventureId, location } = record;
+    const staying = record.caravan?.staying.length ?? 0;
     const heroIds = record.snapshot.heroes.map((h) => h.heroId);
     const failures: Failure[] = [];
     const on = failing(failures);
@@ -780,6 +1023,22 @@ export class Repository {
               .commit(),
           ),
         ),
+        ...(returning && returning.returns.length > 0
+          ? [on(CampChanged, warehouseHeld(items, playerId, location, returning.stored, returning.warehouseLevel))]
+          : []),
+        ...cappedCredits(items, on, playerId, adventureId, location, "return", returning?.returns ?? []),
+        ...(record.caravan && staying > 0
+          ? [
+              on(
+                CampChanged,
+                items.camp
+                  .update({ playerId, location: record.caravan.destination })
+                  .subtract({ activeHeroes: staying })
+                  .where((a, op) => op.gte(a.activeHeroes, staying))
+                  .commit(),
+              ),
+            ]
+          : []),
       ])
       .go();
     throwIfCancelled(result, failures);

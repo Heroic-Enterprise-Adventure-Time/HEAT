@@ -10,7 +10,7 @@ import { type Hero, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { heroesSeenAt, type Random, SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, sightingOf } from "../src/seen.js";
-import { player, reads, whole } from "./data.js";
+import { heroFixture, player, reads, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -40,10 +40,7 @@ afterEach(() => {
 const place = () => `test-${randomUUID()}`;
 
 function hero(location: string, overrides: Partial<Hero> = {}): Hero {
-  return {
-    id: randomUUID(), location, unitType: "villager", spriteSet: "villager-01", name: "Ada",
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status: "ALIVE", retiredAt: null, adventureId: null, ...overrides,
-  };
+  return heroFixture(location, { name: "Ada", ...overrides });
 }
 
 async function putSighting(h: Hero, at = new Date()): Promise<void> {

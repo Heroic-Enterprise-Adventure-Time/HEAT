@@ -1,11 +1,18 @@
 import { randomUUID } from "node:crypto";
 
+import { sumBy } from "es-toolkit";
+
 import {
   type AdventureSnapshot,
   FACILITIES,
+  hallCapacity,
+  hubLevelCarrying,
   type Job,
   jobOf,
+  type Location,
+  must,
   type Requirement,
+  type Reward,
   type SnapshotHero,
   UNIT_PROFILES,
 } from "@heat/engine";
@@ -16,14 +23,29 @@ import {
   type AdventureRecord,
   AlreadyApplied,
   campLevels,
+  type CaravanStart,
+  DestinationFull,
   FacilityMissing,
   type Hero,
   HeroChanged,
+  InsufficientBalance,
   LocationLocked,
   type Repository,
 } from "./db/repository.js";
 import { campLocation, refuseNoCamp } from "./locations.js";
-import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Refusal, Requires } from "./refusals.js";
+import {
+  AdventureOpen,
+  badInput,
+  Conflict,
+  HallFull,
+  HeroAdventuring,
+  HeroDead,
+  HeroNotHere,
+  HeroRetired,
+  InsufficientResources,
+  Refusal,
+  Requires,
+} from "./refusals.js";
 
 /**
  * Starting an adventure from a location's job board, or from a facility the
@@ -49,7 +71,28 @@ import { AdventureOpen, badInput, Conflict, HeroAdventuring, HeroDead, HeroNotHe
  * location does not post, or a hero that is not the player's, is
  * BAD_USER_INPUT; the party is 1 to MAX_PARTY distinct lower-case ids by the
  * time it arrives (`StartAdventureInput`).
+ *
+ * A caravan, a job that delivers (decision 0059), also takes its cargo and
+ * the heroes of the party who stay at the destination. Its start debits the
+ * cargo from the origin's holdings and holds a slot in the destination's
+ * hall for each hero who stays, in the same transaction. Its refusals are
+ * InsufficientResources, a cargo the origin cannot pay, and HallFull, a
+ * destination hall with no slot for everyone who stays. A destination the
+ * player has no camp at, a hero marked to stay who is not of the party, or
+ * a cargo or a hero marked to stay on a job that delivers nothing, is
+ * BAD_USER_INPUT: the page offers none of them. A cargo whose hub is below
+ * the level that carries it is Requires, as a job's facility is. Each
+ * resource is in the cargo once, and the cargo within the largest cart, by
+ * the time it arrives (`StartAdventureInput`).
  */
+
+/** What a caravan carries and who stays, as the request names them; empty for any other job. */
+export interface CaravanRequest {
+  cargo: readonly Reward[];
+  staying: readonly string[];
+}
+
+const NO_CARAVAN: CaravanRequest = { cargo: [], staying: [] };
 
 /** A second start answers with the adventure already open, which the client reads from `me`. */
 function refuseOpen(adventureId: string): never {
@@ -105,13 +148,17 @@ async function startedBy(
   locationId: string,
   jobId: string,
   heroIds: readonly string[],
+  caravan: CaravanRequest,
 ): Promise<AdventureRecord | undefined> {
   const adventure = await repo.getAdventure(requestId);
   if (!adventure) return undefined;
   const party = adventure.snapshot.heroes.map((h) => h.heroId);
-  // The party's ids are distinct (StartAdventureInput), so the same ids in any order are the same party.
-  const sameParty = party.length === heroIds.length && heroIds.every((id) => party.includes(id));
-  const same = adventure.playerId === playerId && adventure.location === locationId && adventure.jobId === jobId && sameParty;
+  // The ids and the materials are distinct (StartAdventureInput), so the same ones in any order are the same.
+  const sameIds = (a: readonly string[], b: readonly string[]) => a.length === b.length && b.every((id) => a.includes(id));
+  const cargo = adventure.caravan?.cargo ?? [];
+  const sameCargo = cargo.length === caravan.cargo.length && caravan.cargo.every((c) => cargo.some((d) => d.material === c.material && d.amount === c.amount));
+  const sameCaravan = sameCargo && sameIds(adventure.caravan?.staying ?? [], caravan.staying);
+  const same = adventure.playerId === playerId && adventure.location === locationId && adventure.jobId === jobId && sameIds(party, heroIds) && sameCaravan;
   if (!same) badInput(`request ${requestId} started another adventure`);
   return adventure;
 }
@@ -124,12 +171,13 @@ export function startAdventure(
   locationId: string,
   jobId: string,
   heroIds: readonly string[],
+  caravan: CaravanRequest = NO_CARAVAN,
   now = new Date(),
   issueSeed: () => string = randomUUID,
 ): Promise<AdventureRecord> {
   return retryingConflicts("start", "the party changed while starting; no adventure was started", async () => {
     try {
-      return await startOnce(repo, playerId, version, requestId, locationId, jobId, heroIds, now, issueSeed);
+      return await startOnce(repo, playerId, version, requestId, locationId, jobId, heroIds, now, issueSeed, caravan);
     } catch (e) {
       // A refusal is final only once the work is read as not done after it
       // (graphql.md, rule 9). A repeat of a start that committed, the
@@ -137,7 +185,7 @@ export function startAdventure(
       // finds its own adventure open, or its party on it or back, and is
       // answered with that adventure.
       if (!(e instanceof Refusal)) throw e;
-      const started = await startedBy(repo, playerId, requestId, locationId, jobId, heroIds);
+      const started = await startedBy(repo, playerId, requestId, locationId, jobId, heroIds, caravan);
       if (started) return started;
       throw e;
     }
@@ -154,6 +202,7 @@ async function startOnce(
   heroIds: readonly string[],
   now: Date,
   issueSeed: () => string,
+  caravan: CaravanRequest,
 ): Promise<AdventureRecord> {
   const open = await repo.openAdventure(playerId);
   if (open) refuseOpen(open.adventureId);
@@ -161,9 +210,11 @@ async function startOnce(
   const at = await campLocation(repo, playerId, locationId);
   const job = jobAt(at.id, jobId);
   if (!job) badInput(`${at.name} has no job ${jobId}`);
+  const { destination, hubLevel } = await caravanShape(repo, playerId, job, heroIds, caravan);
 
-  // A facility's job needs the facility built (game.md, "Locations and camps").
-  const needs: Requirement[] = job.facility ? [{ kind: job.facility, level: 1 }] : [];
+  // A facility's job needs the facility built (game.md, "Locations and camps"),
+  // and a caravan's hub the level whose cart carries its cargo (decision 0059).
+  const needs: Requirement[] = job.facility ? [{ kind: job.facility, level: hubLevel }] : [];
   const checkFacilities = async (): Promise<void> => {
     if (needs.length === 0) return;
     const levels = campLevels(await repo.camp(playerId, at.id));
@@ -197,6 +248,31 @@ async function startOnce(
   };
   const heroes = await checkParty();
 
+  // A caravan's cargo against the origin's holdings, and its heroes who stay against the destination's hall.
+  // Another start that committed since the first read took the balance or the slot with its own adventure,
+  // so before either refusal the open item is read again, as a hero on an adventure is answered above.
+  const refuseCaravan = async (refusal: Refusal): Promise<never> => {
+    const winner = await repo.openAdventure(playerId);
+    if (winner) refuseOpen(winner.adventureId);
+    throw refusal;
+  };
+  const checkCaravan = async (): Promise<CaravanStart | undefined> => {
+    if (destination === undefined) return undefined;
+    const origin = await repo.camp(playerId, at.id);
+    const short = caravan.cargo
+      .map(({ material, amount }) => ({ material, amount, balance: origin.holdings.find((h) => h.material === material)?.balance ?? 0 }))
+      .filter((c) => c.balance < c.amount);
+    if (short.length > 0) {
+      const words = short.map((c) => `${c.amount} ${c.material}, and the camp has ${c.balance}`).join("; ");
+      return refuseCaravan(new InsufficientResources(`the cargo needs ${words}`, short));
+    }
+    const there = await repo.camp(playerId, destination.id);
+    const capacity = hallCapacity(there.hallLevel);
+    if (there.activeHeroes + caravan.staying.length > capacity) return refuseCaravan(new HallFull(`the heroes hall at ${destination.name} has no room for everyone who stays`));
+    return { caravan: { destination: destination.id, cargo: [...caravan.cargo], staying: [...caravan.staying] }, destination: there, capacity };
+  };
+  const carrying = await checkCaravan();
+
   const snapshot: AdventureSnapshot = { version, jobId: job.id, heroes: heroes.map(snapshotHero) };
   try {
     return await repo.startAdventure(playerId, {
@@ -207,17 +283,47 @@ async function startOnce(
       snapshot,
       version,
       startedAt: now.toISOString(),
-    }, needs);
+    }, needs, carrying);
   } catch (e) {
-    // The transaction's own check of the unlock, which the read above passed: an unlock is never taken away, so nothing explains it but the read.
-    if (e instanceof LocationLocked) refuseNoCamp(at.id);
+    // The transaction's own check of an unlock, which the reads above passed: an unlock is never taken away, so
+    // nothing explains it but a read. The one that failed is the destination's where the origin needs none.
+    if (e instanceof LocationLocked) refuseNoCamp(destination !== undefined && at.unlock === undefined ? destination.id : at.id);
     // AlreadyApplied: the record exists with no open item, a repeat after the adventure ended.
-    if (!(e instanceof AdventureAlreadyOpen || e instanceof AlreadyApplied || e instanceof HeroChanged || e instanceof FacilityMissing)) throw e;
+    const raced = [AdventureAlreadyOpen, AlreadyApplied, HeroChanged, FacilityMissing, InsufficientBalance, DestinationFull].some((t) => e instanceof t);
+    if (!raced) throw e;
     // Another request got there first: answer with what it changed.
     const winner = await repo.openAdventure(playerId);
     if (winner) refuseOpen(winner.adventureId);
     await checkParty();
     await checkFacilities();
+    await checkCaravan();
     throw new Conflict("the party changed while starting; no adventure was started");
   }
+}
+
+/**
+ * A caravan's request against its job, before anything of a camp is read:
+ * the destination, which must be a camp of the player's, and the least hub
+ * level whose cart carries the cargo, which the start holds as the hub's
+ * requirement (decision 0059). A job that delivers nothing takes no cargo
+ * and leaves nobody, and needs its facility at level 1, as every facility's
+ * job does.
+ */
+async function caravanShape(
+  repo: Repository,
+  playerId: string,
+  job: Job,
+  heroIds: readonly string[],
+  caravan: CaravanRequest,
+): Promise<{ destination: Location | undefined; hubLevel: number }> {
+  if (job.deliversTo === undefined) {
+    if (caravan.cargo.length > 0 || caravan.staying.length > 0) badInput(`${job.name} carries no cargo and leaves nobody anywhere`);
+    return { destination: undefined, hubLevel: 1 };
+  }
+  const stray = caravan.staying.find((id) => !heroIds.includes(id));
+  if (stray !== undefined) badInput(`${stray} is not of the party`);
+  const destination = await campLocation(repo, playerId, job.deliversTo);
+  // The schema refuses a cargo larger than the largest cart (graphql.md, rule 14), so a level always carries it.
+  const hubLevel = must(hubLevelCarrying(sumBy(caravan.cargo, (c) => c.amount)), "the hub level whose cart carries the cargo");
+  return { destination, hubLevel };
 }

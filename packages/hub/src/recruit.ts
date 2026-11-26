@@ -73,12 +73,12 @@ function barred(camp: Camp, recruit: Recruit): Refusal | undefined {
  * The hero this request made, if any. A request id reused for another unit
  * type or another location is the client's defect, not a repeat:
  * BAD_USER_INPUT, never the first request's hero (graphql.md, rule 7). The
- * location is compared with where the hero is, which is where it was
- * recruited for as long as nothing moves a hero; a caravan will (Issue-354).
+ * location is compared with where the hero was recruited, which no write
+ * changes, and not with where it is: a caravan moves a hero (decision 0059).
  */
 function madeBy(hero: Hero | undefined, requestId: string, locationId: string, unitType: string): Hero | undefined {
   if (hero && hero.unitType !== unitType) badInput(`request ${requestId} recruited a ${hero.unitType}, not a ${unitType}`);
-  if (hero && hero.location !== locationId) badInput(`request ${requestId} recruited at ${hero.location}, not at ${locationId}`);
+  if (hero && hero.recruitedIn !== locationId) badInput(`request ${requestId} recruited at ${hero.recruitedIn}, not at ${locationId}`);
   return hero;
 }
 
@@ -124,6 +124,7 @@ async function recruitOnce(repo: Repository, playerId: string, locationId: strin
   const hero: Hero = {
     id: requestId,
     location: at.id,
+    recruitedIn: at.id,
     unitType: recruit.unitType,
     spriteSet,
     name: pick(heroNames(SPRITE_SET_PRESENTATION[spriteSet] ?? "either", names), random),

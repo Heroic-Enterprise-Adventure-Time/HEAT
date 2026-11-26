@@ -10,7 +10,7 @@ import { type Hero, HeroChanged, type HeroStatus, Repository, TransactionConflic
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, Refusal } from "../src/refusals.js";
 import { retireHero } from "../src/retire.js";
-import { player, whole } from "./data.js";
+import { heroFixture, player, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -30,10 +30,7 @@ const at = "millbrook";
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths will leave them. */
 async function putCamp(p: string, statuses: HeroStatus[]): Promise<Hero[]> {
-  const heroes = statuses.map((status, i): Hero => ({
-    id: randomUUID(), location: at, unitType: "villager", spriteSet: "villager-01", name: `Hero ${i}`,
-    recruitedAt: new Date().toISOString(), level: 1, xp: 0, picks: [], status, retiredAt: null, adventureId: null,
-  }));
+  const heroes = statuses.map((status, i) => heroFixture(at, { name: `Hero ${i}`, status }));
   for (const hero of heroes) {
     await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
   }

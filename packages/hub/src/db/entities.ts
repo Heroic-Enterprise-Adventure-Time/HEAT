@@ -7,7 +7,7 @@ import type { RecentAdventure, RecentHero } from "../recent.js";
 import type { Sighting } from "../seen.js";
 import type { Tables } from "./client.js";
 import { GSI1, ITEM_VERSION, KEY, TEMPLATES } from "./keys.js";
-import type { AdventureRecord, EarnedUnlock, Hero, OpenAdventure, Player, SettledResult } from "./repository.js";
+import type { AdventureRecord, Caravan, EarnedUnlock, Hero, OpenAdventure, Player, SettledResult } from "./repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "./statuses.js";
 
 /**
@@ -85,6 +85,8 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         playerId,
         id: text,
         location: text,
+        // Absent on a hero recruited before Issue-354, which the repository reads as its location.
+        recruitedIn: { type: "string" },
         unitType: { type: UNIT_TYPES, required: true },
         spriteSet: text,
         name: text,
@@ -199,6 +201,7 @@ export function createService(client: DynamoDBDocumentClient, tables: Tables) {
         version: text,
         startedAt: text,
         status: { type: ADVENTURE_STATUSES, required: true },
+        caravan: { type: CustomAttributeType<Caravan>("any") },
         result: { type: CustomAttributeType<SettledResult>("any") },
         settledAt: { type: "string" },
         discardedAt: { type: "string" },

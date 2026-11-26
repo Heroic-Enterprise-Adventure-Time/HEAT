@@ -624,6 +624,21 @@ export const RESOURCE_NODES: Readonly<Record<ResourceType, ResourceNodeProfile>>
  */
 export const CART: CartProfile = { name: "Cart", homeLine: "near", health: 60 };
 
+/** What a caravan's cart carries in all, every resource of its cargo together, by caravan hub level; index 0 is level 1 (decision 0059). */
+export const CART_CAPACITY: readonly number[] = [100];
+
+/** What the cart of a hub at this level carries; nothing below level 1, the hub's highest level's above it. */
+export function cartCapacity(hubLevel: number): number {
+  if (hubLevel < 1) return 0;
+  return CART_CAPACITY[Math.min(hubLevel, CART_CAPACITY.length) - 1] ?? 0;
+}
+
+/** The least caravan hub level whose cart carries this much in all, or undefined where no level's does. */
+export function hubLevelCarrying(total: number): number | undefined {
+  const i = CART_CAPACITY.findIndex((capacity) => capacity >= total);
+  return i === -1 ? undefined : i + 1;
+}
+
 /** The content a battle reads by default. */
 export const BATTLE_CONTENT: BattleContent = {
   abilities: ABILITIES,
@@ -643,6 +658,7 @@ export type JobId =
   | "goblins-in-the-old-workings"
   | "lumber-from-the-deep-woods"
   | "scout-the-road-to-highcrag"
+  | "caravan-to-highcrag"
   | "ore-from-the-crag";
 
 /**
@@ -807,6 +823,30 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     pay: [],
     bonusXp: 8,
     grants: ["road-to-highcrag"],
+  },
+  // The caravan hub's caravan (Issue-354, decision 0059): the first job that
+  // delivers, so its party has the cart beside it in both fights, the cart's
+  // health carried between them. One bandit a fight, with a wolf on half the
+  // seeds, where two bandits a fight lose the cart to nearly every party
+  // (decision 0059, Issue-353's amendment). No pay: the delivery is the
+  // reward, and the bonus brings the job's XP to the road job's 20. What the
+  // cart carries, and who stays, is the hub's; the engine knows none of it.
+  "caravan-to-highcrag": {
+    id: "caravan-to-highcrag",
+    name: "Caravan to Highcrag",
+    description: "Carry goods up the hill road to Highcrag, and anyone who means to stay there. Bandits still watch the road, and they go for the cart first.",
+    location: "millbrook",
+    facility: "caravan-hub",
+    deliversTo: "highcrag",
+    stages: [
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "travel", lengthMs: 4000 },
+      { kind: "fight", opponents: [{ type: "bandit", count: 1 }, { type: "wolf", count: 1, chancePercent: 50 }], timeLimitMs: 60_000 },
+      { kind: "arrive" },
+    ],
+    pay: [],
+    bonusXp: 8,
   },
   // Highcrag's one board job (Issue-351, decision 0059): the mine's first
   // job on another hill, two veins and then a wolf, for the parties Highcrag

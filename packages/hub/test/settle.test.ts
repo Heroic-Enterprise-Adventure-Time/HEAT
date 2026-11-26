@@ -75,7 +75,7 @@ const putParty = (p: string, unitTypes: UnitType[]): Promise<Hero[]> => putParty
 
 /** Starts the job for the party; with `seed`, on that seed and not one the hub draws (graphql.md, rule 25). */
 async function start(p: string, heroes: Hero[], issuedBy = version, jobId: string = wolves.id, seed?: string) {
-  return startAdventure(repo, p, issuedBy, randomUUID(), at, jobId, heroes.map((h) => h.id), undefined, seed === undefined ? undefined : () => seed);
+  return startAdventure(repo, p, issuedBy, randomUUID(), at, jobId, heroes.map((h) => h.id), undefined, undefined, seed === undefined ? undefined : () => seed);
 }
 
 async function balanceOf(p: string, material: string) {

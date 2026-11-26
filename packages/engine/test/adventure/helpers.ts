@@ -128,10 +128,12 @@ export const GOBLINS = "goblins-in-the-old-workings";
 export const LUMBER = "lumber-from-the-deep-woods";
 export const ROAD = "scout-the-road-to-highcrag";
 export const CRAG = "ore-from-the-crag";
+export const CARAVAN = "caravan-to-highcrag";
 
 /**
- * A caravan of the tests' own (Issue-353): no caravan job is in the content
- * until Issue-354. Millbrook's hub to Highcrag, two fights with a bandit in
+ * A caravan of the tests' own (Issue-353), kept apart from the content's
+ * "Caravan to Highcrag" (Issue-354) so that the cart's rules are held apart
+ * from the road's numbers. Millbrook's hub to Highcrag, two fights with a bandit in
  * each and a wolf on half of them, so a cart stands beside the party in two
  * stages and carries its health from the first to the second.
  */

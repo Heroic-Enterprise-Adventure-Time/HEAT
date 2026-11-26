@@ -2,6 +2,10 @@
 An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.
 """
 type Adventure {
+  """
+  The caravan, on a job that delivers; null on any other. Read as the adventure is: by its player while it is open, by anyone once it is settled.
+  """
+  caravan: Caravan
   id: ID!
   job: Job!
 
@@ -59,6 +63,14 @@ What the hub's replay found and settlement wrote: how each stage ended, the rewa
 type AdventureResult {
   """What went into the warehouse."""
   credited: [Reward!]!
+
+  """
+  What a caravan's cargo put into the destination's warehouse. Empty for a job that delivers nothing, a cart that broke, a retreat or a defeat.
+  """
+  delivered: [Reward!]!
+
+  """What the destination warehouse's cap turned away of a caravan's cargo."""
+  deliveryLost: [Reward!]!
   endedAtMs: Int!
   heroes: [HeroOutcome!]!
 
@@ -152,6 +164,28 @@ type Camp {
   """Stock of each resource the warehouse holds at its level."""
   resourceCapacity: Int!
   warehouseLevel: Int!
+}
+
+"""
+A caravan as it set out (decision 0059): where it delivers, what it carries, and who of the party stays there on arrival.
+"""
+type Caravan {
+  """What the start took from the origin's warehouse, each resource once."""
+  cargo: [Reward!]!
+
+  """The location the job delivers to."""
+  destination: ID!
+
+  """
+  The heroes of the party who stay at the destination if the caravan arrives.
+  """
+  staying: [ID!]!
+}
+
+"""An amount of one resource a caravan carries."""
+input CargoInput {
+  amount: PositiveInt!
+  material: Material!
 }
 
 """
@@ -425,7 +459,7 @@ type Mutation {
   retireHero(input: RetireHeroInput!): RetireHeroResult
 
   """
-  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT.
+  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.
   """
   startAdventure(input: StartAdventureInput!): StartAdventureResult
 
@@ -709,6 +743,11 @@ type StageResult {
 
 """Which job to start, where, and with whom, and the request's id."""
 input StartAdventureInput {
+  """
+  What a caravan carries from the camp's warehouse, each resource at most once, at most 100 in all, which the cart of the caravan hub at its highest level carries; a hub below that level carries less, which the start refuses. Empty for a job that delivers nothing.
+  """
+  cargo: [CargoInput!]! = []
+
   """The party: one to four of the player's living heroes at that camp."""
   heroIds: [ID!]!
 
@@ -724,12 +763,17 @@ input StartAdventureInput {
   A UUID the client makes, which becomes the adventure's id; a repeat answers the adventure already started.
   """
   requestId: UUID!
+
+  """
+  The heroes of the party who stay at a caravan's destination if it arrives. Empty for a job that delivers nothing.
+  """
+  staying: [ID!]! = []
 }
 
 """
 What startAdventure answers: StartAdventureSuccess, or one of the refusals the union lists, each an Error.
 """
-union StartAdventureResult = AdventureOpen | Conflict | HeroAdventuring | HeroDead | HeroNotHere | HeroRetired | Requires | StartAdventureSuccess
+union StartAdventureResult = AdventureOpen | Conflict | HallFull | HeroAdventuring | HeroDead | HeroNotHere | HeroRetired | InsufficientResources | Requires | StartAdventureSuccess
 
 """The mutation did its work: the adventure opened."""
 type StartAdventureSuccess {
