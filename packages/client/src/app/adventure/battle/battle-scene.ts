@@ -15,6 +15,7 @@ import {
   PROP_SPRITE_SETS,
   RESOURCE_NODES,
   type ResourceType,
+  type Side,
   UNIT_PROFILES,
   type UnitType,
   WEAPON_SPRITES,
@@ -381,7 +382,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   let shown = 0;
   let heroSets: ReadonlyMap<string, string> = new Map();
   /** The party running on from the left, the other side rushing on from the right, or neither. */
-  let entering: 'party' | 'opponents' | null = null;
+  let entering: Side | null = null;
   /** How far right of its spots the other side still is while it rushes on. */
   let offset = 0;
   let destroyed = false;

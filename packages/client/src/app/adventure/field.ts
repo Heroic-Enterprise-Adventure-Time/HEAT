@@ -1,4 +1,4 @@
-import { type AdventureEvent, CART, CART_UNIT_ID, jobOf, type Line, MONSTERS, RESOURCE_NODES, type Side } from '@heat/engine';
+import { type AdventureEvent, type AdventureOutcome, CART, CART_UNIT_ID, jobOf, type Line, MONSTERS, RESOURCE_NODES, type Side, type UnitKind } from '@heat/engine';
 
 /**
  * Where everyone stands and how they are, read from the adventure's events
@@ -10,7 +10,7 @@ import { type AdventureEvent, CART, CART_UNIT_ID, jobOf, type Line, MONSTERS, RE
 export interface FieldUnit {
   readonly unitId: string;
   readonly side: Side;
-  readonly kind: 'hero' | 'cart' | 'monster' | 'resource';
+  readonly kind: UnitKind;
   /** The unit type, monster type or resource type. */
   readonly type: string;
   readonly name: string;
@@ -41,7 +41,7 @@ export interface Field {
   /** What has dropped to the party so far, counted up as each enemy falls (decision 0058). */
   readonly drops: readonly { readonly material: string; readonly amount: number }[];
   readonly order: 'press-on' | 'retreat';
-  readonly outcome: 'complete' | 'retreat' | 'defeat' | null;
+  readonly outcome: AdventureOutcome | null;
 }
 
 /** A cart's health as it sets out, and the most it has. */

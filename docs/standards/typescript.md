@@ -88,6 +88,10 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 29. **A value a script under `scripts/` must agree with in a package's source is read from the source, never copied into the script.** A colour a scene is made with, a list the page reads or a limit the engine applies is imported by the script from the file that declares it, which keeps to what Node's type stripping leaves working where the script runs it as it is, as `packages/client/src/app/ground-sets.ts` and `sprite-sets.ts` do; where it cannot be imported, the change that moves the value searches `scripts/` for it. `scripts/icon-set.mjs` reads the colour its icons are judged against from `GROUNDS`, the page's list of ground sets. Rule 24 says this of a test helper and `docs/README.md`, rule 5, of a document; this says it of a script (the review of PR-361, Issue-352).
 
+### What a package mirrors from another
+
+30. **A union a package mirrors from another is imported from the package that owns it, never spelled again.** Its type is named, `UnitKind` and not its members, or a type derived from it, so that a member added there reaches every place that reads it: rule 18 holds a list and its union together inside one package, and nothing holds two spellings in two packages together. The client's `FieldUnit` takes its kind from the engine's `UnitKind` (the review of PR-369, Issue-353).
+
 ## Held back
 
 Majors not taken, each with the reason and what releases it. A lint rule not yet met is listed in the standards document whose convention it expresses (rule 16): none, in this document or in `docs/standards/graphql.md`, since Issue-155. Checked 2026-11-02.

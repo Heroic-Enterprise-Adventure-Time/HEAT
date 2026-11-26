@@ -34,6 +34,8 @@ Rule 28. A candidate rule from the review of PR-359 (Issue-351), accepted by the
 
 Rule 29. A candidate rule from the review of PR-361 (Issue-352), accepted by the owner on 2026-11-24, where the script held `#4f7f2a` "where each scene makes its canvas" and the change moved that colour into a list and gave it another value.
 
+Rule 30. A candidate rule from the review of PR-369 (Issue-353), accepted by the owner on 2026-11-25: the engine added `cart` to `UnitKind` and the client's field spelled the union again by hand, so only a reader of both packages would have found the second place to add it. Applying the rule found two more copies in the client, the field's outcome and the battle scene's side running on, now `AdventureOutcome` and `Side`.
+
 Held back, `@graphql-tools/utils` overridden under `@apollo/server`. Dependabot alert 8 was reopened on 2026-11-17 by PR-311.
 
 Why. Latest with LTS preferred was stated by the owner as standing policy on 2026-10-14.
