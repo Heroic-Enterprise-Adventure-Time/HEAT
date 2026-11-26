@@ -84,8 +84,8 @@ describe('the layouts', () => {
     expect(groundAt('atlantis')).toBe('meadow-01');
   });
 
-  it('give Highcrag the hall, the warehouse and the job board: nothing can be built there yet (Issue-356)', () => {
-    expect(HIGHCRAG.facilities.map((f) => f.kind)).toEqual(['heroes-hall', 'warehouse', 'job-board']);
+  it('give Highcrag the hall, the warehouse, the job board, the caravan hub and the quarry (Issue-356)', () => {
+    expect(HIGHCRAG.facilities.map((f) => f.kind)).toEqual(['heroes-hall', 'warehouse', 'job-board', 'caravan-hub', 'quarry']);
   });
 
   for (const [id, layout] of Object.entries(LAYOUTS)) {

@@ -468,14 +468,14 @@ describe('Camp', () => {
 });
 
 describe('The camp at Highcrag (Issue-352)', () => {
-  it("is a scene like Millbrook's on Highcrag's own ground and layout: the hall, the warehouse and the job board, in the menu and in the scene", async () => {
+  it("is a scene like Millbrook's on Highcrag's own ground and layout: the hall, the warehouse, the job board, the caravan hub and the quarry, in the menu and in the scene", async () => {
     // The player is not read yet, as on a reload of this address: the camp stays, and is drawn.
     const { router, scene } = await renderCamp(atHighcrag(fakeGame([])), '/camp/highcrag');
     expect(router.url).toBe('/camp/highcrag/heroes-hall');
     expect(scene.layout).toBe(HIGHCRAG);
-    expect(textsOf(menu().getAllByRole('link'))).toEqual(['Heroes hall', 'Warehouse', 'Job board']);
+    expect(textsOf(menu().getAllByRole('link'))).toEqual(['Heroes hall', 'Warehouse', 'Job board', 'Caravan hub', 'Quarry']);
     expect(menu().getByRole('link', { name: 'Warehouse' })).toHaveAttribute('href', '/camp/highcrag/warehouse');
-    expect(scene.levels).toEqual({ 'heroes-hall': 1, warehouse: 1, 'job-board': 1 });
+    expect(scene.levels).toEqual({ 'heroes-hall': 1, warehouse: 1, 'job-board': 1, 'caravan-hub': 0, quarry: 0 });
   });
 
   it('says why its empty hall is empty and how a hero gets there, and offers its recruits at their cost, with no villager and nobody for nothing', async () => {

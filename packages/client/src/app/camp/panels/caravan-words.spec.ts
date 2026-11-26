@@ -3,7 +3,7 @@ import { CARAVAN_ORIGIN, CARAVAN_DESTINATION as highcrag } from '../../testing/c
 import { caravanReason, cargoLines, cargoWords, cartCapacityAt, freeSlots, loadWords, noWayBackWords, roomWords, stayedWords } from './caravan-words';
 
 // A resource a newer deploy holds and this client's engine does not know: the start could not name it.
-const millbrook: CampView = { ...CARAVAN_ORIGIN, holdings: [...CARAVAN_ORIGIN.holdings, { material: 'stone', balance: 5 }] };
+const millbrook: CampView = { ...CARAVAN_ORIGIN, holdings: [...CARAVAN_ORIGIN.holdings, { material: 'marble', balance: 5 }] };
 
 const caravan: NonNullable<AdventureView['caravan']> = {
   destination: 'highcrag',
