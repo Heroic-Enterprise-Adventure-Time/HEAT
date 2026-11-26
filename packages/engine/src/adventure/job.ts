@@ -91,6 +91,11 @@ export interface Job {
    * it; a job with none is on the location's job board (Issue-133).
    */
   readonly facility?: FacilityKind;
+  /**
+   * The level of its facility that the camp must have to start it, where a
+   * level posts a job of its own (Issue-357); a job without one needs level 1.
+   */
+  readonly facilityLevel?: number;
   /** The stages as written; an adventure runs `expandStages(job, seed)`, never these. */
   readonly stages: readonly Stage[];
   /** The reward from whoever posted the job, paid on arrival. */

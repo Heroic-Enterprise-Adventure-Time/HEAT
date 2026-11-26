@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 
 import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { range } from "es-toolkit";
+import { mapValues, range } from "es-toolkit";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import type { Material } from "@heat/engine";
+import type { FacilityKind, Material } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { BuildRefused, campLevels, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
-import { balances as balancesAt, heroFixture, player, stock as stockAt, whole } from "./data.js";
+import { balances as balancesAt, build as buildAt, heroFixture, player, stock as stockAt, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -31,6 +31,7 @@ const at = "millbrook";
 
 const stock = (p: string, holdings: Partial<Record<Material, number>>) => stockAt(repo, p, at, holdings);
 const balances = (p: string) => balancesAt(repo, p, at);
+const buildTo = (p: string, kind: FacilityKind, level: number) => buildAt(repo, p, at, kind, level);
 
 async function ledger(p: string): Promise<Record<string, unknown>[]> {
   const r = await db.send(
@@ -78,11 +79,12 @@ describe("buildFacility: the mine", () => {
     expect(await balances(p)).toEqual({ timber: 60, cloth: 3 });
   });
 
-  it("refuses the mine's second level, which this location does not offer", async () => {
+  it("refuses the mine's third level, which this location does not offer", async () => {
     const p = player();
-    await stock(p, { timber: 60, cloth: 3 });
+    await stock(p, { timber: 160, cloth: 3, stone: 40 });
     await buildFacility(repo, p, at, "mine", 1);
-    expect(await refusal(buildFacility(repo, p, at, "mine", 2))).toBeInstanceOf(MaxLevel);
+    await buildFacility(repo, p, at, "mine", 2);
+    expect(await refusal(buildFacility(repo, p, at, "mine", 3))).toBeInstanceOf(MaxLevel);
   });
 
   it("builds once and charges once for five concurrent requests", async () => {
@@ -239,4 +241,39 @@ describe("buildFacility: what a level needs first", () => {
     await expect(repo.build(p, camp, build)).rejects.toBeInstanceOf(BuildRefused);
     expect((await balances(p))["timber"]).toBe(100);
   });
+});
+
+// Millbrook's second levels (Issue-357, decision 0059): each costs stone,
+// which only Highcrag has, so a camp at Millbrook cannot build them from
+// what Millbrook has.
+describe("buildFacility: the second levels, costing stone", () => {
+  const SECOND_LEVELS = [
+    { kind: "mine", cost: { timber: 100, stone: 40 } },
+    { kind: "lumber-camp", cost: { timber: 60, ore: 40, stone: 40 } },
+    { kind: "caravan-hub", cost: { timber: 150, ore: 80, stone: 80 } },
+  ] as const;
+
+  for (const { kind, cost } of SECOND_LEVELS) {
+    it(`builds the ${kind}'s second level for ${Object.entries(cost).map(([m, a]) => `${String(a)} ${m}`).join(", ")}, with one ledger entry per resource`, async () => {
+      const p = player();
+      await buildTo(p, kind, 1);
+      await stock(p, cost);
+      const camp = await buildFacility(repo, p, at, kind, 2);
+      expect(camp.facilities[kind]).toBe(2);
+      expect(await balances(p)).toMatchObject(mapValues(cost, () => 0));
+      expect((await ledger(p)).map((e) => e["SK"])).toEqual(expect.arrayContaining(Object.keys(cost).map((m) => `LEDGER#build-${at}-${kind}-2#debit#${m}`)));
+    });
+
+    it(`refuses the ${kind}'s second level for want of stone, and builds and debits nothing`, async () => {
+      const p = player();
+      await buildTo(p, kind, 1);
+      const noStone = { ...cost, stone: 0 };
+      await stock(p, noStone);
+      const r = await refusal(buildFacility(repo, p, at, kind, 2));
+      expect(r).toBeInstanceOf(InsufficientResources);
+      expect(r).toMatchObject({ short: [{ material: "stone", amount: cost.stone, balance: 0 }] });
+      expect((await repo.camp(p, at)).facilities[kind]).toBe(1);
+      expect(await balances(p)).toMatchObject(noStone);
+    });
+  }
 });

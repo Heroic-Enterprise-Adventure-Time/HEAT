@@ -29,7 +29,7 @@ import { type Camp, FacilityMissing, type Hero, LocationLocked, Repository } fro
 import { discardAdventure } from "../src/discard.js";
 import { readAdventure } from "../src/read.js";
 import { recruitHero } from "../src/recruit.js";
-import { AdventureOpen, Conflict, HallFull, InsufficientResources } from "../src/refusals.js";
+import { AdventureOpen, Conflict, HallFull, InsufficientResources, Requires } from "../src/refusals.js";
 import { type CaravanRequest, startAdventure } from "../src/start.js";
 import { type OverrideInput, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines, type Timelines } from "../src/timelines.js";
@@ -484,6 +484,35 @@ describe("a caravan's settlement", () => {
     const expected = 3 + 3 * party.length + 1 + 2 * MATERIALS.length + 2 * MATERIALS.length + 1 + 1;
     expect(items).toEqual([expected]);
     expect(expected).toBeLessThan(100);
+  });
+});
+
+// The caravan hub's second level (Issue-357): its cart carries 200 in all.
+describe("the second level's cart", () => {
+  const larger = must(CART_CAPACITY[1], "the second level's cart");
+  const full: Reward[] = [{ material: "ore", amount: larger / 2 }, { material: "timber", amount: larger / 2 }];
+
+  it(`carries a cargo of ${String(larger)} from a level-2 hub, debiting it at the start and delivering it whole`, async () => {
+    const party: UnitType[] = ["fighter", "villager"];
+    const seed = seedFor(party, deliveredWhole);
+    const { p, heroes } = await ready(party);
+    await build(repo, p, home, hub, 2);
+    await stock(repo, p, home, { ore: larger / 2, timber: larger / 2 });
+    const started = await start(repo, p, heroes, { cargo: full, staying: [] }, seed);
+    expect(started.caravan?.cargo).toEqual(full);
+    expect(await balances(repo, p, home)).toMatchObject({ ore: 0, timber: 0 });
+    const settled = await submit(repo, p, started.adventureId);
+    expect(settled.result?.delivered).toEqual(full);
+    expect(await balances(repo, p, there)).toMatchObject({ ore: larger / 2, timber: larger / 2 });
+  });
+
+  it(`refuses a cargo of ${String(larger)} from a level-1 hub, saying it needs level 2, and debits nothing`, async () => {
+    const { p, heroes } = await ready(["fighter"], { ore: larger / 2, timber: larger / 2 });
+    const refused = await refusal(start(repo, p, heroes, { cargo: full, staying: [] }));
+    expect(refused).toBeInstanceOf(Requires);
+    expect(refused).toMatchObject({ missing: [{ kind: hub, level: 2 }] });
+    expect(await balances(repo, p, home)).toMatchObject({ ore: larger / 2, timber: larger / 2 });
+    expect(await repo.openAdventure(p)).toBeUndefined();
   });
 });
 

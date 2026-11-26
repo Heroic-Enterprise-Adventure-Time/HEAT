@@ -7,11 +7,13 @@ const wolves = JOBS['wolves-on-the-mill-road'];
 const timber = JOBS['timber-from-the-near-woods'];
 const ore = JOBS['ore-from-the-hill'];
 const caravan = JOBS['caravan-to-highcrag'];
+const seam = JOBS['the-deep-seam'];
+const stand = JOBS['the-old-growth-stand'];
 
 describe('job words', () => {
   it("lists a poster's jobs and finds one only where it is posted", () => {
     expect(jobsAt('millbrook', 'job-board').map((j) => j.id)).toEqual(['pick-up-sticks', 'timber-from-the-near-woods', 'wolves-on-the-mill-road']);
-    expect(jobsAt('millbrook', 'mine').map((j) => j.id)).toEqual(['ore-from-the-hill', 'goblins-in-the-old-workings']);
+    expect(jobsAt('millbrook', 'mine').map((j) => j.id)).toEqual(['ore-from-the-hill', 'goblins-in-the-old-workings', 'the-deep-seam']);
     expect(jobAt('millbrook', 'job-board', 'timber-from-the-near-woods')).toBe(timber);
     expect(jobAt('millbrook', 'job-board', 'ore-from-the-hill')).toBeUndefined();
     expect(jobAt('millbrook', 'mine', 'ore-from-the-hill')).toBe(ore);
@@ -25,9 +27,19 @@ describe('job words', () => {
   });
 
   it('says what a caravan to a location the player has no camp at needs, by the unlock and not by what grants it, and nothing otherwise', () => {
-    expect(lockedWords(caravan, ['millbrook'])).toBe('Needs the road to Highcrag.');
-    expect(lockedWords(caravan, ['millbrook', 'highcrag'])).toBeNull();
-    expect(lockedWords(wolves, ['millbrook'])).toBeNull();
+    const hub = [{ kind: 'caravan-hub' as const, level: 1 }];
+    expect(lockedWords(caravan, ['millbrook'], hub)).toBe('Needs the road to Highcrag.');
+    expect(lockedWords(caravan, ['millbrook', 'highcrag'], hub)).toBeNull();
+    expect(lockedWords(caravan, null, hub)).toBeNull();
+    expect(lockedWords(wolves, ['millbrook'], [])).toBeNull();
+  });
+
+  it('says what a job of a level the camp has not built needs, as the hub refuses it (Issue-357), and nothing once it is built', () => {
+    expect(lockedWords(seam, ['millbrook'], [{ kind: 'mine', level: 1 }])).toBe('Needs a level 2 mine.');
+    expect(lockedWords(stand, ['millbrook'], [{ kind: 'lumber-camp', level: 1 }])).toBe('Needs a level 2 lumber camp.');
+    expect(lockedWords(seam, null, [{ kind: 'mine', level: 1 }])).toBe('Needs a level 2 mine.');
+    expect(lockedWords(seam, ['millbrook'], [{ kind: 'mine', level: 2 }])).toBeNull();
+    expect(lockedWords(ore, ['millbrook'], [{ kind: 'mine', level: 1 }])).toBeNull();
   });
 
   it("says a job's pay, each resource of it, or that it pays nothing", () => {

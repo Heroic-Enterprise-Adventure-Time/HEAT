@@ -17,7 +17,7 @@ import {
   STARTING_LOCATION,
   warehouseCapacity,
 } from "../../src/index.js";
-import { atLargest, contentWithJob, haul, hideOf, LUMBER, party, played, RECRUITED_TYPES, rewardOf, SEEDS, seeds, snapshot, TIMBER, villagers } from "./helpers.js";
+import { atLargest, contentWithJob, haul, hideOf, LUMBER, party, played, RECRUITED_TYPES, rewardOf, SEEDS, seeds, snapshot, STAND, TIMBER, villagers } from "./helpers.js";
 
 // The lumber camp's first job (Issue-291), the first written for decision
 // 0058's shape: three trees or four, and on half its runs a wolf or two among
@@ -87,10 +87,10 @@ function expectSafe(heroes: readonly SnapshotHero[], level: number): void {
 }
 
 describe("Lumber from the deep woods", () => {
-  it("is posted by Millbrook's lumber camp, its one job, and not by the job board", () => {
+  it("is posted by Millbrook's lumber camp, its first job, and not by the job board", () => {
     expect(lumber.facility).toBe("lumber-camp");
     expect(FACILITIES["lumber-camp"].levels.length).toBeGreaterThan(0);
-    expect(jobsPostedBy(STARTING_LOCATION, "lumber-camp").map((j) => j.id)).toEqual([LUMBER]);
+    expect(jobsPostedBy(STARTING_LOCATION, "lumber-camp").map((j) => j.id)).toEqual([LUMBER, STAND]);
     expect(jobsPostedBy(STARTING_LOCATION, "job-board").map((j) => j.id)).not.toContain(LUMBER);
   });
 

@@ -132,6 +132,8 @@ export const CARAVAN = "caravan-to-highcrag";
 export const QUARRY_FACE = "stone-from-the-quarry-face";
 export const QUARRY_GOBLINS = "goblins-in-the-quarry";
 export const CARAVAN_BACK = "caravan-to-millbrook";
+export const SEAM = "the-deep-seam";
+export const STAND = "the-old-growth-stand";
 
 /**
  * A caravan of the tests' own (Issue-353), kept apart from the content's

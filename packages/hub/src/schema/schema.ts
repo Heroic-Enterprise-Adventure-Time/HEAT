@@ -635,7 +635,7 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
       validate: z.uuid("a request id is a UUID").check(z.toLowerCase()),
     }),
     location: t.id({ required: true, description: "The camp's location, which posts the job." }),
-    jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built." }),
+    jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built to the level the job needs." }),
     heroIds: t.idList({
       required: true,
       description: "The party: one to four of the player's living heroes at that camp.",

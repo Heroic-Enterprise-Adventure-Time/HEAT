@@ -110,8 +110,9 @@ describe("Caravan to Highcrag", () => {
 });
 
 describe("the cart's capacity", () => {
-  it("is 100 in all at hub level 1, and nothing below it", () => {
+  it("is 100 in all at hub level 1, 200 at level 2 (Issue-357), and nothing below level 1", () => {
     expect(cartCapacity(1)).toBe(100);
+    expect(cartCapacity(2)).toBe(200);
     expect(cartCapacity(0)).toBe(0);
     expect(cartCapacity(CART_CAPACITY.length + 1)).toBe(must(CART_CAPACITY.at(-1), "the highest level's cart"));
   });
@@ -119,6 +120,8 @@ describe("the cart's capacity", () => {
   it("names the least hub level whose cart carries a load, and none for a load no cart carries", () => {
     expect(hubLevelCarrying(0)).toBe(1);
     expect(hubLevelCarrying(100)).toBe(1);
+    expect(hubLevelCarrying(101)).toBe(2);
+    expect(hubLevelCarrying(200)).toBe(2);
     expect(hubLevelCarrying(must(CART_CAPACITY.at(-1), "the highest level's cart") + 1)).toBeUndefined();
   });
 });

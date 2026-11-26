@@ -1,4 +1,4 @@
-import { type FacilityKind, type Job, jobsPostedBy, location, UNLOCKS } from '@heat/engine';
+import { FACILITIES, type FacilityKind, type Job, jobFacilityLevel, jobsPostedBy, location, UNLOCKS } from '@heat/engine';
 
 /**
  * A job in the player's words. The page tells a job by its description, its
@@ -22,10 +22,18 @@ export function jobAt(at: string, poster: FacilityKind, id: string | null | unde
  * and not hidden: a caravan to a location the player has no camp at, which
  * needs that location's unlock (decision 0059). The words name the unlock
  * and not what grants it, since a job's description chooses whether to say
- * what it grants (game.md, "Unlocks"). Null for a job that can be started.
+ * what it grants (game.md, "Unlocks"); and a job its facility's level does
+ * not post yet, which needs that level (Issue-357), as the hub's refusal says.
+ * Null for a job that can be started; and, for the unlock alone, while the
+ * player's camps are not read yet (`campsAt` null), so that no route is said
+ * to be locked before the page knows.
  */
-export function lockedWords(job: Job, campsAt: readonly string[]): string | null {
-  if (job.deliversTo === undefined || campsAt.includes(job.deliversTo)) return null;
+export function lockedWords(job: Job, campsAt: readonly string[] | null, facilities: readonly { readonly kind: FacilityKind; readonly level: number }[]): string | null {
+  const needed = jobFacilityLevel(job);
+  if (job.facility && (facilities.find((f) => f.kind === job.facility)?.level ?? 0) < needed) {
+    return `Needs a level ${needed} ${FACILITIES[job.facility].name.toLowerCase()}.`;
+  }
+  if (campsAt === null || job.deliversTo === undefined || campsAt.includes(job.deliversTo)) return null;
   const unlock = location(job.deliversTo)?.unlock;
   if (!unlock) return null;
   const name = UNLOCKS[unlock].name;

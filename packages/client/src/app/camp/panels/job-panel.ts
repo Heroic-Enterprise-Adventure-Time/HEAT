@@ -61,7 +61,8 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
  * destination has no caravan hub, that a hero who stays cannot come back
  * until it has one. Depart is disabled with the reason while the picks break
  * a rule the hub checks again. A caravan to a location the player has not
- * unlocked says what it needs in place of the picks.
+ * unlocked, and a job its facility's level does not post yet (Issue-357),
+ * says what it needs in place of the picks.
  */
 @Component({
   selector: 'heat-job-panel',
@@ -122,11 +123,11 @@ export class JobPanel {
     const to = this.job()?.deliversTo;
     return (to && this.game.player()?.camps.find((c) => c.location === to)) ?? null;
   });
-  /** What a caravan to a location the player has not unlocked needs, once the player is read (`lockedWords`). */
+  /** What a job its facility's level does not post yet needs, or a caravan to a location the player has not unlocked, once the player is read (`lockedWords`). */
   protected readonly locked = computed(() => {
     const job = this.job();
-    const player = this.game.player();
-    return job && player ? lockedWords(job, player.camps.map((c) => c.location)) : null;
+    const camp = this.game.camp();
+    return job && camp ? lockedWords(job, this.game.player()?.camps.map((c) => c.location) ?? null, camp.facilities) : null;
   });
   /** Each resource the camp can load, beside its balance and the destination's room for it. */
   protected readonly cargoLines = computed(() => {

@@ -2,7 +2,7 @@ import { isEqual } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { type AdventureResult, FACILITIES, JOBS, jobsPostedBy, largestStages, location, MONSTERS, must, type SnapshotHero, STARTING_LOCATION } from "../../src/index.js";
-import { CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, party, played, RECRUITED_TYPES, ROAD, SEEDS, villagers, WOLVES } from "./helpers.js";
+import { CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, party, played, RECRUITED_TYPES, ROAD, SEEDS, STAND, villagers, WOLVES } from "./helpers.js";
 
 // "Scout the road to Highcrag" (Issue-352, decision 0059): the caravan hub's
 // first job, the first that grants an unlock, and the bandit's first job. A
@@ -64,9 +64,9 @@ describe("Scout the road to Highcrag", () => {
     expect(isEqual(largestStages(road), road.stages)).toBe(true);
   });
 
-  it("is the bandit's first job: no other job sets one against a party but the caravans the hubs post after it", () => {
+  it("is the bandit's first job: no other job sets one against a party but the caravans the hubs post after it and the lumber camp's second level's job", () => {
     const withBandits = Object.values(JOBS).filter((job) => job.stages.some((s) => (s.kind === "fight" || s.kind === "gather") && s.opponents.some((o) => o.type === "bandit")));
-    expect(withBandits.map((job) => job.id)).toEqual([ROAD, CARAVAN, CARAVAN_BACK]);
+    expect(withBandits.map((job) => job.id)).toEqual([ROAD, CARAVAN, CARAVAN_BACK, STAND]);
   });
 
   it("has no pay, and a bonus that brings its XP to the wolves job's 20", () => {

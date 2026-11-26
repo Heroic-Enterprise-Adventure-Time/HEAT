@@ -1,6 +1,6 @@
 # 0032: Building facilities: by the level asked for, in one transaction, with the hall's and the warehouse's levels on the camp
 
-- **Status:** Decided; the costs, levels and caps are working assumptions in the engine's static content; the mutation's arguments and its refusals take the shape of 0038 since Issue-155 (one input object, the refusals as result types); a second level of the mine, the lumber camp and the caravan hub, costing stone, decided by 0059 and not built (Issue-357).
+- **Status:** Decided; the costs, levels and caps are working assumptions in the engine's static content; the mutation's arguments and its refusals take the shape of 0038 since Issue-155 (one input object, the refusals as result types); a second level of the mine, the lumber camp and the caravan hub, costing stone, decided by 0059 and built by Issue-357, with the costs in its amendment.
 - **Date:** 2026-10-22
 - **Settles:** Issue-93: how a player builds and upgrades a camp's own facilities, the costs and levels at first, what a level needs first, and where each facility's level is stored.
 
