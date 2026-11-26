@@ -33,7 +33,7 @@ export const LIMITS = {
   // Each area's loader, with its standard, in every session that works in the area (Issue-364).
   // A session in the client or the hub loads `packages/AGENTS.md` too, so pays for both.
   // Lowered from 36_000 when typescript.md's detail on dependencies and lint moved to
-  // typescript-dependencies.md, which nothing loads (Issue-375): about 1.5K of room for rules.
+  // typescript-dependencies.md, which nothing loads, leaving room for new rules (Issue-375).
   "packages/AGENTS.md": 30_000,
   "packages/client/AGENTS.md": 25_000,
   "packages/hub/AGENTS.md": 28_000,

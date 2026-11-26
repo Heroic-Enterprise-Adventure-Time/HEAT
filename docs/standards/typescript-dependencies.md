@@ -23,7 +23,7 @@ Weighed against a library and kept, each for its reason:
 - the engine's seeded random, because replay would then depend on a library's stream staying bit-identical across releases (and es-toolkit's `random` is `Math.random`);
 - DataLoader, until a field resolves a list over N parents, which build order step 3 brings;
 - the Powertools idempotency utility, which raises on an in-flight duplicate where the hub answers the work as it is (`docs/standards/graphql.md`, rule 7);
-- a JWT library, because the authorizer has already verified the token (rule 12 of that document);
+- a JWT library, because the authorizer has already verified the token (`docs/standards/graphql.md`, rule 12);
 - the Terraform registry modules, because the project's own module library carries the guardrail reasoning per argument (`docs/standards/terraform.md`);
 - the plan-comment and release actions, because the scripts redact the account id and check the saved plan.
 
