@@ -120,7 +120,7 @@ export type StageKind =
 
 /** Which job to start, where, and with whom, and the request's id. */
 export type StartAdventureInput = {
-  /** What a caravan carries from the camp's warehouse, each resource at most once, within the caravan hub's cart. Empty for a job that delivers nothing. */
+  /** What a caravan carries from the camp's warehouse, each resource at most once, at most 100 in all, which the cart of the caravan hub at its highest level carries; a hub below that level carries less, which the start refuses. Empty for a job that delivers nothing. */
   readonly cargo?: ReadonlyArray<CargoInput>;
   /** The party: one to four of the player's living heroes at that camp. */
   readonly heroIds: ReadonlyArray<string | number>;
