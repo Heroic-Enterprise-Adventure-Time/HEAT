@@ -70,14 +70,14 @@ export type Material =
 /** One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up. */
 export type OverrideInput = {
   /** The ability forced, for a UNIT entry: at most 64 characters. */
-  readonly abilityId?: string | null | undefined;
+  readonly abilityId?: string | number | null | undefined;
   /** Milliseconds on the adventure's clock. */
   readonly acceptedAtSimTime: number;
   readonly kind: OverrideKind;
   /** The order, for a PARTY entry. */
   readonly order?: PartyOrder | null | undefined;
   /** The hero, for a UNIT entry. */
-  readonly unitId?: string | null | undefined;
+  readonly unitId?: string | number | null | undefined;
 };
 
 /** What a log entry is: a hero's forced action, or an order to the whole party. */

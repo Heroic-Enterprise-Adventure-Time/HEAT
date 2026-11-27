@@ -566,8 +566,8 @@ const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implem
       required: true,
     }),
     acceptedAtSimTime: t.field({ type: "NonNegativeInt", required: true, description: "Milliseconds on the adventure's clock." }),
-    unitId: t.string({ description: "The hero, for a UNIT entry." }),
-    abilityId: t.string({
+    unitId: t.id({ description: "The hero, for a UNIT entry." }),
+    abilityId: t.id({
       description: `The ability forced, for a UNIT entry: at most ${MAX_ABILITY_ID} characters.`,
       validate: z.string().check(z.maxLength(MAX_ABILITY_ID, `an ability id is at most ${MAX_ABILITY_ID} characters`)),
     }),

@@ -479,7 +479,7 @@ One entry of the override log, as the engine kept it: a hero's forced action (UN
 """
 input OverrideInput {
   """The ability forced, for a UNIT entry: at most 64 characters."""
-  abilityId: String
+  abilityId: ID
 
   """Milliseconds on the adventure's clock."""
   acceptedAtSimTime: NonNegativeInt!
@@ -489,7 +489,7 @@ input OverrideInput {
   order: PartyOrder
 
   """The hero, for a UNIT entry."""
-  unitId: String
+  unitId: ID
 }
 
 """
