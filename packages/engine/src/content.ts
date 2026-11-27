@@ -12,6 +12,7 @@
 
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
 import type { AbilityDefinition, BattleContent, CartProfile, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
+import { LINES } from "./battle/unit.js";
 import type { Material } from "./index.js";
 
 /** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. The list declares the union (typescript.md, rule 18). */
@@ -339,11 +340,11 @@ export const SPRITE_SETS: Readonly<Record<UnitType, readonly string[]>> = {
 
 /**
  * How a sprite set or a name reads, so that a hero's name suits its sprite
- * (game.md, "Heroes"). "either" fits both.
+ * (game.md, "Heroes"). "either" fits both. The list declares the union
+ * (typescript.md, rule 18).
  */
-export type Presentation = "masculine" | "feminine" | "either";
-
-export const PRESENTATIONS: readonly Presentation[] = ["masculine", "feminine", "either"];
+export const PRESENTATIONS = ["masculine", "feminine", "either"] as const;
+export type Presentation = (typeof PRESENTATIONS)[number];
 
 /**
  * Every sprite set's presentation, by its directory under art/heroes/. The
@@ -422,10 +423,7 @@ export type AbilityId = "strike" | "strike-weakest" | "strike-cart" | "bite" | "
 
 const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
 
-const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as const).map((actorLine) => ({
-  actorLine,
-  targetLines: ["front", "near", "far", "back"],
-}));
+const ANY_LINE: readonly LineReach[] = LINES.map((actorLine) => ({ actorLine, targetLines: LINES }));
 
 /**
  * Every ability a unit type or monster's list names (battle.md).
