@@ -9,6 +9,41 @@ export interface ReplayHero {
   readonly died: boolean;
 }
 
+/** A hero of a party with what its tile needs as well as its words. */
+export interface PartyHero extends ReplayHero {
+  readonly heroId: string;
+  readonly spriteSet: string;
+}
+
+/** A hero as the snapshot holds it when the party set out. */
+interface SetOutHero {
+  readonly heroId: string;
+  readonly name: string;
+  readonly unitType: string;
+  readonly spriteSet: string;
+  readonly level: number;
+}
+
+/** A hero as the result settled it. */
+interface SettledHero {
+  readonly heroId: string;
+  readonly level: number;
+  readonly dead: boolean;
+}
+
+/**
+ * The party in the order it set out, each with the level and the death the
+ * result gave it; with no result, as it set out. One derivation for a
+ * replay's list line, the replay's page and the open adventure's tiles.
+ */
+export function partyAfter(setOut: readonly SetOutHero[], settled: readonly SettledHero[] = []): PartyHero[] {
+  const after = new Map(settled.map((h) => [h.heroId, h]));
+  return setOut.map((h) => {
+    const result = after.get(h.heroId);
+    return { heroId: h.heroId, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: result?.level ?? h.level, died: result?.dead ?? false };
+  });
+}
+
 /**
  * One settled adventure as a list of replays shows it, the job board's
  * recent adventures or a job's replays (Issue-290): the same line from
@@ -41,12 +76,7 @@ export function recentLine(recent: RecentAdventureView): ReplayLine {
 export function replayLine(replay: ReplayView): ReplayLine | null {
   const { result, settledAt } = replay;
   if (!result || !settledAt) return null;
-  const after = new Map(result.heroes.map((h) => [h.heroId, h]));
-  const party = replay.snapshot.heroes.map((h) => {
-    const settled = after.get(h.heroId);
-    return { name: h.name, unitType: h.unitType, level: settled?.level ?? h.level, died: settled?.dead ?? false };
-  });
-  return { id: replay.id, job: replay.job.name, outcome: result.outcome, settledAt, party };
+  return { id: replay.id, job: replay.job.name, outcome: result.outcome, settledAt, party: partyAfter(replay.snapshot.heroes, result.heroes) };
 }
 
 /** The party in words, "Wat (fighter, level 2), Wren (villager, level 1, died)". */

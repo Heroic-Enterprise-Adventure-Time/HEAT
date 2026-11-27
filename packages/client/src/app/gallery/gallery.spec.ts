@@ -10,7 +10,7 @@ describe('the gallery', () => {
   it('opens without sign-in and shows every primitive', async () => {
     const { user } = await renderAt('/gallery', routes, [fakeIcons]);
     expect(await screen.findByRole('heading', { name: 'Gallery' })).toBeInTheDocument();
-    for (const name of ['Buttons', 'Action icons', 'Panel frame', 'Resource chips', 'Slot circles', 'Hero tiles', 'Back links and the more menu', 'Beside the scene']) {
+    for (const name of ['Buttons', 'Action icons', 'Panel frame', 'Resource chips', 'Slot circles', 'Hero tiles', 'Ways out and the more menu', 'Beside the scene']) {
       expect(screen.getByRole('heading', { name })).toBeInTheDocument();
     }
     expect(screen.getAllByRole('button', { name: 'primary, disabled' })[0]).toBeDisabled();
@@ -23,7 +23,7 @@ describe('the gallery', () => {
     expect(beyond).toBeDisabled();
     expect(screen.getByRole('link', { name: 'Wren' })).toHaveAttribute('href', '/gallery');
     expect(screen.getByRole('link', { name: 'Back to Gallery' })).toHaveAttribute('href', '/gallery');
-    const ways = within(screen.getByRole('region', { name: 'Back links and the more menu' }));
+    const ways = within(screen.getByRole('region', { name: 'Ways out and the more menu' }));
     await user.click(ways.getByRole('button', { name: 'More' }));
     expect(ways.getByRole('link', { name: 'Recently here' })).toBeInTheDocument();
   });

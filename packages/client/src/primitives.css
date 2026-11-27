@@ -74,6 +74,13 @@
   padding-bottom: calc(var(--space-xs) - var(--button-press));
 }
 
+/* A toggle that is on takes the primary's gold frame as well, so that the one speed or order chosen stands out of its row by more than a shade (owner's call, Issue-390). */
+.button[aria-pressed='true'] {
+  --button-frame: var(--frame-primary-image);
+  --button-slice: var(--frame-primary-slice);
+  --button-width: var(--frame-primary-width);
+}
+
 /* A panel's frame: the card a panel's content stands on. */
 .frame {
   padding: var(--space-sm);

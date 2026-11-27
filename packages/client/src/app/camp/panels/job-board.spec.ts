@@ -58,7 +58,7 @@ function wolvesReplay(id: string, outcome: NonNullable<ReplayView['result']>['ou
     settledAt: hoursAgo(hours),
     job: { id: 'wolves-on-the-mill-road', name: 'Wolves on the mill road' },
     result: { outcome, heroes: [{ heroId: 'x1', level: 3, dead: outcome === 'defeat' }] },
-    snapshot: { heroes: [{ heroId: 'x1', name: 'Bram', unitType: 'fighter', level: 2 }] },
+    snapshot: { heroes: [{ heroId: 'x1', name: 'Bram', unitType: 'fighter', spriteSet: 'fighter-02', level: 2 }] },
   };
 }
 

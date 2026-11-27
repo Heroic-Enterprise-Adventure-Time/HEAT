@@ -5,18 +5,25 @@
       <p>Loading…</p>
     }
     @case ('missing') {
-      <h2 id="panel-title">Replay</h2>
+      <div class="title">
+        <h2 id="panel-title">Replay</h2>
+        <heat-back-link kind="close" to="/" label="Camp" />
+      </div>
       <p>No such replay.</p>
-      <a class="link" routerLink="/">Back to camp</a>
     }
     @case ('failed') {
-      <h2 id="panel-title">Replay</h2>
+      <div class="title">
+        <h2 id="panel-title">Replay</h2>
+        <heat-back-link kind="close" to="/" label="Camp" />
+      </div>
       <p class="lost" role="alert">The replay could not be read.</p>
-      <a class="link" routerLink="/">Back to camp</a>
     }
     @default {
       @if (adventure(); as adventure) {
-        <h2 id="panel-title">{{ adventure.job.name }}</h2>
+        <div class="title">
+          <h2 id="panel-title">{{ adventure.job.name }}</h2>
+          <heat-back-link kind="close" [to]="['/camp', from().id, 'job-board']" [label]="from().name" />
+        </div>
         <p class="note">Replay. {{ whereWhen() }}</p>
         @if (outcome(); as outcome) {
           <p class="outcome">{{ outcome }}</p>
@@ -24,7 +31,7 @@
         @if (state() === 'playing') {
           <heat-playback [health]="true" />
           <div class="after">
-            <button type="button" (click)="watchAgain()">Watch from the start</button>
+            <button type="button" class="button secondary" (click)="watchAgain()"><heat-icon name="replays" />Watch from the start</button>
           </div>
         } @else if (state() === 'unreadable') {
           <p class="lost" role="alert">The replay could not be read.</p>
@@ -41,10 +48,17 @@
 
         @if (party(); as party) {
           <h3 id="party-title">Party</h3>
-          <p>{{ party }}</p>
+          <ul class="heroes" aria-labelledby="party-title">
+            @for (hero of party; track hero.heroId) {
+              <li>
+                <heat-hero-tile [hero]="hero" [still]="true" />
+                @if (hero.died) {
+                  <span class="dead">died</span>
+                }
+              </li>
+            }
+          </ul>
         }
-
-        <a class="link" [routerLink]="['/camp', from().id, 'job-board']">Back to {{ from().name }}</a>
       }
     }
   }

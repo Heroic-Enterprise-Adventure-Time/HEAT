@@ -10,7 +10,7 @@ import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
-import { textsOf } from '../testing/texts-of';
+import { textsOf, wordsOf } from '../testing/texts-of';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
 import { Replay } from './replay';
 
@@ -32,7 +32,7 @@ function settled(timeline: ReplayedView['timeline'] = played.timeline): Replayed
     status: 'SETTLED',
     settledAt: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
     job: { id: 'timber-from-the-near-woods', name: 'Timber from the near woods' },
-    snapshot: { heroes: snapshot.heroes.map(({ heroId, name, unitType, level }) => ({ heroId, name, unitType, level })) },
+    snapshot: { heroes: snapshot.heroes.map(({ heroId, name, unitType, spriteSet, level }) => ({ heroId, name, unitType, spriteSet, level })) },
     result: {
       outcome: 'complete',
       stages: [
@@ -115,7 +115,7 @@ describe('Replay page (Issue-290)', () => {
     expect(panel().getByText('Replay. At Millbrook, 2 hours ago.')).toBeInTheDocument();
     expect(panel().getByText('Job done.')).toBeInTheDocument();
     expect(textsOf(listItems('Stages'))).toEqual(['travel: done', 'gather: won', 'fight: won', 'arrive: done']);
-    expect(panel().getByText('Bram (fighter, level 3), Tansy (villager, level 1, died).')).toBeInTheDocument();
+    expect(wordsOf(listItems('Party'))).toEqual(['Bram fighter, level 3', 'Tansy villager, level 1 died']);
     expect(panel().getByRole('link', { name: 'Back to Millbrook' })).toHaveAttribute('href', '/camp/millbrook/job-board');
 
     const before = scene.fed.length;
@@ -219,7 +219,7 @@ describe('Replay page (Issue-290)', () => {
   it('says there is no such replay for an id the hub answers none for', async () => {
     await renderReplay(fakeGame(() => Promise.resolve(null)));
     expect(await panel().findByText('No such replay.')).toBeInTheDocument();
-    expect(panel().getByRole('link', { name: 'Back to camp' })).toHaveAttribute('href', '/');
+    expect(panel().getByRole('link', { name: 'Back to Camp' })).toHaveAttribute('href', '/');
   });
 
   it("says there is no such replay for the player's own adventure still open, which has no timeline to play", async () => {
@@ -230,6 +230,6 @@ describe('Replay page (Issue-290)', () => {
   it('says so, as an alert, when the replay could not be read', async () => {
     await renderReplay(fakeGame(() => Promise.reject(new ApiError('the hub answered 502', null))));
     expect(await panel().findByText('The replay could not be read.')).toHaveRole('alert');
-    expect(panel().getByRole('link', { name: 'Back to camp' })).toBeInTheDocument();
+    expect(panel().getByRole('link', { name: 'Back to Camp' })).toBeInTheDocument();
   });
 });
