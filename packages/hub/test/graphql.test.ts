@@ -5,7 +5,7 @@ import type { Context as LambdaContext } from "aws-lambda";
 import { constantCase } from "es-toolkit";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { CART_CAPACITY, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
+import { CART_CAPACITY, location, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
 
 import type { Tables } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
@@ -180,6 +180,16 @@ describe("the camp through the graph", () => {
     const second = await gql(RECRUIT, { id: randomUUID() }, p);
     expect(second.errors).toBeUndefined();
     expect(second.data?.recruitHero).toEqual({ __typename: "InsufficientResources", message: "a villager costs 20 timber, and the camp has 0" });
+  });
+
+  it("answers a unit type the hall is too low for with HallLevel and the level it needs", async () => {
+    const high = must(location("millbrook")?.recruits.find((r) => r.hallLevel > 1), "a recruit that needs a higher hall");
+    const recruit = `mutation($id: UUID!, $unitType: UnitType!) {
+      recruitHero(input: { location: "millbrook", unitType: $unitType, requestId: $id }) { __typename ... on HallLevel { level message } }
+    }` as Query<{ recruitHero: { __typename: string; level?: number; message?: string } }>;
+    const refused = await gql(recruit, { id: randomUUID(), unitType: constantCase(high.unitType) }, player());
+    expect(refused.errors).toBeUndefined();
+    expect(refused.data?.recruitHero).toEqual({ __typename: "HallLevel", level: high.hallLevel, message: `a ${high.unitType} needs a level ${high.hallLevel} hall` });
   });
 
   it("retires the villager, which frees the next villager", async () => {

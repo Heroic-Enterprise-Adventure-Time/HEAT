@@ -4,12 +4,12 @@ import { type DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { sortBy } from "es-toolkit";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { heroNames, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } from "@heat/engine";
+import { heroNames, location, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } from "@heat/engine";
 
 import { type Tables } from "../src/db/client.js";
 import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
-import { HallFull, InsufficientResources } from "../src/refusals.js";
+import { HallFull, HallLevel, InsufficientResources } from "../src/refusals.js";
 import { connected, heroFixture, player, putCamp as putCampAt, stock } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
@@ -210,6 +210,19 @@ describe("recruitHero: paid", () => {
     await putPaidCamp(p, 0, { ore: 40 });
     await recruitHero(repo, p, at, "fighter", randomUUID());
     expect(await repo.holdings(p, at)).toEqual([{ material: "ore", balance: 0 }]);
+  });
+
+  it("refuses a unit type the hall is too low for with the level it needs, before the price, and debits nothing", async () => {
+    // The first recruit this location offers above a new camp's hall, with its price in stock: the hall's level is the rule that answers.
+    const high = must(location(at)?.recruits.find((r) => r.hallLevel > 1), "a recruit that needs a higher hall");
+    const p = player();
+    const price = Object.fromEntries(high.cost.map((c) => [c.material, c.amount]));
+    await putPaidCamp(p, 1, price);
+    const refused = await refusal(recruitHero(repo, p, at, high.unitType, randomUUID()));
+    expect(refused).toBeInstanceOf(HallLevel);
+    expect(refused).toMatchObject({ hallLevel: high.hallLevel, message: `a ${high.unitType} needs a level ${high.hallLevel} hall` });
+    expect(sortBy(await repo.holdings(p, at), ["material"])).toEqual(sortBy(high.cost.map((c) => ({ material: c.material, balance: c.amount })), ["material"]));
+    expect(await repo.heroes(p)).toEqual([]);
   });
 
   it("says what is short when the camp cannot pay, and debits nothing", async () => {
