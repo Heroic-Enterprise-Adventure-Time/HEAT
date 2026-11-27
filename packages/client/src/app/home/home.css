@@ -10,12 +10,6 @@ h1 {
   margin: 0 0 var(--space-xl);
 }
 
-button {
-  font: inherit;
-  padding: var(--space-md) var(--space-xl);
-  cursor: pointer;
-}
-
 .error {
   color: var(--refusal);
 }

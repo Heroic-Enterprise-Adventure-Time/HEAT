@@ -6,7 +6,7 @@
     @if (config.error(); as error) {
       <p class="error" role="alert">The page could not load its stack configuration: {{ error }}.</p>
     } @else {
-      <button type="button" (click)="session.signIn()">{{ session.signInLabel }}</button>
+      <button type="button" class="button primary" (click)="session.signIn()">{{ session.signInLabel }}</button>
     }
 
     @if (session.error(); as error) {

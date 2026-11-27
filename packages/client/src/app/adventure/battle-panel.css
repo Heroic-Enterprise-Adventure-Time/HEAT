@@ -46,6 +46,10 @@ p {
   margin-top: var(--space-md);
 }
 
+.playback {
+  margin-bottom: var(--space-md);
+}
+
 .after {
   display: flex;
   flex-wrap: wrap;
