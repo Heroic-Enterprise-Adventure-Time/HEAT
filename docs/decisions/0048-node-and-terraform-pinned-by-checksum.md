@@ -1,6 +1,6 @@
 # 0048: Node and Terraform run at one exact release, checked against a pinned checksum, in every job
 
-- **Status:** Decided; the pins' tracking by Issue-275, the checkup's rule 12; amended 2026-11-27 by Issue-396 (the pull request that moves Node's major has no `dev` plan, and a bump rides with other pins)
+- **Status:** Decided; the pins' tracking by Issue-275, the checkup's rule 12; amended 2026-11-27 by Issue-426 (a pin per major, the new one first) and by Issue-396 (a bump rides with other pins)
 - **Date:** 2026-11-09
 - **Settles:** Issue-258 and the instance of `docs/process/best-practices.md` rule 14 that Issue-267 names, from the checkup of 2a146cf: `hashicorp/setup-terraform` with no version took the latest Terraform, and `actions/setup-node` took Node 24 by its major, each downloading with no check, in the jobs that plan and apply `prod`.
 - **Reverses:** `docs/standards/terraform.md` rule 13 and ci.yml's comment, which ran the latest Terraform in the pipeline on purpose.
@@ -17,13 +17,17 @@
 
 **No npm cache.** setup-node's `cache: npm` goes with it; `npm ci` checks every package against `package-lock.json`'s hashes on every run. A cache is a further input to the role-holding jobs, and its cost was not measured; it is reopened with the timings if the runs prove slow.
 
-## Amendment: the pull request that moves Node's major has no `dev` plan (Issue-396, 2026-11-27)
+## Amendment: a pin per major, the new one first (Issue-426, 2026-11-27)
 
-**That one pull request is merged without a `dev` plan.** The plan job runs `main`'s copy of `.github/actions/node` (decision 0047), which pins the old major and refuses the branch's `.node-version`, so "Bundle and build" fails; it gates nothing (`docs/process/code-changes.md`, rule 29). What the plan would show is read instead in the branch's sandbox stack, whose plan and apply run the branch's own copy on the new major, and `dev`'s apply after the merge runs on it as usual. What is given up is the owner reading `dev`'s own diff before the merge, for a change whose Terraform is one runtime string, `nodejs<major>.x`, and which the sandbox stack has already applied and tested.
+**The Node action pins one release per major and installs `.node-version`'s,** refusing a major it pins nothing for. A new major's pin lands on `main` in a pull request of its own before the one that moves `.node-version`; the old major's pin goes in the pull request that moves away from it.
+
+**Why.** The `pull_request_target` plan checks out the pull request's `.node-version` but runs `main`'s copy of the action. With one pin, the pull request that moved Node to 26, PR-425, found only 24's on `main`, and its `dev` plan failed. With the new major's pin on `main` first, the moving pull request is planned like any other. It costs one small pull request a major, about once a year.
+
+**Considered and not chosen.** Merging the move without a `dev` plan, reading the sandbox stack's plan instead. The owner first accepted it on Issue-396, on the reasoning that a pin per major would not help the moving pull request; that was wrong, because the pin per major can land first.
+
+## Amendment: a bump rides with other pins (Issue-396, 2026-11-27)
 
 **A bump rides in a pull request of versions and pins,** in a commit of its own, where "Decision" says a pull request of its own: Issue-396 moved Node, Terraform, Chromium and a library together, at the owner's call, and each still reads as one commit.
-
-**Why.** A major moves about once a year. Keeping the plan would take a pin per major in the action, chosen by `.node-version`, and the moving pull request would still find only the old major's pin on `main`, so it would still have no plan; the pin would buy nothing on the one pull request that needs it. A plan job that ran the pull request's copy of the action is what decision 0047 refuses.
 
 ## Considered and not chosen
 
