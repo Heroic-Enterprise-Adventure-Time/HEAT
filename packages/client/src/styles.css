@@ -91,9 +91,11 @@
   --space-xl: 1rem;
   --space-2xl: 1.25rem;
 
-  /* The type sizes beside the base, 1rem. */
+  /* The type sizes beside the base, 1rem: a menu entry's label, the small and the large text, and the home page's title. */
+  --text-xs: 0.7rem;
   --text-sm: 0.9rem;
   --text-lg: 1.1rem;
+  --text-title: 3rem;
 
   /* The border widths. */
   --border-thin: 1px;
