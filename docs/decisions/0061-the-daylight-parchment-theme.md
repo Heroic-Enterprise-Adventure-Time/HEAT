@@ -1,6 +1,6 @@
 # 0061: The daylight parchment theme: role tokens over the palette, shared primitives and pixel-art frames
 
-- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css`; not built: the frames and the action icons by Issue-385, the panels by Issue-386.
+- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css` and amended the frame's edge and corner (the amendment below); not built: the frames and the action icons by Issue-385, the panels by Issue-386.
 - **Date:** 2026-11-26
 - **Settles:** Issue-383: how the page looks once it reads as a casual mobile game, with less text and with buttons for actions. These are the owner's calls of 2026-11-26.
 - **Amends:** 0037, "read by the components with `var()`: the palette, a spacing scale, ...". From Issue-384 on, a component reads a role token, and only `styles.css` reads the palette.
@@ -22,11 +22,11 @@
 
 Each is styled in one place, as global styles or as a component of its own, so that Angular's per-component scoping does not copy it into every panel. A panel builds its controls from these and styles no button of its own.
 
-**The raised edge is subtle.** A frame has a 2px outline with its corners rounded by 4px, and a lower edge 2px below the outline in the ink faded to about a third, so that it reads as a soft shadow, not a second outline; a button's top edge is a lighter shade of its fill. The owner softened the edge and rounded the corners in review of Issue-384's gallery, from A2's square corners and a solid 4px lower edge, and Issue-385's frames follow it. A hero not picked has a soft tan outline, and only the picked hero has the ink outline. These lengths are pixels of the art, drawn at a whole-number scale, which is where `docs/process/best-practices.md`, rule 10, allows a pixel.
+**The raised edge is subtle.** A frame has a 2px outline and a 4px lower edge, and a button's top edge is a lighter shade of its fill. A hero not picked has a soft tan outline, and only the picked hero has the ink outline. These lengths are pixels of the art, drawn at a whole-number scale, which is where `docs/process/best-practices.md`, rule 10, allows a pixel.
 
 **The frames are pixel art, and everything else is plain CSS.** The panel, the primary button and the secondary button are each a 9-slice image. Each is applied with `border-image` at a whole-number scale with `image-rendering: pixelated`, like the page's icons (`docs/process/assets.md`, rule 25). Layout, colour, type and states stay in plain CSS (decision 0037). Until Issue-385 makes the frames, CSS draws them at the same edge. How a frame is made, and whether a pressed or a disabled state is a frame of its own, is settled at the start of Issue-385 and written into `docs/process/assets.md`.
 
-**Enforcement is stylelint.** A lint refuses a colour literal and a `px` length in any stylesheet but `styles.css`. A colour used once is no exception, as it is for other values (`docs/standards/angular.md`, rule 17). A length that is a pixel of the art, such as a frame's outline, lower edge and corner, or a one-pixel line, is a token declared in `styles.css`, so the lint never has to tell an art pixel from a layout one. Existing literals are moved to tokens or listed as allowed. It runs as a gate job, which is a required check of both rulesets (`docs/process/code-changes.md`, rule 29). Issue-384 chooses the rules and adds the job.
+**Enforcement is stylelint.** A lint refuses a colour literal and a `px` length in any stylesheet but `styles.css`. A colour used once is no exception, as it is for other values (`docs/standards/angular.md`, rule 17). A length that is a pixel of the art, such as a frame's outline and lower edge, or a one-pixel line, is a token declared in `styles.css`, so the lint never has to tell an art pixel from a layout one. Existing literals are moved to tokens or listed as allowed. It runs as a gate job, which is a required check of both rulesets (`docs/process/code-changes.md`, rule 29). Issue-384 chooses the rules and adds the job.
 
 **The page's body text stays `system-ui`.** Whether headings and buttons take a pixel webfont is left open. That would need its own record and a check of the font's licence, because the scene's font is drawn as sprites and the service's TrueType file is not committed (`docs/process/assets.md`, rule 37).
 
@@ -37,6 +37,10 @@ Each is styled in one place, as global styles or as a component of its own, so t
 - a panel's secondary views, the replays first, are behind its own "more" (⋯) menu;
 - resources are chips, shown by panel;
 - the header bar keeps its four items.
+
+## Amendment: the frame's edge and corner (Issue-384, 2026-11-26)
+
+The owner softened the raised edge and rounded the corners in review of Issue-384's gallery. A frame keeps its 2px outline, its corners round by 4px, and its lower edge is a shadow 2px below the outline in the ink at about a third of its strength, so that it reads as a soft shadow and not as a second outline, in place of the solid 4px lower edge. A button's top edge is still a lighter shade of its fill, and the hero tiles keep their outlines. The corner is a pixel of the art like the outline and the edge, a token in `styles.css` (`--frame-corner`), and the faded edge is a role (`--line-edge`). Issue-385's 9-slice frames are drawn to this edge and corner.
 
 ## Considered and not chosen
 
