@@ -453,6 +453,15 @@ describe("the adventure loop through the graph", () => {
       expect(repeat.data?.recruitHero).toMatchObject({ __typename: "RecruitHeroSuccess", hero: { id } });
     });
 
+    it("takes a hero's id in any case as that hero", async () => {
+      const p = `p-${randomUUID()}`;
+      await gql(JOIN, {}, p);
+      const id = randomUUID();
+      await gql(RECRUIT, { id }, p);
+      const retired = await gql(RETIRE, { id: id.toUpperCase() }, p);
+      expect(retired.data?.retireHero).toMatchObject({ __typename: "RetireHeroSuccess", hero: { id, status: "RETIRED" } });
+    });
+
     it("refuses a party of none, of too many, or with a hero twice", async () => {
       const p = `p-${randomUUID()}`;
       const id = randomUUID();

@@ -608,7 +608,10 @@ const BuildFacilityInput = builder.inputType("BuildFacilityInput", {
 
 const RetireHeroInput = builder.inputType("RetireHeroInput", {
   description: "Which hero to retire.",
-  fields: (t) => ({ heroId: t.id({ required: true }) }),
+  fields: (t) => ({
+    // One spelling per hero, as the party's ids in StartAdventureInput: the value is the record's key.
+    heroId: t.id({ required: true, validate: z.string().check(z.toLowerCase()) }),
+  }),
 });
 
 const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
