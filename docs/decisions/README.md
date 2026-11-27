@@ -14,6 +14,7 @@ One short record per significant decision: what was chosen, what was considered 
 8. A record's Decision or "Considered and not chosen" section that turns out wrong on a fact, while the decision stands, is corrected on its Status line, which quotes each sentence it corrects and says where the true statement now is; the sections stay as written. A decision that changes is a new record (rule 5; the review of PR-322, Issue-320).
 9. An issue that amends a detail of a record adds a section of its own, `## Amendment: <what> (Issue-n, <date>)`, after the last amendment and before "Considered and not chosen", and names it on the Status line (rules 6 and 7). It may list what that issue weighed and did not choose. An amendment that replaces the record's Decision, rather than adding to it, is a new record (rule 5; the review of PR-334, Issue-205).
 10. What a record decides is stated in its Decision section. "Considered and not chosen" says why a thing was not chosen and decides nothing (the review of PR-358, Issue-292).
+11. A record whose decision is not yet built says so on its Status line as `Decided; not built: ...`, naming each issue that builds a part, and its index row reads `Decided`. When an issue builds its part, the line names it as `built by Issue-n` (rule 6; the review of PR-387, Issue-383).
 
 ## Why
 

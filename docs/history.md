@@ -24,6 +24,8 @@ Rule 14. From Issue-318, which found the dev server's procedure, the shell's qui
 
 Rule 15. A candidate rule from the review of PR-342 (Issue-336), accepted by the owner on 2026-11-20: decision 0058 marked five items of `design/game.md` and missed two, and amended three records and missed 0052.
 
+Rule 15, its last sentence. A candidate rule from the review of PR-387 (Issue-383), accepted by the owner on 2026-11-26: decision 0061 and `process/assets.md`, rule 39, named the art build's glyphs moving to scene roles, and the search of the documents missed `scripts/icon-set.mjs`, which reads the same two colours for its sheet's numbers.
+
 Rule 16. A candidate rule from the review of PR-345 (Issue-339), accepted by the owner on 2026-11-20: `GatheringTrait` was added to the engine's enums, and the lists of them in `standards/graphql.md`, rule 4, and `standards/typescript.md`, rule 18, were found by a search for `StageEnding` and by no search for what the change removed.
 
 Rule 17. Done in two steps. Issue-363 cut what the root `AGENTS.md` loads and the decision index, while the standards, the design documents and this document's own rules still carried their accounts; Issue-364 cut those, and moved "The battle" out of `design/game.md` into `design/battle.md` (decision 0060).
