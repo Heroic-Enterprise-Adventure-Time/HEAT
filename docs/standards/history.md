@@ -6,6 +6,8 @@ Nothing loads this file, and no session reads it at its start (`docs/README.md`,
 
 ## typescript.md
 
+Rule 1. On 2026-11-27 (Issue-396) a pin's move became a commit of its own in a pull request of versions and pins. Issue-396 moved Node, Terraform, Chromium and graphql-eslint in one pull request at the owner's call, and the review of PR-425 found the rule still asked for a pull request of its own; each version still has a commit of its own. The sentence on `@types/node` is from the same review: the branch had dropped the types' major ignore along with Node 24's hold, which would have let Dependabot offer types for a major the code does not run on.
+
 Rule 8. The sentence on Node's own runner was added on 2026-11-19 (Issue-328), from the review of PR-333. The hooks' tests had run under `node --test` since Issue-318 while the rule named one test outside Vitest, and the trace report's test was the second of the kind; the rule now says what the code does, and why those tests need no package.
 
 Rule 9. From the review of PR-209, where a test flushed the metrics itself and so no test showed `logMetrics` doing it.
@@ -97,6 +99,8 @@ Why. The rules for scalars, input objects and result unions were taken on 2026-1
 ## terraform.md
 
 The document. Written on 2026-10-24 (Issue-145) from the roots and modules on `main`.
+
+Rule 13. On 2026-11-27 (Issue-396) the Terraform pin's move became a commit of its own in a pull request of versions and pins. Issue-396 moved Node, Terraform, Chromium and graphql-eslint in one pull request at the owner's call, and the review of PR-425 found the rule still asked for a pull request of its own; each version still has a commit of its own.
 
 Rule 17, tflint. The floor gained tflint on 2026-10-24 (Issue-145), when the owner weighted accepted practice over the code as it was. Its first run found four things of two kinds: an unused variable the environment module declared and three roots passed, removed, and an unused data source that exists on purpose, annotated.
 
