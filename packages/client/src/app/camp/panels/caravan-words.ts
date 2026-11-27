@@ -1,4 +1,4 @@
-import { sumBy } from 'es-toolkit';
+import { clamp, sumBy } from 'es-toolkit';
 
 import { cartCapacity, type Material, MATERIALS } from '@heat/engine';
 
@@ -73,7 +73,7 @@ export function cargoRows(lines: readonly CargoLine[], amounts: ReadonlyMap<Mate
   return lines.map((line) => {
     const amount = amounts.get(line.material) ?? 0;
     const most = Math.max(amount, Math.min(line.balance, amount + capacity - loaded));
-    const to = (delta: number) => Math.min(most, Math.max(0, amount + delta));
+    const to = (delta: number) => clamp(amount + delta, 0, most);
     const step = (delta: number, label: string) => ({ label, to: to(delta), disabled: to(delta) === amount });
     return {
       ...line,

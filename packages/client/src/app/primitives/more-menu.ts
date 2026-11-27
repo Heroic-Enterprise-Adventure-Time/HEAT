@@ -9,6 +9,9 @@ export interface MoreItem {
   readonly to: string | readonly unknown[];
 }
 
+/** Numbers each menu's list, unique on the page. */
+let menus = 0;
+
 /**
  * A panel's own "more" (⋯) menu (decision 0061; game.md, "The page"): a
  * button in the panel's title that shows and hides a short list of links to
@@ -30,8 +33,12 @@ export interface MoreItem {
 })
 export class MoreMenu {
   readonly items = input.required<readonly MoreItem[]>();
-  /** The id of the list, which the button controls; unique on the page. */
-  readonly id = input.required<string>();
+  /**
+   * The id of the list, which the button controls. It is the menu's own and
+   * not an input: an input named `id` and bound statically stays on the host
+   * element too, giving the page two elements of one id (PR-392's review).
+   */
+  protected readonly listId = `more-menu-${++menus}`;
   protected readonly open = signal(false);
   private readonly button = viewChild.required<ElementRef<HTMLButtonElement>>('button');
 

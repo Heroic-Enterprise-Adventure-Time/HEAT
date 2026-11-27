@@ -322,6 +322,10 @@ describe('What was done here (Issue-290), behind the more menu (Issue-386)', () 
     expect(panel().queryByRole('link', { name: 'Recently here' })).not.toBeInTheDocument();
     await user.click(more());
     expect(more()).toHaveAttribute('aria-expanded', 'true');
+    // The button controls the open list, the one element on the page with its id (PR-392's review).
+    const id = more().getAttribute('aria-controls') ?? '';
+    expect(document.querySelectorAll(`[id="${id}"]`)).toHaveLength(1);
+    expect(document.getElementById(id)).toHaveRole('list');
     expect(panel().getByRole('link', { name: 'Recently here' })).toHaveAttribute('href', RECENT);
     await user.keyboard('{Escape}');
     expect(more()).toHaveAttribute('aria-expanded', 'false');

@@ -11,7 +11,7 @@ describe('MoreMenu', () => {
     const user = userEvent.setup();
     await render(MoreMenu, {
       providers: [fakeIcons, provideRouter([])],
-      bindings: [inputBinding('id', () => 'board-more'), inputBinding('items', () => [{ label: 'Recently here', to: '/camp/millbrook/job-board/recent' }])],
+      bindings: [inputBinding('items', () => [{ label: 'Recently here', to: '/camp/millbrook/job-board/recent' }])],
     });
     return { user, button: screen.getByRole('button', { name: 'More' }) };
   }
@@ -19,7 +19,6 @@ describe('MoreMenu', () => {
   it('is a closed disclosure at first, showing the more icon and none of its links', async () => {
     const { button } = await renderMenu();
     expect(button).toHaveAttribute('aria-expanded', 'false');
-    expect(button).toHaveAttribute('aria-controls', 'board-more');
     expect(within(button).getByRole('presentation')).toHaveAttribute('src', '/art/icons/more.test.png');
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
@@ -29,7 +28,9 @@ describe('MoreMenu', () => {
     await user.click(button);
     expect(button).toHaveAttribute('aria-expanded', 'true');
     expect(within(button).getByRole('presentation')).toHaveAttribute('src', '/art/icons/close.test.png');
-    expect(screen.getByRole('list')).toHaveAttribute('id', 'board-more');
+    // The button controls the list it opens.
+    const id = button.getAttribute('aria-controls') ?? '';
+    expect(screen.getByRole('list')).toHaveAttribute('id', id);
     expect(screen.getByRole('link', { name: 'Recently here' })).toHaveAttribute('href', '/camp/millbrook/job-board/recent');
     await user.click(button);
     expect(button).toHaveAttribute('aria-expanded', 'false');

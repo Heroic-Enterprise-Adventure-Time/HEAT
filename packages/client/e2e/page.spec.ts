@@ -13,10 +13,15 @@ const signInButton = (page: Page) => page.getByRole('banner').getByRole('button'
 const signOutButton = (page: Page) => page.getByRole('banner').getByRole('button', { name: 'Sign out' });
 const living = (page: Page) => page.getByRole('list', { name: 'Living' }).getByRole('link');
 
-/** The name of the first living hero, which its tile is labelled by: the tile itself also says its unit type and level. */
+/**
+ * The name of the first living hero, read from the role tree: its tile is a
+ * link named by the hero alone, while its text also says its unit type and level.
+ */
 async function firstLivingName(page: Page): Promise<string> {
-  const id = await living(page).first().getAttribute('aria-labelledby');
-  return page.locator(`[id="${id ?? ''}"]`).innerText();
+  const snapshot = await living(page).first().ariaSnapshot();
+  const name = /^- link "(?<name>[^"]+)"/.exec(snapshot)?.groups?.['name'];
+  if (!name) throw new Error(`the first living hero's tile has no name: ${snapshot}`);
+  return name;
 }
 
 /** What goes wrong in the page from here on, so call it before the first navigation. */
