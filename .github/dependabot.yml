@@ -28,6 +28,10 @@ updates:
     ignore:
       - dependency-name: graphql
         update-types: ["version-update:semver-major"]
+      # Not held back but held for good: the types' major is .node-version's
+      # and moves only with it (docs/standards/typescript.md, rule 1).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
       # Held at the version AWS's OpenTelemetry layer carries, a minor and
