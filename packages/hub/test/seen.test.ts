@@ -7,9 +7,10 @@ import { STARTING_LOCATION } from "@heat/engine";
 
 import { type Tables } from "../src/db/client.js";
 import { type Hero, Repository } from "../src/db/repository.js";
+import type { Random } from "../src/random.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
-import { heroesSeenAt, type Random, SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, sightingOf } from "../src/seen.js";
+import { heroesSeenAt, SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, sightingOf } from "../src/seen.js";
 import { connected, heroFixture, place, player, reads, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 

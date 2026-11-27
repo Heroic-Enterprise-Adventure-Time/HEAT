@@ -21,6 +21,7 @@ import {
   type Repository,
 } from "./db/repository.js";
 import { campLocation, refuseNoCamp } from "./locations.js";
+import type { Random } from "./random.js";
 import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Refusal } from "./refusals.js";
 
 /**
@@ -48,8 +49,7 @@ import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Re
  * lower-case UUID by the time it arrives (`RecruitHeroInput`).
  */
 
-export type Random = (max: number) => number;
-
+/** One of the items, by the draw given (`random.ts` says why not es-toolkit's `sample`). */
 function pick<T>(items: readonly T[], random: Random): T {
   const item = items[random(items.length)];
   if (item === undefined) throw new Error("pick from an empty list");
