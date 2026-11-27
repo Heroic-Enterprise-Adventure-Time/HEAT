@@ -32,9 +32,9 @@ export const LIMITS = {
   "AGENTS.md": 45_000,
   // Each area's loader, with its standard, in every session that works in the area (Issue-364).
   // A session in the client or the hub loads `packages/AGENTS.md` too, so pays for both.
-  // Lowered from 36_000 when typescript.md's detail on dependencies and lint moved to
-  // typescript-dependencies.md, which nothing loads, leaving room for new rules (Issue-375).
-  "packages/AGENTS.md": 30_000,
+  // Lowered from 36_000 when typescript.md's detail on dependencies and lint moved to an unloaded
+  // companion (Issue-375), and from 30_000 when its rules for the client moved to angular.md (Issue-428).
+  "packages/AGENTS.md": 25_000,
   // Raised from 25_000 for rule 17's tokens the art build writes and the two rules of PR-389's review (Issue-385).
   "packages/client/AGENTS.md": 25_500,
   "packages/hub/AGENTS.md": 28_000,

@@ -1,7 +1,7 @@
 # The checks trivy raises against a scale-down a rule already states, one id
 # per line, excused for every root and module under this directory, with the
 # reason on the lines above it; the standing list is "Held back" in
-# docs/standards/terraform.md, and an excuse for one resource is an inline
+# docs/standards/terraform-detail.md, and an excuse for one resource is an inline
 # trivy:ignore on that resource instead (rule 17). Read by `trivy config .`
 # from this directory, on a laptop and in CI alike.
 

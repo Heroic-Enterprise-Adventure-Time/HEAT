@@ -107,4 +107,4 @@ The amendment of Issue-205 above has "The cast is whoever may appear, not whoeve
 
 ## Where it is described
 
-`packages/client/src/app/camp/`: the component, and the scene under `scene/`. `packages/client/src/app/adventure/battle/`: the battle scene. `packages/client/src/app/sprite-sheet.ts` and `packages/client/scripts/pack-art.mjs`: a set's sheet, loaded and packed. `docs/standards/typescript.md`, rule 15, and `docs/process/assets.md`, rule 4, for how the art reaches the build.
+`packages/client/src/app/camp/`: the component, and the scene under `scene/`. `packages/client/src/app/adventure/battle/`: the battle scene. `packages/client/src/app/sprite-sheet.ts` and `packages/client/scripts/pack-art.mjs`: a set's sheet, loaded and packed. `docs/standards/angular.md`, rule 22, and `docs/process/assets.md`, rule 4, for how the art reaches the build.

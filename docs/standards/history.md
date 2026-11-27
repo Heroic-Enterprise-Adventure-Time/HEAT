@@ -52,6 +52,8 @@ Why. The client's rules were added on 2026-10-17 with the first Angular code (Is
 
 Why. Rule 17's utility library comes from the review of PR-153 (Issue-149) and was adopted by Issue-154 on 2026-11-02: the code wrote by hand what a utility library names, a range in sixteen places, a clamp both ways round, one-key sort comparators, `[...new Set(xs)]`, each correct and each a second read to see what it means.
 
+Tiers, 2026-11-27 (Issue-428). The loaded documents kept reaching their limits: on PR-425 `typescript.md` went over `packages/AGENTS.md`'s 30,000 twice, by 46 bytes and then 77, and each time was reworded back under. The owner asked for a structural fix and accepted the three tiers of decision 0060's amendment. `typescript.md`'s "Held back" and "Why" moved to `typescript-detail.md`, with the detail of its long rules and the whole of those it now writes as one line; no rule's number changed. Rules 13 to 15, the client's, moved to `angular.md` as rules 20 to 22, because only client sessions need them, and their numbers here were retired with pointers; `packages/AGENTS.md`'s limit came down by their 5,000 bytes, and the client's stayed where it was. `typescript-dependencies.md`, the detail file of Issue-375, was renamed `typescript-detail.md`. The issue's body counted rules 27, 30 and 31 as enforced by a test or lint; a search found no check that holds them, so they stayed loaded.
+
 ## angular.md
 
 The document. Written on 2026-10-24 (Issue-145) from the code on `main` and from decisions 0024, 0028 and 0030, with accepted practice stated as the rule and the code's distance from it under "Held back".
@@ -73,6 +75,8 @@ Rule 15. The test rule, decision 0044, was the owner's call of 2026-11-03; Angul
 Rule 17. The pixel constants that copied the tokens were true only at the default font size, which the review of PR-189 found.
 
 Rule 19. Added on 2026-11-24 (Issue-352). The result page first asked the submit's result for the unlocks the run earned, a field the hub gained one pull request earlier: on `dev` the previous deploy already had it, and on `prod`, which had neither, the next release would have left every adventure open across it unsettled until the release after. Decision 0038 met the same limit once and accepted it; nothing said that the next field would meet it too. Rewritten on 2026-11-25 (Issue-355), by the owner's call: the rule of Issue-352 was that a field joins the submit's selection only once every environment's previous deploy has it, and what a result needed from a newer schema was read from an operation the current route alone answers. Issue-355's result needed what a caravan delivered; the agent proposed that second read, and the owner chose the cleaner shape, the fields on the submit's own result, with the break of the previous route said in the pull request. The rule now puts the cleanest shape first and makes the second read the exception.
+
+Tiers, 2026-11-27 (Issue-428). The loaded documents kept reaching their limits: on PR-425 `typescript.md` went over `packages/AGENTS.md`'s 30,000 twice, by 46 bytes and then 77, and each time was reworded back under. The owner asked for a structural fix and accepted the three tiers of decision 0060's amendment. `angular.md`'s "Held back" and "Why" moved to `angular-detail.md`, with the detail of its long rules and the whole of those it now writes as one line; no rule's number changed. Rules 20 to 22 came from `typescript.md`, rules 13 to 15.
 
 ## graphql.md
 
@@ -96,6 +100,8 @@ Rule 29. A candidate rule from the review of PR-371 (Issue-354), accepted by the
 
 Why. The rules for scalars, input objects and result unions were taken on 2026-10-24, when the owner weighted accepted practice over the code as it was: the hub's `GraphQLError` with a code in `extensions` was Apollo's older documented shape and still correct, but a union per mutation puts every refusal into the contract, typed. Both changes, the unions and the two tiers of error, touched the client and the stack test, which is why they were an issue of their own, Issue-155, and not a rubric's pull request. One place for each check (decision 0039) replaced checks written by hand in the verbs, correct and invisible to a reader of the contract, so that they ran after the reads they should have saved, and a test had to reach a verb to see them. Rules checked twice is the shape every transaction took from Issue-81 on. Logging lines and never bodies is the hub's observability module as first written.
 
+Tiers, 2026-11-27 (Issue-428). The loaded documents kept reaching their limits: on PR-425 `typescript.md` went over `packages/AGENTS.md`'s 30,000 twice, by 46 bytes and then 77, and each time was reworded back under. The owner asked for a structural fix and accepted the three tiers of decision 0060's amendment. `graphql.md`'s "Held back" and "Why" moved to `graphql-detail.md`, with the detail of its long rules and the whole of those it now writes as one line; no rule's number changed. Rule 11's list of public fields moved there too: the `ACCESS` table's test holds it, and the review reads the detail file whole.
+
 ## terraform.md
 
 The document. Written on 2026-10-24 (Issue-145) from the roots and modules on `main`.
@@ -107,3 +113,5 @@ Rule 17, tflint. The floor gained tflint on 2026-10-24 (Issue-145), when the own
 Rule 17, trivy. The floor gained trivy on 2026-11-02 (Issue-157). Its first run over `main` found 39 things of nine kinds. One was a fix, versioning on the replay bucket, whose objects are written once, so a version is never stored twice and a deleted timeline can be put back. Eight were scale-downs the rules already state, excused on the resource or in the ignore file.
 
 Held back, the scale-downs trivy would fail. Excused by id in `terraform/.trivyignore` on 2026-11-02 (Issue-157).
+
+Tiers, 2026-11-27 (Issue-428). The loaded documents kept reaching their limits: on PR-425 `typescript.md` went over `packages/AGENTS.md`'s 30,000 twice, by 46 bytes and then 77, and each time was reworded back under. The owner asked for a structural fix and accepted the three tiers of decision 0060's amendment. `terraform.md`'s "Held back" and "Why" moved to `terraform-detail.md`, with the detail of its long rules and the whole of those it now writes as one line; no rule's number changed.
