@@ -603,8 +603,10 @@ describe("discard", () => {
 
 describe("the level table", () => {
   it("raises a level at each threshold and never past the last", () => {
-    expect(levelForXp(0)).toBe(1);
-    expect(levelForXp(must(LEVEL_XP[1], "the second level's threshold"))).toBe(2);
+    for (const [i, threshold] of LEVEL_XP.entries()) {
+      expect(levelForXp(threshold), `at ${threshold} XP`).toBe(i + 1);
+      if (i > 0) expect(levelForXp(threshold - 1), `one short of ${threshold} XP`).toBe(i);
+    }
     expect(levelForXp(1_000_000)).toBe(LEVEL_XP.length);
   });
 });
