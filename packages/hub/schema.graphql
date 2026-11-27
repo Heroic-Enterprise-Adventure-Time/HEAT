@@ -461,7 +461,7 @@ type Mutation {
   retireHero(input: RetireHeroInput!): RetireHeroResult
 
   """
-  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.
+  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of 1 to 4 of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.
   """
   startAdventure(input: StartAdventureInput!): StartAdventureResult
 
@@ -548,7 +548,10 @@ type Query {
   """
   A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.
   """
-  heroesSeenAt(location: ID!): [SeenHero!]
+  heroesSeenAt(
+    """A location of the static content; any other id is refused."""
+    location: ID!
+  ): [SeenHero!]
 
   """The signed-in player, or null before joinGame has made their profile."""
   me: Player
@@ -561,12 +564,18 @@ type Query {
   """
   The adventures most recently settled at the location, newest first, at most 20 and none older than a week; the caller's own are among them like anyone's, and nothing says whose an adventure was.
   """
-  recentAdventuresAt(location: ID!): [RecentAdventure!]
+  recentAdventuresAt(
+    """A location of the static content; any other id is refused."""
+    location: ID!
+  ): [RecentAdventure!]
 
   """
   The job's replays: its adventures most recently settled, newest first, at most 20, whatever their outcome and whoever's they were, which nothing says. One settled a moment ago may not be listed yet. A job this version does not post is refused.
   """
-  replaysOf(job: ID!): [Adventure!]
+  replaysOf(
+    """A job of the static content; any other id is refused."""
+    job: ID!
+  ): [Adventure!]
 
   """
   The deploy's version: the commit this route's deploy runs. /graphql answers the current deploy's, /previous/graphql the one before.
@@ -710,6 +719,8 @@ type SnapshotHero {
   heroId: ID!
   level: Int!
   name: String!
+
+  """The set's directory under art/heroes/."""
   spriteSet: String!
   stats: UnitStats!
   unitType: UnitType!
@@ -750,7 +761,9 @@ input StartAdventureInput {
   """
   cargo: [CargoInput!]! = []
 
-  """The party: one to four of the player's living heroes at that camp."""
+  """
+  The party: 1 to 4 of the player's living heroes at that camp, each once.
+  """
   heroIds: [ID!]!
 
   """
@@ -767,7 +780,7 @@ input StartAdventureInput {
   requestId: UUID!
 
   """
-  The heroes of the party who stay at a caravan's destination if it arrives. Empty for a job that delivers nothing.
+  The heroes of the party who stay at a caravan's destination if it arrives, each once. Empty for a job that delivers nothing.
   """
   staying: [ID!]! = []
 }
