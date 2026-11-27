@@ -1,16 +1,19 @@
 import { Component, computed, effect, inject, resource, untracked, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { type AdventureTimeline, isPlayableTimeline, location } from '@heat/engine';
 
 import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
+import { BackLink } from '../primitives/back-link';
+import { HeroTile } from '../primitives/hero-tile';
+import { Icon } from '../primitives/icon';
 import { BattleView } from './battle-view';
 import { timelineCast } from './cast';
 import { Play } from './play';
 import { Playback } from './playback';
-import { agoWords, partyWords, replayLine } from './replay-words';
+import { agoWords } from './replay-words';
 import { outcomeWords, stageResultWords } from './result-words';
 
 /**
@@ -33,7 +36,7 @@ type ReplayState = 'loading' | 'missing' | 'failed' | 'unreadable' | 'unavailabl
  */
 @Component({
   selector: 'heat-replay',
-  imports: [BattleView, Playback, RouterLink],
+  imports: [BackLink, BattleView, HeroTile, Icon, Playback],
   templateUrl: './replay.html',
   styleUrl: './battle-panel.css',
   providers: [Play],
@@ -75,10 +78,15 @@ export class Replay {
     return outcome ? `${outcomeWords(outcome)}.` : null;
   });
   protected readonly stages = computed(() => stageResultWords(this.adventure()?.result?.stages ?? []));
+  /** The party as it set out, each hero's tile at the level the result gave it, and whether it died; null before a settled adventure is read. */
   protected readonly party = computed(() => {
     const adventure = this.adventure();
-    const line = adventure && replayLine(adventure);
-    return line ? `${partyWords(line.party)}.` : null;
+    if (!adventure?.result) return null;
+    const after = new Map(adventure.result.heroes.map((h) => [h.heroId, h]));
+    return adventure.snapshot.heroes.map((h) => {
+      const settled = after.get(h.heroId);
+      return { heroId: h.heroId, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: settled?.level ?? h.level, died: settled?.dead ?? false };
+    });
   });
 
   constructor() {

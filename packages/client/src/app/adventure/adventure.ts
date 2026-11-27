@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { ABILITIES, type AbilityId, isPlayableTimeline, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
@@ -7,6 +7,10 @@ import { cargoWords, stayedWords } from '../camp/panels/caravan-words';
 import { rewardWords } from '../camp/panels/job-words';
 import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
+import { BackLink } from '../primitives/back-link';
+import { HeroTile, type TileHero } from '../primitives/hero-tile';
+import { Icon } from '../primitives/icon';
+import { ResourceChip } from '../primitives/resource-chip';
 import { BattleView } from './battle-view';
 import { jobCast, timelineCast } from './cast';
 import { secondsLeft, waitingWords } from './field';
@@ -27,14 +31,15 @@ const UNREAD = 'Your camp could not be read again, so anything this run opened i
  * controls' place, with each unlock the run earned that the player did not
  * hold (Issue-352), and for a caravan what became of its cargo and who
  * stayed (Issue-355), the replay, which plays the stored timeline in the
- * same scene with no engine, and Back to camp. With no adventure open and no
+ * same scene with no engine, and the way out to the camp, which leaves the
+ * result behind. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
  * to load, and for the art of everyone this adventure sets against the party, so
  * that the party is seen running on from the start.
  */
 @Component({
   selector: 'heat-adventure',
-  imports: [BattleView, Playback],
+  imports: [BackLink, BattleView, HeroTile, Icon, Playback, ResourceChip],
   templateUrl: './adventure.html',
   styleUrl: './battle-panel.css',
   providers: [Play],
@@ -122,6 +127,8 @@ export class Adventure {
   protected readonly abilitiesWaitId = computed(() => (this.abilitiesWait() ? 'abilities-wait' : null));
 
   constructor() {
+    // The result is shown once: leaving it, by its way out or any other, puts it away, and the camp the player is read again for shows what it changed.
+    inject(DestroyRef).onDestroy(() => { this.game.settled.set(null); });
     effect(() => {
       const adventure = this.game.adventure();
       if (!adventure || this.game.settled() || !this.view().ready() || this.startedId === adventure.id) return;
@@ -190,10 +197,13 @@ export class Adventure {
     return this.game.settled()?.adventure.snapshot.heroes.find((h) => h.heroId === heroId)?.level ?? 1;
   }
 
-  /** Back to the camp the adventure left from, which the player was read again for; a reload waiting for this happens now. */
-  protected async backToCamp(): Promise<void> {
-    const at = this.game.settled()?.adventure.location ?? this.game.location();
-    await this.router.navigate(['/camp', at]);
-    this.game.settled.set(null);
+  /**
+   * A hero as its tile shows it, from the snapshot the adventure set out
+   * with: at the level the result gave it where there is one, else the level
+   * it set out at. Null for a hero the snapshot does not hold.
+   */
+  protected tileAfter(heroId: string, level: number | null): TileHero | null {
+    const hero = (this.game.settled()?.adventure ?? this.game.adventure())?.snapshot.heroes.find((h) => h.heroId === heroId);
+    return hero ? { name: hero.name, unitType: hero.unitType, spriteSet: hero.spriteSet, level: level ?? hero.level } : null;
   }
 }

@@ -11,7 +11,7 @@ import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { itemHolding, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
-import { textsOf } from '../testing/texts-of';
+import { textsOf, wordsOf } from '../testing/texts-of';
 import { Adventure } from './adventure';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
 import { isEntry } from './field';
@@ -140,6 +140,7 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBa
 }
 
 const button = (name: string) => screen.getByRole('button', { name });
+const link = (name: string) => screen.getByRole('link', { name });
 /** What a hero may do next: the group of its ability buttons. */
 const abilities = (hero: string) => within(screen.getByRole('group', { name: `${hero} next action` }));
 /** A hero's item in the party, which holds what it will do next. */
@@ -429,12 +430,12 @@ describe('Adventure', () => {
     expect(loadRun('a1')).toBeNull();
     expect(await screen.findByText('Job done.')).toBeInTheDocument();
     expect(textsOf(listItems('Stages'))).toEqual(['travel: done', 'gather: won', 'fight: won', 'arrive: done']);
-    expect(textsOf(listItems('Rewards'))).toEqual(['60 timber', '3 cloth']);
-    expect(screen.getByText('10 timber lost: the warehouse was full.')).toBeInTheDocument();
+    expect(wordsOf(listItems('Rewards'))).toEqual(['timber 60', 'cloth 3']);
+    expect(wordsOf([screen.getByText(/lost: the warehouse was full/)])).toEqual(['timber 10 lost: the warehouse was full.']);
     expect(screen.queryByText(/cloth lost/)).not.toBeInTheDocument();
-    expect(textsOf(listItems('Heroes'))).toEqual(['Wat +15 XP, level 2 level up', 'Wren died']);
+    expect(wordsOf(listItems('Heroes'))).toEqual(['Wat fighter, level 2 +15 XP level up', 'Wren villager, level 1 died']);
 
-    await user.click(button('Back to Millbrook'));
+    await user.click(link('Back to Millbrook'));
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
     expect(game.settled()).toBeNull();
   });
@@ -555,7 +556,7 @@ describe('Adventure', () => {
     const { run } = await renderAdventure(fakeGame(() => null));
     await run(120_000);
     expect(await screen.findByText('This adventure was lost to a game update. The party came home with nothing.')).toHaveRole('alert');
-    expect(button('Back to Millbrook')).toBeInTheDocument();
+    expect(link('Back to Millbrook')).toHaveAttribute('href', '/camp/millbrook');
   });
 
   it('keeps the log and offers to try again when the hub cannot be reached', async () => {

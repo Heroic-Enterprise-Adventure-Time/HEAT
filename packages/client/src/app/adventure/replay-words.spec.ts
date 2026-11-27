@@ -50,8 +50,8 @@ describe('replayLine', () => {
     result: { outcome: 'defeat', heroes: [{ heroId: 'x2', level: 4, dead: true }] },
     snapshot: {
       heroes: [
-        { heroId: 'x1', name: 'Bram', unitType: 'fighter', level: 2 },
-        { heroId: 'x2', name: 'Tansy', unitType: 'villager', level: 3 },
+        { heroId: 'x1', name: 'Bram', unitType: 'fighter', spriteSet: 'fighter-02', level: 2 },
+        { heroId: 'x2', name: 'Tansy', unitType: 'villager', spriteSet: 'villager-01', level: 3 },
       ],
     },
   };

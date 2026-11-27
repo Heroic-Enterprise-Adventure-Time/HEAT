@@ -9,7 +9,7 @@
         <span class="surface">On the {{ surface.name }}</span>
         @for (kind of kinds; track kind.name) {
           <button type="button" [class]="kind.classes">{{ kind.name }}</button>
-          <button type="button" aria-pressed="true" [class]="kind.classes">{{ kind.name }}, pressed</button>
+          <button type="button" aria-pressed="true" [class]="kind.classes">{{ kind.name }}, on</button>
           <button type="button" disabled [class]="kind.classes">{{ kind.name }}, disabled</button>
           <button type="button" [class]="kind.focusClasses">{{ kind.name }}, focus</button>
         }
@@ -85,9 +85,10 @@
   </section>
 
   <section aria-labelledby="ways">
-    <h2 id="ways">Back links and the more menu</h2>
+    <h2 id="ways">Ways out and the more menu</h2>
     <div class="row frame">
       <heat-back-link label="Gallery" to="/gallery" />
+      <heat-back-link kind="close" label="Camp" to="/gallery" />
       <heat-more-menu [items]="more" />
     </div>
   </section>
