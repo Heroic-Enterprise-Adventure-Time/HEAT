@@ -71,3 +71,7 @@ Standards for the API and `packages/hub`, beside `docs/standards/typescript.md`,
 ### What a request fills
 
 29. **A verb's parameters that a request fills come before those only a test passes,** as a caravan's cargo and its heroes who stay go ahead of `now` and `issueSeed` in `startAdventure`, so that a resolver never passes `undefined` to reach one, one argument away from passing a test's parameter by mistake (the review of PR-371, Issue-354).
+
+### What a check is held by
+
+30. **Every zod check on an input field or an argument has a case, sent through the handler, that it refuses, and the case reads its words.** The test finds the checks by walking the built schema (typescript.md, rule 28) and counts them against its cases, so a check added later fails until it has one: `CHECKS` in `packages/hub/test/graphql.test.ts`. A rewrite, such as a lower-casing, refuses nothing and has no case (Issue-269).

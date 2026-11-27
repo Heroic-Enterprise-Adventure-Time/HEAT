@@ -2,13 +2,15 @@ import { randomUUID } from "node:crypto";
 
 import { DeleteCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { Context as LambdaContext } from "aws-lambda";
-import { constantCase } from "es-toolkit";
+import { constantCase, sumBy } from "es-toolkit";
+import { type GraphQLSchema, isInputObjectType, isObjectType } from "graphql";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { CART_CAPACITY, location, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
 
 import type { Tables } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
+import { schema } from "../src/schema/schema.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
 import { connected, emptyResult, player, putRecentAdventure, putSettledAdventure, putUnlock, recentAdventure, settledAdventure } from "./data.js";
 import { event, type Handler, loadHandler } from "./event.js";
@@ -66,6 +68,47 @@ async function invalid(query: string, variables: Record<string, unknown>, player
   const res = await handler(event(query, variables, playerId, headers), {} as LambdaContext);
   expect(res.statusCode).toBe(400);
   return JSON.parse(res.body ?? "{}") as Reply<unknown>;
+}
+
+/** A zod schema as the walk reads it: its own check, the checks added to it, and what an array or an object holds. */
+interface Checked {
+  def: { check?: string; checks?: { _zod: { def: { check: string } } }[]; element?: Checked; shape?: Record<string, Checked> };
+}
+
+/**
+ * How many of a zod schema's checks can refuse a value: its own, as a UUID's
+ * format is, each one added to it that is not a rewrite (`overwrite`, which
+ * `toLowerCase` is), and those of an array's elements and an object's
+ * fields. A type alone is not counted: the field's GraphQL type refuses that
+ * before zod runs.
+ */
+function refusing(checked: Checked): number {
+  const own = checked.def.check === undefined ? 0 : 1;
+  const added = (checked.def.checks ?? []).filter((c) => c._zod.def.check !== "overwrite").length;
+  const held = [...(checked.def.element ? [checked.def.element] : []), ...Object.values(checked.def.shape ?? {})];
+  return own + added + sumBy(held, refusing);
+}
+
+/**
+ * Every input field and argument the built schema holds a zod schema for,
+ * `Type.field` or `Type.field(argument)`, with its count of refusing checks.
+ * The schema is read from the options Pothos keeps on what it built, where the
+ * validation plugin reads it too, as `access.test.ts` reads a scope; were an
+ * upgrade to move the options, the walk would find nothing and the test fail.
+ */
+function checksOf(built: GraphQLSchema): Record<string, number> {
+  const validate = (of: { extensions: object }) => ((of.extensions as Record<string, unknown>)["pothosOptions"] as { validate?: Checked } | undefined)?.validate;
+  const found: [string, number][] = [];
+  const note = (place: string, checked: Checked | undefined) => {
+    if (checked) found.push([place, refusing(checked)]);
+  };
+  for (const type of Object.values(built.getTypeMap())) {
+    if (isInputObjectType(type)) for (const field of Object.values(type.getFields())) note(`${type.name}.${field.name}`, validate(field));
+    if (isObjectType(type)) {
+      for (const field of Object.values(type.getFields())) for (const arg of field.args) note(`${type.name}.${field.name}(${arg.name})`, validate(arg));
+    }
+  }
+  return Object.fromEntries(found);
 }
 
 const JOIN = `mutation { joinGame { ... on JoinGameSuccess { player { id name } } } }` as Query<{ joinGame: Result<"player", { id: string; name: string | null }> }>;
@@ -434,17 +477,65 @@ describe("the adventure loop through the graph", () => {
     const ANY_LOG = `mutation($log: [OverrideInput!]!) { submitAdventure(input: { adventureId: "any", overrides: $log }) { __typename } }`;
     const BUILD = `mutation($level: PositiveInt!) { buildFacility(input: { location: "millbrook", kind: MINE, level: $level }) { __typename } }`;
     const unitEntry = { kind: "UNIT", acceptedAtSimTime: 0, unitId: "any", abilityId: "swing" };
+    const CARAVAN_START = `mutation($cargo: [CargoInput!]!, $staying: [ID!]!) {
+      startAdventure(input: { requestId: "${randomUUID()}", location: "millbrook", jobId: "caravan-to-highcrag", heroIds: ["any"], cargo: $cargo, staying: $staying }) { __typename }
+    }`;
+    const AT = (field: string) => `query($location: ID!) { ${field}(location: $location) { __typename } }`;
+    const REPLAYS = `query($job: ID!) { replaysOf(job: $job) { __typename } }`;
+    const hero = randomUUID();
+    const largest = Math.max(...CART_CAPACITY);
+    const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
+    const NOT_A_UUID = `${randomUUID()}}`;
+
+    type Case = readonly [what: string, query: string, variables: Record<string, unknown>, words: string];
+
+    /**
+     * Every zod check on an input field or an argument (graphql.md, rules 14
+     * and 30), by where the schema holds it, with one case per check: what it
+     * refuses, sent through the handler, and the words it answers. A place
+     * with no case holds only rewrites, a lower-casing, which refuse nothing.
+     * The walk counts the checks in the built schema, so a check added there
+     * fails here until it has a case.
+     */
+    const CHECKS: Record<string, readonly Case[]> = {
+      "OverrideInput.abilityId": [["an ability id of too many characters", ANY_LOG, { log: [{ ...unitEntry, abilityId: "a".repeat(MAX_ABILITY_ID + 1) }] }, `an ability id is at most ${MAX_ABILITY_ID} characters`]],
+      "Query.heroesSeenAt(location)": [["a location the content does not hold", AT("heroesSeenAt"), { location: "nowhere" }, "no location nowhere"]],
+      "Query.recentAdventuresAt(location)": [["a location the content does not hold", AT("recentAdventuresAt"), { location: "nowhere" }, "no location nowhere"]],
+      "Query.replaysOf(job)": [["a job the content does not hold", REPLAYS, { job: "no-such-job" }, "no job no-such-job"]],
+      // The UUID scalar lets a trailing brace through.
+      "RecruitHeroInput.requestId": [["what the scalar lets through as a UUID", RECRUIT, { id: NOT_A_UUID }, "a request id is a UUID"]],
+      "RetireHeroInput.heroId": [],
+      "StartAdventureInput.cargo": [
+        ["a resource twice", CARAVAN_START, { cargo: [{ material: "ORE", amount: 1 }, { material: "ORE", amount: 1 }], staying: [] }, "a resource is in the cargo twice"],
+        ["more than the largest cart carries", CARAVAN_START, { cargo: [{ material: "ORE", amount: largest }, { material: "TIMBER", amount: 1 }], staying: [] }, `a cart carries at most ${largest} in all`],
+      ],
+      "StartAdventureInput.heroIds": [
+        ["a party of none", START, { requestId: randomUUID(), heroIds: [] }, PARTY_SIZE],
+        ["a party of too many", START, { requestId: randomUUID(), heroIds: Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()) }, PARTY_SIZE],
+        ["a hero twice, in another case", START, { requestId: randomUUID(), heroIds: [hero, hero.toUpperCase()] }, "a hero is in the party twice"],
+      ],
+      "StartAdventureInput.requestId": [["what the scalar lets through as a UUID", START, { requestId: NOT_A_UUID, heroIds: [hero] }, "a request id is a UUID"]],
+      "StartAdventureInput.staying": [["a hero who stays twice, in another case", CARAVAN_START, { cargo: [], staying: [hero, hero.toUpperCase()] }, "a hero stays twice"]],
+      "SubmitAdventureInput.overrides": [["a log of too many entries", ANY_LOG, { log: Array.from({ length: MAX_OVERRIDES + 1 }, () => unitEntry) }, `a log holds at most ${MAX_OVERRIDES} entries`]],
+    };
+
+    it("has a case for every check the schema holds on an input field or an argument", () => {
+      expect(Object.fromEntries(Object.entries(CHECKS).map(([place, cases]) => [place, cases.length]))).toEqual(checksOf(schema));
+    });
+
+    it.each(Object.entries(CHECKS).flatMap(([place, cases]) => cases.map((c) => [place, ...c] as const)))("refuses at %s %s", async (_place, _what, query, variables, words) => {
+      const p = player();
+      const reply = await gql(query, variables, p);
+      expect(code(reply)).toBe("BAD_USER_INPUT");
+      expect(message(reply)).toContain(words);
+      expect(await repo.openAdventure(p)).toBeUndefined();
+      expect(await repo.heroes(p)).toEqual([]);
+    });
 
     it.each(["not-a-uuid", 7])("refuses the request id %s by its scalar", async (id) => {
       const reply = await invalid(RECRUIT, { id }, player());
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect(message(reply)).toContain("$id");
-    });
-
-    it("refuses what the scalar lets through as a UUID", async () => {
-      const reply = await gql(RECRUIT, { id: `${randomUUID()}}` }, player());
-      expect(code(reply)).toBe("BAD_USER_INPUT");
-      expect(message(reply)).toContain("a request id is a UUID");
     });
 
     it("takes a request id in any case as one request", async () => {
@@ -466,40 +557,6 @@ describe("the adventure loop through the graph", () => {
       expect(retired.data?.retireHero).toMatchObject({ __typename: "RetireHeroSuccess", hero: { id, status: "RETIRED" } });
     });
 
-    it("refuses a party of none, of too many, or with a hero twice", async () => {
-      const p = player();
-      const id = randomUUID();
-      for (const [heroIds, words] of [
-        [[], `a party is 1 to ${MAX_PARTY} heroes`],
-        [Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()), `a party is 1 to ${MAX_PARTY} heroes`],
-        [[id, id.toUpperCase()], "a hero is in the party twice"],
-      ] as const) {
-        const reply = await gql(START, { requestId: randomUUID(), heroIds }, p);
-        expect(code(reply)).toBe("BAD_USER_INPUT");
-        expect(message(reply)).toContain(words);
-      }
-      expect(await repo.openAdventure(p)).toBeUndefined();
-    });
-
-    it("refuses a cargo with a resource twice, beyond the largest cart, or a hero who stays twice", async () => {
-      const p = player();
-      const id = randomUUID();
-      const largest = Math.max(...CART_CAPACITY);
-      const CARAVAN_START = `mutation($requestId: UUID!, $cargo: [CargoInput!]!, $staying: [ID!]!) {
-        startAdventure(input: { requestId: $requestId, location: "millbrook", jobId: "caravan-to-highcrag", heroIds: ["${id}"], cargo: $cargo, staying: $staying }) { __typename }
-      }` as Query<{ startAdventure: { __typename: string } }>;
-      for (const [cargo, staying, words] of [
-        [[{ material: "ORE", amount: 1 }, { material: "ORE", amount: 1 }], [], "a resource is in the cargo twice"],
-        [[{ material: "ORE", amount: largest }, { material: "TIMBER", amount: 1 }], [], `a cart carries at most ${largest} in all`],
-        [[], [id, id.toUpperCase()], "a hero stays twice"],
-      ] as const) {
-        const reply = await gql(CARAVAN_START, { requestId: randomUUID(), cargo, staying }, p);
-        expect(code(reply)).toBe("BAD_USER_INPUT");
-        expect(message(reply)).toContain(words);
-      }
-      expect(await repo.openAdventure(p)).toBeUndefined();
-    });
-
     it("refuses a malformed party before a refusal: an open adventure is not read first", async () => {
       const p = player();
       await gql(JOIN, {}, p);
@@ -511,16 +568,6 @@ describe("the adventure loop through the graph", () => {
       const reply = await gql(START, { requestId: randomUUID(), heroIds: Array.from({ length: MAX_PARTY + 1 }, () => randomUUID()) }, p);
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect((await repo.openAdventure(p))?.adventureId).toBe(open.adventureId);
-    });
-
-    it("refuses a log of too many entries and an ability id of too many characters", async () => {
-      const p = player();
-      const long = await gql(ANY_LOG, { log: Array.from({ length: MAX_OVERRIDES + 1 }, () => unitEntry) }, p);
-      expect(code(long)).toBe("BAD_USER_INPUT");
-      expect(message(long)).toContain(`a log holds at most ${MAX_OVERRIDES} entries`);
-      const named = await gql(ANY_LOG, { log: [{ ...unitEntry, abilityId: "a".repeat(MAX_ABILITY_ID + 1) }] }, p);
-      expect(code(named)).toBe("BAD_USER_INPUT");
-      expect(message(named)).toContain(`an ability id is at most ${MAX_ABILITY_ID} characters`);
     });
 
     it.each([-1, 1.5, "7abc", 1e21])("refuses the time %s", async (acceptedAtSimTime) => {

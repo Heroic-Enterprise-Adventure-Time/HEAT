@@ -34,7 +34,7 @@ Public by decision, with what each contains, so that the list is reviewed: `play
 
 ## Rule 14: the checks on the schema
 
-A request id the client makes is a `UUID`. The zod schemas hold, besides a party, a log of at most `MAX_OVERRIDES` entries, the length of an ability id, and a known location where a field does nothing else with it. A limit a schema holds is stated in the field's description so that the printed schema shows it as a scalar's does. What stays in the verb: the job exists at this location, the hero is the player's, the level is the next, an entry names a hero of the party. A scalar's refusal is Apollo's own `BAD_USER_INPUT`, with HTTP 400 because execution never started. That input is checked before a scope is decided by the plugin's place in Pothos.
+A request id the client makes is a `UUID`. The zod schemas hold, besides a party, a log of at most `MAX_OVERRIDES` entries, the length of an ability id, and a known location where a field does nothing else with it. A limit a schema holds is stated in the field's description so that the printed schema shows it as a scalar's does. What stays in the verb: the job exists at this location, the hero is the player's, the level is the next, an entry names a hero of the party. A scalar's refusal is Apollo's own `BAD_USER_INPUT`, with HTTP 400 because execution never started. That input is checked before a scope is decided by the plugin's place in Pothos. The checks are counted by rule 30's test, which reads each zod schema from the options Pothos keeps on the built field, as rule 11's walk reads a scope.
 
 ## Rule 16: the log and the span
 
