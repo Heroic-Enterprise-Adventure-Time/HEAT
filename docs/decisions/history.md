@@ -15,3 +15,5 @@ Rule 8. From the review of PR-322 (Issue-320), where decision 0054 said that a c
 Rule 9. From the review of PR-334 (Issue-205), whose amendment to 0028 was the record's sixth and the first with a list of its own of what was not chosen, where no rule said what an amendment is.
 
 Rule 10. From the review of PR-358 (Issue-292), where decision 0059 said who may read a caravan's cargo only under an alternative it did not choose.
+
+Rule 11. A candidate rule from the review of PR-387 (Issue-383), accepted by the owner on 2026-11-26: decision 0061's Status line read `Decided, not built`, which is not one of rule 4's status words, where 0058 and 0059 had written `Decided; ... Built by Issue-n`.

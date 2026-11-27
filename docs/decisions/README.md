@@ -14,6 +14,7 @@ One short record per significant decision: what was chosen, what was considered 
 8. A record's Decision or "Considered and not chosen" section that turns out wrong on a fact, while the decision stands, is corrected on its Status line, which quotes each sentence it corrects and says where the true statement now is; the sections stay as written. A decision that changes is a new record (rule 5; the review of PR-322, Issue-320).
 9. An issue that amends a detail of a record adds a section of its own, `## Amendment: <what> (Issue-n, <date>)`, after the last amendment and before "Considered and not chosen", and names it on the Status line (rules 6 and 7). It may list what that issue weighed and did not choose. An amendment that replaces the record's Decision, rather than adding to it, is a new record (rule 5; the review of PR-334, Issue-205).
 10. What a record decides is stated in its Decision section. "Considered and not chosen" says why a thing was not chosen and decides nothing (the review of PR-358, Issue-292).
+11. A record whose decision is not yet built says so on its Status line as `Decided; not built: ...`, naming each issue that builds a part, and its index row reads `Decided`. When an issue builds its part, the line names it as `built by Issue-n` (rule 6; the review of PR-387, Issue-383).
 
 ## Why
 
@@ -59,7 +60,7 @@ The design and architecture documents say what is true now. They are edited as t
 | [0034](0034-checkup-findings-are-issues.md) | The checkup's findings are issues, and a closed `excused` issue is the suppression record | Decided, amended |
 | [0035](0035-account-ids-as-repository-secrets.md) | The account ids reach the pipeline as repository secrets | Decided |
 | [0036](0036-es-toolkit-and-known-libraries.md) | es-toolkit names the utility idioms, and a known library is preferred over our own | Decided |
-| [0037](0037-plain-css-with-a-token-layer.md) | Plain CSS with a token layer the layout arithmetic reads | Decided |
+| [0037](0037-plain-css-with-a-token-layer.md) | Plain CSS with a token layer the layout arithmetic reads | Decided, amended |
 | [0038](0038-errors-as-data.md) | Refusals as data in a result union per mutation, one input object per mutation, and the engine's sets as enums | Decided, amended |
 | [0039](0039-zod-through-the-validation-plugin.md) | The contract's scalars and zod check every boundary, and the Pothos validation plugin is where zod runs on the API | Decided, amended |
 | [0040](0040-metrics-through-powertools-and-middy.md) | Metrics through Powertools, with middy as the handler's middleware chain | Decided, amended |
@@ -83,3 +84,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0058](0058-drops-by-trait-and-jobs-that-vary.md) | What an adventure yields: drops by gathering trait, enemy XP, and jobs that vary | Decided, amended |
 | [0059](0059-unlocks-caravans-and-highcrag.md) | More locations: general unlocks, caravans with a cart, and Highcrag | Decided, amended |
 | [0060](0060-what-a-session-costs.md) | What a session costs: a compaction window, rules kept apart from their accounts, and a size for what every session loads | Decided, amended |
+| [0061](0061-the-daylight-parchment-theme.md) | The daylight parchment theme: role tokens over the palette, shared primitives and pixel-art frames | Decided |
