@@ -35,3 +35,5 @@ Rule 18. A candidate rule from the review of PR-369 (Issue-353), accepted by the
 Rule 19. A candidate rule from the review of PR-376 (Issue-375), accepted by the owner on 2026-11-26: the comment on `packages/AGENTS.md`'s new limit said "about 2K of room", was corrected to 1.5K before the pull request opened, and would have gone stale at the next rule added to `typescript.md`.
 
 Rule 20. A candidate rule from the review of PR-376 (Issue-375), accepted by the owner on 2026-11-26: `standards/typescript-dependencies.md` was the first document of its kind, with neither a Rules nor a Why section, and its occasions for reading were listed three times, in its opening, in `packages/AGENTS.md` and in this index, each differently.
+
+Rules 2, 3 and 20, 2026-11-27 (Issue-428). The standards' rules were sorted into the three tiers of decision 0060, item 9, and each standard was given a detail file, `<standard>-detail.md`, after `typescript-dependencies.md`, the first, was renamed. Rule 20 now says what such a file holds besides a rule's detail, rule 2 that a standard's reasons are there, and rule 3 that the tiers are how a standard makes room.

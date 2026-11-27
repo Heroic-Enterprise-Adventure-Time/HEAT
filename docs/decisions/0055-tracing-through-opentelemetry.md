@@ -59,4 +59,4 @@ All read on 2026-11-17.
 
 ## Where it is described
 
-`docs/standards/typescript.md`, rules 12 and 17, and `docs/standards/typescript-dependencies.md`, "Held back" (in `typescript.md` until Issue-375); `docs/standards/graphql.md`, rule 16; `docs/architecture/overview.md`, the functions' paragraph; `terraform/modules/environment/README.md`; `docs/process/development.md`, rule 7, which holds the standing yes; `docs/standards/terraform.md`, rule 20, and `docs/runbooks/checkup.md`, rule 12, for the layer's pin; `docs/README.md`, rule 9, for AWS's own account id in the layer's ARN.
+`docs/standards/typescript.md`, rules 12 and 17, and `docs/standards/typescript-detail.md`, "Held back" (in `typescript.md` until Issue-375); `docs/standards/graphql.md`, rule 16; `docs/architecture/overview.md`, the functions' paragraph; `terraform/modules/environment/README.md`; `docs/process/development.md`, rule 7, which holds the standing yes; `docs/standards/terraform.md`, rule 20, and `docs/runbooks/checkup.md`, rule 12, for the layer's pin; `docs/README.md`, rule 9, for AWS's own account id in the layer's ARN.
