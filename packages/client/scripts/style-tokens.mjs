@@ -8,6 +8,9 @@ import { fileURLToPath } from "node:url";
 
 const STYLES = readFileSync(fileURLToPath(new URL("../src/styles.css", import.meta.url)), "utf8");
 
+/** A colour of the palette: six hex digits, opaque. Both functions below read a colour by this one pattern. */
+const PALETTE_COLOUR = /^#([0-9a-f]{6})$/i;
+
 /**
  * A colour token as RGBA, by its name, `--scene-glyph`: a role followed
  * through the `var()` it is mapped onto to the palette's colour, opaque, as
@@ -21,7 +24,7 @@ export function colourToken(name, styles = STYLES) {
     seen.add(token);
     const value = new RegExp(`(?:^|[\\s;{])${token}:\\s*([^;]+);`, "m").exec(styles)?.[1]?.trim();
     if (value === undefined) throw new Error(`src/styles.css has no colour ${token}`);
-    const hex = /^#([0-9a-f]{6})$/i.exec(value)?.[1];
+    const hex = PALETTE_COLOUR.exec(value)?.[1];
     if (hex) return [0, 2, 4].map((at) => Number.parseInt(hex.slice(at, at + 2), 16)).concat(255);
     const next = /^var\((--[\w-]+)\)$/.exec(value)?.[1];
     if (!next) throw new Error(`src/styles.css gives ${token} no colour: ${value}`);
@@ -29,7 +32,15 @@ export function colourToken(name, styles = STYLES) {
   }
 }
 
-/** The palette's names, every token whose value is a colour literal, as the stylesheet lint reads them. */
+/**
+ * The palette's names, every token whose value is a colour literal, as the
+ * stylesheet lint reads them. A literal in any form but six hex digits is
+ * refused, so that the lint and colourToken never disagree on what is a
+ * colour of the palette.
+ */
 export function paletteNames(styles = STYLES) {
-  return [...styles.matchAll(/^\s*(--[\w-]+):\s*#[0-9a-f]{3,8};/gim)].map((match) => match[1]);
+  return [...styles.matchAll(/^\s*(--[\w-]+):\s*(#\w*);/gm)].map(([, name, value]) => {
+    if (!PALETTE_COLOUR.test(value)) throw new Error(`src/styles.css writes ${name} as ${value}, not six hex digits`);
+    return name;
+  });
 }

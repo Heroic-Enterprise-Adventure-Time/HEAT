@@ -37,6 +37,11 @@ test("the palette is every token whose value is a colour literal", () => {
   assert.deepEqual(paletteNames(STYLES), ["--soot", "--bone"]);
 });
 
+test("a palette colour in another form than six hex digits is refused", () => {
+  assert.throws(() => paletteNames(":root {\n  --white: #fff;\n}"), /--white as #fff, not six hex digits/);
+  assert.throws(() => paletteNames(":root {\n  --glass: #e8b55a80;\n}"), /--glass as #e8b55a80/);
+});
+
 test("the real stylesheet maps the scene's roles onto the scene's two colours", () => {
   assert.deepEqual(colourToken("--scene-glyph"), colourToken("--bone"));
   assert.deepEqual(colourToken("--scene-glyph-outline"), colourToken("--soot"));

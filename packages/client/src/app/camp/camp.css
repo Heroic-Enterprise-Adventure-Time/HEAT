@@ -164,9 +164,15 @@
   border-left: var(--border-thick) solid var(--line-frame);
 }
 
+/* The message stands on a panel's surface of its own, so that it reads wherever it lands, over the scene or the ink menu rail. */
 .error {
   position: fixed;
   bottom: var(--space-md);
   left: var(--space-xl);
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: var(--frame-outline) solid var(--line-frame);
+  border-radius: var(--frame-corner);
+  background: var(--surface-panel);
   color: var(--refusal);
 }

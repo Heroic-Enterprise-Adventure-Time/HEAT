@@ -1,7 +1,8 @@
 import { NgOptimizedImage } from '@angular/common';
 import { Component, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 
-import type { Material } from '@heat/engine';
+import { MATERIALS } from '@heat/engine';
 
 import { MAP_HEIGHT, MAP_WIDTH } from '../camp/scene/layout';
 import { HeroTile, type TileHero } from '../primitives/hero-tile';
@@ -12,6 +13,17 @@ const SCENE_FRAME = '/gallery/camp-millbrook-3x.png';
 /** The frame is the whole map at scale 3. */
 const SCENE_SCALE = 3;
 
+/** The sample heroes; the first stands beside the scene. */
+const WREN: TileHero = { name: 'Wren', unitType: 'ranger', level: 3 };
+const BRAM: TileHero = { name: 'Bram', unitType: 'knight', level: 1 };
+
+/** A button's kind, with the classes each of its states takes. */
+interface ButtonKind {
+  readonly name: string;
+  readonly classes: string;
+  readonly focusClasses: string;
+}
+
 /**
  * The gallery (Issue-384): every shared primitive in every state, on the
  * page and on a panel, beside a real frame of the scene, so that the theme
@@ -20,7 +32,7 @@ const SCENE_SCALE = 3;
  */
 @Component({
   selector: 'heat-gallery',
-  imports: [HeroTile, NgOptimizedImage, ResourceChip],
+  imports: [HeroTile, NgOptimizedImage, ResourceChip, RouterLink],
   templateUrl: './gallery.html',
   styleUrl: './gallery.css',
 })
@@ -28,11 +40,20 @@ export class Gallery {
   protected readonly sceneFrame = SCENE_FRAME;
   protected readonly sceneWidth = MAP_WIDTH * SCENE_SCALE;
   protected readonly sceneHeight = MAP_HEIGHT * SCENE_SCALE;
-  protected readonly materials: readonly Material[] = ['timber', 'ore', 'hide', 'cloth', 'stone'];
-  protected readonly heroes: readonly TileHero[] = [
-    { name: 'Wren', unitType: 'ranger', level: 3 },
-    { name: 'Bram', unitType: 'knight', level: 1 },
-  ];
+  /** The buttons are shown on the page and on a panel. */
+  protected readonly surfaces = [
+    { name: 'page', panel: false },
+    { name: 'panel', panel: true },
+  ] as const;
+  protected readonly kinds: readonly ButtonKind[] = ['primary', 'secondary'].map((name) => ({
+    name,
+    classes: `button ${name}`,
+    focusClasses: `button ${name} focus`,
+  }));
+  /** Every material, each with a sample amount. */
+  protected readonly chips = MATERIALS.map((material, index) => ({ material, amount: index * 25 + 4 }));
+  protected readonly heroes: readonly TileHero[] = [WREN, BRAM];
+  protected readonly sceneHero = WREN;
   /** The first sample hero starts picked; a tile toggles as it would in a party pick. */
   protected readonly picked = signal<ReadonlySet<string>>(new Set(['Wren']));
   protected toggle(name: string): void {
