@@ -33,9 +33,9 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 ### The client
 
-13. *Retired: the client's Angular version is `docs/standards/angular.md`, rule 20 (Issue-428).*
-14. *Retired: the client's tsconfig is `docs/standards/angular.md`, rule 21 (Issue-428).*
-15. *Retired: the client's dev server and build are `docs/standards/angular.md`, rule 22 (Issue-428).*
+13. *Retired: the client's Angular version is `docs/standards/angular.md`, rule 20 (decision 0060, as amended by Issue-428).*
+14. *Retired: the client's tsconfig is `docs/standards/angular.md`, rule 21 (decision 0060, as amended by Issue-428).*
+15. *Retired: the client's dev server and build are `docs/standards/angular.md`, rule 22 (decision 0060, as amended by Issue-428).*
 
 ### Lint
 
