@@ -38,6 +38,8 @@ Rule 30. A candidate rule from the review of PR-369 (Issue-353), accepted by the
 
 Rule 31. A candidate rule from the review of PR-373 (Issue-356), accepted by the owner on 2026-11-26: the engine's test helpers named the quarry's and the route back's jobs as constants, and three test files spelled the ids again. Applying the rule converted every job id and Highcrag's id in the engine's tests, the bonus tables of `content.test.ts` among them.
 
+Rule 33. A rule the owner accepted on the checkup of `6df7d6e`, added by Issue-396 on 2026-11-27: the hub's tests started `amazon/dynamodb-local:latest`, so each run of "Build and test" pulled whatever the tag pointed at that day. The reference went into a `FROM` line of a Dockerfile that nothing builds because Dependabot's `docker` ecosystem matches file names by `/dockerfile|containerfile/i` and reads no string in TypeScript, and its file updater moves a tag and a digest together (dependabot-core, read 2026-11-27). The rule went under a heading of its own after rule 32, so that rules 10 to 32 kept the numbers other documents cite.
+
 Held back, `@graphql-tools/utils` overridden under `@apollo/server`. Dependabot alert 8 was reopened on 2026-11-17 by PR-311.
 
 Why. Latest with LTS preferred was stated by the owner as standing policy on 2026-10-14.
