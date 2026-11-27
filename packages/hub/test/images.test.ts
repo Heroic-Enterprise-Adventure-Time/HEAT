@@ -67,10 +67,17 @@ describe("imageFrom", () => {
     return pathToFileURL(file);
   };
 
-  it("returns a reference pinned by version and digest", () => {
-    expect(imageFrom(fileWith(`# a comment\nFROM amazon/dynamodb-local:3.3.2@sha256:${digest}\n`))).toBe(
-      `amazon/dynamodb-local:3.3.2@sha256:${digest}`,
-    );
+  it.each([
+    ["a name", `# a comment\nFROM amazon/dynamodb-local:3.3.2@sha256:${digest}\n`, `amazon/dynamodb-local:3.3.2@sha256:${digest}`],
+    ["a variant's suffix", `FROM postgres:17.2-alpine@sha256:${digest}`, `postgres:17.2-alpine@sha256:${digest}`],
+    [
+      "a registry's port",
+      `FROM registry.example:5000/team/app:1.4@sha256:${digest}`,
+      `registry.example:5000/team/app:1.4@sha256:${digest}`,
+    ],
+    ["a flag before it", `FROM --platform=linux/amd64 postgres:17.2@sha256:${digest} AS db`, `postgres:17.2@sha256:${digest}`],
+  ])("returns a pinned reference with %s", (_case, text, image) => {
+    expect(imageFrom(fileWith(text))).toBe(image);
   });
 
   it.each([
@@ -79,6 +86,8 @@ describe("imageFrom", () => {
     ["latest with a digest", `FROM amazon/dynamodb-local:latest@sha256:${digest}`],
     ["a digest with no version", `FROM amazon/dynamodb-local@sha256:${digest}`],
     ["a short digest", "FROM amazon/dynamodb-local:3.3.2@sha256:abc"],
+    ["a variant with no version", `FROM postgres:alpine@sha256:${digest}`],
+    ["only a flag", "FROM --platform=linux/amd64"],
     ["no FROM line", "# nothing"],
     ["two FROM lines", `FROM a:1@sha256:${digest}\nFROM b:2@sha256:${digest}`],
   ])("refuses %s", (_case, text) => {
