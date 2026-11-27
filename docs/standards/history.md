@@ -6,6 +6,8 @@ Nothing loads this file, and no session reads it at its start (`docs/README.md`,
 
 ## typescript.md
 
+Rule 1. The sentence on a new major's pin landing on `main` first was added on 2026-11-27 (Issue-426). The pull request that moved Node to 26, PR-425, had no `dev` plan, because its plan job runs `main`'s copy of the Node action, which pinned only 24; decision 0048's amendment of Issue-426 records why the pin per major was taken.
+
 Rule 8. The sentence on Node's own runner was added on 2026-11-19 (Issue-328), from the review of PR-333. The hooks' tests had run under `node --test` since Issue-318 while the rule named one test outside Vitest, and the trace report's test was the second of the kind; the rule now says what the code does, and why those tests need no package.
 
 Rule 9. From the review of PR-209, where a test flushed the metrics itself and so no test showed `logMetrics` doing it.
