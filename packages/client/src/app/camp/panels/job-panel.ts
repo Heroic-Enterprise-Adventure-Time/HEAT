@@ -1,7 +1,6 @@
 import { LowerCasePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { sumBy } from 'es-toolkit';
 
 import { FACILITIES, type Material, MAX_PARTY } from '@heat/engine';
@@ -13,9 +12,9 @@ import { HeroTile } from '../../primitives/hero-tile';
 import { Icon } from '../../primitives/icon';
 import { type MoreItem, MoreMenu } from '../../primitives/more-menu';
 import { ResourceChip } from '../../primitives/resource-chip';
-import { CampState } from '../camp-state';
 import { caravanReason, cargoLines, cargoRows, cartCapacityAt, loadWords, noWayBackWords, roomWords } from './caravan-words';
-import { bonusWords, lockedWords, NO_PAY, postedJob, posterOf, retreatWords } from './job-words';
+import { bonusWords, lockedWords, NO_PAY, retreatWords } from './job-words';
+import { injectRoutedJob } from './routed-job';
 
 /**
  * The hub's refusals of a start, by type, in the player's words; any other is
@@ -76,20 +75,12 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
 })
 export class JobPanel {
   protected readonly game = inject(Game);
-  private readonly camp = inject(CampState);
   private readonly router = inject(Router);
-  private readonly params = toSignal(inject(ActivatedRoute).paramMap);
   protected readonly maxParty = MAX_PARTY;
 
-  private readonly poster = computed(() => posterOf(this.params()?.get('facility')));
-  protected readonly posterName = computed(() => {
-    const poster = this.poster();
-    return poster ? FACILITIES[poster].name : 'Camp';
-  });
-  protected readonly job = computed(() => {
-    const poster = this.poster();
-    return postedJob(this.game.location(), poster, poster ? (this.camp.facility(poster)?.level ?? 0) : 0, this.params()?.get('job'));
-  });
+  private readonly routed = injectRoutedJob();
+  protected readonly posterName = this.routed.posterName;
+  protected readonly job = this.routed.job;
   /** The job's secondary views, behind its "more" menu (decision 0061): its replays, a child of its route. */
   protected readonly more: readonly MoreItem[] = [{ label: 'Replays', to: 'replays' }];
   /** What a job with no pay says in its place, from the same words as the board's list. */

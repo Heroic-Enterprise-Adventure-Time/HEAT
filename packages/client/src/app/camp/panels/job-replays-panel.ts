@@ -1,15 +1,10 @@
 import { Component, computed, inject, resource } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute } from '@angular/router';
-
-import { FACILITIES } from '@heat/engine';
 
 import { replayLine } from '../../adventure/replay-words';
 import { Game } from '../../game';
 import { BackLink } from '../../primitives/back-link';
-import { CampState } from '../camp-state';
-import { postedJob, posterOf } from './job-words';
 import { ReplayList } from './replay-list';
+import { injectRoutedJob } from './routed-job';
 
 /**
  * A job's replays, a secondary view behind the job's "more" menu (decision
@@ -25,17 +20,9 @@ import { ReplayList } from './replay-list';
 })
 export class JobReplaysPanel {
   protected readonly game = inject(Game);
-  private readonly camp = inject(CampState);
-  private readonly params = toSignal(inject(ActivatedRoute).paramMap);
-  private readonly poster = computed(() => posterOf(this.params()?.get('facility')));
-  protected readonly posterName = computed(() => {
-    const poster = this.poster();
-    return poster ? FACILITIES[poster].name : 'Camp';
-  });
-  protected readonly job = computed(() => {
-    const poster = this.poster();
-    return postedJob(this.game.location(), poster, poster ? (this.camp.facility(poster)?.level ?? 0) : 0, this.params()?.get('job'));
-  });
+  private readonly routed = injectRoutedJob();
+  protected readonly posterName = this.routed.posterName;
+  protected readonly job = this.routed.job;
   private readonly replays = resource({ params: () => this.job()?.id, loader: ({ params }) => this.game.replaysOf(params) });
   protected readonly lines = computed(() =>
     // A list read again for another job says Loading, not the last job's lines.
