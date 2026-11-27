@@ -35,9 +35,8 @@ export const LIMITS = {
   // Lowered from 36_000 when typescript.md's detail on dependencies and lint moved to an unloaded
   // companion (Issue-375), and from 30_000 when its rules for the client moved to angular.md (Issue-428).
   "packages/AGENTS.md": 25_000,
-  // Raised from 25_000 for rule 17's tokens the art build writes and the two rules of PR-389's review (Issue-385),
-  // and from 25_500 by the 5,000 bytes of typescript.md's rules for the client, which moved here (Issue-428).
-  "packages/client/AGENTS.md": 30_500,
+  // Raised from 25_000 for rule 17's tokens the art build writes and the two rules of PR-389's review (Issue-385).
+  "packages/client/AGENTS.md": 25_500,
   "packages/hub/AGENTS.md": 28_000,
   "terraform/AGENTS.md": 14_000,
 };

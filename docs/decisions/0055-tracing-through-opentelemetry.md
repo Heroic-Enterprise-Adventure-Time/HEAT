@@ -1,6 +1,6 @@
 # 0055: Tracing through OpenTelemetry: AWS's Lambda layer, the AWS SDK beside the bundle, and a span for each root field
 
-- **Status:** Decided
+- **Status:** Decided. Corrected 2026-11-27 (Issue-428): "Both are listed under "Held back" in `docs/standards/typescript.md`" is no longer true; since Issue-375 they have been listed outside it, and now under "Held back" in `docs/standards/typescript-detail.md`.
 - **Date:** 2026-11-17
 - **Settles:** Issue-326: how the hub is traced now that the X-Ray SDK, in maintenance since 2026-02-25, loses support on 2027-02-25. It amends decision 0040, whose third middleware is gone, and reopens the overview's "there are no layers" (`docs/process/best-practices.md`, rule 11).
 
