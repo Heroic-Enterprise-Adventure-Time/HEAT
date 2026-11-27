@@ -1,4 +1,4 @@
-import { fetchIconNames, iconAddress } from './icon-names';
+import { fetchIconNames, fetchPortraitNames, iconAddress, portraitAddress } from './icon-names';
 
 const names = { timber: 'timber.0123456789ab.png', mine: 'mine.ba9876543210.png' };
 
@@ -27,5 +27,25 @@ describe('iconAddress', () => {
   it('is nothing for an icon the index does not hold, or for a name every object has', () => {
     expect(iconAddress(names, 'cloth')).toBeNull();
     expect(iconAddress(names, 'toString')).toBeNull();
+  });
+});
+
+describe('portraits', () => {
+  const portraits = { 'ranger-01': 'ranger-01.0123456789ab.png' };
+
+  it('reads the index the build wrote beside the portraits', async () => {
+    const asked: string[] = [];
+    const fetchFn: typeof fetch = (input) => {
+      asked.push(input instanceof Request ? input.url : String(input));
+      return Promise.resolve(new Response(JSON.stringify(portraits), { status: 200 }));
+    };
+    await expect(fetchPortraitNames(fetchFn)).resolves.toEqual(portraits);
+    expect(asked).toEqual(['/art/portraits/pictures.json']);
+  });
+
+  it('is where the portrait of a sprite set is served, or nothing for a set the index does not hold', () => {
+    expect(portraitAddress(portraits, 'ranger-01')).toBe('/art/portraits/ranger-01.0123456789ab.png');
+    expect(portraitAddress(portraits, 'knight-06')).toBeNull();
+    expect(portraitAddress(portraits, 'toString')).toBeNull();
   });
 });

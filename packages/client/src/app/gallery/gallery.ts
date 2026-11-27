@@ -15,8 +15,8 @@ const SCENE_FRAME = '/gallery/camp-millbrook-3x.png';
 const SCENE_SCALE = 3;
 
 /** The sample heroes; the first stands beside the scene. */
-const WREN: TileHero = { name: 'Wren', unitType: 'ranger', level: 3 };
-const BRAM: TileHero = { name: 'Bram', unitType: 'knight', level: 1 };
+const WREN: TileHero = { name: 'Wren', unitType: 'ranger', level: 3, spriteSet: 'ranger-01' };
+const BRAM: TileHero = { name: 'Bram', unitType: 'knight', level: 1, spriteSet: 'knight-06' };
 
 /** A button's kind, with the classes each of its states takes. */
 interface ButtonKind {

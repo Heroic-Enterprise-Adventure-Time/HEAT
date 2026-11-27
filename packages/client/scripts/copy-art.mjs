@@ -25,6 +25,10 @@
 // the page reads no pixels. The page reads the picture's name there, so the
 // row is always the row of the picture it is drawn with, whatever a browser
 // has kept (the review of PR-334).
+// A hero's portrait is cut from its set's still facing south, a square of
+// head and shoulders (PORTRAIT in src/app/sprite-sets.ts), and copied under
+// a name that carries a hash of the cut, with pictures.json beside the
+// portraits naming each by its set, as the icons are.
 // A frame under art/frames is trimmed to the box its pixels fill and copied
 // under a name that carries a hash of the trimmed picture, and its name and
 // its slice, from the frames' provenance, go into generated/frames.css, a
@@ -37,9 +41,9 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import { GROUND_FILES, GROUNDS } from "../src/app/ground-sets.ts";
-import { PACKED_AREAS, SET_CLIPS } from "../src/app/sprite-sets.ts";
+import { PACKED_AREAS, PORTRAIT, SET_CLIPS } from "../src/app/sprite-sets.ts";
 import { checkSlice, frameStyles, opaqueBox } from "./frame-art.mjs";
-import { glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
+import { glyphFrames, opaqueRows, packSet, pictureName, portraitBox } from "./pack-art.mjs";
 import { colourToken } from "./style-tokens.mjs";
 
 const from = fileURLToPath(new URL("../../../art/", import.meta.url));
@@ -122,6 +126,18 @@ for (const file of pictures(join(from, "icons"))) {
 }
 writeFileSync(join(to, "icons", "pictures.json"), JSON.stringify(iconNames));
 
+const portraitNames = {};
+mkdirSync(join(to, "portraits"), { recursive: true });
+for (const set of directories(join(from, "heroes"))) {
+  const source = join(from, "heroes", set, `${PORTRAIT.clip}.png`);
+  const box = portraitBox(await pixels(source), PORTRAIT.side, `art/heroes/${set}/${PORTRAIT.clip}.png`);
+  const cut = await sharp(source).extract(box).png({ compressionLevel: 9 }).toBuffer();
+  const image = pictureName(set, cut);
+  writeFileSync(join(to, "portraits", image), cut);
+  portraitNames[set] = image;
+}
+writeFileSync(join(to, "portraits", "pictures.json"), JSON.stringify(portraitNames));
+
 const frameProvenance = JSON.parse(readFileSync(join(from, "frames", "provenance.json"), "utf8"));
 const framePictures = new Set(pictures(join(from, "frames")).map((file) => basename(file)));
 const frames = {};
@@ -139,4 +155,4 @@ for (const [name, { file, slice }] of Object.entries(frameProvenance.frames)) {
 if (framePictures.size > 0) throw new Error(`art/frames holds ${[...framePictures].join(" and ")}, which its provenance names for no frame`);
 writeFileSync(fileURLToPath(new URL("../generated/frames.css", import.meta.url)), frameStyles(frames));
 
-console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")}, copied art/${[...COPIED_AREAS, "facilities", "icons"].join(", art/")} and trimmed ${Object.keys(frames).length} frames from art/frames into packages/client/generated`);
+console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")}, copied art/${[...COPIED_AREAS, "facilities", "icons"].join(", art/")}, cut ${Object.keys(portraitNames).length} portraits from art/heroes and trimmed ${Object.keys(frames).length} frames from art/frames into packages/client/generated`);

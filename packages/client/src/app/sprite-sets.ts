@@ -29,6 +29,14 @@ export type SetKind = keyof typeof SET_CLIPS;
 /** A clip a scene may ask a set of this kind for. */
 export type SetClip<Kind extends SetKind> = (typeof SET_CLIPS)[Kind][number];
 
+/**
+ * A hero's portrait, which the hero tile shows (decision 0061, Issue-385):
+ * the build cuts a square of `side` art pixels from the top of the set's
+ * `clip`, its head and shoulders facing the player, centred on the columns
+ * those rows fill, and publishes it under `/art/portraits`.
+ */
+export const PORTRAIT = { clip: 'still-south', side: 24 } as const satisfies { clip: SetClip<'figure'>; side: number };
+
 /** The areas under `art/` whose sets are packed, each served under `/art/<area>/<set>`, and the kind of set it holds. */
 export const PACKED_AREAS = { heroes: 'figure', monsters: 'figure', props: 'prop', weapons: 'weapon', fonts: 'font' } as const satisfies Record<string, SetKind>;
 export type PackedArea = keyof typeof PACKED_AREAS;

@@ -1,6 +1,6 @@
 # 0061: The daylight parchment theme: role tokens over the palette, shared primitives and pixel-art frames
 
-- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css` and amended the frame's edge and corner and added the slot circles and the short chip (the amendments below); the frames made as pixel art by Issue-385, which amended the frame again (the amendment below); not built: the action icons and the portraits by Issue-385, the panels by Issue-386.
+- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css` and amended the frame's edge and corner and added the slot circles and the short chip (the amendments below); the frames made as pixel art and the heroes' portraits cut from their sprite sets by Issue-385, which amended the frame again (the amendment below); not built: the action icons by Issue-385, the panels by Issue-386.
 - **Date:** 2026-11-26
 - **Settles:** Issue-383: how the page looks once it reads as a casual mobile game, with less text and with buttons for actions. These are the owner's calls of 2026-11-26.
 - **Amends:** 0037, "read by the components with `var()`: the palette, a spacing scale, ...". From Issue-384 on, a component reads a role token, and only `styles.css` reads the palette.

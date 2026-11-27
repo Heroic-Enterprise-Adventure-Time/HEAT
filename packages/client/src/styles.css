@@ -96,12 +96,14 @@
    * Pixels of the art, drawn at a whole-number scale, which is where a pixel
    * is a pixel (docs/process/best-practices.md, rule 10): a frame's outline,
    * its lower edge below the outline, and its corner's radius (decision
-   * 0061), and one pixel of the screen, as the box a visually hidden label
-   * keeps.
+   * 0061), a hero's portrait, its 24 art pixels (PORTRAIT in
+   * src/app/sprite-sets.ts) at scale 2, and one pixel of the screen, as the
+   * box a visually hidden label keeps.
    */
   --frame-outline: 2px;
   --frame-edge: 2px;
   --frame-corner: 4px;
+  --portrait: 48px;
   --pixel: 1px;
 
   /*

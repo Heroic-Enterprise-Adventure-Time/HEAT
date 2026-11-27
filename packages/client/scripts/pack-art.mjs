@@ -39,6 +39,28 @@ export function opaqueRows({ width, height, data }) {
 }
 
 /**
+ * Where a portrait is cut from a picture: a square `side` pixels across whose
+ * top is the picture's top opaque row, centred on the columns its rows fill,
+ * moved in to stay inside the picture. A picture too small for the square,
+ * or with nothing drawn, is refused by `name`.
+ */
+export function portraitBox({ width, height, data }, side, name) {
+  if (side > width || side > height) throw new Error(`${name}: ${width} by ${height} pixels hold no portrait ${side} pixels square`);
+  const { top } = opaqueRows({ width, height, data });
+  let left = width, right = -1;
+  for (let y = top; y < Math.min(height, top + side); y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] === 0) continue;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+  }
+  if (right < 0) throw new Error(`${name}: nothing is drawn to cut a portrait from`);
+  const clamp = (value, max) => Math.max(0, Math.min(max, value));
+  return { left: clamp(Math.round((left + right + 1 - side) / 2), width - side), top: clamp(top, height - side), width: side, height: side };
+}
+
+/**
  * The set's clips from its frames' names: `walk-east-0` to `walk-east-5` are
  * the animation `walk-east`, and a name with no number, `still-south` or
  * `standing`, is a clip of one frame. A clip with a frame missing is refused.
