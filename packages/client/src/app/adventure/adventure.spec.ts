@@ -227,6 +227,8 @@ describe('Adventure', () => {
     await user.click(button('Pause'));
     await run(1000);
     expect(onTheRoad()).toBeInTheDocument();
+    // The button's name says its state, so it carries no pressed state beside it.
+    expect(button('Resume')).not.toHaveAttribute('aria-pressed');
     await user.click(button('Resume'));
     await user.click(button('4×'));
     await waitFor(() => { expect(button('4×')).toHaveAttribute('aria-pressed', 'true'); });
