@@ -18,6 +18,16 @@ const testingImports = [
 ];
 const testBedImport = { name: '@angular/core/testing', importNames: ['TestBed', 'getTestBed'], message: 'Render the component through Testing Library.' };
 
+// What no-restricted-syntax refuses in every TypeScript file. A block that
+// adds to it for its own files spreads this list first, because a later
+// block's options replace an earlier block's.
+const restrictedSyntax = [
+  {
+    selector: 'TSAsExpression > MemberExpression.expression[computed=true]:not([property.value=type(string)])',
+    message: 'Narrow an indexed read, or read it through must(value, what): a cast hides that it may be absent.',
+  },
+];
+
 export default tseslint.config(
   // Build output, Angular's cache, the client's copy of the art, and the
   // client's generated GraphQL code (codegen.mjs), which is read as the
@@ -59,6 +69,12 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', ignoreRestSiblings: true },
       ],
+      // Under noUncheckedIndexedAccess an indexed read may be absent, and a
+      // cast on it is the non-null assertion in another spelling: the value is
+      // narrowed, or read through must (docs/standards/typescript.md, rule 6).
+      // A property read by its name in brackets, env["HEAT_VERSION"], is not an
+      // indexed read: a cast on it says the shape of an unknown value.
+      'no-restricted-syntax': ['error', ...restrictedSyntax],
     },
   },
 
