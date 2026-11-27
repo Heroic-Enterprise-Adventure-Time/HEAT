@@ -1,4 +1,7 @@
+import { mapValues } from 'es-toolkit';
+
 import { TEST_LAYOUT_SIZES as SIZES } from '../testing/layout-sizes';
+import { rootStyle } from '../testing/style-tokens';
 import { heroScale, iconScale, isSideBySide, menuLabels, panelPx, readLayoutSizes, sceneScale, sceneView, stackedStageHeight } from './page-layout';
 
 const HEADER = SIZES.header;
@@ -90,20 +93,29 @@ describe('stackedStageHeight', () => {
 
 describe('readLayoutSizes', () => {
   const style = (fontSize: string, tokens: Record<string, string>) => ({ fontSize, getPropertyValue: (name: string) => tokens[name] ?? '' });
+  // A style of the test's own, in round numbers that are not the stylesheet's: what these check is the reading.
   const tokens = {
-    '--header-height': '2.25rem',
-    '--menu-rail-width': '3.5rem',
-    '--menu-labelled-width': '13.5rem',
-    '--menu-row-height': '4rem',
-    '--panel-min-width': '17rem',
-    '--panel-share': '26vw',
-    '--panel-max-width': '28rem',
+    '--header-height': '2rem',
+    '--menu-rail-width': '3rem',
+    '--menu-labelled-width': '10rem',
+    '--menu-row-height': '5rem',
+    '--panel-min-width': '15rem',
+    '--panel-share': '25vw',
+    '--panel-max-width': '30rem',
   };
 
   it("resolves the rem tokens at the root font size, so the arithmetic follows the player's settings", () => {
-    expect(readLayoutSizes(style('16px', tokens))).toEqual(SIZES);
+    expect(readLayoutSizes(style('16px', tokens))).toEqual({ header: 32, rail: 48, labelledMenu: 160, menuRow: 80, panelShare: 0.25, panelMin: 240, panelMax: 480 });
     // A player at a 20px default font: every region a quarter larger, the panel's share unchanged.
-    expect(readLayoutSizes(style('20px', tokens))).toEqual({ header: 45, rail: 70, labelledMenu: 270, menuRow: 80, panelShare: 0.26, panelMin: 340, panelMax: 560 });
+    expect(readLayoutSizes(style('20px', tokens))).toEqual({ header: 40, rail: 60, labelledMenu: 200, menuRow: 100, panelShare: 0.25, panelMin: 300, panelMax: 600 });
+  });
+
+  it('reads every region from the tokens styles.css declares, so a token it cannot read fails here and not on the page', () => {
+    for (const size of Object.values(SIZES)) expect(size).toBeGreaterThan(0);
+    const { panelShare, ...lengths } = SIZES;
+    const larger = readLayoutSizes(rootStyle('20px'));
+    expect(larger.panelShare).toBe(panelShare);
+    for (const ratio of Object.values(mapValues(lengths, (length, region) => larger[region] / length))) expect(ratio).toBeCloseTo(1.25);
   });
 
   it('reads a px token as it is, and trims what getComputedStyle hands back', () => {
