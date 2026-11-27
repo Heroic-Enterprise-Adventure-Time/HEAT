@@ -1,4 +1,4 @@
-// The page's frames (decision 0061, Issue-385): each 9-slice picture under
+// The page's frames (decision 0062, Issue-385): each 9-slice picture under
 // art/frames is trimmed to the box its pixels fill, published under a name
 // that carries the trimmed picture's hash, and named with its slice in a
 // stylesheet the build writes, generated/frames.css, which angular.json

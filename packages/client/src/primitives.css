@@ -7,7 +7,7 @@
  * the role tokens of styles.css and the frames of generated/frames.css.
  *
  * The button and the panel are framed by 9-slice pixel art under art/frames
- * (Issue-385; docs/process/assets.md, rule 40), drawn at 1× with
+ * (decision 0062; docs/process/assets.md, rule 40), drawn at 1× with
  * border-image: the build trims each picture and names it, with its slice and
  * the border it is drawn in, in generated/frames.css. Each corner is drawn as
  * it is and each edge and the middle repeat their pixels, never stretched, so
