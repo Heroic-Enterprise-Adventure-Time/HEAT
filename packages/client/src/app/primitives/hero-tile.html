@@ -1,7 +1,12 @@
 @if (hero(); as hero) {
   <button type="button" class="tile" [class.picked]="picked()" [attr.aria-pressed]="picked()" (click)="toggled.emit()">
-    <span class="name">{{ hero.name }}</span>
-    <span class="about">{{ hero.unitType }}, level {{ hero.level }}</span>
+    @if (icons.portrait(hero.spriteSet); as portrait) {
+      <img class="portrait" alt="" [ngSrc]="portrait" [width]="portraitPx" [height]="portraitPx" />
+    }
+    <span class="about">
+      <span class="name">{{ hero.name }}</span>
+      <span class="detail">{{ hero.unitType }}, level {{ hero.level }}</span>
+    </span>
   </button>
 } @else {
   <span class="tile empty">Empty slot</span>

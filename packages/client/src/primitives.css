@@ -4,73 +4,83 @@
  * button, primary or secondary, a panel's frame, and the visually hidden text
  * a primitive gives a screen reader. The resource chip, the hero tile and the
  * slot circles are components of their own (app/primitives/). Each reads only
- * the role tokens of styles.css.
+ * the role tokens of styles.css and the frames of generated/frames.css.
  *
- * Until Issue-385 makes the frames as 9-slice art, CSS draws them at the
- * agreed edge: a 2px outline with corners rounded by 4px, a lower edge 2px
- * below it in a faded ink, as a soft shadow, and a button's top edge a lighter
- * shade of its fill.
+ * The button and the panel are framed by 9-slice pixel art under art/frames
+ * (decision 0062; docs/process/assets.md, rule 40), drawn at 1× with
+ * border-image: the build trims each picture and names it, with its slice and
+ * the border it is drawn in, in generated/frames.css. Each corner is drawn as
+ * it is and each edge and the middle repeat their pixels, never stretched, so
+ * every pixel of the art stays one square pixel. A button's states are its
+ * frame as drawn, changed by CSS filters, so each keeps the frame's depth; its
+ * label, its focus ring and its layout stay CSS.
  */
 
 /* A button: an action, something that changes the game (docs/design/game.md, "The page"). */
 .button {
+  --button-frame: var(--frame-secondary-image);
+  --button-slice: var(--frame-secondary-slice);
+  --button-width: var(--frame-secondary-width);
+
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-lg);
-  border: var(--frame-outline) solid var(--line-frame);
-  border-radius: var(--frame-corner);
-  box-shadow: 0 var(--frame-edge) 0 var(--line-edge);
+  padding: var(--space-xs) var(--space-md);
+  border-style: solid;
+  border-width: var(--button-width);
+  border-image: var(--button-frame) var(--button-slice) fill / var(--button-width) repeat;
+  background: none;
+  image-rendering: pixelated;
   font: inherit;
   font-weight: bold;
   color: var(--on-action);
   cursor: pointer;
+  filter: var(--button-state,) var(--button-focus,);
 }
 
 .button.primary {
-  background: var(--action);
-  box-shadow:
-    inset 0 var(--frame-outline) 0 var(--action-edge-light),
-    0 var(--frame-edge) 0 var(--line-edge);
+  --button-frame: var(--frame-primary-image);
+  --button-slice: var(--frame-primary-slice);
+  --button-width: var(--frame-primary-width);
 }
 
-.button.secondary {
-  background: var(--action-secondary);
-  box-shadow:
-    inset 0 var(--frame-outline) 0 var(--action-secondary-edge-light),
-    0 var(--frame-edge) 0 var(--line-edge);
-}
-
-/* .focus shows the ring without focus, for the gallery. */
-.button:focus-visible,
-.button.focus {
-  outline: var(--frame-outline) solid var(--focus-on-panel);
-  outline-offset: var(--frame-outline);
-}
-
+/* Disabled: the frame as it is, its colour drained, so it keeps the depth of the enabled button. */
 .button:disabled {
-  background: var(--action-disabled);
+  --button-state: grayscale(1) opacity(0.7);
+
   color: var(--on-action-disabled);
-  border-color: var(--line-soft);
-  box-shadow: none;
   cursor: not-allowed;
 }
 
-/* Pressed, while held or as a toggle that is on: the face sinks on to its lower edge, which it covers, and nothing around it moves. */
+/* The focus ring follows the frame's own stepped outline: four copies of the frame's shape, offset by its outline with no blur. .focus shows it without focus, for the gallery. */
+.button:focus-visible,
+.button.focus {
+  --button-focus:
+    drop-shadow(var(--frame-outline) 0 0 var(--focus-on-panel))
+    drop-shadow(calc(-1 * var(--frame-outline)) 0 0 var(--focus-on-panel))
+    drop-shadow(0 var(--frame-outline) 0 var(--focus-on-panel))
+    drop-shadow(0 calc(-1 * var(--frame-outline)) 0 var(--focus-on-panel));
+
+  outline: none;
+}
+
+/* Pressed, while held or as a toggle that is on: the frame as it is, a shade darker, its label sunk by the press, so nothing around it moves. */
 .button:active:not(:disabled),
 .button[aria-pressed='true'] {
-  box-shadow: none;
-  transform: translateY(var(--frame-edge));
+  --button-state: brightness(0.88);
+
+  padding-top: calc(var(--space-xs) + var(--button-press));
+  padding-bottom: calc(var(--space-xs) - var(--button-press));
 }
 
 /* A panel's frame: the card a panel's content stands on. */
 .frame {
-  padding: var(--space-lg) var(--space-xl);
-  border: var(--frame-outline) solid var(--line-frame);
-  border-radius: var(--frame-corner);
-  box-shadow: 0 var(--frame-edge) 0 var(--line-edge);
-  background: var(--surface-panel);
+  padding: var(--space-sm);
+  border-style: solid;
+  border-width: var(--frame-panel-width);
+  border-image: var(--frame-panel-image) var(--frame-panel-slice) fill / var(--frame-panel-width) repeat;
+  image-rendering: pixelated;
   color: var(--on-panel);
 }
 

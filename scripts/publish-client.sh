@@ -42,7 +42,9 @@
 # for its pixels and kept for the year; art/facilities/pictures.json, which
 # names each facility picture the same way, beside the row it stands on; and
 # art/icons/pictures.json, which names each icon the same way (the review of
-# PR-348).
+# PR-348); and art/portraits/pictures.json, which names each hero's portrait
+# the same way (Issue-385). The frames' names are in the page's stylesheet,
+# which is itself named for its contents.
 #
 # The order: everything long-lived first, with nothing deleted; then the
 # short-lived files, each of which names long-lived ones, the atlases their
@@ -83,7 +85,7 @@ set -- --exclude index.html --exclude favicon.png --exclude config.json \
 
 aws s3 sync "$build_dir" "s3://$bucket" --only-show-errors "$@" --cache-control "$long"
 
-# The atlases and the indexes of the facilities' pictures and of the icons alone: everything else under art/ went with the sync above.
+# The atlases and the indexes of the facilities' pictures, of the icons and of the portraits alone: everything else under art/ went with the sync above.
 aws s3 sync "$build_dir/art" "s3://$bucket/art" --delete --only-show-errors \
   --exclude "*" --include "*/sheet.json" --include "*/pictures.json" \
   --cache-control "$short" --content-type "application/json"

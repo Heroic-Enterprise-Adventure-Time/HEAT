@@ -38,6 +38,7 @@
             ],
             "styles": [
               "src/styles.css",
+              "generated/frames.css",
               "src/primitives.css"
             ]
           },

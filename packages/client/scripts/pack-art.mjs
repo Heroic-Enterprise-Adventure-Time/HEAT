@@ -15,7 +15,7 @@
 // fails the build here, not the page (docs/standards/typescript.md, rule 23).
 import { createHash } from "node:crypto";
 
-import { range, sortBy } from "es-toolkit";
+import { clamp, range, sortBy } from "es-toolkit";
 import { MaxRectsPacker } from "maxrects-packer";
 
 import { SET_CLIPS } from "../src/app/sprite-sets.ts";
@@ -36,6 +36,27 @@ export function opaqueRows({ width, height, data }) {
   let top = 0;
   while (top < bottom && !opaque(top)) top++;
   return { top, bottom };
+}
+
+/**
+ * Where a portrait is cut from a picture: a square `side` pixels across whose
+ * top is the picture's top opaque row, moved up to stay inside the picture,
+ * centred on the columns the square's rows fill and moved in to stay inside. A picture too small for the square,
+ * or with nothing drawn, is refused by `name`.
+ */
+export function portraitBox({ width, height, data }, side, name) {
+  if (side > width || side > height) throw new Error(`${name}: ${width} by ${height} pixels hold no portrait ${side} pixels square`);
+  const top = clamp(opaqueRows({ width, height, data }).top, 0, height - side);
+  let left = width, right = -1;
+  for (let y = top; y < top + side; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] === 0) continue;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+    }
+  }
+  if (right < 0) throw new Error(`${name}: nothing is drawn to cut a portrait from`);
+  return { left: clamp(Math.round((left + right + 1 - side) / 2), 0, width - side), top, width: side, height: side };
 }
 
 /**

@@ -1,10 +1,11 @@
 import { NgOptimizedImage } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { MATERIALS } from '@heat/engine';
 
 import { MAP_HEIGHT, MAP_WIDTH } from '../camp/scene/layout';
+import { Icons } from '../icons';
 import { HeroTile, type TileHero } from '../primitives/hero-tile';
 import { ResourceChip } from '../primitives/resource-chip';
 import { Slots } from '../primitives/slots';
@@ -15,8 +16,11 @@ const SCENE_FRAME = '/gallery/camp-millbrook-3x.png';
 const SCENE_SCALE = 3;
 
 /** The sample heroes; the first stands beside the scene. */
-const WREN: TileHero = { name: 'Wren', unitType: 'ranger', level: 3 };
-const BRAM: TileHero = { name: 'Bram', unitType: 'knight', level: 1 };
+const WREN: TileHero = { name: 'Wren', unitType: 'ranger', level: 3, spriteSet: 'ranger-01' };
+const BRAM: TileHero = { name: 'Bram', unitType: 'knight', level: 1, spriteSet: 'knight-06' };
+
+/** An icon is 32 art pixels square (docs/process/assets.md, rule 25), drawn on a button at scale 1. */
+const ICON_PX = 32;
 
 /** A button's kind, with the classes each of its states takes. */
 interface ButtonKind {
@@ -38,6 +42,22 @@ interface ButtonKind {
   styleUrl: './gallery.css',
 })
 export class Gallery {
+  protected readonly icons = inject(Icons);
+  protected readonly iconPx = ICON_PX;
+  /** The action icons (Issue-385), each on a button with its word. */
+  protected readonly actions = [
+    { icon: 'depart', label: 'Depart', classes: 'button primary' },
+    { icon: 'recruit', label: 'Recruit', classes: 'button primary' },
+    { icon: 'build', label: 'Build', classes: 'button primary' },
+    { icon: 'replays', label: 'Replays', classes: 'button secondary' },
+    { icon: 'settings', label: 'Settings', classes: 'button secondary' },
+    { icon: 'back', label: 'Back', classes: 'button secondary' },
+  ] as const;
+  /** The icons a button may show alone, its word its accessible name. */
+  protected readonly iconOnly = [
+    { icon: 'close', label: 'Close' },
+    { icon: 'more', label: 'More' },
+  ] as const;
   protected readonly sceneFrame = SCENE_FRAME;
   protected readonly sceneWidth = MAP_WIDTH * SCENE_SCALE;
   protected readonly sceneHeight = MAP_HEIGHT * SCENE_SCALE;

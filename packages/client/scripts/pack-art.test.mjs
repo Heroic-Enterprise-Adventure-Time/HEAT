@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { range } from "es-toolkit";
 
 import { SET_CLIPS } from "../src/app/sprite-sets.ts";
-import { clipsOf, glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
+import { clipsOf, glyphFrames, opaqueRows, packSet, pictureName, portraitBox } from "./pack-art.mjs";
 
 /** A picture of one colour per frame, opaque on the rows from `top` to `bottom` and transparent elsewhere. */
 function picture(name, width, height, top, bottom, shade = 200) {
@@ -248,4 +248,22 @@ test("packSet asks a set for the clips the page's own list names for its kind", 
   const clips = SET_CLIPS.prop;
   const frames = clips.slice(0, -1).map((clip) => picture(clip, 8, 8, 1, 6));
   assert.throws(() => packSet({ set: "props/test", kind: "prop", frames, provenance: {} }), new RegExp(`^Error: props/test: no ${clips.at(-1)}$`));
+});
+
+test("a portrait is a square from the figure's top row, centred on the columns those rows fill", () => {
+  // A figure 6 columns wide, columns 10 to 15, from row 4 down.
+  const figure = { width: 32, height: 32, data: Buffer.alloc(32 * 32 * 4) };
+  for (let y = 4; y < 30; y++) for (let x = 10; x < 16; x++) figure.data[(y * 32 + x) * 4 + 3] = 255;
+  assert.deepEqual(portraitBox(figure, 8, "a"), { left: 9, top: 4, width: 8, height: 8 });
+});
+
+test("a portrait stays inside its picture", () => {
+  const figure = { width: 16, height: 16, data: Buffer.alloc(16 * 16 * 4) };
+  for (let y = 12; y < 16; y++) for (let x = 0; x < 2; x++) figure.data[(y * 16 + x) * 4 + 3] = 255;
+  assert.deepEqual(portraitBox(figure, 8, "a"), { left: 0, top: 8, width: 8, height: 8 });
+});
+
+test("a picture with nothing drawn, or too small, gives no portrait, by its name", () => {
+  assert.throws(() => portraitBox({ width: 16, height: 16, data: Buffer.alloc(16 * 16 * 4) }, 8, "art/heroes/x/still-south.png"), /art\/heroes\/x\/still-south.png: nothing is drawn/);
+  assert.throws(() => portraitBox({ width: 6, height: 16, data: Buffer.alloc(6 * 16 * 4) }, 8, "art/heroes/x/still-south.png"), /6 by 16 pixels hold no portrait 8 pixels square/);
 });

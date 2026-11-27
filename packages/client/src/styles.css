@@ -62,13 +62,8 @@
   --focus-on-panel: var(--gold-dark);
   --focus-on-bar: var(--gold);
 
-  /* Actions: the primary button's fill and its edges, the secondary's fill, a disabled one's. */
+  /* Actions: the main action's fill where no frame draws it, and a disabled button's label; a button's face is its frame's art. */
   --action: var(--gold);
-  --action-edge-light: var(--gold-light);
-  --action-edge-dark: var(--gold-dark);
-  --action-secondary: var(--card-soft);
-  --action-secondary-edge-light: var(--card);
-  --action-disabled: var(--card-soft);
   --on-action-disabled: var(--ink-quiet);
 
   /* The scene's: a drop's digits, drawn by the art build and scripts/icon-set.mjs (docs/process/assets.md, rule 39). */
@@ -96,12 +91,15 @@
    * Pixels of the art, drawn at a whole-number scale, which is where a pixel
    * is a pixel (docs/process/best-practices.md, rule 10): a frame's outline,
    * its lower edge below the outline, and its corner's radius (decision
-   * 0061), and one pixel of the screen, as the box a visually hidden label
-   * keeps.
+   * 0061), how far a pressed button's label sinks, and one pixel of the
+   * screen, as the box a visually hidden label keeps. A hero's portrait,
+   * --portrait, is the build's, in generated/frames.css, from PORTRAIT in
+   * src/app/sprite-sets.ts.
    */
   --frame-outline: 2px;
   --frame-edge: 2px;
   --frame-corner: 4px;
+  --button-press: 2px;
   --pixel: 1px;
 
   /*
