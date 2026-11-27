@@ -12,7 +12,7 @@ import { fakeSession, PLAYER } from '../testing/fake-session';
 import { testLayoutSizes } from '../testing/layout-sizes';
 import { itemHolding, listItems, menu, panel, panelBox } from '../testing/page';
 import { renderAt } from '../testing/render-at';
-import { textsOf } from '../testing/texts-of';
+import { textsOf, wordsOf } from '../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from './camp';
 import type { SceneCallbacks, SceneHero } from './scene/camp-scene';
 import { type CampLayout, HIGHCRAG } from './scene/layout';
@@ -181,10 +181,14 @@ function atHighcrag(game: ReturnType<typeof fakeGame>) {
 }
 
 const marked = (name: string) => menu().getByRole('link', { name, current: 'page' });
-const backTo = (name: string) => panel().getByRole('link', { name: `← ${name}` });
+const backTo = (name: string) => panel().getByRole('link', { name: `Back to ${name}` });
 /** The entry of the hall's recruit list that offers a unit type. */
 const recruit = (unitType: string) => within(itemHolding('Recruit', 'button', `Recruit a ${unitType}`));
 const recruitButton = (unitType: string) => recruit(unitType).getByRole('button');
+/** A recruit's cost, chip by chip, as a reader hears it. */
+const costOf = (unitType: string) => wordsOf(within(panel().getByRole('list', { name: `Cost of a ${unitType}` })).getAllByRole('listitem'));
+/** A build's cost in a section, chip by chip. */
+const buildCost = (section: HTMLElement) => wordsOf(within(within(section).getByRole('list', { name: 'Cost' })).getAllByRole('listitem'));
 const section = (name: string) => screen.getByRole('region', { name });
 
 describe('Camp', () => {
@@ -194,20 +198,20 @@ describe('Camp', () => {
     expect(router.url).toBe('/camp/millbrook/heroes-hall');
     expect(panel().getByRole('heading', { name: 'Heroes hall', level: 2 })).toBeInTheDocument();
     expect(panel().getByText('No living heroes.')).toBeInTheDocument();
-    expect(recruit('villager').getByText('free')).toBeInTheDocument();
+    expect(costOf('villager')).toEqual(['Free']);
 
     await user.click(recruitButton('villager'));
     expect(await panel().findByRole('link', { name: 'Wren' })).toBeInTheDocument();
     expect(game.recruited).toEqual(['villager']);
     await waitFor(() => { expect(scene.shown.at(-1)).toEqual({ heroes: [{ id: 'h1', spriteSet: 'villager-01' }], arriving: 'h1' }); });
-    expect(recruit('villager').getByText('20 timber, you have 60')).toBeInTheDocument();
+    expect(costOf('villager')).toEqual(['timber 20']);
   });
 
   it("shows each recruit's price beside the camp's balance, and why one cannot be had", async () => {
     await renderCamp(fakeGame([wren]));
-    expect(recruit('villager').getByText('20 timber, you have 60')).toBeInTheDocument();
+    expect(costOf('villager')).toEqual(['timber 20']);
     expect(recruitButton('villager')).toBeEnabled();
-    expect(recruit('fighter').getByText('40 ore, you have 0')).toBeInTheDocument();
+    expect(costOf('fighter')).toEqual(['ore 40, more than the camp has']);
     expect(recruit('fighter').getByText('Not enough ore.')).toBeInTheDocument();
     expect(recruitButton('fighter')).toBeDisabled();
   });
@@ -282,7 +286,8 @@ describe('Camp', () => {
 
   it("lists the camp's stock against the warehouse's cap", async () => {
     await renderCamp(fakeGame([]), '/camp/millbrook/warehouse');
-    expect(textsOf(listItems('Stock'))).toEqual(['60 of 100 timber', '3 of 100 cloth']);
+    expect(panel().getByText('Holds up to 100 of each.')).toBeInTheDocument();
+    expect(wordsOf(listItems('Stock'))).toEqual(['timber 60', 'cloth 3']);
   });
 
   it("walks other players' heroes seen here beside the player's own", async () => {
@@ -366,7 +371,7 @@ describe('Camp', () => {
     const { scene, user } = await renderCamp(game, '/camp/millbrook/mine');
     const build = section('Build');
     expect(within(build).getByRole('heading', { name: 'Build' })).toBeInTheDocument();
-    expect(within(build).getByText('60 timber, you have 60; 3 cloth, you have 3')).toBeInTheDocument();
+    expect(buildCost(build)).toEqual(['timber 60', 'cloth 3']);
     await user.click(within(build).getByRole('button', { name: 'Build' }));
     expect(await panel().findByText('Level 1.')).toBeInTheDocument();
     expect(game.built).toEqual([['mine', 1]]);
@@ -384,8 +389,8 @@ describe('Camp', () => {
     const job = await panel().findByRole('link', { name: 'Ore from the hill' });
     expect(job).toHaveAttribute('href', '/camp/millbrook/mine/jobs/ore-from-the-hill');
     expect(listItems('Jobs')).toHaveLength(3);
-    expect(within(itemHolding('Jobs', 'link', 'Ore from the hill')).getByText('No pay, 4 bonus XP')).toBeInTheDocument();
-    expect(within(itemHolding('Jobs', 'link', 'Goblins in the old workings')).getByText('No pay, 6 bonus XP')).toBeInTheDocument();
+    expect(wordsOf([itemHolding('Jobs', 'link', 'Ore from the hill')])).toEqual(['Ore from the hill No pay 4 bonus XP']);
+    expect(wordsOf([itemHolding('Jobs', 'link', 'Goblins in the old workings')])).toEqual(['Goblins in the old workings No pay 6 bonus XP']);
     // The second level's job is listed with what it needs, as a caravan not unlocked is (Issue-357).
     expect(within(itemHolding('Jobs', 'link', 'The deep seam')).getByText('Needs a level 2 mine.')).toBeInTheDocument();
     // Greyed out, as every job that cannot be started yet is; the others are not (the owner, 2026-11-26).
@@ -400,7 +405,8 @@ describe('Camp', () => {
     game.camp.set({ ...built, facilities: built.facilities.map((f) => (f.kind === 'mine' ? { kind: 'mine', level: 1 } : f)) });
     await renderCamp(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
     expect(panel().getByRole('heading', { name: 'Ore from the hill', level: 2 })).toBeInTheDocument();
-    expect(textsOf(listItems('Reward'))).toEqual(['No pay.', 'Bonus: 4 XP to each hero who arrives.']);
+    expect(textsOf(listItems('Reward'))).toEqual(['No pay']);
+    expect(panel().getByText('Bonus: 4 XP to each hero who arrives.')).toBeInTheDocument();
     expect(backTo('Mine')).toHaveAttribute('href', '/camp/millbrook/mine');
     expect(marked('Mine')).toBeInTheDocument();
   });
@@ -472,7 +478,7 @@ describe('Camp', () => {
     const job = panel().getByRole('link', { name: 'Scout the road to Highcrag' });
     expect(job).toHaveAttribute('href', '/camp/millbrook/caravan-hub/jobs/scout-the-road-to-highcrag');
     expect(textsOf(listItems('Jobs').map((li) => within(li).getByRole('link')))).toEqual(['Scout the road to Highcrag', 'Caravan to Highcrag']);
-    expect(within(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).getByText('No pay, 8 bonus XP')).toBeInTheDocument();
+    expect(wordsOf([itemHolding('Jobs', 'link', 'Scout the road to Highcrag')])).toEqual(['Scout the road to Highcrag No pay 8 bonus XP']);
     expect(within(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).getByText('Needs the road to Highcrag.')).toBeInTheDocument();
     expect(itemHolding('Jobs', 'link', 'Caravan to Highcrag')).toHaveClass('locked');
     expect(itemHolding('Jobs', 'link', 'Scout the road to Highcrag')).not.toHaveClass('locked');
@@ -480,7 +486,8 @@ describe('Camp', () => {
     await user.click(job);
     expect(await panel().findByRole('heading', { name: 'Scout the road to Highcrag', level: 2 })).toBeInTheDocument();
     expect(panel().getByText(/the way is open: you will have a camp there/)).toBeInTheDocument();
-    expect(textsOf(listItems('Reward'))).toEqual(['No pay.', 'Bonus: 8 XP to each hero who arrives.']);
+    expect(textsOf(listItems('Reward'))).toEqual(['No pay']);
+    expect(panel().getByText('Bonus: 8 XP to each hero who arrives.')).toBeInTheDocument();
     expect(backTo('Caravan hub')).toHaveAttribute('href', '/camp/millbrook/caravan-hub');
   });
 });
@@ -501,18 +508,19 @@ describe('The camp at Highcrag (Issue-352)', () => {
     expect(panel().getByText('No hero is here yet. Nobody at Highcrag joins for nothing: its first hero comes by caravan from another camp.')).toBeInTheDocument();
     expect(panel().queryByText('No living heroes.')).not.toBeInTheDocument();
     expect(textsOf(panel().getAllByRole('button', { name: /^Recruit a / }))).toEqual(['Recruit a miner', 'Recruit a fighter']);
-    expect(recruit('miner').getByText('30 ore, you have 0; 20 timber, you have 0')).toBeInTheDocument();
+    expect(costOf('miner')).toEqual(['ore 30, more than the camp has', 'timber 20, more than the camp has']);
     expect(recruit('miner').getByText('Not enough ore or timber.')).toBeInTheDocument();
-    expect(recruit('fighter').getByText('40 ore, you have 0')).toBeInTheDocument();
+    expect(costOf('fighter')).toEqual(['ore 40, more than the camp has']);
     expect(recruitButton('miner')).toBeDisabled();
     expect(recruitButton('fighter')).toBeDisabled();
-    expect(panel().queryByText('free')).not.toBeInTheDocument();
+    expect(panel().queryByText('Free')).not.toBeInTheDocument();
   });
 
   it('says the next hero comes by caravan when every hero there is dead', async () => {
     await renderCamp(atHighcrag(fakeGame([{ ...wren, status: 'DEAD', location: 'highcrag' }])), '/camp/highcrag');
     expect(panel().getByText('No living hero is here. Nobody at Highcrag joins for nothing: the next comes by caravan from another camp.')).toBeInTheDocument();
-    expect(textsOf(listItems('Dead').map((item) => within(item).getByRole('link')))).toEqual(['Wren']);
+    expect(wordsOf(listItems('Dead'))).toEqual(['Wren villager, level 1']);
+    expect(within(panel().getByRole('list', { name: 'Dead' })).getByRole('link', { name: 'Wren' })).toBeInTheDocument();
   });
 
   it('says the same of a camp whose heroes have all retired: it has had heroes, and none is its first', async () => {
@@ -527,11 +535,11 @@ describe('The camp at Highcrag (Issue-352)', () => {
     game.camp.set({ ...game.camp(), activeHeroes: 1 });
     game.onTheWay.set([wren]);
     await renderCamp(game, '/camp/highcrag');
-    expect(panel().getByText('Level 1: 1 of 4 heroes.')).toBeInTheDocument();
-    const [onTheWay, ...others] = listItems('On the way');
-    expect(others).toEqual([]);
-    expect(within(must(onTheWay, 'the hero on the way')).getByText('Wren')).toBeInTheDocument();
-    expect(within(must(onTheWay, 'the hero on the way')).getByText('villager, level 1, coming by caravan: a slot is held here.')).toBeInTheDocument();
+    expect(panel().getByRole('img', { name: '1 of 4 heroes' })).toBeInTheDocument();
+    expect(panel().getByText('Coming by caravan, each holding a slot here.')).toBeInTheDocument();
+    expect(wordsOf(listItems('On the way'))).toEqual(['Wren villager, level 1']);
+    // On its way, the hero is no control: its card is not the camp's to open yet.
+    expect(within(must(listItems('On the way')[0], 'the hero on the way')).queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('has no list of heroes on the way while none is', async () => {
@@ -541,7 +549,7 @@ describe('The camp at Highcrag (Issue-352)', () => {
 
   it('says nothing of a caravan while a hero is alive there', async () => {
     await renderCamp(atHighcrag(fakeGame([{ ...wren, location: 'highcrag' }])), '/camp/highcrag');
-    expect(textsOf(listItems('Living').map((item) => within(item).getByRole('link')))).toEqual(['Wren']);
+    expect(wordsOf(listItems('Living'))).toEqual(['Wren villager, level 1']);
     expect(panel().queryByText(/by caravan/)).not.toBeInTheDocument();
   });
 
@@ -549,7 +557,7 @@ describe('The camp at Highcrag (Issue-352)', () => {
     await renderCamp(atHighcrag(fakeGame([])), '/camp/highcrag/warehouse');
     expect(panel().getByText('The warehouse is empty.')).toBeInTheDocument();
     const upgrade = section('Upgrade to level 2');
-    expect(within(upgrade).getByText('80 timber, you have 0; 40 ore, you have 0')).toBeInTheDocument();
+    expect(buildCost(upgrade)).toEqual(['timber 80, more than the camp has', 'ore 40, more than the camp has']);
     expect(within(upgrade).getByRole('button', { name: 'Upgrade' })).toBeDisabled();
   });
 

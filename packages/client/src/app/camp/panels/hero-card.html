@@ -1,4 +1,4 @@
-<a class="back" routerLink="../..">← Heroes hall</a>
+<heat-back-link to="../.." label="Heroes hall" />
 @if (hero(); as hero) {
   <h2 id="panel-title">{{ hero.name }}</h2>
   <dl>
@@ -23,14 +23,16 @@
           Retire <strong>{{ hero.name }}</strong>? Retiring is permanent. {{ hero.name }} leaves the hall for good and
           frees a slot; the record stays.
         </p>
-        <button type="button" [disabled]="pending()" (click)="retire(hero.id)">Retire {{ hero.name }}</button>
-        <button type="button" [disabled]="pending()" (click)="confirming.set(null)">Keep</button>
+        <div class="actions">
+          <button type="button" class="button primary" [disabled]="pending()" (click)="retire(hero.id)">Retire {{ hero.name }}</button>
+          <button type="button" class="button secondary" [disabled]="pending()" (click)="confirming.set(null)">Keep</button>
+        </div>
         @if (refused(); as refused) {
           <p class="refusal" role="alert">{{ refused }}</p>
         }
       </div>
     } @else {
-      <button type="button" class="retire" (click)="confirming.set(hero.id)">Retire</button>
+      <button type="button" class="button secondary retire" (click)="confirming.set(hero.id)">Retire</button>
     }
   }
 } @else {

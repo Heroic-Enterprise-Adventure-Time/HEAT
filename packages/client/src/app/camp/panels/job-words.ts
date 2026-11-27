@@ -18,6 +18,25 @@ export function jobAt(at: string, poster: FacilityKind, id: string | null | unde
 }
 
 /**
+ * The poster a job's address names: the job board, whose route names no
+ * facility, or the facility in the address; null for no such facility.
+ */
+export function posterOf(facility: string | null | undefined): FacilityKind | null {
+  if (!facility) return 'job-board';
+  return Object.hasOwn(FACILITIES, facility) ? (facility as FacilityKind) : null;
+}
+
+/**
+ * The job an address names under its poster, which posts its jobs only once
+ * built (game.md, "Locations and camps"); undefined for no such job. The job
+ * board is always there.
+ */
+export function postedJob(at: string, poster: FacilityKind | null, posterLevel: number, id: string | null | undefined): Job | undefined {
+  if (!poster || (poster !== 'job-board' && posterLevel < 1)) return undefined;
+  return jobAt(at, poster, id);
+}
+
+/**
  * Why a job cannot be started yet, where the reason is the player's to fix
  * and not hidden: a caravan to a location the player has no camp at, which
  * needs that location's unlock (decision 0059). The words name the unlock
@@ -48,14 +67,9 @@ export function rewardWords(reward: { readonly amount: number; readonly material
   return `${reward.amount} ${reward.material}`;
 }
 
-/** A job's pay in words, "3 cloth", "10 cloth and 5 ore", or "No pay". */
-export function payWords(job: Job): string {
-  return job.pay.length === 0 ? NO_PAY : job.pay.map(rewardWords).join(' and ');
-}
-
-/** A job on its poster's list, by its pay and its bonus: "3 cloth, 4 bonus XP", "No pay, 2 bonus XP". */
-export function boardWords(job: Job): string {
-  return `${payWords(job)}, ${job.bonusXp} bonus XP`;
+/** A job's bonus on its poster's list, beside its pay's chips: "4 bonus XP". */
+export function bonusXpWords(job: Job): string {
+  return `${job.bonusXp} bonus XP`;
 }
 
 /** A job's bonus on its own page: "Bonus: 4 XP to each hero who arrives." */

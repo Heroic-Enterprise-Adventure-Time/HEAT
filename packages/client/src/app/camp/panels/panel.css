@@ -1,4 +1,10 @@
-/* What every panel in the content area shares; the area itself is the camp's (camp.css). */
+/*
+ * What every panel in the content area shares; the area itself is the
+ * camp's (camp.css). A panel builds its controls from the shared primitives
+ * (decision 0061) and styles no button of its own: an element rule here
+ * would be scoped to the panel and outrank the global .button (found in the
+ * review of PR-388).
+ */
 h2 {
   margin: 0 0 var(--space-md);
   font-size: var(--text-lg);
@@ -9,46 +15,72 @@ h3 {
   font-size: 1rem;
 }
 
-.back {
-  display: inline-block;
-  margin-bottom: var(--space-md);
-  color: inherit;
-}
-
-.roster {
-  list-style: none;
-  padding: 0;
-  margin: 0 0 var(--space-lg);
-}
-
-.roster li {
+/* A panel's title, with its "more" menu at the end of the line where it has one. */
+.title {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--space-md);
+  margin-bottom: var(--space-md);
 }
 
+.title h2 {
+  margin: 0;
+}
+
+.tiles,
+.chips,
 .jobs,
-.party,
+.credits,
+.offers,
 .cargo,
-.recruits,
 .replays {
   list-style: none;
   padding: 0;
   margin: 0 0 var(--space-lg);
 }
 
+/* Hero tiles and resource chips wrap in rows. */
+.tiles,
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
 .jobs li,
-.party li,
-.cargo li,
-.recruits li,
+.credits li,
+.offers li,
 .replays li {
   display: flex;
   flex-wrap: wrap;
-  column-gap: var(--space-md);
+  align-items: center;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
-.credits {
-  margin: 0 0 var(--space-md);
-  padding-left: var(--space-2xl);
+.pays {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+/* A recruit's cost beside its button, on the same line where it fits. */
+.offers .chips {
+  margin: 0;
+}
+
+.offers p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-weight: bold;
 }
 
 .refusal {
@@ -72,15 +104,6 @@ h3 {
   font-weight: normal;
 }
 
-button {
-  font: inherit;
-}
-
-.status {
-  font-weight: bold;
-}
-
-.dead,
 .note {
   color: var(--refusal);
 }
@@ -108,8 +131,11 @@ dd {
   margin: 0 0 var(--space-md);
 }
 
-.confirm button + button {
-  margin-left: var(--space-md);
+/* A row of buttons side by side, as a confirmation's yes and no. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
 }
 
 .retire {
@@ -124,20 +150,6 @@ dd {
   cursor: pointer;
 }
 
-.recruits li {
-  align-items: baseline;
-  margin-bottom: var(--space-sm);
-}
-
-.recruits p {
-  flex-basis: 100%;
-  margin: 0;
-}
-
-.replays li {
-  margin-bottom: var(--space-sm);
-}
-
 /* A replay's party, on a line of its own under how it ended. */
 .replay-party {
   flex-basis: 100%;
@@ -145,12 +157,24 @@ dd {
 }
 
 .cargo li {
-  align-items: baseline;
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
-/* An amount of a few digits, beside what the camp holds and the destination's room. */
-.cargo input {
-  width: 5em;
-  font: inherit;
+/* A resource's stepper: the steps down, the amount picked, the steps up. */
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.amount {
+  min-width: 5rem;
+  text-align: center;
+}
+
+.detail {
+  display: block;
+  margin-top: var(--space-xs);
+  font-size: var(--text-sm);
 }

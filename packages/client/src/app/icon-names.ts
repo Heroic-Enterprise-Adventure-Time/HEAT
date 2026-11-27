@@ -18,6 +18,8 @@ import { fetchJson } from './static-json';
  */
 
 const ICONS = '/art/icons';
+/** An icon is 32 art pixels square (docs/process/assets.md, rule 25), drawn on the page at scale 1 unless a region scales it. */
+export const ICON_PX = 32;
 const PORTRAITS = '/art/portraits';
 /** The published file of each picture, by what it stands for: `timber` to `timber.<hash>.png`, a hero's sprite set `ranger-01` to `ranger-01.<hash>.png`. */
 const PictureNamesSchema = z.record(z.string(), z.string());

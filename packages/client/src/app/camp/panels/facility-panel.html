@@ -7,12 +7,15 @@
     <p class="status">Level {{ facility.level }}.</p>
     <p>{{ facility.description }}</p>
     @if (facility.kind === 'warehouse') {
+      @if (game.camp(); as camp) {
+        <p>Holds up to {{ camp.resourceCapacity }} of each.</p>
+      }
       @if (stock().length === 0) {
         <p>The warehouse is empty.</p>
       } @else {
-        <ul class="stock" aria-label="Stock">
+        <ul class="chips" aria-label="Stock">
           @for (holding of stock(); track holding.material) {
-            <li>{{ holding.balance }} of {{ game.camp()?.resourceCapacity }} {{ holding.material }}</li>
+            <li><heat-resource-chip [material]="holding.material" [amount]="holding.balance" /></li>
           }
         </ul>
       }

@@ -13,6 +13,12 @@ const signInButton = (page: Page) => page.getByRole('banner').getByRole('button'
 const signOutButton = (page: Page) => page.getByRole('banner').getByRole('button', { name: 'Sign out' });
 const living = (page: Page) => page.getByRole('list', { name: 'Living' }).getByRole('link');
 
+/** The name of the first living hero, which its tile is labelled by: the tile itself also says its unit type and level. */
+async function firstLivingName(page: Page): Promise<string> {
+  const id = await living(page).first().getAttribute('aria-labelledby');
+  return page.locator(`[id="${id ?? ''}"]`).innerText();
+}
+
 /** What goes wrong in the page from here on, so call it before the first navigation. */
 function watchForProblems(page: Page): string[] {
   const art = `${siteUrl}/art/`;
@@ -32,7 +38,7 @@ function watchForProblems(page: Page): string[] {
 /** Waits for the hall with the camp's data in it; the list of heroes can be read after this. */
 async function hallIsShown(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Heroes hall' })).toBeVisible();
-  await expect(page.getByText(/^Level \d+: \d+ of \d+ heroes\.$/)).toBeVisible();
+  await expect(page.getByRole('img', { name: /^\d+ of \d+ heroes$/ })).toBeVisible();
 }
 
 /** Signs in through the managed login's form, which a sandbox stack offers (Issue-86). */
@@ -49,12 +55,12 @@ async function signInWithTheForm(page: Page): Promise<void> {
 async function retireEveryone(page: Page): Promise<void> {
   await hallIsShown(page);
   while ((await living(page).count()) > 0) {
-    const name = await living(page).first().innerText();
+    const name = await firstLivingName(page);
     await living(page).first().click();
     await page.getByRole('button', { name: 'Retire', exact: true }).click();
     await page.getByRole('button', { name: `Retire ${name}` }).click();
     await expect(page.getByText(/^retired/)).toBeVisible();
-    await page.getByRole('link', { name: '← Heroes hall' }).click();
+    await page.getByRole('link', { name: 'Back to Heroes hall' }).click();
     await hallIsShown(page);
   }
 }
@@ -75,7 +81,7 @@ async function playAndLeave(page: Page, problems: readonly string[]): Promise<vo
     await expect(living(page)).toHaveCount(1);
   }
 
-  const name = await living(page).first().innerText();
+  const name = await firstLivingName(page);
   await living(page).first().click();
   await expect(page.getByRole('heading', { name })).toBeVisible();
   await expect(page.getByText('alive', { exact: true })).toBeVisible();

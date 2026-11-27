@@ -47,12 +47,7 @@ header {
   white-space: nowrap;
 }
 
-select,
-button {
+select {
   font: inherit;
   padding: var(--space-xs) var(--space-md);
-}
-
-button {
-  cursor: pointer;
 }

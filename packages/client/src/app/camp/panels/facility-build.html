@@ -4,8 +4,13 @@
     @if (offer.gives) {
       <p>{{ offer.gives }}</p>
     }
-    <p class="price">{{ cost() }}</p>
-    <button type="button" [disabled]="pending() || offer.reason !== null" (click)="build(offer)">
+    <ul class="chips" aria-label="Cost">
+      @for (cost of offer.cost; track cost.material) {
+        <li><heat-resource-chip [material]="cost.material" [amount]="cost.amount" [have]="cost.balance" /></li>
+      }
+    </ul>
+    <button type="button" class="button primary" [disabled]="pending() || offer.reason !== null" (click)="build(offer)">
+      <heat-icon name="build" />
       {{ offer.level === 1 ? 'Build' : 'Upgrade' }}
     </button>
     @if (refused(); as refused) {

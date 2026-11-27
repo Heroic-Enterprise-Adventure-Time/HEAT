@@ -1,16 +1,16 @@
 <h2 id="panel-title">Heroes hall</h2>
 @if (game.camp(); as camp) {
-  <p>Level {{ camp.hallLevel }}: {{ camp.activeHeroes }} of {{ camp.heroCapacity }} heroes.</p>
+  <p class="status">
+    Level {{ camp.hallLevel }}
+    <heat-slots of="heroes" [filled]="camp.activeHeroes" [total]="camp.heroCapacity" />
+  </p>
 }
 
 <h3 id="living-title">Living</h3>
 @if (game.livingHere().length > 0) {
-  <ul class="roster living" aria-labelledby="living-title">
+  <ul class="tiles" aria-labelledby="living-title">
     @for (hero of game.livingHere(); track hero.id) {
-      <li>
-        <a class="link" [routerLink]="['heroes', hero.id]">{{ hero.name }}</a>
-        <span>{{ hero.unitType }}, level {{ hero.level }}</span>
-      </li>
+      <li><heat-hero-tile [hero]="hero" [link]="['heroes', hero.id]" /></li>
     }
   </ul>
 } @else if (byCaravan(); as words) {
@@ -21,24 +21,19 @@
 
 @if (game.onTheWay().length > 0) {
   <h3 id="on-the-way-title">On the way</h3>
-  <ul class="roster" aria-labelledby="on-the-way-title">
+  <p>Coming by caravan, each holding a slot here.</p>
+  <ul class="tiles" aria-labelledby="on-the-way-title">
     @for (hero of game.onTheWay(); track hero.id) {
-      <li>
-        <strong>{{ hero.name }}</strong>
-        <span>{{ hero.unitType }}, level {{ hero.level }}, coming by caravan: a slot is held here.</span>
-      </li>
+      <li><heat-hero-tile [hero]="hero" [still]="true" /></li>
     }
   </ul>
 }
 
 @if (dead().length > 0) {
   <h3 id="dead-title">Dead</h3>
-  <ul class="roster dead" aria-labelledby="dead-title">
+  <ul class="tiles" aria-labelledby="dead-title">
     @for (hero of dead(); track hero.id) {
-      <li>
-        <a class="link" [routerLink]="['heroes', hero.id]">{{ hero.name }}</a>
-        <span>{{ hero.unitType }}, level {{ hero.level }}</span>
-      </li>
+      <li><heat-hero-tile [hero]="hero" [link]="['heroes', hero.id]" /></li>
     }
   </ul>
 }
@@ -46,25 +41,29 @@
 @if (game.retiredHere().length > 0) {
   <details class="retired">
     <summary id="retired-title">Retired ({{ game.retiredHere().length }})</summary>
-    <ul class="roster" aria-labelledby="retired-title">
+    <ul class="tiles" aria-labelledby="retired-title">
       @for (hero of game.retiredHere(); track hero.id) {
-        <li>
-          <a class="link" [routerLink]="['heroes', hero.id]">{{ hero.name }}</a>
-          <span>{{ hero.unitType }}, level {{ hero.level }}</span>
-        </li>
+        <li><heat-hero-tile [hero]="hero" [link]="['heroes', hero.id]" /></li>
       }
     </ul>
   </details>
 }
 
 <h3 id="recruit-title">Recruit</h3>
-<ul class="recruits" aria-labelledby="recruit-title">
+<ul class="offers" aria-labelledby="recruit-title">
   @for (offer of game.recruits(); track offer.unitType) {
     <li>
-      <button type="button" [disabled]="pending() !== null || offer.reason !== null" (click)="recruit(offer)">
+      <button type="button" class="button primary" [disabled]="pending() !== null || offer.reason !== null" (click)="recruit(offer)">
+        <heat-icon name="recruit" />
         Recruit a {{ offer.unitType }}
       </button>
-      <span class="price">{{ price(offer) }}</span>
+      <ul class="chips" [attr.aria-label]="`Cost of a ${offer.unitType}`">
+        @for (cost of offer.cost; track cost.material) {
+          <li><heat-resource-chip [material]="cost.material" [amount]="cost.amount" [have]="cost.balance" /></li>
+        } @empty {
+          <li>Free</li>
+        }
+      </ul>
       @if (refused(); as refused) {
         @if (refused.unitType === offer.unitType) {
           <p class="refusal" role="alert">{{ refused.words }}</p>

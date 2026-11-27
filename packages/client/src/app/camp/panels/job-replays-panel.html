@@ -1,0 +1,9 @@
+@if (job(); as job) {
+  <heat-back-link to=".." [label]="job.name" />
+  <h2 id="panel-title">Replays</h2>
+  <heat-replay-list empty="No replays of this job yet." labelledBy="panel-title" [failed]="failed()" [lines]="lines()" />
+} @else {
+  <heat-back-link to="../../.." [label]="posterName()" />
+  <h2 id="panel-title">Replays</h2>
+  <p>There is no such job here.</p>
+}

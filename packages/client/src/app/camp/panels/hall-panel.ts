@@ -1,10 +1,12 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 
 import { Game, type RecruitOffer, type RecruitRefusal } from '../../game';
 import { refusalWords } from '../../hub';
+import { HeroTile } from '../../primitives/hero-tile';
+import { Icon } from '../../primitives/icon';
+import { ResourceChip } from '../../primitives/resource-chip';
+import { Slots } from '../../primitives/slots';
 import { CampState } from '../camp-state';
-import { priceWords } from './cost-words';
 import { FacilityBuild } from './facility-build';
 
 /** The hub's refusals of a recruit, by type, in the player's words; any other is shown as the hub put it. */
@@ -17,19 +19,20 @@ const REFUSALS: Readonly<Record<RecruitRefusal, string>> = {
 
 /**
  * The heroes hall's panel, `/camp/<location>/heroes-hall` (game.md, "The
- * heroes hall" and "The page"): the hall's count against its cap; the
- * roster grouped living, dead and retired, the retired collapsed, and at a
+ * heroes hall" and "The page"): the hall's count against its cap, as slot
+ * circles (decision 0061); the roster as hero tiles, each a link to the
+ * hero's card, grouped living, dead and retired, the retired collapsed, and at a
  * camp with nobody alive whose location offers no hero for nothing, why it
  * is empty and that a hero comes by caravan (Issue-352); the heroes on
  * their way by caravan, each holding a slot the count includes, so a hall
  * that looks to have room and refuses a recruit says why (Issue-355); every
- * unit type the location recruits, its price beside the camp's balance and
- * why it cannot be had now. A refusal from the hub is shown in place, on
+ * unit type the location recruits, its price as resource chips that know
+ * the camp's balance, and why it cannot be had now. A refusal from the hub is shown in place, on
  * the recruit it refused. Last, the hall's next level (Issue-93).
  */
 @Component({
   selector: 'heat-hall-panel',
-  imports: [RouterLink, FacilityBuild],
+  imports: [FacilityBuild, HeroTile, Icon, ResourceChip, Slots],
   templateUrl: './hall-panel.html',
   styleUrl: './panel.css',
 })
@@ -55,7 +58,6 @@ export class HallPanel {
   protected readonly pending = signal<string | null>(null);
   /** The hub's last refusal, on the recruit it refused; cleared by the next try. */
   protected readonly refused = signal<{ unitType: string; words: string } | null>(null);
-  protected readonly price = priceWords;
 
   protected async recruit(offer: RecruitOffer): Promise<void> {
     this.refused.set(null);

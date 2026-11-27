@@ -1,12 +1,8 @@
 import { NgOptimizedImage } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 
-import type { Material } from '@heat/engine';
-
+import { ICON_PX } from '../icon-names';
 import { Icons } from '../icons';
-
-/** A resource's icon is 32 art pixels square (docs/process/assets.md, rule 25), drawn here at scale 1. */
-const ICON_PX = 32;
 
 /**
  * A resource chip (decision 0061): a resource's icon and an amount, the one
@@ -27,7 +23,11 @@ const ICON_PX = 32;
 export class ResourceChip {
   protected readonly icons = inject(Icons);
   protected readonly iconPx = ICON_PX;
-  readonly material = input.required<Material>();
+  /**
+   * The resource, as the hub names it: a material this client's engine does
+   * not know, sent by a newer deploy, is shown by its name (angular.md, rule 6).
+   */
+  readonly material = input.required<string>();
   readonly amount = input.required<number>();
   /** The camp's balance of the resource, for a cost; null for a reward or a holding. */
   readonly have = input<number | null>(null);
