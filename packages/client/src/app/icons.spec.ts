@@ -1,12 +1,10 @@
 import { Icons } from './icons';
+import { answering } from './testing/fetch';
 
 const names = { timber: 'timber.0123456789ab.png', mine: 'mine.ba9876543210.png' };
 
 /** The address a fetch was asked for. */
 const addressOf = (input: Parameters<typeof fetch>[0]): string => (input instanceof Request ? input.url : input.toString());
-
-/** A fetch that answers every request with the body and the status. */
-const answering = (body: unknown, status = 200): typeof fetch => () => Promise.resolve(new Response(JSON.stringify(body), { status }));
 
 describe('Icons', () => {
   it('has no icon before its index is in, and each one after', async () => {

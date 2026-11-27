@@ -2,6 +2,12 @@ import { type ByRoleMatcher, screen, within } from '@testing-library/angular/zon
 
 import { must } from '@heat/engine';
 
+/** The page's button of that name. */
+export const button = (name: string) => screen.getByRole('button', { name });
+
+/** The button a party sets out with, on the job board and at the caravan hub. */
+export const depart = () => button('Depart');
+
 /** The panel beside the scene, as an element and to query within. */
 export const panelBox = () => screen.getByRole('complementary');
 export const panel = () => within(panelBox());

@@ -1,4 +1,5 @@
 import { fetchIconNames, fetchPortraitNames, iconAddress, portraitAddress } from './icon-names';
+import { answering } from './testing/fetch';
 
 const names = { timber: 'timber.0123456789ab.png', mine: 'mine.ba9876543210.png' };
 
@@ -20,8 +21,7 @@ describe('fetchIconNames', () => {
   });
 
   it('refuses an index that is not names by name, naming the file', async () => {
-    const fetchFn: typeof fetch = () => Promise.resolve(new Response(JSON.stringify({ timber: 7 }), { status: 200 }));
-    await expect(fetchIconNames(fetchFn)).rejects.toThrow(/^\/art\/icons\/pictures\.json is not what the page reads/);
+    await expect(fetchIconNames(answering({ timber: 7 }))).rejects.toThrow(/^\/art\/icons\/pictures\.json is not what the page reads/);
   });
 });
 
