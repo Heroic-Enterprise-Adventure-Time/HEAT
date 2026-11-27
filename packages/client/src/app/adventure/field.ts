@@ -1,4 +1,4 @@
-import { type AdventureEvent, type AdventureOutcome, CART, CART_UNIT_ID, jobOf, type Line, MONSTERS, RESOURCE_NODES, type Side, type UnitKind } from '@heat/engine';
+import { type AdventureEvent, type AdventureOutcome, CART, CART_UNIT_ID, jobOf, type Line, MONSTERS, type PartyOrder, RESOURCE_NODES, type Side, type UnitKind } from '@heat/engine';
 
 /**
  * Where everyone stands and how they are, read from the adventure's events
@@ -40,7 +40,7 @@ export interface Field {
   readonly opponents: readonly FieldUnit[];
   /** What has dropped to the party so far, counted up as each enemy falls (decision 0058). */
   readonly drops: readonly { readonly material: string; readonly amount: number }[];
-  readonly order: 'press-on' | 'retreat';
+  readonly order: PartyOrder;
   readonly outcome: AdventureOutcome | null;
 }
 
