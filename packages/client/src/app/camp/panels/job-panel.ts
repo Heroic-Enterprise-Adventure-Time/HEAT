@@ -1,18 +1,20 @@
 import { LowerCasePipe } from '@angular/common';
-import { Component, computed, inject, resource, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router, RouterLink } from '@angular/router';
 import { sumBy } from 'es-toolkit';
 
-import { FACILITIES, type FacilityKind, type Material, MAX_PARTY } from '@heat/engine';
+import { FACILITIES, type Material, MAX_PARTY } from '@heat/engine';
 
-import { replayLine } from '../../adventure/replay-words';
 import { Game, type StartRefusal } from '../../game';
 import { Refusal, refusalWords } from '../../hub';
-import { CampState } from '../camp-state';
-import { caravanReason, cargoLines, cartCapacityAt, loadWords, noWayBackWords, roomWords } from './caravan-words';
-import { bonusWords, jobAt, lockedWords, NO_PAY, retreatWords, rewardWords } from './job-words';
-import { ReplayList } from './replay-list';
+import { BackLink } from '../../primitives/back-link';
+import { HeroTile } from '../../primitives/hero-tile';
+import { Icon } from '../../primitives/icon';
+import { type MoreItem, MoreMenu } from '../../primitives/more-menu';
+import { ResourceChip } from '../../primitives/resource-chip';
+import { caravanReason, cargoLines, cargoRows, cartCapacityAt, loadWords, noWayBackWords, roomWords } from './caravan-words';
+import { bonusWords, lockedWords, NO_PAY, retreatWords } from './job-words';
+import { injectRoutedJob } from './routed-job';
 
 /**
  * The hub's refusals of a start, by type, in the player's words; any other is
@@ -40,79 +42,61 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
  * A job's detail under the poster that lists it, the job board,
  * `/camp/<location>/job-board/jobs/<id>`, or a facility the camp has built,
  * such as `/camp/<location>/mine/jobs/<id>`, so the menu keeps the poster
- * marked (Issue-115, refined by Issue-109; Issue-133): its description, which is all the page tells of what the job
- * holds; its pay, each resource beside the camp's balance and the room left
- * under the warehouse's cap ("Resources"), and its bonus XP; what a retreat
- * keeps, in words; and never its stages nor what its enemies drop, so the
- * room is shown for the pay alone (decision 0058; the owner, 2026-11-20,
- * Issue-339, on the stages); then the party pick, one to four of the camp's
- * living heroes in no order, since a unit type's home line places it; and
- * Depart, which starts it and goes to `/adventure`. A refusal is shown in
- * place, under Depart. Last, the job's replays, anyone's and every outcome,
- * each opening its replay page, read when the page opens (Issue-290,
- * decision 0053).
+ * marked (Issue-115, refined by Issue-109; Issue-133): its description,
+ * which is all the page tells of what the job holds; its pay, as resource
+ * chips, each beside the room left under the warehouse's cap ("Resources"),
+ * and its bonus XP; what a retreat keeps, in words; and never its stages nor
+ * what its enemies drop, so the room is shown for the pay alone (decision
+ * 0058; the owner, 2026-11-20, Issue-339, on the stages); then the party
+ * pick, one to four of the camp's living heroes as hero tiles in no order,
+ * since a unit type's home line places it; and Depart, which starts it and
+ * goes to `/adventure`. A refusal is shown in place, under Depart. The job's
+ * replays are behind the panel's "more" menu, at `<job>/replays`
+ * (`JobReplaysPanel`; decision 0061).
  *
  * A caravan's page is a job's page with two more picks (Issue-355; game.md,
- * "Caravans"): the cargo, an amount of each resource the camp holds, up to
- * what the cart carries, each beside the camp's balance and the
- * destination's room for it; and who of the party stays at the destination,
- * beside its hall's free slots. Under them, what cannot be undone: that a
- * retreat abandons the cargo, which the retreat's line says, and where the
- * destination has no caravan hub, that a hero who stays cannot come back
- * until it has one. Depart is disabled with the reason while the picks break
- * a rule the hub checks again. A caravan to a location the player has not
- * unlocked, and a job its facility's level does not post yet (Issue-357),
- * says what it needs in place of the picks.
+ * "Caravans"): the cargo, an amount of each resource the camp holds, set by
+ * steppers clamped to the balance and to what the cart carries, each beside
+ * the camp's balance and the destination's room for it (Issue-386); and who
+ * of the party stays at the destination, as hero tiles, beside its hall's
+ * free slots. Under them, what cannot be undone: that a retreat abandons the
+ * cargo, which the retreat's line says, and where the destination has no
+ * caravan hub, that a hero who stays cannot come back until it has one.
+ * Depart is disabled with the reason while the picks break a rule the hub
+ * checks again. A caravan to a location the player has not unlocked, and a
+ * job its facility's level does not post yet (Issue-357), says what it needs
+ * in place of the picks.
  */
 @Component({
   selector: 'heat-job-panel',
-  imports: [LowerCasePipe, RouterLink, ReplayList],
+  imports: [BackLink, HeroTile, Icon, LowerCasePipe, MoreMenu, ResourceChip, RouterLink],
   templateUrl: './job-panel.html',
   styleUrl: './panel.css',
 })
 export class JobPanel {
   protected readonly game = inject(Game);
-  private readonly camp = inject(CampState);
   private readonly router = inject(Router);
-  private readonly params = toSignal(inject(ActivatedRoute).paramMap);
   protected readonly maxParty = MAX_PARTY;
 
-  /** The poster: the job board, whose route names no facility, or the facility in the address; null for no such facility. */
-  private readonly poster = computed((): FacilityKind | null => {
-    const facility = this.params()?.get('facility');
-    if (!facility) return 'job-board';
-    return Object.hasOwn(FACILITIES, facility) ? (facility as FacilityKind) : null;
-  });
-  protected readonly posterName = computed(() => {
-    const poster = this.poster();
-    return poster ? FACILITIES[poster].name : 'Camp';
-  });
-  /** A facility posts its jobs only once built (game.md, "Locations and camps"). */
-  protected readonly job = computed(() => {
-    const poster = this.poster();
-    if (!poster || (poster !== 'job-board' && (this.camp.facility(poster)?.level ?? 0) < 1)) return undefined;
-    return jobAt(this.game.location(), poster, this.params()?.get('job'));
-  });
+  private readonly routed = injectRoutedJob();
+  protected readonly posterName = this.routed.posterName;
+  protected readonly job = this.routed.job;
+  /** The job's secondary views, behind its "more" menu (decision 0061): its replays, a child of its route. */
+  protected readonly more: readonly MoreItem[] = [{ label: 'Replays', to: 'replays' }];
   /** What a job with no pay says in its place, from the same words as the board's list. */
   protected readonly noPay = NO_PAY;
-  /** The job's pay, each resource of it beside what the camp holds and the room the warehouse has left for it. */
+  /** The job's pay, each resource of it beside the room the warehouse has left for it: the one thing a chip cannot say. */
   protected readonly pay = computed(() => {
     const camp = this.game.camp();
     return (this.job()?.pay ?? []).map((reward) => {
       const balance = camp?.holdings.find((h) => h.material === reward.material)?.balance ?? 0;
-      return { material: reward.material, words: rewardWords(reward), balance, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
+      return { material: reward.material, amount: reward.amount, room: Math.max(0, (camp?.resourceCapacity ?? 0) - balance) };
     });
   });
   protected readonly bonus = computed(() => {
     const job = this.job();
     return job ? bonusWords(job) : '';
   });
-  private readonly replays = resource({ params: () => this.job()?.id, loader: ({ params }) => this.game.replaysOf(params) });
-  protected readonly replayLines = computed(() =>
-    // A list read again for another job says Loading, not the last job's lines.
-    this.replays.hasValue() && !this.replays.isLoading() ? this.replays.value().flatMap((replay) => replayLine(replay) ?? []) : undefined,
-  );
-  protected readonly replaysFailed = computed(() => this.replays.status() === 'error');
   protected readonly retreat = computed(() => {
     const job = this.job();
     return job ? retreatWords(job) : '';
@@ -136,6 +120,11 @@ export class JobPanel {
     return origin && destination ? cargoLines(origin, destination) : [];
   });
   private readonly amounts = signal<ReadonlyMap<Material, number>>(new Map());
+  /** Each line's stepper, clamped to the camp's balance and the cart's room. */
+  protected readonly cargoRows = computed(() => {
+    const origin = this.game.camp();
+    return origin ? cargoRows(this.cargoLines(), this.amounts(), cartCapacityAt(origin)) : [];
+  });
   /** The cargo as the start sends it: each resource still offered, at the amount picked, and none at 0. */
   private readonly cargo = computed(() =>
     this.cargoLines().flatMap(({ material }) => {
@@ -145,7 +134,7 @@ export class JobPanel {
   );
   protected readonly load = computed(() => {
     const origin = this.game.camp();
-    return origin ? loadWords(sumBy(this.cargo(), (c) => (Number.isFinite(c.amount) ? c.amount : 0)), cartCapacityAt(origin)) : '';
+    return origin ? loadWords(sumBy(this.cargo(), (c) => c.amount), cartCapacityAt(origin)) : '';
   });
   protected readonly room = computed(() => {
     const destination = this.destination();
@@ -162,11 +151,18 @@ export class JobPanel {
     const living = new Set(this.game.livingHere().map((h) => h.id));
     return new Set([...this.chosen()].filter((id) => living.has(id)));
   });
-  /** The party's heroes, in the camp's order, who may be marked to stay. */
-  protected readonly partyHeroes = computed(() => this.game.livingHere().filter((h) => this.picked().has(h.id)));
+  /**
+   * The heroes who may be marked to stay: the party's, in the camp's order,
+   * since every hero on a caravan fights (decision 0059). Issue-391 widens
+   * this to riders, heroes who stay without escorting.
+   */
+  protected readonly mayStay = computed(() => this.game.livingHere().filter((h) => this.picked().has(h.id)));
   private readonly marked = signal<ReadonlySet<string>>(new Set());
-  /** The heroes marked to stay who are still of the party. */
-  protected readonly staying = computed(() => new Set([...this.marked()].filter((id) => this.picked().has(id))));
+  /** The heroes marked to stay who still may. */
+  protected readonly staying = computed(() => {
+    const may = new Set(this.mayStay().map((h) => h.id));
+    return new Set([...this.marked()].filter((id) => may.has(id)));
+  });
   /** Why the caravan cannot depart as picked, or null; always null for a job that delivers nothing. */
   protected readonly caravanReason = computed(() => {
     const origin = this.game.camp();
@@ -184,15 +180,10 @@ export class JobPanel {
     this.chosen.set(next);
   }
 
-  /**
-   * An amount as typed. A field the player cleared is 0; text the field cannot
-   * read as a number, "1e" or a lone "-", which it also reports as empty, is
-   * NaN, so that Depart waits with the reason rather than carrying none.
-   */
-  protected setAmount(material: Material, event: Event): void {
-    const field = event.target as HTMLInputElement;
+  /** An amount as a stepper set it, already clamped (`cargoRows`). */
+  protected setAmount(material: Material, amount: number): void {
     const next = new Map(this.amounts());
-    next.set(material, field.validity.badInput ? Number.NaN : field.value === '' ? 0 : field.valueAsNumber);
+    next.set(material, amount);
     this.amounts.set(next);
   }
 

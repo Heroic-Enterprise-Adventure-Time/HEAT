@@ -15,7 +15,7 @@ import { fakeSession, PLAYER } from '../../testing/fake-session';
 import { testLayoutSizes } from '../../testing/layout-sizes';
 import { panel } from '../../testing/page';
 import { renderAt } from '../../testing/render-at';
-import { textsOf } from '../../testing/texts-of';
+import { wordsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
 
 function hero(id: string, name: string): HeroView {
@@ -67,24 +67,26 @@ function renderCaravan(game: ReturnType<typeof fakeGame>) {
 
 const CARAVAN = '/camp/millbrook/caravan-hub/jobs/caravan-to-highcrag';
 const depart = () => screen.getByRole('button', { name: 'Depart' });
-const partyBox = (name: string) => within(screen.getByRole('group', { name: 'Party' })).getByRole('checkbox', { name });
-const stays = (name: string) => within(screen.getByRole('group', { name: 'Who stays' })).getByRole('checkbox', { name: `${name} stays at Highcrag` });
-const amount = (material: string) => within(panel().getByRole('group', { name: 'Cargo' })).getByRole('spinbutton', { name: material });
-
-/** Types an amount into a resource's field, replacing what was there. */
-async function load(user: Awaited<ReturnType<typeof renderCaravan>>['user'], material: string, value: string) {
-  await user.clear(amount(material));
-  if (value !== '') await user.type(amount(material), value);
-}
+const group = (name: string) => within(screen.getByRole('group', { name }));
+const partyTile = (name: string) => group('Party').getByRole('button', { name });
+const stays = (name: string) => group('Who stays at Highcrag').getByRole('button', { name });
+/** One of a resource's stepper buttons, "+10" or "−1". */
+const step = (label: string, material: string) => group('Cargo').getByRole('button', { name: `${label} ${material}` });
+/** The amount a resource's stepper shows, as a reader hears its chip. */
+const amountOf = (material: string) => wordsOf([group(material).getByRole('status')])[0];
+const cargo = () => screen.getByRole('group', { name: 'Cargo' });
 
 describe("A caravan's page (Issue-355)", () => {
   it("offers each resource the camp holds, beside its balance and Highcrag's room for it, against what the cart carries", async () => {
     await renderCaravan(fakeGame());
     expect(panel().getByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).toBeInTheDocument();
     expect(panel().getByText(JOBS['caravan-to-highcrag'].description)).toBeInTheDocument();
-    expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 0 of the 100 the cart carries.');
-    expect(textsOf(within(screen.getByRole('group', { name: 'Cargo' })).getAllByRole('listitem'))).toEqual(['timber Millbrook holds 90. Highcrag has room for 100 more.', 'ore Millbrook holds 40. Highcrag has room for 30 more.']);
-    expect(amount('timber')).toHaveValue(0);
+    expect(cargo()).toHaveAccessibleDescription('Cargo: 0 of the 100 the cart carries.');
+    expect(panel().getByText('Millbrook holds 90; room for 100 at Highcrag')).toBeInTheDocument();
+    expect(panel().getByText('Millbrook holds 40; room for 30 at Highcrag')).toBeInTheDocument();
+    expect(amountOf('timber')).toBe('timber 0');
+    expect(step('−1', 'timber')).toBeDisabled();
+    expect(step('+1', 'timber')).toBeEnabled();
   });
 
   it('says before departing that a retreat abandons the cargo, and that a hero who stays cannot come back while Highcrag has no caravan hub', async () => {
@@ -98,29 +100,32 @@ describe("A caravan's page (Issue-355)", () => {
     expect(panel().queryByText(/cannot come back/)).not.toBeInTheDocument();
   });
 
-  it("offers who stays from the party alone, beside Highcrag's free slots", async () => {
+  it("offers who stays from the party alone, as tiles, beside Highcrag's free slots", async () => {
     const { user } = await renderCaravan(fakeGame());
-    const group = screen.getByRole('group', { name: 'Who stays' });
-    expect(group).toHaveAccessibleDescription("Highcrag's heroes hall has room for 2 more.");
-    expect(within(group).queryAllByRole('checkbox')).toHaveLength(0);
-    expect(within(group).getByText('Pick the party first.')).toBeInTheDocument();
+    const staying = screen.getByRole('group', { name: 'Who stays at Highcrag' });
+    expect(staying).toHaveAccessibleDescription("Highcrag's heroes hall has room for 2 more.");
+    expect(within(staying).queryAllByRole('button')).toHaveLength(0);
+    expect(within(staying).getByText('Pick the party first.')).toBeInTheDocument();
 
-    await user.click(partyBox('Wren'));
-    await user.click(partyBox('Lark'));
-    await waitFor(() => { expect(within(group).getAllByRole('checkbox')).toHaveLength(2); });
-    expect(stays('Wren')).not.toBeChecked();
+    await user.click(partyTile('Wren'));
+    await user.click(partyTile('Lark'));
+    await waitFor(() => { expect(within(staying).getAllByRole('button')).toHaveLength(2); });
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'false');
     expect(stays('Lark')).toBeInTheDocument();
+    await user.click(stays('Wren'));
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('Departs with the cargo picked and who stays, leaving out a resource at 0', async () => {
     const game = fakeGame();
     const { user } = await renderCaravan(game);
-    await user.click(partyBox('Wren'));
-    await user.click(partyBox('Moss'));
-    await load(user, 'timber', '60');
-    await load(user, 'ore', '40');
-    await user.click(await screen.findByRole('checkbox', { name: 'Wren stays at Highcrag' }));
-    await waitFor(() => { expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 100 of the 100 the cart carries.'); });
+    await user.click(partyTile('Wren'));
+    await user.click(partyTile('Moss'));
+    await user.click(step('+100', 'ore'));
+    await user.click(step('+100', 'timber'));
+    await waitFor(() => { expect(stays('Wren')).toBeInTheDocument(); });
+    await user.click(stays('Wren'));
+    await waitFor(() => { expect(cargo()).toHaveAccessibleDescription('Cargo: 100 of the 100 the cart carries.'); });
     await waitFor(() => { expect(depart()).toBeEnabled(); });
     await user.click(depart());
     expect(game.started).toEqual([
@@ -141,69 +146,49 @@ describe("A caravan's page (Issue-355)", () => {
   it('sends an escort with no cargo and nobody staying as a caravan all the same', async () => {
     const game = fakeGame();
     const { user } = await renderCaravan(game);
-    await user.click(partyBox('Wren'));
+    await user.click(partyTile('Wren'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
     await user.click(depart());
     expect(game.started).toEqual([{ jobId: 'caravan-to-highcrag', heroIds: ['h1'], caravan: { cargo: [], staying: [] } }]);
   });
 
-  it("waits with the reason while the cargo is more than the camp holds, more than the cart carries, or not a whole number", async () => {
-    const { user } = await renderCaravan(fakeGame());
-    await user.click(partyBox('Wren'));
-    await load(user, 'ore', '41');
-    expect(await screen.findByText('Millbrook holds only 40 ore.')).toBeInTheDocument();
-    expect(depart()).toBeDisabled();
+  it('clamps a step to what the camp holds and what the cart has left, and never below 0, so a cargo is never refused for its amounts (Issue-386)', async () => {
+    const game = fakeGame();
+    const { user } = await renderCaravan(game);
+    await user.click(partyTile('Wren'));
+    await user.click(step('+100', 'ore'));
+    await waitFor(() => { expect(amountOf('ore')).toBe('ore 40'); });
+    expect(step('+1', 'ore')).toBeDisabled();
 
-    await load(user, 'ore', '31');
-    await load(user, 'timber', '70');
-    expect(await screen.findByText('The cart carries 100 in all.')).toBeInTheDocument();
-    expect(depart()).toBeDisabled();
+    await user.click(step('+100', 'timber'));
+    await waitFor(() => { expect(amountOf('timber')).toBe('timber 60'); });
+    expect(step('+1', 'timber')).toBeDisabled();
+    await user.click(step('−10', 'timber'));
+    await waitFor(() => { expect(amountOf('timber')).toBe('timber 50'); });
+    expect(step('+1', 'timber')).toBeEnabled();
 
-    await load(user, 'timber', '2.5');
-    expect(await screen.findByText('Each amount is a whole number, 0 or more.')).toBeInTheDocument();
-    expect(depart()).toBeDisabled();
-
-    await load(user, 'timber', '');
-    await waitFor(() => { expect(depart()).toBeEnabled(); });
+    await user.click(step('−100', 'ore'));
+    await waitFor(() => { expect(amountOf('ore')).toBe('ore 0'); });
+    expect(cargo()).toHaveAccessibleDescription('Cargo: 50 of the 100 the cart carries.');
+    expect(depart()).toBeEnabled();
+    await user.click(depart());
+    expect(game.started[0]?.caravan?.cargo).toEqual([{ material: 'timber', amount: 50 }]);
   });
 
   it("waits with the reason while more stay than Highcrag's hall has room for, and lets go of one who leaves the party", async () => {
     const { user } = await renderCaravan(fakeGame());
-    for (const name of ['Wren', 'Moss', 'Lark']) await user.click(partyBox(name));
-    for (const name of ['Wren', 'Moss', 'Lark']) await user.click(await screen.findByRole('checkbox', { name: `${name} stays at Highcrag` }));
+    for (const name of ['Wren', 'Moss', 'Lark']) await user.click(partyTile(name));
+    for (const name of ['Wren', 'Moss', 'Lark']) {
+      await waitFor(() => { expect(stays(name)).toBeInTheDocument(); });
+      await user.click(stays(name));
+    }
     await waitFor(() => { expect(depart()).toBeDisabled(); });
     expect(panel().getAllByText("Highcrag's heroes hall has room for 2 more.")).toHaveLength(2);
 
     // Lark leaves the party, and with it who stays.
-    await user.click(partyBox('Lark'));
+    await user.click(partyTile('Lark'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
     expect(panel().getAllByText("Highcrag's heroes hall has room for 2 more.")).toHaveLength(1);
-  });
-
-  it('waits with the reason while a field holds text it cannot read as a number, which it reports as empty', async () => {
-    const { user } = await renderCaravan(fakeGame());
-    await user.click(partyBox('Wren'));
-    await load(user, 'ore', '10');
-    await waitFor(() => { expect(depart()).toBeEnabled(); });
-    // jsdom does not parse "1e" as a browser does; the field says what a browser's would: empty, and bad input.
-    const field = amount('ore');
-    if (!(field instanceof HTMLInputElement)) throw new Error('the ore field is an input');
-    Object.defineProperty(field, 'validity', { value: { badInput: true } });
-    field.value = '';
-    field.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(await screen.findByText('Each amount is a whole number, 0 or more.')).toBeInTheDocument();
-    expect(depart()).toBeDisabled();
-  });
-
-  it('leaves a field the player cleared empty, carrying none of it, and writes nothing back into it', async () => {
-    const { user } = await renderCaravan(fakeGame());
-    await user.click(partyBox('Wren'));
-    await load(user, 'ore', '10');
-    await waitFor(() => { expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 10 of the 100 the cart carries.'); });
-    await user.clear(amount('ore'));
-    await waitFor(() => { expect(screen.getByRole('group', { name: 'Cargo' })).toHaveAccessibleDescription('Cargo: 0 of the 100 the cart carries.'); });
-    expect(amount('ore')).toHaveDisplayValue('');
-    expect(depart()).toBeEnabled();
   });
 
   // Another start or a build took the balance or the slot since the page read the camp.
@@ -212,7 +197,7 @@ describe("A caravan's page (Issue-355)", () => {
     ['HallFull', 'The heroes hall at the destination has no room for everyone who stays.'],
   ])("shows the hub's refusal %s in place, in the player's words", async (kind, words) => {
     const { user } = await renderCaravan(fakeGame(undefined, () => new Refusal(kind, kind)));
-    await user.click(partyBox('Wren'));
+    await user.click(partyTile('Wren'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
     await user.click(depart());
     expect(await screen.findByText(words)).toHaveRole('alert');

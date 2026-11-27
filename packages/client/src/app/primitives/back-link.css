@@ -1,0 +1,8 @@
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+  color: inherit;
+  font-weight: bold;
+}

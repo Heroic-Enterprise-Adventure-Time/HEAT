@@ -1,8 +1,9 @@
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { Game } from '../../game';
+import { BackLink } from '../../primitives/back-link';
 
 /**
  * Another player's hero, `/camp/<location>/seen/<id>`: who it is and nothing
@@ -12,7 +13,7 @@ import { Game } from '../../game';
  */
 @Component({
   selector: 'heat-seen-hero-card',
-  imports: [RouterLink],
+  imports: [BackLink],
   templateUrl: './seen-hero-card.html',
   styleUrl: './panel.css',
 })

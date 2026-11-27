@@ -1,12 +1,14 @@
 import { NgOptimizedImage } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 
 import { MATERIALS } from '@heat/engine';
 
 import { MAP_HEIGHT, MAP_WIDTH } from '../camp/scene/layout';
-import { Icons } from '../icons';
+import { BackLink } from '../primitives/back-link';
 import { HeroTile, type TileHero } from '../primitives/hero-tile';
+import { Icon } from '../primitives/icon';
+import { type MoreItem, MoreMenu } from '../primitives/more-menu';
 import { ResourceChip } from '../primitives/resource-chip';
 import { Slots } from '../primitives/slots';
 
@@ -18,9 +20,6 @@ const SCENE_SCALE = 3;
 /** The sample heroes; the first stands beside the scene. */
 const WREN: TileHero = { name: 'Wren', unitType: 'ranger', level: 3, spriteSet: 'ranger-01' };
 const BRAM: TileHero = { name: 'Bram', unitType: 'knight', level: 1, spriteSet: 'knight-06' };
-
-/** An icon is 32 art pixels square (docs/process/assets.md, rule 25), drawn on a button at scale 1. */
-const ICON_PX = 32;
 
 /** A button's kind, with the classes each of its states takes. */
 interface ButtonKind {
@@ -37,13 +36,11 @@ interface ButtonKind {
  */
 @Component({
   selector: 'heat-gallery',
-  imports: [HeroTile, NgOptimizedImage, ResourceChip, RouterLink, Slots],
+  imports: [BackLink, HeroTile, Icon, MoreMenu, NgOptimizedImage, ResourceChip, RouterLink, Slots],
   templateUrl: './gallery.html',
   styleUrl: './gallery.css',
 })
 export class Gallery {
-  protected readonly icons = inject(Icons);
-  protected readonly iconPx = ICON_PX;
   /** The action icons (Issue-385), each on a button with its word. */
   protected readonly actions = [
     { icon: 'depart', label: 'Depart', classes: 'button primary' },
@@ -85,7 +82,11 @@ export class Gallery {
     { filled: 4, total: 4 },
   ] as const;
   protected readonly heroes: readonly TileHero[] = [WREN, BRAM];
+  /** A panel's more menu holds links to its secondary views; here, back to the gallery. */
+  protected readonly more: readonly MoreItem[] = [{ label: 'Recently here', to: '/gallery' }];
   protected readonly sceneHero = WREN;
+  /** The hero the disabled and still tiles show. */
+  protected readonly spareHero = BRAM;
   /** The first sample hero starts picked; a tile toggles as it would in a party pick. */
   protected readonly picked = signal<ReadonlySet<string>>(new Set(['Wren']));
   protected toggle(name: string): void {

@@ -1,6 +1,6 @@
 import { JOBS } from '@heat/engine';
 
-import { boardWords, bonusWords, jobAt, jobsAt, lockedWords, payWords, retreatWords, rewardWords } from './job-words';
+import { bonusWords, bonusXpWords, jobAt, jobsAt, lockedWords, postedJob, posterOf, retreatWords, rewardWords } from './job-words';
 
 const sticks = JOBS['pick-up-sticks'];
 const wolves = JOBS['wolves-on-the-mill-road'];
@@ -19,6 +19,21 @@ describe('job words', () => {
     expect(jobAt('millbrook', 'mine', 'ore-from-the-hill')).toBe(ore);
     expect(jobAt('elsewhere', 'job-board', 'timber-from-the-near-woods')).toBeUndefined();
     expect(jobAt('millbrook', 'job-board', 'nothing')).toBeUndefined();
+  });
+
+  it("reads a job's poster from its address: the job board where it names no facility, and none for a facility there is not", () => {
+    expect(posterOf(undefined)).toBe('job-board');
+    expect(posterOf('mine')).toBe('mine');
+    expect(posterOf('forge')).toBeNull();
+    expect(posterOf('toString')).toBeNull();
+  });
+
+  it('finds a job under its poster only once the poster is built, the job board always', () => {
+    expect(postedJob('millbrook', 'job-board', 0, 'pick-up-sticks')).toBe(sticks);
+    expect(postedJob('millbrook', 'mine', 0, 'ore-from-the-hill')).toBeUndefined();
+    expect(postedJob('millbrook', 'mine', 1, 'ore-from-the-hill')).toBe(ore);
+    expect(postedJob('millbrook', null, 1, 'ore-from-the-hill')).toBeUndefined();
+    expect(postedJob('millbrook', 'mine', 1, null)).toBeUndefined();
   });
 
   it("lists the caravan hub's caravan beside its road job, now that its page picks a cargo and who stays (Issue-355)", () => {
@@ -42,19 +57,13 @@ describe('job words', () => {
     expect(lockedWords(ore, ['millbrook'], [{ kind: 'mine', level: 1 }])).toBeNull();
   });
 
-  it("says a job's pay, each resource of it, or that it pays nothing", () => {
+  it("says one resource of a job's pay", () => {
     expect(rewardWords({ amount: 3, material: 'cloth' })).toBe('3 cloth');
-    expect(payWords(wolves)).toBe('10 cloth');
-    expect(payWords({ ...wolves, pay: [{ material: 'cloth', amount: 10 }, { material: 'ore', amount: 5 }] })).toBe('10 cloth and 5 ore');
-    expect(payWords(sticks)).toBe('No pay');
   });
 
-  it('says a job on the board by its pay and its bonus XP, and never by what it drops (decision 0058)', () => {
-    expect(boardWords(sticks)).toBe('No pay, 2 bonus XP');
-    expect(boardWords(timber)).toBe('3 cloth, 4 bonus XP');
-    expect(boardWords(wolves)).toBe('10 cloth, 10 bonus XP');
-    expect(boardWords(ore)).toBe('No pay, 4 bonus XP');
-    for (const job of Object.values(JOBS)) expect(boardWords(job)).not.toMatch(/timber|ore\b|up to/);
+  it("says a job's bonus XP on the board, beside its pay's chips", () => {
+    expect(bonusXpWords(sticks)).toBe('2 bonus XP');
+    expect(bonusXpWords(wolves)).toBe('10 bonus XP');
   });
 
   it("says a job's bonus as what arriving pays each hero", () => {

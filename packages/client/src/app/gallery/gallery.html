@@ -22,19 +22,13 @@
     <div class="row frame">
       @for (action of actions; track action.icon) {
         <button type="button" [class]="action.classes">
-          @if (icons.src(action.icon); as icon) {
-            <img alt="" [ngSrc]="icon" [width]="iconPx" [height]="iconPx" />
-          }
+          <heat-icon [name]="action.icon" />
           {{ action.label }}
         </button>
       }
       @for (action of iconOnly; track action.icon) {
         <button type="button" class="button secondary" [attr.aria-label]="action.label">
-          @if (icons.src(action.icon); as icon) {
-            <img alt="" [ngSrc]="icon" [width]="iconPx" [height]="iconPx" />
-          } @else {
-            {{ action.label }}
-          }
+          <heat-icon [name]="action.icon" />
         </button>
       }
     </div>
@@ -82,6 +76,20 @@
       }
       <heat-hero-tile [hero]="null" />
     </div>
+    <h3>Disabled, linked and still</h3>
+    <div class="row frame">
+      <heat-hero-tile [hero]="spareHero" [disabled]="true" />
+      <heat-hero-tile link="/gallery" [hero]="sceneHero" />
+      <heat-hero-tile [hero]="spareHero" [still]="true" />
+    </div>
+  </section>
+
+  <section aria-labelledby="ways">
+    <h2 id="ways">Back links and the more menu</h2>
+    <div class="row frame">
+      <heat-back-link label="Gallery" to="/gallery" />
+      <heat-more-menu [items]="more" />
+    </div>
   </section>
 
   <section aria-labelledby="bar">
@@ -100,9 +108,7 @@
       <img class="scene" alt="Millbrook's camp, a frame of the scene at scale 3" [ngSrc]="sceneFrame" [width]="sceneWidth" [height]="sceneHeight" />
       <div class="frame">
         <button type="button" class="button primary">
-          @if (icons.src('depart'); as icon) {
-            <img alt="" [ngSrc]="icon" [width]="iconPx" [height]="iconPx" />
-          }
+          <heat-icon name="depart" />
           Depart
         </button>
         <heat-resource-chip material="timber" [amount]="40" />

@@ -12,8 +12,18 @@
   text-align: left;
 }
 
-button.tile {
+button.tile,
+a.tile {
   cursor: pointer;
+}
+
+a.tile {
+  text-decoration: none;
+}
+
+button.tile:disabled {
+  color: var(--on-panel-quiet);
+  cursor: not-allowed;
 }
 
 .tile.picked {

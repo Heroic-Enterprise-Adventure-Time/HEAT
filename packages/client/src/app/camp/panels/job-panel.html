@@ -1,19 +1,23 @@
-<a class="back" routerLink="../..">← {{ posterName() }}</a>
+<heat-back-link to="../.." [label]="posterName()" />
 @if (job(); as job) {
-  <h2 id="panel-title">{{ job.name }}</h2>
+  <div class="title">
+    <h2 id="panel-title">{{ job.name }}</h2>
+    <heat-more-menu [items]="more" />
+  </div>
   <p>{{ job.description }}</p>
 
   <h3 id="reward-title">Reward</h3>
   <ul class="credits" aria-labelledby="reward-title">
     @for (credit of pay(); track credit.material) {
       <li>
-        {{ credit.words }}. {{ game.camp()?.name }} holds {{ credit.balance }}, with room for {{ credit.room }} more.
+        <heat-resource-chip [material]="credit.material" [amount]="credit.amount" />
+        <span>room for {{ credit.room }} more</span>
       </li>
     } @empty {
-      <li>{{ noPay }}.</li>
+      <li>{{ noPay }}</li>
     }
-    <li>{{ bonus() }}</li>
   </ul>
+  <p>{{ bonus() }}</p>
   <p class="retreat">{{ retreat() }}</p>
 
   <h3 id="party-title">Party</h3>
@@ -22,28 +26,23 @@
   } @else if (locked(); as words) {
     <p class="note">{{ words }}</p>
   } @else if (game.adventure(); as adventure) {
-    <p class="note">An adventure is under way: <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>.</p>
+    <p class="note">An adventure is under way.</p>
+    <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>
   } @else if (game.livingHere().length === 0) {
-    <p>
-      No hero here is alive. Recruit one at the
-      <a class="link" [routerLink]="['/camp', game.location(), 'heroes-hall']">heroes hall</a>.
-    </p>
+    <p>No hero here is alive.</p>
+    <a class="link" [routerLink]="['/camp', game.location(), 'heroes-hall']">Recruit at the heroes hall</a>
   } @else {
     <div role="group" aria-labelledby="party-title" aria-describedby="party-size">
       <p id="party-size">Pick one to {{ maxParty }} heroes.</p>
-      <ul class="party">
+      <ul class="tiles">
         @for (hero of game.livingHere(); track hero.id) {
           <li>
-            <label>
-              <input
-                type="checkbox"
-                [checked]="picked().has(hero.id)"
-                [disabled]="!picked().has(hero.id) && picked().size >= maxParty"
-                (change)="toggle(hero.id)"
-              />
-              {{ hero.name }}
-            </label>
-            <span>{{ hero.unitType }}, level {{ hero.level }}</span>
+            <heat-hero-tile
+              [hero]="hero"
+              [picked]="picked().has(hero.id)"
+              [disabled]="!picked().has(hero.id) && picked().size >= maxParty"
+              (toggled)="toggle(hero.id)"
+            />
           </li>
         }
       </ul>
@@ -52,16 +51,24 @@
       <h3 id="cargo-title">Cargo</h3>
       <div role="group" aria-labelledby="cargo-title" aria-describedby="cargo-load">
         <p id="cargo-load">{{ load() }}</p>
-        @if (cargoLines().length > 0) {
+        @if (cargoRows().length > 0) {
           <ul class="cargo">
-            @for (line of cargoLines(); track line.material) {
+            @for (row of cargoRows(); track row.material) {
               <li>
-                <label>
-                  {{ line.material }}
-                  <!-- Written once and then left to the player: a binding would write 0 back into a field they are still typing in. -->
-                  <input type="number" min="0" step="1" value="0" [max]="line.balance" (input)="setAmount(line.material, $event)" />
-                </label>
-                <span>{{ game.camp()?.name }} holds {{ line.balance }}. {{ destination.name }} has room for {{ line.room }} more.</span>
+                <div class="stepper" role="group" [attr.aria-label]="row.material">
+                  @for (step of row.down; track step.label) {
+                    <button type="button" class="button secondary" [attr.aria-label]="`${step.label} ${row.material}`" [disabled]="step.disabled" (click)="setAmount(row.material, step.to)">
+                      {{ step.label }}
+                    </button>
+                  }
+                  <span class="amount" role="status"><heat-resource-chip [material]="row.material" [amount]="row.amount" /></span>
+                  @for (step of row.up; track step.label) {
+                    <button type="button" class="button secondary" [attr.aria-label]="`${step.label} ${row.material}`" [disabled]="step.disabled" (click)="setAmount(row.material, step.to)">
+                      {{ step.label }}
+                    </button>
+                  }
+                </div>
+                <span class="detail">{{ game.camp()?.name }} holds {{ row.balance }}; room for {{ row.room }} at {{ destination.name }}</span>
               </li>
             }
           </ul>
@@ -70,17 +77,12 @@
         }
       </div>
 
-      <h3 id="staying-title">Who stays</h3>
+      <h3 id="staying-title">Who stays at {{ destination.name }}</h3>
       <div role="group" aria-labelledby="staying-title" aria-describedby="staying-room">
         <p id="staying-room">{{ room() }}</p>
-        <ul class="party">
-          @for (hero of partyHeroes(); track hero.id) {
-            <li>
-              <label>
-                <input type="checkbox" [checked]="staying().has(hero.id)" (change)="toggleStay(hero.id)" />
-                {{ hero.name }} stays at {{ destination.name }}
-              </label>
-            </li>
+        <ul class="tiles">
+          @for (hero of mayStay(); track hero.id) {
+            <li><heat-hero-tile [hero]="hero" [picked]="staying().has(hero.id)" (toggled)="toggleStay(hero.id)" /></li>
           } @empty {
             <li>Pick the party first.</li>
           }
@@ -93,14 +95,14 @@
         <p class="note">{{ reason }}</p>
       }
     }
-    <button type="button" [disabled]="picked().size === 0 || caravanReason() !== null || pending()" (click)="depart(job.id)">Depart</button>
+    <button type="button" class="button primary" [disabled]="picked().size === 0 || caravanReason() !== null || pending()" (click)="depart(job.id)">
+      <heat-icon name="depart" />
+      Depart
+    </button>
   }
   @if (refusal(); as refusal) {
     <p class="refusal" role="alert">{{ refusal }}</p>
   }
-
-  <h3 id="replays-title">Replays</h3>
-  <heat-replay-list empty="No replays of this job yet." labelledBy="replays-title" [failed]="replaysFailed()" [lines]="replayLines()" />
 } @else {
   <h2 id="panel-title">Job</h2>
   <p>The {{ posterName() | lowercase }} has no such job.</p>

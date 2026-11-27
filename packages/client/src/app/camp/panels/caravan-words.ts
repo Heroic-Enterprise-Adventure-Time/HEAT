@@ -1,4 +1,4 @@
-import { sumBy } from 'es-toolkit';
+import { clamp, sumBy } from 'es-toolkit';
 
 import { cartCapacity, type Material, MATERIALS } from '@heat/engine';
 
@@ -44,6 +44,46 @@ export function cargoLines(origin: CampView, destination: CampView): CargoLine[]
   });
 }
 
+/** The steps a cargo's amount moves by, each way, in place of a number field (the owner, 2026-11-27, Issue-386). */
+export const CARGO_STEPS = [1, 10, 100] as const;
+
+/** One stepper button: what it says, the amount it sets, and whether it would change nothing. */
+export interface CargoStep {
+  readonly label: string;
+  readonly to: number;
+  readonly disabled: boolean;
+}
+
+/** A resource's line of the cargo as its stepper draws it: the amount picked, and the buttons below it and above it. */
+export interface CargoRow extends CargoLine {
+  readonly amount: number;
+  readonly down: readonly CargoStep[];
+  readonly up: readonly CargoStep[];
+}
+
+/**
+ * Each line's stepper, `−100 −10 −1 [amount] +1 +10 +100`. A step is
+ * clamped, never refused: it goes no lower than 0 and no higher than what
+ * the camp holds of the resource or what the cart has left, so a camp
+ * holding 40 that steps up by 100 loads 40. A step that would change
+ * nothing, already at its limit, is disabled.
+ */
+export function cargoRows(lines: readonly CargoLine[], amounts: ReadonlyMap<Material, number>, capacity: number): CargoRow[] {
+  const loaded = sumBy(lines, (line) => amounts.get(line.material) ?? 0);
+  return lines.map((line) => {
+    const amount = amounts.get(line.material) ?? 0;
+    const most = Math.max(amount, Math.min(line.balance, amount + capacity - loaded));
+    const to = (delta: number) => clamp(amount + delta, 0, most);
+    const step = (delta: number, label: string) => ({ label, to: to(delta), disabled: to(delta) === amount });
+    return {
+      ...line,
+      amount,
+      down: [...CARGO_STEPS].reverse().map((n) => step(-n, `−${n}`)),
+      up: CARGO_STEPS.map((n) => step(n, `+${n}`)),
+    };
+  });
+}
+
 /** What the camp's cart carries in all, by its caravan hub's level (decision 0059). */
 export function cartCapacityAt(camp: CampView): number {
   return cartCapacity(camp.facilities.find((f) => f.kind === 'caravan-hub')?.level ?? 0);
@@ -75,11 +115,11 @@ export function noWayBackWords(destination: CampView): string | null {
 }
 
 /**
- * Why the caravan cannot depart as picked, or null when it can: an amount
- * that is not a whole number of 0 or more, more of a resource than the camp
- * holds, more in all than the cart carries, or more heroes staying than the
- * destination's hall has room for. The hub refuses the same with
- * BAD_USER_INPUT, InsufficientResources and HallFull.
+ * Why the caravan cannot depart as picked, or null when it can: more of a
+ * resource than the camp holds, or more in all than the cart carries, which
+ * the steppers never pick but a camp read again after a refusal may leave;
+ * or more heroes staying than the destination's hall has room for. The hub
+ * refuses the same with BAD_USER_INPUT, InsufficientResources and HallFull.
  */
 export function caravanReason(
   origin: CampView,
@@ -87,7 +127,6 @@ export function caravanReason(
   cargo: readonly { readonly material: string; readonly amount: number }[],
   staying: number,
 ): string | null {
-  if (cargo.some((c) => !Number.isInteger(c.amount) || c.amount < 0)) return 'Each amount is a whole number, 0 or more.';
   for (const c of cargo) {
     const balance = origin.holdings.find((h) => h.material === c.material)?.balance ?? 0;
     if (c.amount > balance) return `${origin.name} holds only ${balance} ${c.material}.`;

@@ -7,6 +7,8 @@ import { HallPanel } from './camp/panels/hall-panel';
 import { HeroCard } from './camp/panels/hero-card';
 import { JobBoardPanel } from './camp/panels/job-board-panel';
 import { JobPanel } from './camp/panels/job-panel';
+import { JobReplaysPanel } from './camp/panels/job-replays-panel';
+import { RecentPanel } from './camp/panels/recent-panel';
 import { SeenHeroCard } from './camp/panels/seen-hero-card';
 import { Home } from './home/home';
 import { Session } from './session';
@@ -29,7 +31,9 @@ export const signedIn: CanActivateFn = (_route, state) => {
  * so a hero's card sits under the hall; another player's hero seen about the
  * camp is `/camp/<location>/seen/<id>`, under no facility. A job's detail
  * sits under the job board, `/camp/<location>/job-board/jobs/<id>`, or under
- * the facility that posts it, `/camp/<location>/mine/jobs/<id>` (Issue-133), and the
+ * the facility that posts it, `/camp/<location>/mine/jobs/<id>` (Issue-133); the
+ * secondary views behind a panel's "more" menu are its children, the board's
+ * `job-board/recent` and a job's `<job>/replays` (decision 0061); and the
  * open adventure is `/adventure`, outside any camp (Issue-115), and any settled
  * adventure's replay is `/replays/<id>`, beside it (Issue-290). Anything else
  * goes home, which sends a signed-in player on to their camp.
@@ -45,10 +49,13 @@ export const routes: Routes = [
       { path: 'heroes-hall', component: HallPanel },
       { path: 'heroes-hall/heroes/:hero', component: HeroCard },
       { path: 'job-board', component: JobBoardPanel },
+      { path: 'job-board/recent', component: RecentPanel },
       { path: 'job-board/jobs/:job', component: JobPanel },
+      { path: 'job-board/jobs/:job/replays', component: JobReplaysPanel },
       { path: 'seen/:hero', component: SeenHeroCard },
       { path: ':facility', component: FacilityPanel },
       { path: ':facility/jobs/:job', component: JobPanel },
+      { path: ':facility/jobs/:job/replays', component: JobReplaysPanel },
     ],
   },
   // Loaded on first use, so the engine that plays it is a chunk of its own (Issue-15).
