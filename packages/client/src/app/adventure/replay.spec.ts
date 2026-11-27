@@ -8,7 +8,7 @@ import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
 import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
-import { listItems } from '../testing/page';
+import { button, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf, wordsOf } from '../testing/texts-of';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
@@ -91,7 +91,6 @@ async function renderReplay(game: ReturnType<typeof fakeGame>, scene = fakeBattl
   return { ...view, run, frames };
 }
 
-const button = (name: string) => screen.getByRole('button', { name });
 const panel = () => within(screen.getByRole('complementary', { name: /./ }));
 
 describe('Replay page (Issue-290)', () => {
@@ -139,7 +138,8 @@ describe('Replay page (Issue-290)', () => {
     const paused = scene.fed.length;
     await run(10_000);
     expect(scene.fed).toHaveLength(paused);
-    expect(playback.getByRole('button', { name: 'Resume' })).toHaveAttribute('aria-pressed', 'true');
+    // The button's name is its state: it is no toggle, and says nothing of being pressed.
+    expect(playback.getByRole('button', { name: 'Resume' })).not.toHaveAttribute('aria-pressed');
 
     await user.click(button('Watch from the start'));
     await waitFor(() => { expect(scene.resets).toHaveLength(2); });

@@ -16,6 +16,10 @@ export class Playback {
   protected readonly play = inject(Play);
   readonly health = input(false);
   protected readonly speeds = SPEEDS;
-  /** What the pause toggle does next. */
+  /**
+   * What the pause button does next. Its name is its state, so it has no
+   * `aria-pressed`: a toggle keeps one name and says its state with the
+   * attribute, and a button with both is read out as "Resume, pressed".
+   */
   protected readonly pauseLabel = computed(() => (this.play.paused() ? 'Resume' : 'Pause'));
 }

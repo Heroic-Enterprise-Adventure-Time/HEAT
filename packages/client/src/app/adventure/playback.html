@@ -1,5 +1,5 @@
 <div class="playback" role="group" aria-label="Playback">
-  <button type="button" class="button secondary" [attr.aria-pressed]="play.paused()" (click)="play.togglePause()">
+  <button type="button" class="button secondary" (click)="play.togglePause()">
     {{ pauseLabel() }}
   </button>
   @for (speed of speeds; track speed) {
