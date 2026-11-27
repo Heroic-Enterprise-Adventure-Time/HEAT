@@ -258,6 +258,45 @@ describe("recruitHero: paid", () => {
     }
   });
 
+  type Place = (k: number, winner: () => Promise<unknown>) => Race;
+  const before: Place = (k, winner) => winnerBefore(repo, k, winner);
+  const afterConflict: Place = (k, winner) => cancelled(repo, "recruit", new TransactionConflict("conflict"), k, winner);
+
+  /**
+   * A paid recruit with another request's recruit placed by `place`, at a camp
+   * with the given living heroes and timber: wherever the other commits first,
+   * this one is told `rule`, and the camp is left as the one recruit left it.
+   */
+  function lostRecruit(living: number, timber: number, rule: typeof HallFull | typeof InsufficientResources, place: Place): Promise<number> {
+    return everyInterleaving(async (k) => {
+      const p = player();
+      await putPaidCamp(p, living, { timber });
+      const late = place(k, () => recruitHero(repo, p, at, "villager", randomUUID()));
+      const lost = await refusal(recruitHero(late.repo, p, at, "villager", randomUUID()));
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(rule);
+      expect(await repo.heroes(p)).toHaveLength(1);
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: timber - 20 }]);
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: living + 1, livingHeroes: living + 1 });
+      return true;
+    });
+  }
+
+  it("tells a recruit the hall is full wherever another request's recruit takes the last slot first (Issue-261)", async () => {
+    // Before each of getHero, camp, heroes and recruit.
+    expect(await lostRecruit(3, 100, HallFull, before)).toBe(4);
+  });
+
+  it("tells a recruit what is short wherever another request's recruit spends the timber first (Issue-261)", async () => {
+    expect(await lostRecruit(1, 30, InsufficientResources, before)).toBe(4);
+  });
+
+  it("retries a recruit cancelled by another request's, still committing, and tells it the rule that now fails", async () => {
+    // Before each of the next run's getHero, camp, heroes and recruit.
+    expect(await lostRecruit(3, 100, HallFull, afterConflict)).toBe(4);
+    expect(await lostRecruit(1, 30, InsufficientResources, afterConflict)).toBe(4);
+  });
+
   it("holds the price in the transaction: a villager read as free is refused once a hero lives", async () => {
     const p = player();
     await putPaidCamp(p, 0, { timber: 100 });

@@ -13,7 +13,7 @@ import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
 import { balances as balancesAt, build as buildAt, connected, heroFixture, player, stock as stockAt, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
-import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
+import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 
 let db: DynamoDBDocumentClient;
@@ -131,6 +131,46 @@ describe("buildFacility: the mine", () => {
     expect(lost.reason).toBeInstanceOf(InsufficientResources);
     expect((await balances(p))["timber"]).toBeGreaterThanOrEqual(0);
     expect(Object.keys((await repo.camp(p, at)).facilities)).toHaveLength(1);
+  });
+
+  /**
+   * A build of the mine with a build of the lumber camp placed by `place`, on
+   * stock that pays for either and not both: whichever writes first builds,
+   * and the other is told what is short. The lumber camp is first wherever it
+   * commits before the mine's write; placed after it, it is the one refused.
+   */
+  function oneOfTwoBuilds(place: (k: number, winner: () => Promise<unknown>) => Race): Promise<number> {
+    return everyInterleaving(async (k) => {
+      const p = player();
+      await stock(p, { timber: 60, cloth: 3, ore: 20 });
+      let other: unknown;
+      const late = place(k, async () => {
+        other = await refusal(buildFacility(repo, p, at, "lumber-camp", 1));
+      });
+      const mine = await refusal(buildFacility(late.repo, p, at, "mine", 1));
+      if (!late.ran()) return false;
+      const refused = [mine, other].filter((r) => r !== undefined);
+      expect(refused).toHaveLength(1);
+      expect(refused[0]).toBeInstanceOf(InsufficientResources);
+      const built = mine === undefined ? "mine" : "lumber-camp";
+      expect((await repo.camp(p, at)).facilities).toEqual({ [built]: 1 });
+      expect(Math.min(...Object.values(await balances(p)))).toBeGreaterThanOrEqual(0);
+      // Every debit in the ledger is the built facility's: the refused build wrote none.
+      const debits = (await ledger(p)).map((e) => String(e["SK"]));
+      expect(debits.length).toBeGreaterThan(0);
+      expect(debits.filter((sk) => !sk.startsWith(`LEDGER#build-${at}-${built}-1#`))).toEqual([]);
+      return true;
+    });
+  }
+
+  it("builds one of two facilities on the stock of one, wherever the other build commits, and tells the other what is short (Issue-261)", async () => {
+    // Before each of camp, build and the camp read after it.
+    expect(await oneOfTwoBuilds((k, winner) => winnerBefore(repo, k, winner))).toBe(3);
+  });
+
+  it("retries a build cancelled by another facility's, still committing, and tells it what is short", async () => {
+    // Before each of the next run's camp, build and the camp read after it.
+    expect(await oneOfTwoBuilds((k, winner) => cancelled(repo, "build", new TransactionConflict("conflict"), k, winner))).toBe(3);
   });
 
   it("holds the level in the transaction, against a camp read before another build", async () => {

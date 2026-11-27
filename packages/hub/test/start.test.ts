@@ -396,4 +396,61 @@ describe("no retiring a hero while it is adventuring", () => {
       expect(await repo.camp(p, at)).toMatchObject({ livingHeroes: after.status === "ALIVE" ? 1 : 0 });
     }
   });
+
+  type Place = (k: number, winner: () => Promise<unknown>, method: keyof Repository) => Race;
+  const before: Place = (k, winner) => winnerBefore(repo, k, winner);
+  const afterConflict: Place = (k, winner, method) => cancelled(repo, method, new TransactionConflict("conflict"), k, winner);
+
+  /** A start of a hero whose retire is placed by `place`: the start is told the hero has retired, and opens nothing. */
+  function startLosesToRetire(place: Place): Promise<number> {
+    return everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      const late = place(k, () => retireHero(repo, p, hero.id), "startAdventure");
+      const lost = await refusal(startAdventure(late.repo, p, version, randomUUID(), at, wolves, [hero.id]));
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(HeroRetired);
+      expect(await repo.openAdventure(p)).toBeUndefined();
+      expect(await repo.getHero(p, hero.id)).toMatchObject({ status: "RETIRED", adventureId: null });
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 0, livingHeroes: 0 });
+      return true;
+    });
+  }
+
+  /** A retire of a hero whose start is placed by `place`: the retire is told the hero is adventuring, and the hero is on that adventure, alive. */
+  function retireLosesToStart(place: Place): Promise<number> {
+    return everyInterleaving(async (k) => {
+      const p = player();
+      const hero = must((await putHeroes(p, ["ALIVE"]))[0], "the hero");
+      let started: AdventureRecord | undefined;
+      const late = place(k, async () => (started = await startAdventure(repo, p, version, randomUUID(), at, wolves, [hero.id])), "retire");
+      const lost = await refusal(retireHero(late.repo, p, hero.id));
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(HeroAdventuring);
+      expect(await repo.getHero(p, hero.id)).toMatchObject({ status: "ALIVE", adventureId: started?.adventureId });
+      expect((await repo.openAdventure(p))?.adventureId).toBe(started?.adventureId);
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 1, livingHeroes: 1 });
+      return true;
+    });
+  }
+
+  it("refuses a start with HeroRetired wherever the hero's retire commits before the start's write (Issue-261)", async () => {
+    // Before each of openAdventure, getHero and startAdventure.
+    expect(await startLosesToRetire(before)).toBe(3);
+  });
+
+  it("retries a start cancelled by the hero's retire, still committing, and refuses it with HeroRetired", async () => {
+    // Before each of the next run's openAdventure, getHero and startAdventure.
+    expect(await startLosesToRetire(afterConflict)).toBe(3);
+  });
+
+  it("refuses a retire with HeroAdventuring wherever the hero's start commits before the retire's write (Issue-261)", async () => {
+    // Before each of getHero and retire.
+    expect(await retireLosesToStart(before)).toBe(2);
+  });
+
+  it("retries a retire cancelled by the hero's start, still committing, and refuses it with HeroAdventuring", async () => {
+    // Before each of the next run's getHero and retire.
+    expect(await retireLosesToStart(afterConflict)).toBe(2);
+  });
 });

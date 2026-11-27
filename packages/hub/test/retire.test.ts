@@ -170,6 +170,34 @@ describe("retireHero", () => {
     }
   });
 
+  it("gives a paid recruit the slot a retire frees only when it reads the camp after the retire, wherever the retire commits (Issue-261)", async () => {
+    // A full hall of living heroes and timber for two villagers, as above, with the retire placed before each of
+    // the recruit's calls in turn: its first read of the hero, its read of the camp, and the read of the hero again
+    // that comes before a refusal. A recruit that read the hall full is refused though a slot has since come free.
+    const made: boolean[] = [];
+    const runs = await everyInterleaving(async (k) => {
+      const p = player();
+      const leaving = must((await putCamp(p, ["ALIVE", "ALIVE", "ALIVE", "ALIVE"]))[0], "the leaving hero");
+      await repo.setBalance(p, at, "timber", 40);
+      const requestId = randomUUID();
+      const late = winnerBefore(repo, k, () => retireHero(repo, p, leaving.id));
+      const refused = await refusal(recruitHero(late.repo, p, at, "villager", requestId));
+      if (!late.ran()) return false;
+      const recruited = refused === undefined;
+      if (!recruited) expect(refused).toBeInstanceOf(HallFull);
+      made.push(recruited);
+      expect((await repo.getHero(p, leaving.id))?.status).toBe("RETIRED");
+      expect(await repo.heroes(p)).toHaveLength(recruited ? 5 : 4);
+      await expectCountsAgree(p);
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: recruited ? 20 : 40 }]);
+      const ledger = await db.send(new GetCommand({ TableName: tables.player, Key: playerKeys.ledger(p, requestId, "debit#timber") }));
+      expect(ledger.Item?.["delta"]).toBe(recruited ? -20 : undefined);
+      return true;
+    });
+    expect(runs).toBe(3);
+    expect(made).toEqual([true, true, false]);
+  });
+
   it("refuses a hero the player does not have", async () => {
     const p = player();
     const other = player();
