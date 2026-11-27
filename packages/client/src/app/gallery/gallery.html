@@ -17,6 +17,29 @@
     }
   </section>
 
+  <section aria-labelledby="actions">
+    <h2 id="actions">Action icons</h2>
+    <div class="row frame">
+      @for (action of actions; track action.icon) {
+        <button type="button" [class]="action.classes">
+          @if (icons.src(action.icon); as icon) {
+            <img alt="" [ngSrc]="icon" [width]="iconPx" [height]="iconPx" />
+          }
+          {{ action.label }}
+        </button>
+      }
+      @for (action of iconOnly; track action.icon) {
+        <button type="button" class="button secondary" [attr.aria-label]="action.label">
+          @if (icons.src(action.icon); as icon) {
+            <img alt="" [ngSrc]="icon" [width]="iconPx" [height]="iconPx" />
+          } @else {
+            {{ action.label }}
+          }
+        </button>
+      }
+    </div>
+  </section>
+
   <section aria-labelledby="frame">
     <h2 id="frame">Panel frame</h2>
     <div class="frame">
@@ -76,7 +99,12 @@
     <div class="beside">
       <img class="scene" alt="Millbrook's camp, a frame of the scene at scale 3" [ngSrc]="sceneFrame" [width]="sceneWidth" [height]="sceneHeight" />
       <div class="frame">
-        <button type="button" class="button primary">Depart</button>
+        <button type="button" class="button primary">
+          @if (icons.src('depart'); as icon) {
+            <img alt="" [ngSrc]="icon" [width]="iconPx" [height]="iconPx" />
+          }
+          Depart
+        </button>
         <heat-resource-chip material="timber" [amount]="40" />
         <heat-hero-tile [hero]="sceneHero" [picked]="true" />
       </div>
