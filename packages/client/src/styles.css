@@ -55,7 +55,8 @@
   --refusal: var(--rust); /* a refusal, a loss, a note or an error */
 
   /* Lines. */
-  --line-frame: var(--ink); /* a frame's outline and lower edge, a region's border, the picked hero */
+  --line-frame: var(--ink); /* a frame's outline, a region's border, the picked hero */
+  --line-edge: color-mix(in srgb, var(--ink) 35%, transparent); /* a frame's lower edge, faded so it reads as a soft shadow */
   --line-soft: var(--tan); /* a hero not picked */
   --marker-active: var(--gold); /* the open panel's entry, an unlock's line */
   --focus-on-panel: var(--gold-dark);
@@ -93,12 +94,14 @@
 
   /*
    * Pixels of the art, drawn at a whole-number scale, which is where a pixel
-   * is a pixel (docs/process/best-practices.md, rule 10): a frame's outline
-   * and its lower edge (decision 0061), and one pixel of the screen, as the
-   * box a visually hidden label keeps.
+   * is a pixel (docs/process/best-practices.md, rule 10): a frame's outline,
+   * its lower edge below the outline, and its corner's radius (decision
+   * 0061), and one pixel of the screen, as the box a visually hidden label
+   * keeps.
    */
   --frame-outline: 2px;
-  --frame-edge: 4px;
+  --frame-edge: 2px;
+  --frame-corner: 4px;
   --pixel: 1px;
 
   /*

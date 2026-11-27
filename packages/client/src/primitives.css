@@ -6,8 +6,9 @@
  * role tokens of styles.css.
  *
  * Until Issue-385 makes the frames as 9-slice art, CSS draws them at the
- * agreed edge: a 2px outline and a 4px lower edge, and a button's top edge a
- * lighter shade of its fill.
+ * agreed edge: a 2px outline with corners rounded by 4px, a lower edge 2px
+ * below it in a faded ink, as a soft shadow, and a button's top edge a lighter
+ * shade of its fill.
  */
 
 /* A button: an action, something that changes the game (docs/design/game.md, "The page"). */
@@ -18,8 +19,8 @@
   gap: var(--space-sm);
   padding: var(--space-sm) var(--space-lg);
   border: var(--frame-outline) solid var(--line-frame);
-  border-bottom-width: var(--frame-edge);
-  border-radius: 0;
+  border-radius: var(--frame-corner);
+  box-shadow: 0 var(--frame-edge) 0 var(--line-edge);
   font: inherit;
   font-weight: bold;
   color: var(--on-action);
@@ -28,12 +29,16 @@
 
 .button.primary {
   background: var(--action);
-  box-shadow: inset 0 var(--frame-outline) 0 var(--action-edge-light);
+  box-shadow:
+    inset 0 var(--frame-outline) 0 var(--action-edge-light),
+    0 var(--frame-edge) 0 var(--line-edge);
 }
 
 .button.secondary {
   background: var(--action-secondary);
-  box-shadow: inset 0 var(--frame-outline) 0 var(--action-secondary-edge-light);
+  box-shadow:
+    inset 0 var(--frame-outline) 0 var(--action-secondary-edge-light),
+    0 var(--frame-edge) 0 var(--line-edge);
 }
 
 /* .focus shows the ring without focus, for the gallery. */
@@ -51,19 +56,19 @@
   cursor: not-allowed;
 }
 
-/* Pressed, while held or as a toggle that is on: the lower edge sinks to the outline's width, and the face moves down by the difference, so nothing below it moves. */
+/* Pressed, while held or as a toggle that is on: the face sinks on to its lower edge, which it covers, and nothing around it moves. */
 .button:active:not(:disabled),
 .button[aria-pressed='true'] {
-  border-bottom-width: var(--frame-outline);
-  margin-top: calc(var(--frame-edge) - var(--frame-outline));
   box-shadow: none;
+  transform: translateY(var(--frame-edge));
 }
 
 /* A panel's frame: the card a panel's content stands on. */
 .frame {
   padding: var(--space-lg) var(--space-xl);
   border: var(--frame-outline) solid var(--line-frame);
-  border-bottom-width: var(--frame-edge);
+  border-radius: var(--frame-corner);
+  box-shadow: 0 var(--frame-edge) 0 var(--line-edge);
   background: var(--surface-panel);
   color: var(--on-panel);
 }
