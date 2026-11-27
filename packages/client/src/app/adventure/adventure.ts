@@ -16,6 +16,7 @@ import { jobCast, timelineCast } from './cast';
 import { secondsLeft, waitingWords } from './field';
 import { Play } from './play';
 import { Playback } from './playback';
+import { partyAfter } from './replay-words';
 import { earnedWords, outcomeWords, stageResultWords } from './result-words';
 
 /** What a result says while the player could not be read again after the run was sent. */
@@ -50,6 +51,16 @@ export class Adventure {
   private readonly router = inject(Router);
   protected readonly outcomeWords = outcomeWords;
   /** Each stage of the settled result in words, "fight: won". */
+  /**
+   * Each hero's tile by id, from the snapshot the adventure set out with: at
+   * the level the result gave it once settled, else the level it set out at.
+   * Read once for the party in battle and the result's heroes.
+   */
+  protected readonly tiles = computed((): ReadonlyMap<string, TileHero> => {
+    const settled = this.game.settled();
+    const setOut = (settled?.adventure ?? this.game.adventure())?.snapshot.heroes ?? [];
+    return new Map(partyAfter(setOut, settled?.result?.heroes).map((h) => [h.heroId, h]));
+  });
   protected readonly stages = computed(() => stageResultWords(this.game.settled()?.result?.stages ?? []));
   /**
    * What the player is told for each unlock this run earned that they did
@@ -197,13 +208,4 @@ export class Adventure {
     return this.game.settled()?.adventure.snapshot.heroes.find((h) => h.heroId === heroId)?.level ?? 1;
   }
 
-  /**
-   * A hero as its tile shows it, from the snapshot the adventure set out
-   * with: at the level the result gave it where there is one, else the level
-   * it set out at. Null for a hero the snapshot does not hold.
-   */
-  protected tileAfter(heroId: string, level: number | null): TileHero | null {
-    const hero = (this.game.settled()?.adventure ?? this.game.adventure())?.snapshot.heroes.find((h) => h.heroId === heroId);
-    return hero ? { name: hero.name, unitType: hero.unitType, spriteSet: hero.spriteSet, level: level ?? hero.level } : null;
-  }
 }

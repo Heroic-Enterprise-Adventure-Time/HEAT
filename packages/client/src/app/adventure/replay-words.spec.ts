@@ -63,8 +63,8 @@ describe('replayLine', () => {
       outcome: 'defeat',
       settledAt: before(HOUR_MS),
       party: [
-        { name: 'Bram', unitType: 'fighter', level: 2, died: false },
-        { name: 'Tansy', unitType: 'villager', level: 4, died: true },
+        { heroId: 'x1', name: 'Bram', unitType: 'fighter', spriteSet: 'fighter-02', level: 2, died: false },
+        { heroId: 'x2', name: 'Tansy', unitType: 'villager', spriteSet: 'villager-01', level: 4, died: true },
       ],
     });
   });

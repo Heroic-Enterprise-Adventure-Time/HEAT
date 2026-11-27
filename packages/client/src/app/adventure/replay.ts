@@ -13,7 +13,7 @@ import { BattleView } from './battle-view';
 import { timelineCast } from './cast';
 import { Play } from './play';
 import { Playback } from './playback';
-import { agoWords } from './replay-words';
+import { agoWords, partyAfter } from './replay-words';
 import { outcomeWords, stageResultWords } from './result-words';
 
 /**
@@ -81,12 +81,7 @@ export class Replay {
   /** The party as it set out, each hero's tile at the level the result gave it, and whether it died; null before a settled adventure is read. */
   protected readonly party = computed(() => {
     const adventure = this.adventure();
-    if (!adventure?.result) return null;
-    const after = new Map(adventure.result.heroes.map((h) => [h.heroId, h]));
-    return adventure.snapshot.heroes.map((h) => {
-      const settled = after.get(h.heroId);
-      return { heroId: h.heroId, name: h.name, unitType: h.unitType, spriteSet: h.spriteSet, level: settled?.level ?? h.level, died: settled?.dead ?? false };
-    });
+    return adventure?.result ? partyAfter(adventure.snapshot.heroes, adventure.result.heroes) : null;
   });
 
   constructor() {

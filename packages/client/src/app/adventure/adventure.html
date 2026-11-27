@@ -58,7 +58,7 @@
       <ul class="heroes" aria-labelledby="heroes-title">
         @for (hero of result.heroes; track hero.heroId) {
           <li>
-            <heat-hero-tile [hero]="tileAfter(hero.heroId, hero.level)" [still]="true" />
+            <heat-hero-tile [hero]="tiles().get(hero.heroId) ?? null" [still]="true" />
             @if (hero.dead) {
               <span class="dead">died</span>
             } @else {
@@ -107,7 +107,7 @@
         @for (hero of field.party; track hero.unitId) {
           <li [class.down]="hero.health <= 0">
             <div class="who">
-              <heat-hero-tile [hero]="tileAfter(hero.unitId, null)" [still]="true" />
+              <heat-hero-tile [hero]="tiles().get(hero.unitId) ?? null" [still]="true" />
               <span class="health">{{ hero.health }}/{{ hero.maxHealth }}</span>
             </div>
             <meter min="0" [max]="hero.maxHealth" [value]="hero.health" [attr.aria-label]="`${hero.name} health`"></meter>
