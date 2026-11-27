@@ -22,6 +22,7 @@ import {
 } from '@heat/engine';
 
 import { layGround, type Terrain, type TilesetJson, TilesetJsonSchema } from '../../camp/scene/ground';
+import { TILE } from '../../camp/scene/layout';
 import { GROUNDS, type GroundSet } from '../../ground-sets';
 import { fetchJson } from '../../static-json';
 import type { CastMember } from '../cast';
@@ -29,7 +30,7 @@ import type { Field, FieldUnit } from '../field';
 import { effectFrameAt, effectMs, flightMs, flyingAt, followFrame, followMs, heldPoint, leadFrame, nockedAt, releaseMs } from './action-sprites';
 import { artSettled } from './art-loads';
 import { type EffectArt, type Frames, loadEffectArt, loadGlyphArt, loadIconArt, loadUnitArt, loadWeaponArt, type UnitArt, type UnitArtPath, type WeaponArt } from './battle-art';
-import { battleView, type BattleView, entryOffset, spots } from './battle-layout';
+import { battleView, type BattleView, entryOffset, spots, STAGE_HEIGHT, STAGE_WIDTH } from './battle-layout';
 import { clipHold } from './clip-hold';
 import { AMOUNT_AT, amountRow, DROP_FROM, dropAt, dropTime } from './drop-clip';
 
@@ -146,6 +147,23 @@ const HAND = { x: 10, y: -20 };
 const SCENE_FONT = 'scene-01';
 /** A drop is drawn over everyone, whatever row they stand on: the stage is not this many rows high. */
 const DROP_Z = 1000;
+
+/**
+ * A unit's health bar, in art pixels: its width, centred on the unit, its
+ * height, and how far under the unit's feet its top is. Sizes of the
+ * picture, set by looking.
+ */
+const BAR_WIDTH = 14;
+const BAR_HEIGHT = 2;
+const BAR_BELOW = 2;
+/** The shares of its health above which a unit's bar is drawn as high, and as middling; at or under the second it is low. */
+const BAR_HIGH_ABOVE = 0.5;
+const BAR_MIDDLE_ABOVE = 0.25;
+
+/** How far beyond the window's left edge the party's front hero starts its run on, in art pixels, so that it comes on from just out of sight. Set by looking. */
+const RUN_ON_MARGIN = 16;
+/** How far beyond the window's left edge what a stage left behind has scrolled before it is removed, in art pixels: a sprite's canvas, 48 across, so that nothing of it still shows. */
+const BEHIND_MARGIN = 48;
 
 /** The road the units stand on, in the ground's lower terrain: the corner rows from 6 to 10, y 96 to 160 on the stage. */
 const ROAD_ROWS = { from: 6, to: 10 };
@@ -275,7 +293,7 @@ const frameOf = (frames: Frames, index: number) => must(frames.textures[clamp(in
 export async function createBattleScene(host: HTMLElement, callbacks: BattleSceneCallbacks): Promise<BattleSceneHandle> {
   TextureStyle.defaultOptions.scaleMode = 'nearest';
   const app = new Application();
-  await app.init({ width: 320, height: 180, background: GROUNDS[START_GROUND].backdrop, antialias: false, resolution: 1, roundPixels: true });
+  await app.init({ width: STAGE_WIDTH, height: STAGE_HEIGHT, background: GROUNDS[START_GROUND].backdrop, antialias: false, resolution: 1, roundPixels: true });
   app.canvas.style.imageRendering = 'pixelated';
   app.canvas.style.display = 'block';
   app.canvas.setAttribute('role', 'img');
@@ -314,15 +332,15 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
   world.addChild(ground, things);
   app.stage.addChild(world);
 
-  let view: BattleView = battleView(320, 180);
+  let view: BattleView = battleView(STAGE_WIDTH, STAGE_HEIGHT);
   let scroll = 0;
 
   /** The road, one column of tiles repeated across the window and one tile more, so that it can scroll by a tile. */
   const layRoad = () => {
     for (const child of ground.removeChildren()) child.destroy();
-    const row0 = Math.floor(-view.stageY / 16);
-    const rows = Math.ceil((view.height - view.stageY) / 16) - row0;
-    const cols = Math.ceil(view.width / 16) + 1;
+    const row0 = Math.floor(-view.stageY / TILE);
+    const rows = Math.ceil((view.height - view.stageY) / TILE) - row0;
+    const cols = Math.ceil(view.width / TILE) + 1;
     const corners = range(rows + 1).map((r): Terrain[] => {
       const row = row0 + r;
       const terrain: Terrain = row >= ROAD_ROWS.from && row <= ROAD_ROWS.to ? 'lower' : 'upper';
@@ -330,12 +348,12 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     });
     for (const tile of layGround(tileset, corners)) {
       const sprite = new Sprite(new Texture({ source: sheet.source, frame: new Rectangle(tile.box.x, tile.box.y, tile.box.width, tile.box.height) }));
-      sprite.position.set(tile.col * 16, (row0 + tile.row) * 16);
+      sprite.position.set(tile.col * TILE, (row0 + tile.row) * TILE);
       ground.addChild(sprite);
     }
   };
   const placeRoad = () => {
-    ground.x = -view.stageX - (Math.round(scroll) % 16);
+    ground.x = -view.stageX - (Math.round(scroll) % TILE);
   };
   /** Lays the road with the ground prepared last, where it is not the one laid: when its run is handed over, or when it arrives after that. */
   const layPrepared = () => {
@@ -678,16 +696,16 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     // The field has a hit as soon as its action resolves; the bar shows it as the projectile lands.
     const health = unitView.barHeld?.health ?? unit.health;
     const shown = unit.kind === 'resource' || health <= 0 || unitView.behind ? '' : `${health}/${unit.maxHealth}`;
-    unitView.bar.position.set(Math.round(unitView.x) - 7, Math.round(unitView.y) + 2);
+    unitView.bar.position.set(Math.round(unitView.x) - BAR_WIDTH / 2, Math.round(unitView.y) + BAR_BELOW);
     unitView.bar.zIndex = unitView.y + 0.5;
     if (shown === unitView.barShown) return;
     unitView.barShown = shown;
     unitView.bar.clear();
     if (!shown) return;
     const share = health / unit.maxHealth;
-    const fill = Math.max(1, Math.round(14 * share));
-    unitView.bar.rect(0, 0, 14, 2).fill(0x140d08);
-    unitView.bar.rect(0, 0, fill, 2).fill(share > 0.5 ? 0x6fbf4a : share > 0.25 ? 0xd9a441 : 0xc0392b);
+    const fill = Math.max(1, Math.round(BAR_WIDTH * share));
+    unitView.bar.rect(0, 0, BAR_WIDTH, BAR_HEIGHT).fill(0x140d08);
+    unitView.bar.rect(0, 0, fill, BAR_HEIGHT).fill(share > BAR_HIGH_ABOVE ? 0x6fbf4a : share > BAR_MIDDLE_ABOVE ? 0xd9a441 : 0xc0392b);
   };
 
   /** Shows one frame, standing on `foot`, mirrored for the other side or a retreat. */
@@ -820,7 +838,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
       const at = targets(field);
       // Running on, the party keeps its order and starts with its front hero just beyond the window's left edge.
       const front = Math.max(...partyOf(field).map((u) => must(at.get(u.unitId), `the spot of ${u.unitId}`).x));
-      const runOn = front + view.stageX + 16;
+      const runOn = front + view.stageX + RUN_ON_MARGIN;
       for (const unitView of units.values()) {
         const spot = must(at.get(unitView.unit.unitId), `the spot of ${unitView.unit.unitId}`);
         unitView.y = spot.y;
@@ -956,7 +974,7 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
         const standing = !fallen(unitView) && (unitView.unit.health > 0 || unitView.downAt !== null);
         if (unitView.behind) {
           unitView.x -= rolled;
-          if (unitView.x < -view.stageX - 48) {
+          if (unitView.x < -view.stageX - BEHIND_MARGIN) {
             removeUnit(unitView.unit.unitId);
             continue;
           }

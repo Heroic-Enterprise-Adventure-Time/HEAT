@@ -184,6 +184,9 @@ export function isEntry(event: AdventureEvent): boolean {
   return event.kind === 'adventure-start' || (event.kind === 'stage-start' && (event.stageKind === 'fight' || event.stageKind === 'gather'));
 }
 
+/** The last of a stage's time limit in which the countdown shows, in milliseconds on the adventure's clock: ten seconds (the owner's call on Issue-15). */
+const COUNTDOWN_MS = 10_000;
+
 /**
  * Whole seconds left before the stage's time limit turns the party back,
  * shown only in the last ten (the owner's call on Issue-15, amending
@@ -192,7 +195,7 @@ export function isEntry(event: AdventureEvent): boolean {
 export function secondsLeft(field: Field, simTime: number): number | null {
   if (field.timeLimitMs === null || field.outcome !== null) return null;
   const left = field.stageStart + field.timeLimitMs - simTime;
-  return left <= 10_000 && left > 0 ? Math.ceil(left / 1000) : null;
+  return left <= COUNTDOWN_MS && left > 0 ? Math.ceil(left / 1000) : null;
 }
 
 /**
