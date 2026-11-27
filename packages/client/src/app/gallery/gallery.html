@@ -34,6 +34,21 @@
         <heat-resource-chip [material]="chip.material" [amount]="chip.amount" />
       }
     </div>
+    <h3>A cost, against the camp's balance</h3>
+    <div class="row frame">
+      @for (cost of costs; track cost.material) {
+        <heat-resource-chip [material]="cost.material" [amount]="cost.amount" [have]="cost.have" />
+      }
+    </div>
+  </section>
+
+  <section aria-labelledby="slots">
+    <h2 id="slots">Slot circles</h2>
+    <div class="row frame">
+      @for (count of slotCounts; track count.filled) {
+        <heat-slots of="heroes" [filled]="count.filled" [total]="count.total" />
+      }
+    </div>
   </section>
 
   <section aria-labelledby="tiles">

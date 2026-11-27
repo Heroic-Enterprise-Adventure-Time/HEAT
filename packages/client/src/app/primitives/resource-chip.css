@@ -11,6 +11,13 @@
   white-space: nowrap;
 }
 
+/* A cost the camp cannot meet: rust, and dashed so that it does not rest on colour alone. */
+.chip.short {
+  border-style: dashed;
+  border-color: var(--refusal);
+  color: var(--refusal);
+}
+
 .chip img {
   image-rendering: pixelated;
 }

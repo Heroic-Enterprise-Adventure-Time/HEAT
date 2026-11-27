@@ -1,6 +1,6 @@
 # 0061: The daylight parchment theme: role tokens over the palette, shared primitives and pixel-art frames
 
-- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css` and amended the frame's edge and corner (the amendment below); not built: the frames and the action icons by Issue-385, the panels by Issue-386.
+- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css` and amended the frame's edge and corner and added the slot circles and the short chip (the amendments below); not built: the frames and the action icons by Issue-385, the panels by Issue-386.
 - **Date:** 2026-11-26
 - **Settles:** Issue-383: how the page looks once it reads as a casual mobile game, with less text and with buttons for actions. These are the owner's calls of 2026-11-26.
 - **Amends:** 0037, "read by the components with `var()`: the palette, a spacing scale, ...". From Issue-384 on, a component reads a role token, and only `styles.css` reads the palette.
@@ -41,6 +41,10 @@ Each is styled in one place, as global styles or as a component of its own, so t
 ## Amendment: the frame's edge and corner (Issue-384, 2026-11-26)
 
 The owner softened the raised edge and rounded the corners in review of Issue-384's gallery. A frame keeps its 2px outline, its corners round by 4px, and its lower edge is a shadow 2px below the outline in the ink at about a third of its strength, so that it reads as a soft shadow and not as a second outline, in place of the solid 4px lower edge. A button's top edge is still a lighter shade of its fill, and the hero tiles keep their outlines. The corner is a pixel of the art like the outline and the edge, a token in `styles.css` (`--frame-corner`), and the faded edge is a role (`--line-edge`). Issue-385's 9-slice frames are drawn to this edge and corner.
+
+## Amendment: slot circles and the short chip (Issue-384, 2026-11-26)
+
+The owner asked for less text in review of Issue-384's gallery, so two pieces join the primitives. Slot circles show a count of slots, filled for each one taken and empty for each one free, as one picture named for the count, "2 of 4 heroes"; they differ by fill, not by colour. A resource chip given the camp's balance is short when the balance is less than the amount: rust, with a dashed outline so that it does not rest on colour alone (WCAG 1.4.1), and named "more than the camp has" to a screen reader through visually hidden text. The balance itself is not written beside each cost. An accessible name alone was weighed and not chosen, because it reaches a screen reader and not a sighted player who does not tell rust from ink; the balance written beside each chip was weighed and not chosen, because it is the text the owner wants cut. Issue-386 puts them in the panels (`docs/design/game.md`, "The page").
 
 ## Considered and not chosen
 

@@ -56,11 +56,3 @@ button {
 button {
   cursor: pointer;
 }
-
-.visually-hidden {
-  position: absolute;
-  width: var(--pixel);
-  height: var(--pixel);
-  overflow: hidden;
-  clip-path: inset(50%);
-}

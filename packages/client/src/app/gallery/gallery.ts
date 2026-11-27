@@ -7,6 +7,7 @@ import { MATERIALS } from '@heat/engine';
 import { MAP_HEIGHT, MAP_WIDTH } from '../camp/scene/layout';
 import { HeroTile, type TileHero } from '../primitives/hero-tile';
 import { ResourceChip } from '../primitives/resource-chip';
+import { Slots } from '../primitives/slots';
 
 /** The frame of the scene the gallery shows the primitives beside (docs/runbooks/capture-scene.md), served by angular.json from gallery/. */
 const SCENE_FRAME = '/gallery/camp-millbrook-3x.png';
@@ -32,7 +33,7 @@ interface ButtonKind {
  */
 @Component({
   selector: 'heat-gallery',
-  imports: [HeroTile, NgOptimizedImage, ResourceChip, RouterLink],
+  imports: [HeroTile, NgOptimizedImage, ResourceChip, RouterLink, Slots],
   templateUrl: './gallery.html',
   styleUrl: './gallery.css',
 })
@@ -52,6 +53,17 @@ export class Gallery {
   }));
   /** Every material, each with a sample amount. */
   protected readonly chips = MATERIALS.map((material, index) => ({ material, amount: index * 25 + 4 }));
+  /** A cost the camp can meet, and one it cannot. */
+  protected readonly costs = [
+    { material: 'timber', amount: 40, have: 52 },
+    { material: 'ore', amount: 30, have: 12 },
+  ] as const;
+  /** A hall empty, part full and full. */
+  protected readonly slotCounts = [
+    { filled: 0, total: 4 },
+    { filled: 2, total: 4 },
+    { filled: 4, total: 4 },
+  ] as const;
   protected readonly heroes: readonly TileHero[] = [WREN, BRAM];
   protected readonly sceneHero = WREN;
   /** The first sample hero starts picked; a tile toggles as it would in a party pick. */

@@ -1,9 +1,10 @@
 /*
  * The shared primitives (decision 0061), styled once here as global classes so
  * that Angular's per-component scoping does not copy them into every panel: a
- * button, primary or secondary, and a panel's frame. The resource chip and the
- * hero tile are components of their own (app/primitives/). Each reads only the
- * role tokens of styles.css.
+ * button, primary or secondary, a panel's frame, and the visually hidden text
+ * a primitive gives a screen reader. The resource chip, the hero tile and the
+ * slot circles are components of their own (app/primitives/). Each reads only
+ * the role tokens of styles.css.
  *
  * Until Issue-385 makes the frames as 9-slice art, CSS draws them at the
  * agreed edge: a 2px outline with corners rounded by 4px, a lower edge 2px
@@ -71,4 +72,13 @@
   box-shadow: 0 var(--frame-edge) 0 var(--line-edge);
   background: var(--surface-panel);
   color: var(--on-panel);
+}
+
+/* Text for a screen reader alone: kept in the page, drawn in one pixel and clipped away. */
+.visually-hidden {
+  position: absolute;
+  width: var(--pixel);
+  height: var(--pixel);
+  overflow: hidden;
+  clip-path: inset(50%);
 }
