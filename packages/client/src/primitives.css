@@ -11,8 +11,9 @@
  * border-image: the build trims each picture and names it, with its slice and
  * the border it is drawn in, in generated/frames.css. Each corner is drawn as
  * it is and each edge and the middle repeat their pixels, never stretched, so
- * every pixel of the art stays one square pixel. A button's states are frames
- * of their own; its label, its focus ring and its layout stay CSS.
+ * every pixel of the art stays one square pixel. A button's states are its
+ * frame as drawn, changed by CSS filters, so each keeps the frame's depth; its
+ * label, its focus ring and its layout stay CSS.
  */
 
 /* A button: an action, something that changes the game (docs/design/game.md, "The page"). */
@@ -35,6 +36,7 @@
   font-weight: bold;
   color: var(--on-action);
   cursor: pointer;
+  filter: var(--button-state,) var(--button-focus,);
 }
 
 .button.primary {
@@ -43,43 +45,33 @@
   --button-width: var(--frame-primary-width);
 }
 
-.button.secondary:disabled {
-  --button-frame: var(--frame-secondary-disabled-image);
-  --button-slice: var(--frame-secondary-disabled-slice);
-  --button-width: var(--frame-secondary-disabled-width);
-}
-
-.button.primary:disabled {
-  --button-frame: var(--frame-primary-disabled-image);
-  --button-slice: var(--frame-primary-disabled-slice);
-  --button-width: var(--frame-primary-disabled-width);
-}
-
-/* Pressed, while held or as a toggle that is on: a frame whose face has sunk on to its lower edge, its borders adding up to the same height, so nothing around it moves. */
-.button.secondary:active:not(:disabled),
-.button.secondary[aria-pressed='true'] {
-  --button-frame: var(--frame-secondary-pressed-image);
-  --button-slice: var(--frame-secondary-pressed-slice);
-  --button-width: var(--frame-secondary-pressed-width);
-}
-
-.button.primary:active:not(:disabled),
-.button.primary[aria-pressed='true'] {
-  --button-frame: var(--frame-primary-pressed-image);
-  --button-slice: var(--frame-primary-pressed-slice);
-  --button-width: var(--frame-primary-pressed-width);
-}
-
+/* Disabled: the frame as it is, its colour drained, so it keeps the depth of the enabled button. */
 .button:disabled {
+  --button-state: grayscale(1) opacity(0.7);
+
   color: var(--on-action-disabled);
   cursor: not-allowed;
 }
 
-/* .focus shows the ring without focus, for the gallery. */
+/* The focus ring follows the frame's own stepped outline: four copies of the frame's shape, offset by its outline with no blur. .focus shows it without focus, for the gallery. */
 .button:focus-visible,
 .button.focus {
-  outline: var(--frame-outline) solid var(--focus-on-panel);
-  outline-offset: var(--frame-outline);
+  --button-focus:
+    drop-shadow(var(--frame-outline) 0 0 var(--focus-on-panel))
+    drop-shadow(calc(-1 * var(--frame-outline)) 0 0 var(--focus-on-panel))
+    drop-shadow(0 var(--frame-outline) 0 var(--focus-on-panel))
+    drop-shadow(0 calc(-1 * var(--frame-outline)) 0 var(--focus-on-panel));
+
+  outline: none;
+}
+
+/* Pressed, while held or as a toggle that is on: the frame as it is, a shade darker, its label sunk by the lower edge, so nothing around it moves. */
+.button:active:not(:disabled),
+.button[aria-pressed='true'] {
+  --button-state: brightness(0.88);
+
+  padding-top: calc(var(--space-xs) + var(--frame-edge));
+  padding-bottom: calc(var(--space-xs) - var(--frame-edge));
 }
 
 /* A panel's frame: the card a panel's content stands on. */

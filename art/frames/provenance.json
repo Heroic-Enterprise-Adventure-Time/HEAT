@@ -20,12 +20,46 @@
         "name": "heat-frames-probe",
         "width": 256,
         "height": 256,
-        "palette": ["#d9c7a3", "#f7eedb", "#ecdcbc", "#c9b48e", "#5a4330", "#76604b", "#e8b55a", "#f6d590", "#8a5d1c"],
+        "palette": [
+          "#d9c7a3",
+          "#f7eedb",
+          "#ecdcbc",
+          "#c9b48e",
+          "#5a4330",
+          "#76604b",
+          "#e8b55a",
+          "#f6d590",
+          "#8a5d1c"
+        ],
         "paletteName": "HEAT A2 daylight parchment",
         "pieces": [
-          { "id": "panel", "kind": "rounded_rect", "x": 24, "y": 24, "w": 464, "h": 280, "radius": 16 },
-          { "id": "primary", "kind": "rounded_rect", "x": 24, "y": 344, "w": 216, "h": 96, "radius": 12 },
-          { "id": "secondary", "kind": "rounded_rect", "x": 272, "y": 344, "w": 216, "h": 96, "radius": 12 }
+          {
+            "id": "panel",
+            "kind": "rounded_rect",
+            "x": 24,
+            "y": 24,
+            "w": 464,
+            "h": 280,
+            "radius": 16
+          },
+          {
+            "id": "primary",
+            "kind": "rounded_rect",
+            "x": 24,
+            "y": 344,
+            "w": 216,
+            "h": 96,
+            "radius": 12
+          },
+          {
+            "id": "secondary",
+            "kind": "rounded_rect",
+            "x": 272,
+            "y": 344,
+            "w": 216,
+            "h": 96,
+            "radius": 12
+          }
         ],
         "styleImage": null,
         "noBackground": true
@@ -41,9 +75,27 @@
         "uiAssetId": "e83958cb-2360-4f34-b12f-73fbc7d503c4",
         "split": true,
         "splitBoxes": [
-          { "label": "panel", "x": 2, "y": 2, "width": 252, "height": 160 },
-          { "label": "primary", "x": 9, "y": 169, "width": 114, "height": 54 },
-          { "label": "secondary", "x": 133, "y": 169, "width": 114, "height": 54 }
+          {
+            "label": "panel",
+            "x": 2,
+            "y": 2,
+            "width": 252,
+            "height": 160
+          },
+          {
+            "label": "primary",
+            "x": 9,
+            "y": 169,
+            "width": 114,
+            "height": 54
+          },
+          {
+            "label": "secondary",
+            "x": 133,
+            "y": 169,
+            "width": 114,
+            "height": 54
+          }
         ]
       },
       "note": "The boxes are the ones the service proposed for the template's shapes.",
@@ -55,27 +107,70 @@
       "createdAt": "2026-11-26",
       "jobId": "32150ecd-4dd0-4b49-aa82-694874f7f585",
       "parameters": {
-        "elementIds": ["734e87fc-ea33-496f-9d24-70ece792adb8", "f2585aea-c959-487c-92a8-3bd9f646503e"],
-        "states": [
-          { "name": "pressed", "description": "pushed in: the same button with its face sunk down onto its lower edge, so the thick lower edge is gone and the face sits 2 pixels lower inside the same outline; same colours, same size, same outline" },
-          { "name": "disabled", "description": "unavailable: the same button flattened and faded to pale greyish parchment, the outline a soft tan instead of dark brown, no light top edge, no thick lower edge, same size" }
+        "elementIds": [
+          "734e87fc-ea33-496f-9d24-70ece792adb8",
+          "f2585aea-c959-487c-92a8-3bd9f646503e"
         ],
-        "palette": ["#d9c7a3", "#f7eedb", "#ecdcbc", "#c9b48e", "#5a4330", "#76604b", "#e8b55a", "#f6d590", "#8a5d1c"],
+        "states": [
+          {
+            "name": "pressed",
+            "description": "pushed in: the same button with its face sunk down onto its lower edge, so the thick lower edge is gone and the face sits 2 pixels lower inside the same outline; same colours, same size, same outline"
+          },
+          {
+            "name": "disabled",
+            "description": "unavailable: the same button flattened and faded to pale greyish parchment, the outline a soft tan instead of dark brown, no light top edge, no thick lower edge, same size"
+          }
+        ],
+        "palette": [
+          "#d9c7a3",
+          "#f7eedb",
+          "#ecdcbc",
+          "#c9b48e",
+          "#5a4330",
+          "#76604b",
+          "#e8b55a",
+          "#f6d590",
+          "#8a5d1c"
+        ],
         "paletteName": "HEAT A2 daylight parchment"
       },
-      "generations": 15
+      "generations": 15,
+      "note": "Not kept: the pressed state drew its shadow along the top, and the disabled state dropped the button's depth. The owner chose, in review of the gallery on 2026-11-26, the states drawn by CSS on the normal frame instead (docs/process/assets.md, rule 41). The call is recorded for its cost."
     }
   ],
   "chosenBy": "The owner, 2026-11-26, from the template at 3× (Issue-385): taken for its panel border, \"more 90s-game-y and less web-y\", over the CSS frame of Issue-384.",
   "verified": "Each file is byte-identical to its PNG in the template's ZIP, /mcp/ui-assets/e83958cb-2360-4f34-b12f-73fbc7d503c4/zip, downloaded twice on 2026-11-26.",
   "frames": {
-    "panel": { "file": "panel.png", "uiAssetId": "90b6d770-d0fc-45d2-8c13-ad028652bf05", "slice": { "top": 26, "right": 26, "bottom": 26, "left": 26 } },
-    "primary": { "file": "primary.png", "uiAssetId": "734e87fc-ea33-496f-9d24-70ece792adb8", "slice": { "top": 8, "right": 10, "bottom": 12, "left": 10 } },
-    "primary-pressed": { "file": "primary-pressed.png", "uiAssetId": "932145f6-10fc-4824-b687-9b7a6bdd573f", "slice": { "top": 12, "right": 10, "bottom": 8, "left": 10 } },
-    "primary-disabled": { "file": "primary-disabled.png", "uiAssetId": "fda64a54-9331-4a96-9588-e8ee54070f0d", "slice": { "top": 8, "right": 10, "bottom": 12, "left": 10 } },
-    "secondary": { "file": "secondary.png", "uiAssetId": "f2585aea-c959-487c-92a8-3bd9f646503e", "slice": { "top": 8, "right": 10, "bottom": 12, "left": 10 } },
-    "secondary-pressed": { "file": "secondary-pressed.png", "uiAssetId": "6a55fb1c-a121-4fa5-b2fd-c13acdccfe87", "slice": { "top": 12, "right": 10, "bottom": 8, "left": 10 } },
-    "secondary-disabled": { "file": "secondary-disabled.png", "uiAssetId": "f8aede2b-a2a5-4975-a851-7cabc64785fc", "slice": { "top": 8, "right": 10, "bottom": 12, "left": 10 } }
+    "panel": {
+      "file": "panel.png",
+      "uiAssetId": "90b6d770-d0fc-45d2-8c13-ad028652bf05",
+      "slice": {
+        "top": 26,
+        "right": 26,
+        "bottom": 26,
+        "left": 26
+      }
+    },
+    "primary": {
+      "file": "primary.png",
+      "uiAssetId": "734e87fc-ea33-496f-9d24-70ece792adb8",
+      "slice": {
+        "top": 8,
+        "right": 10,
+        "bottom": 12,
+        "left": 10
+      }
+    },
+    "secondary": {
+      "file": "secondary.png",
+      "uiAssetId": "f2585aea-c959-487c-92a8-3bd9f646503e",
+      "slice": {
+        "top": 8,
+        "right": 10,
+        "bottom": 12,
+        "left": 10
+      }
+    }
   },
-  "sliceNote": "Each slice is in the pixels of the frame's opaque box, which the build trims each file to: every corner and every band of the edge lies inside it, so the edges and the middle repeat only flat runs. A state's top and bottom add up to its button's, so a button keeps its height when it is pressed and its label sinks by the difference."
+  "sliceNote": "Each slice is in the pixels of the frame's opaque box, which the build trims each file to: every corner and every band of the edge lies inside it, so the edges and the middle repeat only flat runs."
 }
