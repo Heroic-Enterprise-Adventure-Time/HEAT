@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from "node:fs";
 
+import { mapValues } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -44,7 +45,7 @@ describe("static content", () => {
   it("lists the sprite sets each unit type allows exactly as the sets' provenance says", () => {
     const fromArt: Record<string, string[]> = {};
     for (const { set, classes } of provenances) for (const unitType of classes) (fromArt[unitType] ??= []).push(set);
-    const fromContent = Object.fromEntries(Object.entries(SPRITE_SETS).map(([u, sets]) => [u, [...sets].sort()]));
+    const fromContent = mapValues(SPRITE_SETS, (sets) => [...sets].sort());
     expect(fromContent).toEqual(fromArt);
     expect(Object.keys(SPRITE_SETS).sort()).toEqual([...UNIT_TYPES].sort());
   });
