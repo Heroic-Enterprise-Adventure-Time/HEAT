@@ -21,13 +21,8 @@
 # repository checked out.
 #
 # So the pull request that moves .node-version to a new major has no dev
-# plan: the base's copy still pins the old major and refuses the branch's
-# .node-version, and the plan job, which gates nothing, fails. That pull
-# request's Terraform change is read in its sandbox stack's plan and apply
-# instead; after the merge the base's copy pins the new major and dev's
-# apply runs as usual. Accepted by the owner on Issue-396, because a major
-# moves about once a year and one pin per major would still leave the
-# moving pull request itself without a plan.
+# plan: the base's copy refuses the branch's major. Its sandbox stack's plan
+# and apply stand in (decision 0048's amendment of Issue-396).
 name: Node
 description: Installs one exact Node release, checked against its pinned checksum, and refuses a major other than .node-version's.
 
