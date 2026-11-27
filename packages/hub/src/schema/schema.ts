@@ -1,5 +1,4 @@
 import { constantCase, sumBy, uniq } from "es-toolkit";
-import { GraphQLError } from "graphql";
 import * as z from "zod/mini";
 
 import {
@@ -32,7 +31,7 @@ import { callerId } from "../context.js";
 import { type AdventureRecord, type Camp, campLevels, type Caravan, type EarnedUnlock, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "../db/statuses.js";
 import { discardAdventure } from "../discard.js";
-import { readAdventure } from "../read.js";
+import { jobOfAdventure, readAdventure, readOpenAdventure, readTimeline } from "../read.js";
 import { type RecentAdventure, recentAdventuresAt, type RecentHero } from "../recent.js";
 import { recruitHero } from "../recruit.js";
 import {
@@ -310,13 +309,6 @@ const CaravanRef = builder.objectRef<Caravan>("Caravan").implement({
   }),
 });
 
-/** The job an adventure names, which an adventure of another version may name and this one not know. */
-function knownJob(jobId: string): Job {
-  const job = jobOf(jobId);
-  if (!job) throw new GraphQLError(`no job ${jobId} in this version`, { extensions: { code: "NO_SUCH_JOB" } });
-  return job;
-}
-
 const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
   description: "An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.",
   fields: (t) => ({
@@ -325,8 +317,7 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     startedAt: t.expose("startedAt", { type: "DateTime" }),
     settledAt: t.expose("settledAt", { type: "DateTime", nullable: true, description: "When the adventure settled. Null until it has." }),
     location: t.exposeID("location", { description: "The location's id in the static content." }),
-    // A job this version does not know means the adventure is another version's.
-    job: t.field({ type: JobRef, resolve: (adventure) => knownJob(adventure.jobId) }),
+    job: t.field({ type: JobRef, resolve: (adventure) => jobOfAdventure(adventure) }),
     snapshot: t.expose("snapshot", { type: SnapshotRef }),
     version: t.exposeString("version", { description: "The deploy that issued the adventure, and the only one that verifies it." }),
     status: t.field({ type: AdventureStatusRef, resolve: (adventure) => adventure.status }),
@@ -341,11 +332,7 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
       type: "JSON",
       nullable: true,
       description: "The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled. Read from the store once per adventure, so it is asked of the one adventure being played, not of each in a list.",
-      resolve: async (adventure, _args, ctx) => {
-        if (adventure.status !== "SETTLED") return null;
-        const body = await ctx.timelines.get(adventure.adventureId);
-        return body === undefined ? null : (JSON.parse(body) as unknown);
-      },
+      resolve: (adventure, _args, ctx) => readTimeline(ctx.timelines, adventure),
     }),
   }),
 });
@@ -366,7 +353,7 @@ const RecentAdventureRef = builder.objectRef<RecentAdventure>("RecentAdventure")
   fields: (t) => ({
     id: t.exposeID("adventureId"),
     // The list leaves out an adventure whose job this version does not know (recent.ts).
-    job: t.field({ type: JobRef, resolve: (recent) => knownJob(recent.jobId) }),
+    job: t.field({ type: JobRef, resolve: (recent) => jobOfAdventure(recent) }),
     outcome: t.expose("outcome", { type: AdventureOutcomeRef }),
     stages: t.expose("stages", { type: [StageResultRef], description: "How each stage the party entered ended." }),
     credited: t.expose("credited", { type: [RewardRef], description: "What went into the warehouse." }),
@@ -419,10 +406,7 @@ const PlayerRef = builder.objectRef<Player>("Player").implement({
       type: AdventureRef,
       nullable: true,
       authScopes: (player) => ({ self: player.id }),
-      resolve: async (player, _args, ctx) => {
-        const open = await ctx.repo.openAdventure(player.id);
-        return open ? ctx.repo.getAdventure(open.adventureId) : undefined;
-      },
+      resolve: (player, _args, ctx) => readOpenAdventure(ctx.repo, player.id),
     }),
   }),
 });
