@@ -9,8 +9,8 @@
 // packed into one sheet, its image named for its pixels and sheet.json naming
 // it (pack-art.mjs; Issue-205): its frames and its provenance are not
 // published. A font under art/fonts is packed the same way, its frames the
-// glyphs a scene draws, cut from its atlas and given the page's own light and
-// ink from src/styles.css (Issue-344). art/effects and art/ground are copied
+// glyphs a scene draws, cut from its atlas and given the scene glyph and its
+// outline from src/styles.css (Issue-344, decision 0061). art/effects and art/ground are copied
 // as they are.
 // An icon is copied under a name that carries a hash of its file, and beside
 // the icons goes pictures.json, that name for each icon: everything under
@@ -61,7 +61,7 @@ for (const [area, kind] of Object.entries(PACKED_AREAS)) {
     const provenance = JSON.parse(readFileSync(join(dir, "provenance.json"), "utf8"));
     // A font's frames are its glyphs, cut from its atlas; any other set's are its pictures.
     const frames = kind === "font"
-      ? glyphFrames({ set: `${area}/${name}`, atlas: await pixels(join(dir, "atlas.png")), layout: provenance.atlas, glyphs: SET_CLIPS.font, ink: colourToken("--light"), outline: colourToken("--ink") })
+      ? glyphFrames({ set: `${area}/${name}`, atlas: await pixels(join(dir, "atlas.png")), layout: provenance.atlas, glyphs: SET_CLIPS.font, ink: colourToken("--scene-glyph"), outline: colourToken("--scene-glyph-outline") })
       : await Promise.all(pictures(dir).map(pixels));
     const { image, json } = packSet({ set: `${area}/${name}`, kind, frames, provenance });
     const out = join(to, area, name);

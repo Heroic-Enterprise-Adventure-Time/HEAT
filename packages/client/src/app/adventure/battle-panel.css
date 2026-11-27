@@ -22,8 +22,8 @@ button {
 }
 
 button[aria-pressed='true'] {
-  background: var(--gold);
-  color: var(--ink);
+  background: var(--action);
+  color: var(--on-action);
 }
 
 .playback,
@@ -75,12 +75,12 @@ meter {
 .dead,
 .lost,
 .note {
-  color: var(--rust);
+  color: var(--refusal);
 }
 
 .countdown {
   font-weight: bold;
-  color: var(--rust);
+  color: var(--refusal);
 }
 
 .queued {
@@ -106,7 +106,7 @@ meter {
  */
 .unlocked p {
   padding-left: var(--space-sm);
-  border-left: var(--border-thick) solid var(--gold);
+  border-left: var(--border-thick) solid var(--marker-active);
   font-weight: bold;
 }
 

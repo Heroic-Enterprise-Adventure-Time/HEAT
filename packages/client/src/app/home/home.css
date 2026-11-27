@@ -17,5 +17,5 @@ button {
 }
 
 .error {
-  color: light-dark(#a40000, var(--ember));
+  color: var(--refusal);
 }

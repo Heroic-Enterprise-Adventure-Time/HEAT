@@ -1,6 +1,6 @@
 # 0037: Plain CSS with a token layer the layout arithmetic reads
 
-- **Status:** Decided; amended by 0061: from Issue-384 on, a component reads a role token named for what it does, and only `styles.css` reads the palette, so "read by the components with `var()`: the palette" holds only until then.
+- **Status:** Decided; amended by 0061: since Issue-384, a component reads a role token named for what it does, and only `styles.css` reads the palette, so "read by the components with `var()`: the palette" no longer holds.
 - **Date:** 2026-11-02
 - **Settles:** Issue-186: whether the client's styles stay plain CSS or adopt Sass, what the token layer is, and how the layout arithmetic in TypeScript gets the sizes the stylesheet declares.
 
