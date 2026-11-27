@@ -5,7 +5,6 @@ import { range } from "es-toolkit";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
-  type AdventureSnapshot,
   type AdventureTimeline,
   expandStages,
   JOBS,
@@ -15,12 +14,11 @@ import {
   must,
   replay,
   RESOURCE_NODES,
-  UNIT_PROFILES,
   type UnitType,
   warehouseCapacity,
 } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type Hero, HeroChanged, Repository, type Settlement, TransactionConflict } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
 import { logger } from "../src/observability.js";
@@ -28,10 +26,11 @@ import { AdventureDiscarded, AdventureSettled, AdventureVerifiable, Conflict, En
 import { startAdventure } from "../src/start.js";
 import { SETTLE_ATTEMPTS, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { player, putParty as putPartyAt, storedItem } from "./data.js";
+import { connected, player, putParty as putPartyAt, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
+import { standIn } from "./seeds.js";
 import { PREVIOUS_VERSION as previous, VERSION as version } from "./versions.js";
 
 /**
@@ -57,10 +56,7 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const at = "millbrook";
@@ -460,16 +456,10 @@ describe("what dropped (decision 0058)", () => {
     // with a stand-in party of those two types, since a roll does not read who the heroes are.
     const seeds = range(2000).map((i) => `varies-${String(i)}`);
     const types = ["ranger", "villager"] as const satisfies readonly UnitType[];
-    const standIn: AdventureSnapshot = {
-      version,
-      jobId: sticks.id,
-      heroes: types.map((unitType) => ({
-        heroId: `stand-in-${unitType}`, unitType, name: unitType, spriteSet: `${unitType}-01`, level: 1, stats: must(UNIT_PROFILES[unitType], `the ${unitType}'s profile`).stats,
-      })),
-    };
+    const party = standIn(sticks.id, types);
     const wolfIn = (seed: string) => expandStages(sticks, seed).some((stage) => "opponents" in stage && stage.opponents.some((o) => o.type === "wolf"));
     // A wolf's hide falls half the time at skinning 1, so the seed with the wolf is one where it does.
-    const hideOn = (seed: string) => replay(standIn, seed, []).result.rewards.some((r) => r.material === "hide");
+    const hideOn = (seed: string) => replay(party, seed, []).result.rewards.some((r) => r.material === "hide");
     const withWolf = must(seeds.find((seed) => wolfIn(seed) && hideOn(seed)), "a seed with the wolf and its hide");
     const quiet = must(seeds.find((seed) => !wolfIn(seed)), "a seed without the wolf");
 

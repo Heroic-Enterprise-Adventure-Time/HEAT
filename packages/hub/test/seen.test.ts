@@ -5,12 +5,12 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { STARTING_LOCATION } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type Hero, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { retireHero } from "../src/retire.js";
 import { heroesSeenAt, type Random, SAMPLE_READ, SAMPLE_SIZE, SIGHTING_TTL_SECONDS, sightingOf } from "../src/seen.js";
-import { heroFixture, player, reads, whole } from "./data.js";
+import { connected, heroFixture, place, player, reads, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -26,18 +26,12 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
-
-/** Each test its own location, so other tests' sightings never land in its sample. */
-const place = () => `test-${randomUUID()}`;
 
 function hero(location: string, overrides: Partial<Hero> = {}): Hero {
   return heroFixture(location, { name: "Ada", ...overrides });

@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { sortBy } from "es-toolkit";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { heroNames, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources } from "../src/refusals.js";
-import { heroFixture, player, stock, whole } from "./data.js";
+import { connected, heroFixture, player, putCamp as putCampAt, stock } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -20,24 +20,13 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const at = "millbrook";
 
 /** A camp in a given state, as the transactions that kill heroes will leave it. */
-async function putCamp(p: string, activeHeroes: number, livingHeroes: number) {
-  await db.send(
-    new PutCommand({
-      TableName: tables.player,
-      Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes, livingHeroes }),
-    }),
-  );
-}
-
+const putCamp = (p: string, activeHeroes: number, livingHeroes: number) => putCampAt(db, tables, p, at, activeHeroes, livingHeroes);
 
 describe("recruitHero: the free villager", () => {
   it("gives a new player a villager drawn by the hub, and counts it into the camp", async () => {

@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, PutCommand } from "@aws-sdk/lib-dynamodb";
+import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { type FacilityKind, jobFacilityLevel, JOBS, jobsPostedBy, location, must, UNIT_PROFILES } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type AdventureRecord, type Camp, type Hero, type HeroStatus, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { AdventureOpen, HeroAdventuring, HeroDead, HeroNotHere, HeroRetired, Requires } from "../src/refusals.js";
@@ -13,8 +13,7 @@ import { retireHero } from "../src/retire.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { build, heroFixture, player, whole } from "./data.js";
-import { playerKeys } from "./keys.js";
+import { build, connected, player, putHeroes as putHeroesAt } from "./data.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { PREVIOUS_VERSION as version } from "./versions.js";
@@ -30,10 +29,7 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const at = "millbrook";
@@ -58,24 +54,7 @@ function staleFacility(kind: FacilityKind, level: number): Repository {
 }
 
 /** Heroes and a camp whose counts agree with them, as recruits and deaths leave them. */
-async function putHeroes(p: string, statuses: HeroStatus[], location = at): Promise<Hero[]> {
-  const heroes = statuses.map((status, i) => heroFixture(location, { name: `Hero ${i}`, status }));
-  for (const hero of heroes) {
-    await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
-  }
-  await db.send(
-    new PutCommand({
-      TableName: tables.player,
-      Item: whole("camp", {
-        ...playerKeys.camp(p, location), location, hallLevel: 1, warehouseLevel: 1,
-        activeHeroes: statuses.filter((s) => s !== "RETIRED").length,
-        livingHeroes: statuses.filter((s) => s === "ALIVE").length,
-      }),
-    }),
-  );
-  return heroes;
-}
-
+const putHeroes = (p: string, statuses: HeroStatus[], location = at): Promise<Hero[]> => putHeroesAt(db, tables, p, statuses, location);
 
 describe("startAdventure", () => {
   it("starts the wolves job with the free villager: the record, the snapshot, the open item and the mark", async () => {

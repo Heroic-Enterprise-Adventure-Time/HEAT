@@ -4,20 +4,18 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { must } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import {
   AdventureAlreadyOpen,
   AlreadyApplied,
   InsufficientBalance,
   Repository,
 } from "../src/db/repository.js";
-import { player } from "./data.js";
+import { connected, player } from "./data.js";
 
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  repo = new Repository(createDocumentClient(config), config.tables);
+  ({ repo } = connected());
 });
 
 const at = "millbrook";

@@ -4,22 +4,40 @@ import { type DynamoDBDocumentClient, GetCommand, PutCommand, QueryCommand } fro
 import { range } from "es-toolkit";
 import { vi } from "vitest";
 
-import { type AdventureOutcome, FACILITIES, type FacilityKind, type Material, must, type UnitType, type UnlockId } from "@heat/engine";
+import { type AdventureOutcome, FACILITIES, type FacilityKind, type Material, must, STARTING_LOCATION, type UnitType, type UnlockId } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
-import type { Tables } from "../src/db/client.js";
+import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { ITEM_VERSION } from "../src/db/keys.js";
-import type { AdventureRecord, Hero, Repository, SettledResult } from "../src/db/repository.js";
+import { type AdventureRecord, type Hero, type HeroStatus, Repository, type SettledResult } from "../src/db/repository.js";
 import { RECENT_TTL_SECONDS, type RecentAdventure } from "../src/recent.js";
+import { recruitHero } from "../src/recruit.js";
+import { startAdventure } from "../src/start.js";
 import { locationKeys, playerKeys, replayKeys } from "./keys.js";
 import { VERSION } from "./versions.js";
 
 /**
- * What the data-layer tests share for their data (typescript.md, rule 19): a
- * player no other test has, and an item as it is stored, read past the repository.
+ * What the data-layer tests share for their data (typescript.md, rule 19):
+ * the tables as a test reaches them, a player no other test has, and an item
+ * as it is stored, read past the repository.
  */
 
+/** The client, the tables' names and a repository on them, from the environment the global set-up made: what a file's `beforeAll` asks for. */
+export function connected(): { db: DynamoDBDocumentClient; tables: Tables; repo: Repository } {
+  const config = configFromEnv();
+  const db = createDocumentClient(config);
+  return { db, tables: config.tables, repo: new Repository(db, config.tables) };
+}
+
 export const player = () => `p-${randomUUID()}`;
+
+/** A location no content knows and no other test has, so that no other test's sightings or adventures are read at it. */
+export const place = () => `test-${randomUUID()}`;
+
+/** The time a number of minutes before another. */
+export const minutesBefore = (now: Date, minutes: number) => new Date(now.getTime() - minutes * 60_000);
+
+export const ids = (heroes: readonly Hero[]) => heroes.map((h) => h.id);
 
 /** An item a test puts past the repository, with what ElectroDB finds it by. */
 export const whole = <Item extends object>(entity: string, item: Item) => ({ ...item, __edb_e__: entity, __edb_v__: ITEM_VERSION });
@@ -102,6 +120,30 @@ export function heroFixture(location: string, overrides: Partial<Hero> = {}): He
   };
 }
 
+/** A level-1 camp at a location with the given counts, put past the repository, as the transactions that recruit, kill and retire heroes leave one. */
+export async function putCamp(db: DynamoDBDocumentClient, tables: Tables, p: string, location: string, activeHeroes: number, livingHeroes: number): Promise<void> {
+  await db.send(new PutCommand({
+    TableName: tables.player,
+    Item: whole("camp", { ...playerKeys.camp(p, location), location, hallLevel: 1, warehouseLevel: 1, activeHeroes, livingHeroes }),
+  }));
+}
+
+/** Villagers of the given statuses at a location, and a camp there whose counts agree with them. */
+export async function putHeroes(db: DynamoDBDocumentClient, tables: Tables, p: string, statuses: readonly HeroStatus[], location: string): Promise<Hero[]> {
+  const heroes = statuses.map((status, i) => heroFixture(location, { name: `Hero ${i}`, status }));
+  for (const hero of heroes) {
+    await db.send(new PutCommand({ TableName: tables.player, Item: whole("hero", { ...playerKeys.hero(p, hero.id), ...hero }) }));
+  }
+  await putCamp(db, tables, p, location, statuses.filter((s) => s !== "RETIRED").length, statuses.filter((s) => s === "ALIVE").length);
+  return heroes;
+}
+
+/** A player's adventure on a job of the starting location, open, with the free villager, issued by the given version. */
+export async function opened(repo: Repository, p: string, version: string, jobId: string): Promise<AdventureRecord> {
+  const villager = await recruitHero(repo, p, STARTING_LOCATION, "villager", randomUUID());
+  return startAdventure(repo, p, version, randomUUID(), STARTING_LOCATION, jobId, [villager.id]);
+}
+
 /** Living heroes of the given unit types at a location, with their sightings, and a level-1 camp there that counts them. */
 export async function putParty(db: DynamoDBDocumentClient, tables: Tables, p: string, unitTypes: readonly UnitType[], location: string): Promise<Hero[]> {
   const heroes = unitTypes.map((unitType, i) => heroFixture(location, { unitType, spriteSet: `${unitType}-01`, name: `Hero ${i}` }));
@@ -112,10 +154,7 @@ export async function putParty(db: DynamoDBDocumentClient, tables: Tables, p: st
       Item: whole("sighting", { ...locationKeys.seen(location, hero.id), heroId: hero.id, level: 1, seenAt: "2026-01-01T00:00:00.000Z", expiresAt: 1 }),
     }));
   }
-  await db.send(new PutCommand({
-    TableName: tables.player,
-    Item: whole("camp", { ...playerKeys.camp(p, location), location, hallLevel: 1, warehouseLevel: 1, activeHeroes: heroes.length, livingHeroes: heroes.length }),
-  }));
+  await putCamp(db, tables, p, location, heroes.length, heroes.length);
   return heroes;
 }
 

@@ -2,14 +2,11 @@ import { randomUUID } from "node:crypto";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { configFromEnv, createDocumentClient } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { readAdventure } from "../src/read.js";
-import { recruitHero } from "../src/recruit.js";
-import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { player } from "./data.js";
+import { connected, opened as openedBy, player } from "./data.js";
 import { PREVIOUS_VERSION as version } from "./versions.js";
 
 /**
@@ -21,18 +18,12 @@ import { PREVIOUS_VERSION as version } from "./versions.js";
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  repo = new Repository(createDocumentClient(config), config.tables);
+  ({ repo } = connected());
 });
 
-const at = "millbrook";
 const wolves = "wolves-on-the-mill-road";
 
-/** A player's adventure, open, with the free villager. */
-async function opened(p: string) {
-  const villager = await recruitHero(repo, p, at, "villager", randomUUID());
-  return startAdventure(repo, p, version, randomUUID(), at, wolves, [villager.id]);
-}
+const opened = (p: string) => openedBy(repo, p, version, wolves);
 
 describe("readAdventure", () => {
   it("answers an open adventure to its player only", async () => {

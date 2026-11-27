@@ -10,7 +10,7 @@ import { must, UNIT_PROFILES, UNLOCK_IDS } from "@heat/engine";
 import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
 import { createService, type HeatService } from "../src/db/entities.js";
 import { type Hero, HeroChanged, Repository, TransactionConflict } from "../src/db/repository.js";
-import { emptyResult, heroFixture, player, putOldCampsPastAPage, settledAdventure, storedItem, whole } from "./data.js";
+import { connected, emptyResult, heroFixture, player, putOldCampsPastAPage, settledAdventure, storedItem, whole } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 
 /**
@@ -26,11 +26,8 @@ let service: HeatService;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
+  ({ db, tables, repo } = connected());
   service = createService(db, tables);
-  repo = new Repository(db, tables);
 });
 
 const at = "millbrook";

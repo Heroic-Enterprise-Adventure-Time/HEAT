@@ -1,17 +1,17 @@
 import { randomUUID } from "node:crypto";
 
-import { DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { DeleteCommand, type DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import type { Context as LambdaContext } from "aws-lambda";
 import { constantCase } from "es-toolkit";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
 import { CART_CAPACITY, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient } from "../src/db/client.js";
+import type { Tables } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { MAX_ABILITY_ID, MAX_OVERRIDES } from "../src/submit.js";
-import { emptyResult, putRecentAdventure, putSettledAdventure, putUnlock, recentAdventure, settledAdventure } from "./data.js";
-import { event, type Handler } from "./event.js";
+import { connected, emptyResult, player, putRecentAdventure, putSettledAdventure, putUnlock, recentAdventure, settledAdventure } from "./data.js";
+import { event, type Handler, loadHandler } from "./event.js";
 import { locationKeys } from "./keys.js";
 
 /**
@@ -26,14 +26,13 @@ import { locationKeys } from "./keys.js";
  * input a GraphQLError in `errors`.
  */
 let handler: Handler;
+let db: DynamoDBDocumentClient;
+let tables: Tables;
 let repo: Repository;
 
 beforeAll(async () => {
-  // The handler reads its configuration at import time, after global setup
-  // has set the environment, so it is imported here rather than at the top.
-  handler = (await import("../src/handler.js")).handler as unknown as Handler;
-  const config = configFromEnv();
-  repo = new Repository(createDocumentClient(config), config.tables);
+  handler = await loadHandler();
+  ({ db, tables, repo } = connected());
 });
 
 /** The handler's reply: the data the query selected, the errors, and the extensions. */
@@ -93,8 +92,8 @@ const RETIRE = `mutation($id: ID!) {
 
 describe("authorization at the field level", () => {
   it("serves public fields to anyone and private fields only to the owner", async () => {
-    const owner = `p-${randomUUID()}`;
-    const other = `p-${randomUUID()}`;
+    const owner = player();
+    const other = player();
     const email = "owner@example.com";
     await repo.putPlayer({ id: owner, name: email });
     await repo.setBalance(owner, "millbrook", "timber", 5);
@@ -133,7 +132,7 @@ describe("authorization at the field level", () => {
 
 describe("first sign-in", () => {
   it("makes the profile once, with joinGame, and starting an adventure no longer does", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(START, { requestId: randomUUID(), heroIds: [randomUUID()] }, p);
     expect(await repo.getPlayer(p)).toBeUndefined();
 
@@ -147,7 +146,7 @@ describe("first sign-in", () => {
   });
 
   it("stores nothing of a token's email, which an ID token carries (decision 0043)", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     const withEmail = event(JOIN, {}, p);
     withEmail.requestContext.authorizer.jwt.claims["email"] = "player@example.com";
     await handler(withEmail, {} as LambdaContext);
@@ -157,7 +156,7 @@ describe("first sign-in", () => {
 
 describe("the camp through the graph", () => {
   it("shows a new player the starting camp, recruits the free villager, and refuses a second", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     const camp = `{ me { camps { location name hallLevel heroCapacity resourceCapacity activeHeroes livingHeroes } heroes { id name unitType spriteSet status } } }`;
 
@@ -184,7 +183,7 @@ describe("the camp through the graph", () => {
   });
 
   it("retires the villager, which frees the next villager", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     const id = randomUUID();
     await gql(RECRUIT, { id }, p);
@@ -200,13 +199,13 @@ describe("the camp through the graph", () => {
     expect(next.data?.recruitHero.__typename).toBe("RecruitHeroSuccess");
 
     // Another player's hero is not said to exist: the client's defect, in errors, not a refusal type.
-    const missing = await gql(RETIRE, { id: randomUUID() }, `p-${randomUUID()}`);
+    const missing = await gql(RETIRE, { id: randomUUID() }, player());
     expect(missing.data?.retireHero).toBeNull();
     expect(missing.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
   });
 
   it("shows other players' heroes seen at the location by their public fields, never the caller's own", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     const mine = randomUUID();
     await gql(RECRUIT, { id: mine }, p);
@@ -229,8 +228,7 @@ describe("the camp through the graph", () => {
   it("lists the adventures recently completed at the location by their public fields, to any signed-in player", async () => {
     // Settled far in the future, so that it is first whatever the other test files settle at Millbrook meanwhile.
     const settledAt = "9999-01-01T00:00:00.000Z";
-    const config = configFromEnv();
-    const { adventureId } = await putRecentAdventure(createDocumentClient(config), config.tables.location, recentAdventure("millbrook", new Date(settledAt), {
+    const { adventureId } = await putRecentAdventure(db, tables.location, recentAdventure("millbrook", new Date(settledAt), {
       outcome: "retreat",
       stages: [{ stage: 0, kind: "travel", ended: "done", startedAtMs: 0, endedAtMs: 1000 }, { stage: 1, kind: "fight", ended: "retreat", startedAtMs: 1000, endedAtMs: 4000 }],
       credited: [{ material: "cloth", amount: 3 }],
@@ -238,7 +236,7 @@ describe("the camp through the graph", () => {
     }));
 
     const recent = `query($at: ID!) { recentAdventuresAt(location: $at) { id job { id name } outcome stages { stage kind ended } credited { material amount } party { name unitType spriteSet level died } settledAt } }`;
-    const r = await gql(recent as Query<{ recentAdventuresAt: unknown[] }>, { at: "millbrook" }, `p-${randomUUID()}`);
+    const r = await gql(recent as Query<{ recentAdventuresAt: unknown[] }>, { at: "millbrook" }, player());
     expect(r.errors).toBeUndefined();
     expect(r.data?.recentAdventuresAt.length).toBeLessThanOrEqual(20);
     expect(r.data?.recentAdventuresAt[0]).toEqual({
@@ -259,13 +257,13 @@ describe("the camp through the graph", () => {
 
     const anonymous = await gql(recent, { at: "millbrook" });
     expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
-    const nowhere = await gql(recent, { at: "atlantis" }, `p-${randomUUID()}`);
+    const nowhere = await gql(recent, { at: "atlantis" }, player());
     expect(nowhere.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
   });
 
   it("serves the unlocks a player holds to that player alone, with the camp one opens, and the unlocks a settled run earned to any signed-in player (decision 0059)", async () => {
-    const owner = `p-${randomUUID()}`;
-    const other = `p-${randomUUID()}`;
+    const owner = player();
+    const other = player();
     await gql(JOIN, {}, owner);
     const mine = `{ me { unlocks { unlock earnedAt adventureId } camps { location name } } }` as Query<{ me: { unlocks: unknown[]; camps: unknown[] } }>;
     const before = await gql(mine, {}, owner);
@@ -278,16 +276,14 @@ describe("the camp through the graph", () => {
     expect(locked.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
 
     // As settlement leaves them: a settled record whose result lists the unlock, and the unlock's item naming that adventure.
-    const config = configFromEnv();
-    const db = createDocumentClient(config);
     const unlock = must(UNLOCK_IDS[0], "an unlock of the content");
     const earnedAt = "2026-11-24T12:00:00.000Z";
     const record = await putSettledAdventure(
       db,
-      config.tables.location,
+      tables.location,
       settledAdventure("wolves-on-the-mill-road", new Date(earnedAt), { playerId: owner, result: { ...emptyResult("complete"), unlocks: [unlock] } }),
     );
-    await putUnlock(db, config.tables.player, owner, unlock, { earnedAt, adventureId: record.adventureId });
+    await putUnlock(db, tables.player, owner, unlock, { earnedAt, adventureId: record.adventureId });
 
     const after = await gql(mine, {}, owner);
     expect(after.errors).toBeUndefined();
@@ -313,16 +309,14 @@ describe("the camp through the graph", () => {
     // Settled far in the future, so that it is first whatever the other test files settle of the job meanwhile.
     const settledAt = "9999-01-01T00:00:00.000Z";
     const wolves = "wolves-on-the-mill-road";
-    const config = configFromEnv();
-    const db = createDocumentClient(config);
-    const record = await putSettledAdventure(db, config.tables.location, settledAdventure(wolves, new Date(settledAt), { result: emptyResult("retreat") }));
+    const record = await putSettledAdventure(db, tables.location, settledAdventure(wolves, new Date(settledAt), { result: emptyResult("retreat") }));
     // Taken out again, or it would be first in the job's replays for every test that runs after this one.
     onTestFinished(async () => {
-      await db.send(new DeleteCommand({ TableName: config.tables.location, Key: locationKeys.adventure(record.adventureId) }));
+      await db.send(new DeleteCommand({ TableName: tables.location, Key: locationKeys.adventure(record.adventureId) }));
     });
 
     const replays = `query($job: ID!) { replaysOf(job: $job) { id job { id } location status settledAt result { outcome } snapshot { jobId heroes { heroId } } } }`;
-    const viewer = `p-${randomUUID()}`;
+    const viewer = player();
     // The index is eventually consistent (decision 0050).
     const r = await vi.waitFor(async () => {
       const answer = await gql(replays as Query<{ replaysOf: unknown[] }>, { job: wolves }, viewer);
@@ -352,7 +346,7 @@ describe("the camp through the graph", () => {
 
 describe("the adventure loop through the graph", () => {
   it("starts a job with the villager, shows it on me, refuses a second start, and settles with the engine's rewards once", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     const villager = randomUUID();
     await gql(RECRUIT, { id: villager }, p);
@@ -389,7 +383,7 @@ describe("the adventure loop through the graph", () => {
     const SUBMIT = `mutation($id: ID!, $log: [OverrideInput!]!) {
       submitAdventure(input: { adventureId: $id, overrides: $log }) { __typename ... on SubmitAdventureSuccess { adventure { id status } } }
     }` as Query<{ submitAdventure: Result<"adventure", { id: string; status: string }> | null }>;
-    const stranger = await gql(SUBMIT, { id: adventureId, log: [] }, `p-${randomUUID()}`);
+    const stranger = await gql(SUBMIT, { id: adventureId, log: [] }, player());
     expect(stranger.data?.submitAdventure).toBeNull();
     expect(stranger.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
     const badLog = await gql(SUBMIT, { id: adventureId, log: [{ kind: "UNIT", acceptedAtSimTime: 0, unitId: "nobody", abilityId: "swing" }] }, p);
@@ -405,12 +399,12 @@ describe("the adventure loop through the graph", () => {
     const read = `query($id: ID!) { adventure(id: $id) { id status result { outcome } timeline } }`;
     const own = await gql(read as Query<{ adventure: unknown }>, { id: adventureId }, p);
     expect(own.data?.adventure).toEqual({ id: adventureId, status: "OPEN", result: null, timeline: null });
-    const other = await gql(read as Query<{ adventure: unknown }>, { id: adventureId }, `p-${randomUUID()}`);
+    const other = await gql(read as Query<{ adventure: unknown }>, { id: adventureId }, player());
     expect(other.data?.adventure).toBeNull();
   });
 
   it("refuses an input the schema cannot read before any resolver runs", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     // A unit type outside the enum, and a mutation called with its old positional arguments.
     const dragon = await invalid(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: DRAGON, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
@@ -432,19 +426,19 @@ describe("the adventure loop through the graph", () => {
     const unitEntry = { kind: "UNIT", acceptedAtSimTime: 0, unitId: "any", abilityId: "swing" };
 
     it.each(["not-a-uuid", 7])("refuses the request id %s by its scalar", async (id) => {
-      const reply = await invalid(RECRUIT, { id }, `p-${randomUUID()}`);
+      const reply = await invalid(RECRUIT, { id }, player());
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect(message(reply)).toContain("$id");
     });
 
     it("refuses what the scalar lets through as a UUID", async () => {
-      const reply = await gql(RECRUIT, { id: `${randomUUID()}}` }, `p-${randomUUID()}`);
+      const reply = await gql(RECRUIT, { id: `${randomUUID()}}` }, player());
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect(message(reply)).toContain("a request id is a UUID");
     });
 
     it("takes a request id in any case as one request", async () => {
-      const p = `p-${randomUUID()}`;
+      const p = player();
       await gql(JOIN, {}, p);
       const id = randomUUID();
       const first = await gql(RECRUIT, { id: id.toUpperCase() }, p);
@@ -454,7 +448,7 @@ describe("the adventure loop through the graph", () => {
     });
 
     it("takes a hero's id in any case as that hero", async () => {
-      const p = `p-${randomUUID()}`;
+      const p = player();
       await gql(JOIN, {}, p);
       const id = randomUUID();
       await gql(RECRUIT, { id }, p);
@@ -463,7 +457,7 @@ describe("the adventure loop through the graph", () => {
     });
 
     it("refuses a party of none, of too many, or with a hero twice", async () => {
-      const p = `p-${randomUUID()}`;
+      const p = player();
       const id = randomUUID();
       for (const [heroIds, words] of [
         [[], `a party is 1 to ${MAX_PARTY} heroes`],
@@ -478,7 +472,7 @@ describe("the adventure loop through the graph", () => {
     });
 
     it("refuses a cargo with a resource twice, beyond the largest cart, or a hero who stays twice", async () => {
-      const p = `p-${randomUUID()}`;
+      const p = player();
       const id = randomUUID();
       const largest = Math.max(...CART_CAPACITY);
       const CARAVAN_START = `mutation($requestId: UUID!, $cargo: [CargoInput!]!, $staying: [ID!]!) {
@@ -497,7 +491,7 @@ describe("the adventure loop through the graph", () => {
     });
 
     it("refuses a malformed party before a refusal: an open adventure is not read first", async () => {
-      const p = `p-${randomUUID()}`;
+      const p = player();
       await gql(JOIN, {}, p);
       const villager = randomUUID();
       await gql(RECRUIT, { id: villager }, p);
@@ -510,7 +504,7 @@ describe("the adventure loop through the graph", () => {
     });
 
     it("refuses a log of too many entries and an ability id of too many characters", async () => {
-      const p = `p-${randomUUID()}`;
+      const p = player();
       const long = await gql(ANY_LOG, { log: Array.from({ length: MAX_OVERRIDES + 1 }, () => unitEntry) }, p);
       expect(code(long)).toBe("BAD_USER_INPUT");
       expect(message(long)).toContain(`a log holds at most ${MAX_OVERRIDES} entries`);
@@ -520,13 +514,13 @@ describe("the adventure loop through the graph", () => {
     });
 
     it.each([-1, 1.5, "7abc", 1e21])("refuses the time %s", async (acceptedAtSimTime) => {
-      const reply = await invalid(ANY_LOG, { log: [{ ...unitEntry, acceptedAtSimTime }] }, `p-${randomUUID()}`);
+      const reply = await invalid(ANY_LOG, { log: [{ ...unitEntry, acceptedAtSimTime }] }, player());
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect(message(reply)).toContain("acceptedAtSimTime");
     });
 
     it.each([0, -1, 1.5, "2abc", 1e21])("refuses the level %s", async (level) => {
-      const reply = await invalid(BUILD, { level }, `p-${randomUUID()}`);
+      const reply = await invalid(BUILD, { level }, player());
       expect(code(reply)).toBe("BAD_USER_INPUT");
       expect(message(reply)).toContain("$level");
     });
@@ -540,7 +534,7 @@ describe("the adventure loop through the graph", () => {
 
 describe("the deploy's version", () => {
   it("flags outdated on a response to a client of another version, errors included, and never otherwise", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     const version = must(process.env["HEAT_VERSION"], "HEAT_VERSION");
 
@@ -562,7 +556,7 @@ describe("the deploy's version", () => {
   });
 
   it("flags outdated on a document refused at validation, which is how a tab loaded before a field was dropped hears of the deploy", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     // `gather` was UnitStats' field until Issue-339; a client of that deploy still asks for it.
     const dropped = `{ me { openAdventure { snapshot { heroes { stats { gather { material rating } } } } } } }`;
@@ -575,7 +569,7 @@ describe("the deploy's version", () => {
   });
 
   it("flags outdated on an input that lacks a field since required, which is how a tab loaded before a recruit named its location hears of the deploy", async () => {
-    const p = `p-${randomUUID()}`;
+    const p = player();
     await gql(JOIN, {}, p);
     // The client's own document, which is unchanged; until Issue-351 its input held no location.
     const recruit = `mutation($input: RecruitHeroInput!) { recruitHero(input: $input) { __typename } }`;

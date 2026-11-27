@@ -7,11 +7,11 @@ import { beforeAll, describe, expect, it } from "vitest";
 import type { FacilityKind, Material } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { BuildRefused, campLevels, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { HallFull, InsufficientResources, MaxLevel, Requires } from "../src/refusals.js";
-import { balances as balancesAt, build as buildAt, heroFixture, player, stock as stockAt, whole } from "./data.js";
+import { balances as balancesAt, build as buildAt, connected, heroFixture, player, stock as stockAt, whole } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -21,10 +21,7 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const at = "millbrook";
