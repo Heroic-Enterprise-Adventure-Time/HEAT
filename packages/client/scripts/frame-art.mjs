@@ -10,6 +10,8 @@
 // Everything here is a function of the pictures it is handed, so that it is
 // tested without a file; copy-art.mjs reads the files and writes the result.
 
+import { isEqual, sortBy } from "es-toolkit";
+
 const SIDES = ["top", "right", "bottom", "left"];
 
 /** The smallest box that holds every pixel of a picture that is not transparent; a picture with none is refused. */
@@ -43,6 +45,23 @@ export function checkSlice(name, slice, box) {
 }
 
 /**
+ * Refuses a provenance whose frames are not the page's: `names` as the
+ * provenance lists them, `frames` the list the page reads (FRAMES in
+ * src/app/sprite-sets.ts), so that a frame renamed or dropped on one side
+ * fails the build rather than drawing nothing.
+ */
+export function checkFrameNames(names, frames) {
+  if (!isEqual(sortBy(names, [(name) => name]), sortBy([...frames], [(name) => name]))) {
+    throw new Error(`art/frames/provenance.json names the frames ${names.join(", ")}, and the page reads ${frames.join(", ")} (FRAMES in src/app/sprite-sets.ts)`);
+  }
+}
+
+/** The portrait's size on the page, `--portrait`: its side in art pixels at its scale. */
+export function portraitStyle({ side, scale }) {
+  return `:root {\n  --portrait: ${side * scale}px;\n}\n`;
+}
+
+/**
  * The stylesheet that names every frame: for each, its published picture,
  * its slice in the picture's pixels, and the border that slice is drawn in,
  * the same lengths, so that the frame is drawn at 1× and each pixel of the
@@ -50,8 +69,7 @@ export function checkSlice(name, slice, box) {
  * slice }`, the picture's published name under /art/frames.
  */
 export function frameStyles(frames) {
-  const lines = Object.entries(frames)
-    .sort(([a], [b]) => a.localeCompare(b))
+  const lines = sortBy(Object.entries(frames), [([name]) => name])
     .flatMap(([name, { image, slice }]) => [
       `  --frame-${name}-image: url("/art/frames/${image}");`,
       `  --frame-${name}-slice: ${SIDES.map((side) => slice[side]).join(" ")};`,

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { checkSlice, frameStyles, opaqueBox } from "./frame-art.mjs";
+import { checkFrameNames, checkSlice, frameStyles, opaqueBox, portraitStyle } from "./frame-art.mjs";
 
 /** A picture `width` by `height`, transparent but for an opaque box at `left`, `top`, `w` by `h`. */
 function picture(width, height, left, top, w, h) {
@@ -35,4 +35,14 @@ test("the stylesheet names each frame's picture, its slice and a border of the s
   });
   assert.match(css, /:root \{\n {2}--frame-panel-image: url\("\/art\/frames\/panel\.def\.png"\);\n {2}--frame-panel-slice: 26 26 26 26;\n {2}--frame-panel-width: 26px 26px 26px 26px;\n {2}--frame-primary-image/);
   assert.match(css, /--frame-primary-slice: 8 10 12 10;\n {2}--frame-primary-width: 8px 10px 12px 10px;\n\}\n$/);
+});
+
+test("the provenance names the frames the page reads, in any order, or the build fails", () => {
+  assert.doesNotThrow(() => checkFrameNames(["secondary", "panel", "primary"], ["panel", "primary", "secondary"]));
+  assert.throws(() => checkFrameNames(["panel", "primary"], ["panel", "primary", "secondary"]), /names the frames panel, primary, and the page reads panel, primary, secondary/);
+  assert.throws(() => checkFrameNames(["panel", "primary", "button"], ["panel", "primary", "secondary"]), /FRAMES in src\/app\/sprite-sets.ts/);
+});
+
+test("the portrait's size is its side at its scale", () => {
+  assert.equal(portraitStyle({ side: 24, scale: 2 }), ":root {\n  --portrait: 48px;\n}\n");
 });

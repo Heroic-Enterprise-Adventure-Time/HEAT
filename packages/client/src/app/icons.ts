@@ -6,9 +6,15 @@ import { fetchIconNames, fetchPortraitNames, iconAddress, type IconNames, portra
  * The icons' and the portraits' indexes for the page's templates
  * (`icon-names.ts`), read once before the application starts. A failure is
  * recorded, not thrown, as the configuration's is: the page then renders
- * without its pictures, and every entry of the menu and every hero tile
- * still has its name.
+ * without those pictures, and every entry of the menu and every hero tile
+ * still has its name. Each index loads on its own, so the portraits failing
+ * leaves the icons, and the icons failing leaves the portraits.
  */
+/** What a failed load says. */
+function messageOf(reason: unknown): string {
+  return reason instanceof Error ? reason.message : String(reason);
+}
+
 @Service()
 export class Icons {
   private readonly names = signal<IconNames>({});
@@ -16,16 +22,11 @@ export class Icons {
   readonly error = signal<string | null>(null);
 
   async load(fetchFn: typeof fetch = fetch): Promise<void> {
-    try {
-      const [names, portraits] = await Promise.all([fetchIconNames(fetchFn), fetchPortraitNames(fetchFn)]);
-      this.names.set(names);
-      this.portraits.set(portraits);
-      this.error.set(null);
-    } catch (e) {
-      this.names.set({});
-      this.portraits.set({});
-      this.error.set(e instanceof Error ? e.message : String(e));
-    }
+    const [names, portraits] = await Promise.allSettled([fetchIconNames(fetchFn), fetchPortraitNames(fetchFn)]);
+    this.names.set(names.status === 'fulfilled' ? names.value : {});
+    this.portraits.set(portraits.status === 'fulfilled' ? portraits.value : {});
+    const failures = [names, portraits].flatMap((result) => (result.status === 'rejected' ? [messageOf(result.reason)] : []));
+    this.error.set(failures.length > 0 ? failures.join('; ') : null);
   }
 
   /** Where the icon of that name is served; null until the index is in, and for a name it does not hold. */

@@ -85,7 +85,7 @@ set -- --exclude index.html --exclude favicon.png --exclude config.json \
 
 aws s3 sync "$build_dir" "s3://$bucket" --only-show-errors "$@" --cache-control "$long"
 
-# The atlases and the indexes of the facilities' pictures and of the icons alone: everything else under art/ went with the sync above.
+# The atlases and the indexes of the facilities' pictures, of the icons and of the portraits alone: everything else under art/ went with the sync above.
 aws s3 sync "$build_dir/art" "s3://$bucket/art" --delete --only-show-errors \
   --exclude "*" --include "*/sheet.json" --include "*/pictures.json" \
   --cache-control "$short" --content-type "application/json"

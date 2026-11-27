@@ -65,13 +65,13 @@
   outline: none;
 }
 
-/* Pressed, while held or as a toggle that is on: the frame as it is, a shade darker, its label sunk by the lower edge, so nothing around it moves. */
+/* Pressed, while held or as a toggle that is on: the frame as it is, a shade darker, its label sunk by the press, so nothing around it moves. */
 .button:active:not(:disabled),
 .button[aria-pressed='true'] {
   --button-state: brightness(0.88);
 
-  padding-top: calc(var(--space-xs) + var(--frame-edge));
-  padding-bottom: calc(var(--space-xs) - var(--frame-edge));
+  padding-top: calc(var(--space-xs) + var(--button-press));
+  padding-bottom: calc(var(--space-xs) - var(--button-press));
 }
 
 /* A panel's frame: the card a panel's content stands on. */

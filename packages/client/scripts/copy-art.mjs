@@ -41,8 +41,8 @@ import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
 import { GROUND_FILES, GROUNDS } from "../src/app/ground-sets.ts";
-import { PACKED_AREAS, PORTRAIT, SET_CLIPS } from "../src/app/sprite-sets.ts";
-import { checkSlice, frameStyles, opaqueBox } from "./frame-art.mjs";
+import { FRAMES, PACKED_AREAS, PORTRAIT, SET_CLIPS } from "../src/app/sprite-sets.ts";
+import { checkFrameNames, checkSlice, frameStyles, opaqueBox, portraitStyle } from "./frame-art.mjs";
 import { glyphFrames, opaqueRows, packSet, pictureName, portraitBox } from "./pack-art.mjs";
 import { colourToken } from "./style-tokens.mjs";
 
@@ -139,6 +139,7 @@ for (const set of directories(join(from, "heroes"))) {
 writeFileSync(join(to, "portraits", "pictures.json"), JSON.stringify(portraitNames));
 
 const frameProvenance = JSON.parse(readFileSync(join(from, "frames", "provenance.json"), "utf8"));
+checkFrameNames(Object.keys(frameProvenance.frames), FRAMES);
 const framePictures = new Set(pictures(join(from, "frames")).map((file) => basename(file)));
 const frames = {};
 mkdirSync(join(to, "frames"), { recursive: true });
@@ -153,6 +154,6 @@ for (const [name, { file, slice }] of Object.entries(frameProvenance.frames)) {
   frames[name] = { image, slice };
 }
 if (framePictures.size > 0) throw new Error(`art/frames holds ${[...framePictures].join(" and ")}, which its provenance names for no frame`);
-writeFileSync(fileURLToPath(new URL("../generated/frames.css", import.meta.url)), frameStyles(frames));
+writeFileSync(fileURLToPath(new URL("../generated/frames.css", import.meta.url)), frameStyles(frames) + portraitStyle(PORTRAIT));
 
 console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")}, copied art/${[...COPIED_AREAS, "facilities", "icons"].join(", art/")}, cut ${Object.keys(portraitNames).length} portraits from art/heroes and trimmed ${Object.keys(frames).length} frames from art/frames into packages/client/generated`);
