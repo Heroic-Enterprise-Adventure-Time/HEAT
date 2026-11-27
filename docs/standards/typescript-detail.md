@@ -10,7 +10,7 @@ The Lambda runtime is `nodejs<major>.x`, in Terraform, and `@types/node`'s major
 
 ## Rule 6: `must`
 
-`must` is one function, `packages/engine/src/must.ts`, exported from `@heat/engine`, the package every other package imports (rule 7), and used by every package's source and tests; the hub's resolvers narrow the caller with `callerId` instead. The invariant it names in source is one such as a Map entry just written or an index a loop keeps in range. Brackets on an index signature are what `noPropertyAccessFromIndexSignature` enforces.
+`must` is one function, `packages/engine/src/must.ts`, exported from `@heat/engine`, the package every other package imports (rule 7), and used by every package's source and tests; the hub's resolvers narrow the caller with `callerId` instead. The invariant it names in source is one such as a Map entry just written or an index a loop keeps in range. Brackets on an index signature are what `noPropertyAccessFromIndexSignature` enforces, and a property read by its name in brackets is not an indexed read: the lint on a cast leaves `extensions["pothosOptions"] as { authScopes?: unknown }` alone, because that cast says the shape of an unknown value and not that an element is there.
 
 ## Rule 8: where each test runs
 
