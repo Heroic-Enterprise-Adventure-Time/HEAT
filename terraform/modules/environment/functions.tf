@@ -175,7 +175,7 @@ resource "aws_lambda_function" "function" {
 
   # The runtime follows the major in .node-version (docs/standards/typescript.md,
   # rule 1). arm64: the same Node, about a fifth cheaper per millisecond.
-  runtime       = "nodejs24.x"
+  runtime       = "nodejs26.x"
   architectures = ["arm64"]
   memory_size   = each.value.memoryMb
   timeout       = each.value.timeoutSeconds
