@@ -803,8 +803,9 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     pay: [{ material: "cloth", amount: 3 }],
     bonusXp: 4,
   },
-  // A lone villager dies here on every seed; a fighter with a villager, or
-  // three villagers, clear it (decision 0031).
+  // The first job a party can be lost on: two wolves, which a lone villager
+  // does not come back from and a fighter with a villager clears (decision
+  // 0031; `test/adventure/engine.test.ts` plays both on one seed).
   "wolves-on-the-mill-road": {
     id: "wolves-on-the-mill-road",
     name: "Wolves on the mill road",
@@ -911,10 +912,10 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   // The caravan hub's caravan (Issue-354, decision 0059): the first job that
   // delivers, so its party has the cart beside it in both fights, the cart's
   // health carried between them. One bandit a fight, with a wolf on half the
-  // seeds, where two bandits a fight lose the cart to nearly every party
-  // (decision 0059, Issue-353's amendment). No pay: the delivery is the
-  // reward, and the bonus brings the job's XP to the road job's 20. What the
-  // cart carries, and who stays, is the hub's; the engine knows none of it.
+  // seeds; why not two bandits a fight is decision 0059, under Issue-353's
+  // amendment. No pay: the delivery is the reward, and the bonus brings the
+  // job's XP to the road job's 20. What the cart carries, and who stays, is
+  // the hub's; the engine knows none of it.
   "caravan-to-highcrag": {
     id: "caravan-to-highcrag",
     name: "Caravan to Highcrag",
