@@ -6,7 +6,7 @@ Nothing loads this file, and no session reads it at its start (`docs/README.md`,
 
 ## typescript.md
 
-Rule 1. The sentence on a new major's pin landing on `main` first was added on 2026-11-27 (Issue-426). The pull request that moved Node to 26, PR-425, had no `dev` plan, because its plan job runs `main`'s copy of the Node action, which pinned only 24; decision 0048's amendment of Issue-426 records why the pin per major was taken.
+Rule 1. On 2026-11-27 (Issue-396) a pin's move became a commit of its own in a pull request of versions and pins. Issue-396 moved Node, Terraform, Chromium and graphql-eslint in one pull request at the owner's call, and the review of PR-425 found the rule still asked for a pull request of its own; each version still has a commit of its own. The sentence on `@types/node` is from the same review: the branch had dropped the types' major ignore along with Node 24's hold, which would have let Dependabot offer types for a major the code does not run on. The sentence on a new major's pin landing on `main` first was added on 2026-11-27 (Issue-426). The pull request that moved Node to 26, PR-425, had no `dev` plan, because its plan job runs `main`'s copy of the Node action, which pinned only 24; decision 0048's amendment of Issue-426 records why the pin per major was taken.
 
 Rule 8. The sentence on Node's own runner was added on 2026-11-19 (Issue-328), from the review of PR-333. The hooks' tests had run under `node --test` since Issue-318 while the rule named one test outside Vitest, and the trace report's test was the second of the kind; the rule now says what the code does, and why those tests need no package.
 
@@ -39,6 +39,8 @@ Rule 29. A candidate rule from the review of PR-361 (Issue-352), accepted by the
 Rule 30. A candidate rule from the review of PR-369 (Issue-353), accepted by the owner on 2026-11-25: the engine added `cart` to `UnitKind` and the client's field spelled the union again by hand, so only a reader of both packages would have found the second place to add it. Applying the rule found two more copies in the client, the field's outcome and the battle scene's side running on, now `AdventureOutcome` and `Side`.
 
 Rule 31. A candidate rule from the review of PR-373 (Issue-356), accepted by the owner on 2026-11-26: the engine's test helpers named the quarry's and the route back's jobs as constants, and three test files spelled the ids again. Applying the rule converted every job id and Highcrag's id in the engine's tests, the bonus tables of `content.test.ts` among them.
+
+Rule 33. A rule the owner accepted on the checkup of `6df7d6e`, added by Issue-396 on 2026-11-27: the hub's tests started `amazon/dynamodb-local:latest`, so each run of "Build and test" pulled whatever the tag pointed at that day. The reference went into a `FROM` line of a Dockerfile that nothing builds because Dependabot's `docker` ecosystem matches file names by `/dockerfile|containerfile/i` and reads no string in TypeScript, and its file updater moves a tag and a digest together (dependabot-core, read 2026-11-27). The rule went under a heading of its own after rule 32, so that rules 10 to 32 kept the numbers other documents cite.
 
 Held back, `@graphql-tools/utils` overridden under `@apollo/server`. Dependabot alert 8 was reopened on 2026-11-17 by PR-311.
 
@@ -97,6 +99,8 @@ Why. The rules for scalars, input objects and result unions were taken on 2026-1
 ## terraform.md
 
 The document. Written on 2026-10-24 (Issue-145) from the roots and modules on `main`.
+
+Rule 13. On 2026-11-27 (Issue-396) the Terraform pin's move became a commit of its own in a pull request of versions and pins. Issue-396 moved Node, Terraform, Chromium and graphql-eslint in one pull request at the owner's call, and the review of PR-425 found the rule still asked for a pull request of its own; each version still has a commit of its own.
 
 Rule 17, tflint. The floor gained tflint on 2026-10-24 (Issue-145), when the owner weighted accepted practice over the code as it was. Its first run found four things of two kinds: an unused variable the environment module declared and three roots passed, removed, and an unused data source that exists on purpose, annotated.
 

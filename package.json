@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": "24.x"
+    "node": "26.x"
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
@@ -25,8 +25,8 @@
     "@graphql-codegen/cli": "8.0.0",
     "@graphql-codegen/client-preset": "7.0.0",
     "@graphql-codegen/fragment-matcher": "8.0.0",
-    "@graphql-eslint/eslint-plugin": "4.4.2",
-    "@types/node": "24.19.2",
+    "@graphql-eslint/eslint-plugin": "5.0.0",
+    "@types/node": "26.6.11",
     "@vercel/nft": "1.11.7",
     "angular-eslint": "22.6.0",
     "esbuild": "0.28.2",
@@ -45,9 +45,6 @@
   },
   "overrides": {
     "@apollo/server": {
-      "@graphql-tools/utils": "12.1.0"
-    },
-    "@graphql-eslint/eslint-plugin": {
       "@graphql-tools/utils": "12.1.0"
     }
   },
