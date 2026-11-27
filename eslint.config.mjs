@@ -28,6 +28,15 @@ const restrictedSyntax = [
   },
 ];
 
+// A colour written in the client's TypeScript: a hex colour as a string, in
+// quotes or backticks, or as the six-digit hex number PixiJS takes.
+const COLOUR_LITERAL = 'Read a colour role of styles.css (readColourRole); no colour is written in TypeScript (docs/standards/angular.md, rule 17).';
+const colourLiterals = [
+  { selector: 'Literal[value=/^#[0-9a-f]{3,8}$/i]', message: COLOUR_LITERAL },
+  { selector: 'TemplateElement[value.raw=/^#[0-9a-f]{3,8}$/i]', message: COLOUR_LITERAL },
+  { selector: 'Literal[raw=/^0x[0-9a-f]{6}$/i]', message: COLOUR_LITERAL },
+];
+
 export default tseslint.config(
   // Build output, Angular's cache, the client's copy of the art, and the
   // client's generated GraphQL code (codegen.mjs), which is read as the
@@ -138,6 +147,16 @@ export default tseslint.config(
       // that it lives as long as the component does.
       '@angular-eslint/use-injectable-provided-in': 'off',
     },
+  },
+  // The client's colours are the stylesheet's: what draws on a canvas reads a
+  // role at runtime, and Stylelint holds the same in the stylesheets
+  // (docs/standards/angular.md, rule 17; decision 0061). ground-sets.ts is
+  // excepted by name: the art build and scripts/icon-set.mjs read each
+  // ground's backdrop from it (docs/standards/typescript.md, rule 29).
+  {
+    files: ['packages/client/src/**/*.ts'],
+    ignores: ['packages/client/src/app/ground-sets.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax, ...colourLiterals] },
   },
   {
     files: ['packages/client/**/*.html'],

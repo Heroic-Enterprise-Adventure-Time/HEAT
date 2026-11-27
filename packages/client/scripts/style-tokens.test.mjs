@@ -45,4 +45,5 @@ test("a palette colour in another form than six hex digits is refused", () => {
 test("the real stylesheet maps the scene's roles onto the scene's two colours", () => {
   assert.deepEqual(colourToken("--scene-glyph"), colourToken("--bone"));
   assert.deepEqual(colourToken("--scene-glyph-outline"), colourToken("--soot"));
+  assert.deepEqual(colourToken("--scene-bar-track"), colourToken("--soot"));
 });

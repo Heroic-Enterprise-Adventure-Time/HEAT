@@ -1,4 +1,4 @@
-import { clamp, range, uniq } from 'es-toolkit';
+import { clamp, mapValues, range, uniq } from 'es-toolkit';
 import { Application, Assets, Container, Graphics, Rectangle, Sprite, Texture, TextureStyle } from 'pixi.js';
 
 import {
@@ -23,6 +23,7 @@ import {
 
 import { layGround, type Terrain, type TilesetJson, TilesetJsonSchema } from '../../camp/scene/ground';
 import { TILE } from '../../camp/scene/layout';
+import { readColourRole } from '../../colour-role';
 import { GROUNDS, type GroundSet } from '../../ground-sets';
 import { fetchJson } from '../../static-json';
 import type { CastMember } from '../cast';
@@ -33,6 +34,7 @@ import { type EffectArt, type Frames, loadEffectArt, loadGlyphArt, loadIconArt, 
 import { battleView, type BattleView, entryOffset, spots, STAGE_HEIGHT, STAGE_WIDTH } from './battle-layout';
 import { clipHold } from './clip-hold';
 import { AMOUNT_AT, amountRow, DROP_FROM, dropAt, dropTime } from './drop-clip';
+import { BAR_BELOW, BAR_HEIGHT, BAR_ROLES, BAR_WIDTH, barFill } from './health-bar';
 
 /**
  * The battle scene, drawn with PixiJS like the camp (decision 0028): the
@@ -147,18 +149,6 @@ const HAND = { x: 10, y: -20 };
 const SCENE_FONT = 'scene-01';
 /** A drop is drawn over everyone, whatever row they stand on: the stage is not this many rows high. */
 const DROP_Z = 1000;
-
-/**
- * A unit's health bar, in art pixels: its width, centred on the unit, its
- * height, and how far under the unit's feet its top is. Sizes of the
- * picture, set by looking.
- */
-const BAR_WIDTH = 14;
-const BAR_HEIGHT = 2;
-const BAR_BELOW = 2;
-/** The shares of its health above which a unit's bar is drawn as high, and as middling; at or under the second it is low. */
-const BAR_HIGH_ABOVE = 0.5;
-const BAR_MIDDLE_ABOVE = 0.25;
 
 /** How far beyond the window's left edge the party's front hero starts its run on, in art pixels, so that it comes on from just out of sight. Set by looking. */
 const RUN_ON_MARGIN = 16;
@@ -292,6 +282,8 @@ const frameOf = (frames: Frames, index: number) => must(frames.textures[clamp(in
 
 export async function createBattleScene(host: HTMLElement, callbacks: BattleSceneCallbacks): Promise<BattleSceneHandle> {
   TextureStyle.defaultOptions.scaleMode = 'nearest';
+  // The health bar's colours as the page has them, read once: a theme never recolours the scene (decision 0061).
+  const barColours = mapValues(BAR_ROLES, (token) => readColourRole(getComputedStyle(document.documentElement), token));
   const app = new Application();
   await app.init({ width: STAGE_WIDTH, height: STAGE_HEIGHT, background: GROUNDS[START_GROUND].backdrop, antialias: false, resolution: 1, roundPixels: true });
   app.canvas.style.imageRendering = 'pixelated';
@@ -702,10 +694,9 @@ export async function createBattleScene(host: HTMLElement, callbacks: BattleScen
     unitView.barShown = shown;
     unitView.bar.clear();
     if (!shown) return;
-    const share = health / unit.maxHealth;
-    const fill = Math.max(1, Math.round(BAR_WIDTH * share));
-    unitView.bar.rect(0, 0, BAR_WIDTH, BAR_HEIGHT).fill(0x140d08);
-    unitView.bar.rect(0, 0, fill, BAR_HEIGHT).fill(share > BAR_HIGH_ABOVE ? 0x6fbf4a : share > BAR_MIDDLE_ABOVE ? 0xd9a441 : 0xc0392b);
+    const fill = barFill(health, unit.maxHealth);
+    unitView.bar.rect(0, 0, BAR_WIDTH, BAR_HEIGHT).fill(barColours.track);
+    unitView.bar.rect(0, 0, fill.width, BAR_HEIGHT).fill(barColours[fill.level]);
   };
 
   /** Shows one frame, standing on `foot`, mirrored for the other side or a retreat. */

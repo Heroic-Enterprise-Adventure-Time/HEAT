@@ -31,9 +31,16 @@
   --gold-dark: #8a5d1c;
   --rust: #8a2a17;
 
-  /* The scene's two, kept from the first palette so that a theme never recolours the scene (decision 0061). */
+  /*
+   * The scene's: two kept from the first palette, and the three a unit's
+   * health is drawn in, so that a theme never recolours the scene (decision
+   * 0061).
+   */
   --soot: #140d08;
   --bone: #e6d6b8;
+  --leaf: #6fbf4a;
+  --amber: #d9a441;
+  --ember: #c0392b;
 
   /* Surfaces. */
   --surface-page: var(--page);
@@ -69,6 +76,12 @@
   /* The scene's: a drop's digits, drawn by the art build and scripts/icon-set.mjs (docs/process/assets.md, rule 39). */
   --scene-glyph: var(--bone);
   --scene-glyph-outline: var(--soot);
+
+  /* The scene's: a unit's health bar in a battle, its track and its fill while the health is high, middling and low, read at runtime (src/app/colour-role.ts). */
+  --scene-bar-track: var(--soot);
+  --scene-bar-high: var(--leaf);
+  --scene-bar-middle: var(--amber);
+  --scene-bar-low: var(--ember);
 
   /* The spacing scale. */
   --space-xs: 0.125rem;
