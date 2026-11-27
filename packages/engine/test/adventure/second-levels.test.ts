@@ -15,7 +15,7 @@ import {
   STARTING_LOCATION,
   warehouseCapacity,
 } from "../../src/index.js";
-import { CARAVAN, GOBLINS, haul, HIGHCRAG, LUMBER, ORE, party, played, RECRUITED_TYPES, rewardOf, ROAD, SEAM, SEEDS, STAND, villagers } from "./helpers.js";
+import { CARAVAN, GOBLINS, haul, HIGHCRAG, LUMBER, named, ORE, party, played, RECRUITED_TYPES, rewardOf, ROAD, SEAM, SEEDS, STAND, villagers } from "./helpers.js";
 
 // Millbrook's second levels (Issue-357, decision 0059): the mine, the lumber
 // camp and the caravan hub each gain a level that costs stone, which only
@@ -105,7 +105,6 @@ const PARTIES = {
 const LONE = Object.fromEntries(RECRUITED_TYPES.map((type) => [type, party(type)] as const));
 const lone = (type: string) => must(LONE[type], `a lone ${type}`);
 const EVERY_PARTY: readonly (readonly SnapshotHero[])[] = [...Object.values(PARTIES), ...Object.values(LONE)];
-const named = (heroes: readonly SnapshotHero[]) => heroes.map((h) => h.unitType).join(", ");
 const has = (heroes: readonly SnapshotHero[], type: string) => heroes.some((h) => h.unitType === type);
 
 describe("The deep seam", () => {

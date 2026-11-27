@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { JOBS, jobsPostedBy, replay, type UnitType } from "../../src/index.js";
-import { CRAG, haul, HIGHCRAG, HIGHCRAG_RECRUITS, ORE, party, rewardOf, SEEDS, seeds, snapshot } from "./helpers.js";
+import { battleStage, CRAG, haul, HIGHCRAG, HIGHCRAG_RECRUITS, ORE, party, rewardOf, SEEDS, seeds, snapshot } from "./helpers.js";
 
 // Highcrag's one board job (Issue-351, decision 0059): the mine's first job
 // on another hill, for the parties Highcrag can field, which are miners and
@@ -9,8 +9,7 @@ import { CRAG, haul, HIGHCRAG, HIGHCRAG_RECRUITS, ORE, party, rewardOf, SEEDS, s
 // completes without dying, and one run of it pays for a fighter.
 
 const crag = JOBS[CRAG];
-const gather = crag.stages[1];
-if (gather?.kind !== "gather") throw new Error("The crag job gathers second");
+const gather = battleStage(crag, "gather");
 /** What a party with a miner brings home from the two veins: each vein's drop at mining 2. */
 const MINERS_ORE = haul("ore-vein", 2, 2);
 

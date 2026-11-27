@@ -17,7 +17,7 @@ import {
   STARTING_LOCATION,
   warehouseCapacity,
 } from "../../src/index.js";
-import { atLargest, contentWithJob, haul, hideOf, LUMBER, party, played, RECRUITED_TYPES, rewardOf, SEEDS, seeds, snapshot, STAND, TIMBER, villagers } from "./helpers.js";
+import { atLargest, battleStage, contentWithJob, haul, hideOf, LUMBER, party, played, RECRUITED_TYPES, rewardOf, SEEDS, seeds, snapshot, STAND, TIMBER, villagers } from "./helpers.js";
 
 // The lumber camp's first job (Issue-291), the first written for decision
 // 0058's shape: three trees or four, and on half its runs a wolf or two among
@@ -26,14 +26,12 @@ import { atLargest, contentWithJob, haul, hideOf, LUMBER, party, played, RECRUIT
 // is played over the same seeds, and what it brings home is a range.
 
 const lumber = JOBS[LUMBER];
-const stage = lumber.stages[1];
-if (stage?.kind !== "gather") throw new Error("The lumber job gathers second");
+const stage = battleStage(lumber, "gather");
 const [trees, wolves] = stage.opponents;
 if (trees?.type !== "tree" || wolves?.type !== "wolf") throw new Error("The lumber job lists its trees, then its wolves");
 const TREES = countRange(trees.count);
 /** The board's timber job, which this one is to beat: its gather, and the most trees it rolls. */
-const boardGather = JOBS[TIMBER].stages[1];
-if (boardGather?.kind !== "gather") throw new Error("The timber job gathers second");
+const boardGather = battleStage(JOBS[TIMBER], "gather");
 const BOARD_TREES = countRange(must(boardGather.opponents[0], "the timber job's trees").count).max;
 const WOLVES = countRange(wolves.count);
 

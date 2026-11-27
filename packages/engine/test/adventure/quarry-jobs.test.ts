@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { dropRow, FACILITIES, jobOf, JOBS, jobsPostedBy, must, RESOURCE_NODES, rollDrops, type SnapshotHero, warehouseCapacity } from "../../src/index.js";
-import { haul, HIGHCRAG, party, played, QUARRY_FACE, QUARRY_GOBLINS, rewardOf, SEEDS } from "./helpers.js";
+import { haul, HIGHCRAG, named, party, played, QUARRY_FACE, QUARRY_GOBLINS, rewardOf, SEEDS } from "./helpers.js";
 
 // Stone and the quarry (Issue-356, decision 0059): stone is mined at level 2
 // alone, the first drop with no chance at its trait's first level, and the
@@ -71,7 +71,6 @@ const PARTIES = {
   fighterAndTwoMiners: party("fighter", "miner", "miner"),
 };
 const EVERY_PARTY: readonly (readonly SnapshotHero[])[] = Object.values(PARTIES);
-const named = (heroes: readonly SnapshotHero[]) => heroes.map((h) => h.unitType).join(", ");
 const mines = (heroes: readonly SnapshotHero[]) => heroes.some((h) => h.unitType === "miner");
 
 describe("Stone from the quarry face", () => {
