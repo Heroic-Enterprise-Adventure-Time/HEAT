@@ -203,6 +203,40 @@ export function recruitCost(recruit: Recruit, livingHeroes: number): Cost {
   return recruit.unitType === "villager" && livingHeroes === 0 ? [] : recruit.cost;
 }
 
+/** A camp as recruiting reads it: its hall's level, the heroes that hold a slot, the living among them, and its stock. */
+export interface RecruitingCamp {
+  hallLevel: number;
+  activeHeroes: number;
+  livingHeroes: number;
+  holdings: readonly { material: string; balance: number }[];
+}
+
+/** Why a unit type cannot be recruited, in the order the hall shows them; `hallLevel` and `short` say exactly what is lacking. */
+export type RecruitRefusal =
+  | { code: "HALL_LEVEL"; message: string; hallLevel: number }
+  | { code: "HALL_FULL"; message: string }
+  | { code: "INSUFFICIENT_RESOURCES"; message: string; short: readonly { material: Material; amount: number; balance: number }[] };
+
+/**
+ * Why the camp cannot recruit the unit type now, or null when it can: the
+ * hall's level, then a free slot, then the price. One rule, which the hub
+ * checks and the hall shows, as `buildRefusal` is for a build (Issue-165).
+ */
+export function recruitRefusal(camp: RecruitingCamp, recruit: Recruit): RecruitRefusal | null {
+  if (camp.hallLevel < recruit.hallLevel) {
+    return { code: "HALL_LEVEL", message: `a ${recruit.unitType} needs a level ${recruit.hallLevel} hall`, hallLevel: recruit.hallLevel };
+  }
+  if (camp.activeHeroes >= hallCapacity(camp.hallLevel)) return { code: "HALL_FULL", message: "the heroes hall is full" };
+  const short = recruitCost(recruit, camp.livingHeroes)
+    .map(({ material, amount }) => ({ material, amount, balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0 }))
+    .filter((s) => s.balance < s.amount);
+  if (short.length > 0) {
+    const words = short.map((s) => `${s.amount} ${s.material}, and the camp has ${s.balance}`).join("; ");
+    return { code: "INSUFFICIENT_RESOURCES", message: `a ${recruit.unitType} costs ${words}`, short };
+  }
+  return null;
+}
+
 /**
  * The unlocks: what a player earns once and holds for good (game.md,
  * "Unlocks"; decision 0059). One closed list for every kind of unlock; the

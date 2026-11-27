@@ -24,6 +24,7 @@ import {
   must,
   nextLevel,
   recruitCost,
+  recruitRefusal,
   STAGE_ENDINGS,
   STAGE_KINDS,
   STARTING_LOCATION,
@@ -329,6 +330,19 @@ function levelGives(at: string, kind: FacilityKind, level: number): string | nul
   return posted.length === 0 ? null : `Posts a new job: ${posted.map((job) => job.name).join(' and ')}.`;
 }
 
+/** Why the hall cannot recruit a unit type now, in the player's words, or null when it can. */
+function recruitReason(refusal: ReturnType<typeof recruitRefusal>): string | null {
+  if (!refusal) return null;
+  switch (refusal.code) {
+    case 'HALL_LEVEL':
+      return `Needs a level ${refusal.hallLevel} hall.`;
+    case 'HALL_FULL':
+      return 'The hall is full.';
+    case 'INSUFFICIENT_RESOURCES':
+      return `Not enough ${refusal.short.map((s) => s.material).join(' or ')}.`;
+  }
+}
+
 /**
  * The next level of one of a camp's own facilities, by the hub's rules
  * (`buildRefusal`, which the hub checks too), or null at its highest.
@@ -455,7 +469,7 @@ export class Game {
   /**
    * What the hall offers: each unit type on the location's list, its price
    * to this camp beside the camp's balance, and why it cannot be had now,
-   * by the hub's rules in the hub's order (`packages/hub/src/recruit.ts`).
+   * by the engine's rule (`recruitRefusal`, which the hub checks too).
    */
   readonly recruits = computed((): readonly RecruitOffer[] => {
     const camp = this.camp();
@@ -467,16 +481,7 @@ export class Game {
         amount,
         balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0,
       }));
-      const short = cost.filter((c) => c.balance < c.amount).map((c) => c.material);
-      const reason =
-        camp.hallLevel < recruit.hallLevel
-          ? `Needs a level ${recruit.hallLevel} hall.`
-          : camp.activeHeroes >= camp.heroCapacity
-            ? 'The hall is full.'
-            : short.length > 0
-              ? `Not enough ${short.join(' or ')}.`
-              : null;
-      return { unitType: recruit.unitType, cost, reason };
+      return { unitType: recruit.unitType, cost, reason: recruitReason(recruitRefusal(camp, recruit)) };
     });
   });
 
