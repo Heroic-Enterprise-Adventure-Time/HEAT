@@ -1,6 +1,6 @@
 # 0048: Node and Terraform run at one exact release, checked against a pinned checksum, in every job
 
-- **Status:** Decided; the pins' tracking by Issue-275, the checkup's rule 12
+- **Status:** Decided; the pins' tracking by Issue-275, the checkup's rule 12; amended 2026-11-27 by Issue-426 (a pin per major, the new one first)
 - **Date:** 2026-11-09
 - **Settles:** Issue-258 and the instance of `docs/process/best-practices.md` rule 14 that Issue-267 names, from the checkup of 2a146cf: `hashicorp/setup-terraform` with no version took the latest Terraform, and `actions/setup-node` took Node 24 by its major, each downloading with no check, in the jobs that plan and apply `prod`.
 - **Reverses:** `docs/standards/terraform.md` rule 13 and ci.yml's comment, which ran the latest Terraform in the pipeline on purpose.
@@ -16,6 +16,14 @@
 **A bump is a pull request of its own,** moving the version and its checksum together, with the signature check repeated and recorded in the action's comment (`docs/standards/typescript.md`, rule 1; `docs/standards/terraform.md`, rule 13).
 
 **No npm cache.** setup-node's `cache: npm` goes with it; `npm ci` checks every package against `package-lock.json`'s hashes on every run. A cache is a further input to the role-holding jobs, and its cost was not measured; it is reopened with the timings if the runs prove slow.
+
+## Amendment: a pin per major, the new one first (Issue-426, 2026-11-27)
+
+**The Node action pins one release per major and installs `.node-version`'s,** refusing a major it pins nothing for. A new major's pin lands on `main` in a pull request of its own before the one that moves `.node-version`; the old major's pin goes in the pull request that moves away from it.
+
+**Why.** The `pull_request_target` plan checks out the pull request's `.node-version` but runs `main`'s copy of the action. With one pin, the pull request that moved Node to 26, PR-425, found only 24's on `main`, and its `dev` plan failed. With the new major's pin on `main` first, the moving pull request is planned like any other. It costs one small pull request a major, about once a year.
+
+**Considered and not chosen.** Merging the move without a `dev` plan, reading the sandbox stack's plan instead. The owner first accepted it on Issue-396, on the reasoning that a pin per major would not help the moving pull request; that was wrong, because the pin per major can land first.
 
 ## Considered and not chosen
 
