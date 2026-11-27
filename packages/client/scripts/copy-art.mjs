@@ -25,6 +25,11 @@
 // the page reads no pixels. The page reads the picture's name there, so the
 // row is always the row of the picture it is drawn with, whatever a browser
 // has kept (the review of PR-334).
+// A frame under art/frames is trimmed to the box its pixels fill and copied
+// under a name that carries a hash of the trimmed picture, and its name and
+// its slice, from the frames' provenance, go into generated/frames.css, a
+// stylesheet the page is built with (frame-art.mjs; docs/process/assets.md,
+// rule 40).
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -33,6 +38,7 @@ import sharp from "sharp";
 
 import { GROUND_FILES, GROUNDS } from "../src/app/ground-sets.ts";
 import { PACKED_AREAS, SET_CLIPS } from "../src/app/sprite-sets.ts";
+import { checkSlice, frameStyles, opaqueBox } from "./frame-art.mjs";
 import { glyphFrames, opaqueRows, packSet, pictureName } from "./pack-art.mjs";
 import { colourToken } from "./style-tokens.mjs";
 
@@ -116,4 +122,21 @@ for (const file of pictures(join(from, "icons"))) {
 }
 writeFileSync(join(to, "icons", "pictures.json"), JSON.stringify(iconNames));
 
-console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")} and copied art/${[...COPIED_AREAS, "facilities", "icons"].join(", art/")} into packages/client/generated/art`);
+const frameProvenance = JSON.parse(readFileSync(join(from, "frames", "provenance.json"), "utf8"));
+const framePictures = new Set(pictures(join(from, "frames")).map((file) => basename(file)));
+const frames = {};
+mkdirSync(join(to, "frames"), { recursive: true });
+for (const [name, { file, slice }] of Object.entries(frameProvenance.frames)) {
+  if (!framePictures.delete(file)) throw new Error(`art/frames/provenance.json names ${file} for the frame ${name}, and there is no such picture`);
+  const source = join(from, "frames", file);
+  const box = opaqueBox(await pixels(source), name);
+  checkSlice(name, slice, box);
+  const trimmed = await sharp(source).extract(box).png({ compressionLevel: 9 }).toBuffer();
+  const image = pictureName(name, trimmed);
+  writeFileSync(join(to, "frames", image), trimmed);
+  frames[name] = { image, slice };
+}
+if (framePictures.size > 0) throw new Error(`art/frames holds ${[...framePictures].join(" and ")}, which its provenance names for no frame`);
+writeFileSync(fileURLToPath(new URL("../generated/frames.css", import.meta.url)), frameStyles(frames));
+
+console.log(`packed ${sheets} sprite sets from art/${Object.keys(PACKED_AREAS).join(", art/")}, copied art/${[...COPIED_AREAS, "facilities", "icons"].join(", art/")} and trimmed ${Object.keys(frames).length} frames from art/frames into packages/client/generated`);
