@@ -9,7 +9,7 @@
 # signature was verified when the version was taken against HashiCorp's key
 # C874 011F 0AB4 0511 0D02 1055 3436 5D94 72D7 468F, the fingerprint
 # hashicorp.com/security publishes, which is the check that page describes:
-# 1.17.1, 2026-11-09, signed by its subkey 374EC75B485913604A831CC7C820C6D5CD27AB87.
+# 1.17.2, 2026-11-27, signed by its subkey 374EC75B485913604A831CC7C820C6D5CD27AB87.
 # A new version is taken the same way, both values together, in a pull
 # request of its own (docs/standards/terraform.md, rule 13).
 #
@@ -26,8 +26,8 @@ runs:
     - name: Install Terraform, checked against its pinned checksum
       shell: bash
       env:
-        TERRAFORM_VERSION: 1.17.1
-        TERRAFORM_SHA256: 4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061
+        TERRAFORM_VERSION: 1.17.2
+        TERRAFORM_SHA256: e6f16b2f0b137ee5729caa8c4e79a3bae4ee261acd198a1fcfa8584a6296605b
       run: |
         set -eu
         if [ "$RUNNER_OS-$RUNNER_ARCH" != Linux-X64 ]; then
