@@ -1,0 +1,85 @@
+<main class="gallery">
+  <h1>Gallery</h1>
+  <p>Every shared primitive in every state, on the page and on a panel, beside a frame of the scene (decision 0061).</p>
+
+  <section aria-labelledby="buttons">
+    <h2 id="buttons">Buttons</h2>
+    @for (surface of surfaces; track surface.name) {
+      <div class="row" [class.frame]="surface.panel">
+        <span class="surface">On the {{ surface.name }}</span>
+        @for (kind of kinds; track kind.name) {
+          <button type="button" [class]="kind.classes">{{ kind.name }}</button>
+          <button type="button" aria-pressed="true" [class]="kind.classes">{{ kind.name }}, pressed</button>
+          <button type="button" disabled [class]="kind.classes">{{ kind.name }}, disabled</button>
+          <button type="button" [class]="kind.focusClasses">{{ kind.name }}, focus</button>
+        }
+      </div>
+    }
+  </section>
+
+  <section aria-labelledby="frame">
+    <h2 id="frame">Panel frame</h2>
+    <div class="frame">
+      <h3>The job board</h3>
+      <p>A panel's content stands on its frame: an outline with rounded corners and a soft lower edge, drawn in CSS until Issue-385's art.</p>
+      <p class="refusal">A refusal reads like this.</p>
+      <p class="quiet">Quieter text, such as a job that cannot be started yet, reads like this.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="chips">
+    <h2 id="chips">Resource chips</h2>
+    <div class="row frame">
+      @for (chip of chips; track chip.material) {
+        <heat-resource-chip [material]="chip.material" [amount]="chip.amount" />
+      }
+    </div>
+    <h3>A cost, against the camp's balance</h3>
+    <div class="row frame">
+      @for (cost of costs; track cost.material) {
+        <heat-resource-chip [material]="cost.material" [amount]="cost.amount" [have]="cost.have" />
+      }
+    </div>
+  </section>
+
+  <section aria-labelledby="slots">
+    <h2 id="slots">Slot circles</h2>
+    <div class="row frame">
+      @for (count of slotCounts; track count.filled) {
+        <heat-slots of="heroes" [filled]="count.filled" [total]="count.total" />
+      }
+    </div>
+  </section>
+
+  <section aria-labelledby="tiles">
+    <h2 id="tiles">Hero tiles</h2>
+    <div class="row frame">
+      @for (hero of heroes; track hero.name) {
+        <heat-hero-tile [hero]="hero" [picked]="picked().has(hero.name)" (toggled)="toggle(hero.name)" />
+      }
+      <heat-hero-tile [hero]="null" />
+    </div>
+  </section>
+
+  <section aria-labelledby="bar">
+    <h2 id="bar">The bar</h2>
+    <div class="bar">
+      <span>Text on the bar</span>
+      <span class="quiet-on-bar">quieter on the bar</span>
+      <a routerLink="/gallery" class="link-on-bar">a link on the bar</a>
+    </div>
+  </section>
+
+  <section aria-labelledby="scene">
+    <h2 id="scene">Beside the scene</h2>
+    <p>A frame of Millbrook's camp at scale 3, on the stage's surface, with the primitives beside it.</p>
+    <div class="beside">
+      <img class="scene" alt="Millbrook's camp, a frame of the scene at scale 3" [ngSrc]="sceneFrame" [width]="sceneWidth" [height]="sceneHeight" />
+      <div class="frame">
+        <button type="button" class="button primary">Depart</button>
+        <heat-resource-chip material="timber" [amount]="40" />
+        <heat-hero-tile [hero]="sceneHero" [picked]="true" />
+      </div>
+    </div>
+  </section>
+</main>

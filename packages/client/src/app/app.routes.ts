@@ -55,5 +55,7 @@ export const routes: Routes = [
   { path: 'adventure', loadComponent: () => import('./adventure/adventure').then((m) => m.Adventure), canActivate: [signedIn] },
   // The replay plays in the same scene, so it shares the battle's chunks.
   { path: 'replays/:id', loadComponent: () => import('./adventure/replay').then((m) => m.Replay), canActivate: [signedIn] },
+  // The shared primitives in every state, for review at the stack's URL (Issue-384): samples only, so no sign-in.
+  { path: 'gallery', loadComponent: () => import('./gallery/gallery').then((m) => m.Gallery) },
   { path: '**', redirectTo: '' },
 ];

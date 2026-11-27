@@ -1,0 +1,8 @@
+@if (hero(); as hero) {
+  <button type="button" class="tile" [class.picked]="picked()" [attr.aria-pressed]="picked()" (click)="toggled.emit()">
+    <span class="name">{{ hero.name }}</span>
+    <span class="about">{{ hero.unitType }}, level {{ hero.level }}</span>
+  </button>
+} @else {
+  <span class="tile empty">Empty slot</span>
+}

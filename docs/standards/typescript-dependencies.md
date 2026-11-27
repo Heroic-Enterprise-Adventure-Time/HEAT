@@ -12,6 +12,8 @@ Imports in every JavaScript and TypeScript file are grouped and sorted by `perfe
 
 An `all` tier is taken whole, with the rules that contradict a convention of ours named off beside their reason, as the typescript-eslint tiers are. The rules named off or changed, each for a reason about the rule: `restrict-template-expressions` allows a number; `non-nullable-type-assertion-style` is off because it writes the `!` that rule 6 forbids; `no-unused-vars` takes the `_` prefix as deliberate; `no-extraneous-class` allows a decorated class in the client, because the framework instantiates a component from its decorator and one whose whole content is its template has no members. The client's and the schema's own exceptions stand in the config with theirs (`docs/standards/angular.md`, rules 3 and 13; `docs/standards/graphql.md`, rules 1 and 6).
 
+The stylesheets have a floor of their own, stylelint, from `stylelint.config.mjs` at the root (`docs/standards/angular.md`, rule 17; decision 0061): the published `stylelint-config-standard`, taken whole, with no rule named off, and over it the rules that keep colour and `px` in `packages/client/src/styles.css`.
+
 The strict tier is not semver-stable: a typescript-eslint minor may add a rule, and the Dependabot pull request that brings it goes red until the finding is fixed on that branch, which is the floor doing its job.
 
 ## Rule 17: the libraries named, and those weighed and kept

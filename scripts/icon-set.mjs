@@ -42,9 +42,9 @@ const ICON = 32;
  * stylesheet.
  */
 const GROUND = [1, 3, 5].map((at) => Number.parseInt(GROUNDS["meadow-01"].backdrop.slice(at, at + 2), 16)).concat(255);
-/** The page's light and ink, for the numbers and the sheet behind them, from the stylesheet's tokens (assets.md, rule 39). */
-const LIGHT = colourToken("--light");
-const INK = colourToken("--ink");
+/** The scene glyph and its outline, for the numbers and the sheet behind them, from the stylesheet's roles (assets.md, rule 39). */
+const GLYPH = colourToken("--scene-glyph");
+const OUTLINE = colourToken("--scene-glyph-outline");
 const COLUMNS = 9;
 const GAP = 4;
 /** The numbers are the scene's own font, twice its size (rule 37). */
@@ -113,14 +113,14 @@ async function sheet() {
   const rows = Math.ceil(indices.length / COLUMNS);
   const image = { width: COLUMNS * (cell + GAP) + GAP, height: rows * (label + cell + GAP) + GAP };
   image.data = Buffer.alloc(image.width * image.height * 4);
-  for (let at = 0; at < image.data.length; at += 4) image.data.set(INK, at);
+  for (let at = 0; at < image.data.length; at += 4) image.data.set(OUTLINE, at);
   for (const [n, index] of indices.entries()) {
     const left = GAP + (n % COLUMNS) * (cell + GAP);
     const top = GAP + Math.floor(n / COLUMNS) * (label + cell + GAP);
     for (const [place, digit] of [...String(index)].entries()) {
       const glyph = font.characters.indexOf(digit);
       const box = { x: (glyph % font.columns) * font.glyphPx, y: Math.floor(glyph / font.columns) * font.glyphPx, width: font.glyphPx, height: font.glyphPx };
-      draw(image, atlas, box, left + place * font.glyphPx * LABEL_SCALE, top, LABEL_SCALE, LIGHT);
+      draw(image, atlas, box, left + place * font.glyphPx * LABEL_SCALE, top, LABEL_SCALE, GLYPH);
     }
     for (let y = 0; y < cell; y++) for (let x = 0; x < cell; x++) image.data.set(GROUND, ((top + label + y) * image.width + left + x) * 4);
     const frame = await pixels(await download(values.frames.replace("{i}", String(index))));

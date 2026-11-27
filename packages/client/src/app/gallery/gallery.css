@@ -1,0 +1,79 @@
+.gallery {
+  max-width: 60rem;
+  margin: 0 auto;
+  padding: var(--space-xl);
+}
+
+h1 {
+  margin: 0 0 var(--space-md);
+}
+
+h2 {
+  margin: var(--space-2xl) 0 var(--space-md);
+  font-size: var(--text-lg);
+}
+
+h3 {
+  margin: 0 0 var(--space-sm);
+  font-size: 1rem;
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.surface {
+  flex-basis: 100%;
+  font-size: var(--text-sm);
+}
+
+.refusal {
+  color: var(--refusal);
+  font-weight: bold;
+}
+
+.quiet {
+  color: var(--on-panel-quiet);
+}
+
+.bar {
+  display: flex;
+  gap: var(--space-lg);
+  padding: var(--space-sm) var(--space-lg);
+  background: var(--surface-bar);
+  color: var(--on-bar);
+}
+
+.quiet-on-bar {
+  color: var(--on-bar-quiet);
+}
+
+.link-on-bar {
+  color: var(--link-on-bar);
+}
+
+.beside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-xl);
+  padding: var(--space-xl);
+  background: var(--surface-stage);
+}
+
+.beside .frame {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.scene {
+  max-width: 100%;
+  height: auto;
+  image-rendering: pixelated;
+}

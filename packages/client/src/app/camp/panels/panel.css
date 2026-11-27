@@ -53,7 +53,7 @@ h3 {
 
 .refusal {
   margin: var(--space-md) 0 0;
-  color: var(--rust);
+  color: var(--refusal);
   font-weight: bold;
 }
 
@@ -68,7 +68,7 @@ h3 {
  * (the owner, 2026-11-26, Issue-357).
  */
 .jobs li.locked .link {
-  color: #4f4433;
+  color: var(--on-panel-quiet);
   font-weight: normal;
 }
 
@@ -82,7 +82,7 @@ button {
 
 .dead,
 .note {
-  color: var(--rust);
+  color: var(--refusal);
 }
 
 dl {

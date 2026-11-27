@@ -29,10 +29,16 @@
                 "glob": "favicon.png",
                 "input": "generated/favicon",
                 "output": "/"
+              },
+              {
+                "glob": "*.png",
+                "input": "gallery",
+                "output": "gallery"
               }
             ],
             "styles": [
-              "src/styles.css"
+              "src/styles.css",
+              "src/primitives.css"
             ]
           },
           "configurations": {
