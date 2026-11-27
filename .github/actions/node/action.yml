@@ -11,8 +11,8 @@
 # signature was verified when the version was taken, against the release
 # keys the nodejs/node README lists (taken from nodejs/release-keys):
 # v26.13.1, 2026-11-27, signed by 5BE8A3F6C8A5C01D106C0AD820B1A390B168D356.
-# A new version is taken the same way, both values together, in a pull
-# request of its own.
+# A new version is taken the same way, both values together, in a commit
+# of its own (docs/standards/typescript.md, rule 1).
 #
 # The major must be the one .node-version holds, so the role-holding jobs
 # stay on the line every other job follows (docs/standards/typescript.md,

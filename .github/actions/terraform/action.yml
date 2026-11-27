@@ -10,8 +10,8 @@
 # C874 011F 0AB4 0511 0D02 1055 3436 5D94 72D7 468F, the fingerprint
 # hashicorp.com/security publishes, which is the check that page describes:
 # 1.17.2, 2026-11-27, signed by its subkey 374EC75B485913604A831CC7C820C6D5CD27AB87.
-# A new version is taken the same way, both values together, in a pull
-# request of its own (docs/standards/terraform.md, rule 13).
+# A new version is taken the same way, both values together, in a commit
+# of its own (docs/standards/terraform.md, rule 13).
 #
 # One copy for every job that runs Terraform, the gate in ci.yml and the
 # plan, apply, destroy and sweep jobs, so the floor checks the binary that
