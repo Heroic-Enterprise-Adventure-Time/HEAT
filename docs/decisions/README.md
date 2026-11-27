@@ -59,7 +59,7 @@ The design and architecture documents say what is true now. They are edited as t
 | [0034](0034-checkup-findings-are-issues.md) | The checkup's findings are issues, and a closed `excused` issue is the suppression record | Decided, amended |
 | [0035](0035-account-ids-as-repository-secrets.md) | The account ids reach the pipeline as repository secrets | Decided |
 | [0036](0036-es-toolkit-and-known-libraries.md) | es-toolkit names the utility idioms, and a known library is preferred over our own | Decided |
-| [0037](0037-plain-css-with-a-token-layer.md) | Plain CSS with a token layer the layout arithmetic reads | Decided |
+| [0037](0037-plain-css-with-a-token-layer.md) | Plain CSS with a token layer the layout arithmetic reads | Decided, amended |
 | [0038](0038-errors-as-data.md) | Refusals as data in a result union per mutation, one input object per mutation, and the engine's sets as enums | Decided, amended |
 | [0039](0039-zod-through-the-validation-plugin.md) | The contract's scalars and zod check every boundary, and the Pothos validation plugin is where zod runs on the API | Decided, amended |
 | [0040](0040-metrics-through-powertools-and-middy.md) | Metrics through Powertools, with middy as the handler's middleware chain | Decided, amended |
@@ -83,3 +83,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0058](0058-drops-by-trait-and-jobs-that-vary.md) | What an adventure yields: drops by gathering trait, enemy XP, and jobs that vary | Decided, amended |
 | [0059](0059-unlocks-caravans-and-highcrag.md) | More locations: general unlocks, caravans with a cart, and Highcrag | Decided, amended |
 | [0060](0060-what-a-session-costs.md) | What a session costs: a compaction window, rules kept apart from their accounts, and a size for what every session loads | Decided, amended |
+| [0061](0061-the-daylight-parchment-theme.md) | The daylight parchment theme: role tokens over the palette, shared primitives and pixel-art frames | Decided |

@@ -103,7 +103,7 @@ How HEAT's art and audio are made, recorded and committed. The services, the lic
 
 ### Scripts that draw
 
-39. **A script that draws with the page's colours reads them from the stylesheet's tokens.** A build step or a tool that colours what it draws with a colour of the page's palette, as the art build colours a font's glyphs and `scripts/icon-set.mjs` the numbers of its sheet, takes it from `packages/client/src/styles.css` through `colourToken` in `packages/client/scripts/style-tokens.mjs`, and holds no copy of it. A colour that is no token, such as the scenes' ground, is a named constant that says where the page writes it.
+39. **A script that draws with the page's colours reads them from the stylesheet's tokens.** A build step or a tool that colours what it draws with a colour of the page's palette, as the art build colours a font's glyphs and `scripts/icon-set.mjs` the numbers of its sheet, takes it from `packages/client/src/styles.css` through `colourToken` in `packages/client/scripts/style-tokens.mjs`, and holds no copy of it. From Issue-384 on, it reads a role token and not the palette, the glyphs' `--scene-glyph` and `--scene-glyph-outline`, so that a change of the page's theme does not recolour the scene (decision 0061). A colour that is no token, such as the scenes' ground, is a named constant that says where the page writes it.
 
 ## Why
 
