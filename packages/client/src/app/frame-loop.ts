@@ -7,21 +7,31 @@ export type FrameLoop = (onFrame: (elapsedMs: number) => void) => () => void;
 export const MAX_FRAME_MS = 250;
 
 /**
- * The browser's frames, for whatever the page moves frame by frame: a battle
+ * The browser's frames, as the page's frame loop gives them: a function of
+ * its own so that a spec runs it against frames it hands out. A loop stopped
+ * from inside its own frame, as a count is when its last amount is whole,
+ * has no frame left to cancel, so it is remembered as stopped and asks for
+ * no more (the review of PR-443).
+ */
+export const browserFrames: FrameLoop = (onFrame) => {
+  let last: number | null = null;
+  let stopped = false;
+  let id = requestAnimationFrame(function frame(now) {
+    if (last !== null) onFrame(Math.min(now - last, MAX_FRAME_MS));
+    last = now;
+    if (!stopped) id = requestAnimationFrame(frame);
+  });
+  return () => {
+    stopped = true;
+    cancelAnimationFrame(id);
+  };
+};
+
+/**
+ * The page's frame loop, for whatever the page moves frame by frame: a battle
  * (`adventure/battle-view.ts`) and an amount counted up
  * (`primitives/gains.ts`). It is a token so that a spec steps the frames by
  * hand (angular.md, rules 2 and 23); each caller has a loop of its own, and
- * stops it with what the call answers.
+ * stops it with what the call answers, from anywhere.
  */
-export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.frames', {
-  providedIn: 'root',
-  factory: () => (onFrame) => {
-    let last: number | null = null;
-    let id = requestAnimationFrame(function frame(now) {
-      if (last !== null) onFrame(Math.min(now - last, MAX_FRAME_MS));
-      last = now;
-      id = requestAnimationFrame(frame);
-    });
-    return () => { cancelAnimationFrame(id); };
-  },
-});
+export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.frames', { providedIn: 'root', factory: () => browserFrames });
