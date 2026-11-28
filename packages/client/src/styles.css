@@ -30,6 +30,7 @@
   --gold-light: #f6d590;
   --gold-dark: #8a5d1c;
   --rust: #8a2a17;
+  --sage: #cfd6a8;
 
   /*
    * The scene's: two kept from the first palette, and the three a unit's
@@ -50,6 +51,7 @@
   --surface-bar-active: var(--ink-active);
   --surface-panel: var(--card);
   --surface-panel-soft: var(--card-soft);
+  --surface-picked: var(--sage); /* a picked hero's tile */
 
   /* Text, by what it stands on. */
   --on-page: var(--ink);

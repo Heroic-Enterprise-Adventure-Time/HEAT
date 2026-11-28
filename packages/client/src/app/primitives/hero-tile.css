@@ -29,7 +29,7 @@ button.tile:disabled {
 .tile.picked {
   border-color: var(--line-frame);
   box-shadow: 0 var(--frame-edge) 0 var(--line-edge);
-  background: var(--surface-panel);
+  background: var(--surface-picked);
 }
 
 .tile.empty {
