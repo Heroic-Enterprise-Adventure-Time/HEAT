@@ -70,14 +70,14 @@ export type Material =
 /** One entry of the override log, as the engine kept it: a hero's forced action (UNIT, with unitId and abilityId) or a party order (PARTY, with order), stamped with the adventure's clock when it was taken up. */
 export type OverrideInput = {
   /** The ability forced, for a UNIT entry: at most 64 characters. */
-  readonly abilityId?: string | null | undefined;
+  readonly abilityId?: string | number | null | undefined;
   /** Milliseconds on the adventure's clock. */
   readonly acceptedAtSimTime: number;
   readonly kind: OverrideKind;
   /** The order, for a PARTY entry. */
   readonly order?: PartyOrder | null | undefined;
   /** The hero, for a UNIT entry. */
-  readonly unitId?: string | null | undefined;
+  readonly unitId?: string | number | null | undefined;
 };
 
 /** What a log entry is: a hero's forced action, or an order to the whole party. */
@@ -124,7 +124,7 @@ export type StageKind =
 export type StartAdventureInput = {
   /** What a caravan carries from the camp's warehouse, each resource at most once, at most 200 in all, which the cart of the caravan hub at its highest level carries; a hub below that level carries less, which the start refuses. Empty for a job that delivers nothing. */
   readonly cargo?: ReadonlyArray<CargoInput>;
-  /** The party: one to four of the player's living heroes at that camp. */
+  /** The party: 1 to 4 of the player's living heroes at that camp, each once. */
   readonly heroIds: ReadonlyArray<string | number>;
   /** A job the location posts, on its job board or at a facility the camp has built to the level the job needs. */
   readonly jobId: string | number;
@@ -132,7 +132,7 @@ export type StartAdventureInput = {
   readonly location: string | number;
   /** A UUID the client makes, which becomes the adventure's id; a repeat answers the adventure already started. */
   readonly requestId: string;
-  /** The heroes of the party who stay at a caravan's destination if it arrives. Empty for a job that delivers nothing. */
+  /** The heroes of the party who stay at a caravan's destination if it arrives, each once. Empty for a job that delivers nothing. */
   readonly staying?: ReadonlyArray<string | number>;
 };
 

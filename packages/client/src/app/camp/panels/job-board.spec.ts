@@ -12,7 +12,7 @@ import { fakeCampScene } from '../../testing/fake-camp-scene';
 import { fakeIcons } from '../../testing/fake-icons';
 import { fakeSession, PLAYER } from '../../testing/fake-session';
 import { testLayoutSizes } from '../../testing/layout-sizes';
-import { itemHolding, listItems, menu, panel, panelBox } from '../../testing/page';
+import { depart, itemHolding, listItems, menu, panel, panelBox } from '../../testing/page';
 import { renderAt } from '../../testing/render-at';
 import { textsOf, wordsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
@@ -160,7 +160,6 @@ const HIGHCRAG_BOARD = jobsPostedBy('highcrag', 'job-board');
 
 /** A hero's tile in the party pick, a toggle named by the hero. */
 const tile = (name: string) => within(screen.getByRole('group', { name: 'Party' })).getByRole('button', { name });
-const depart = () => screen.getByRole('button', { name: 'Depart' });
 const job = (name: string) => within(itemHolding('Jobs', 'link', name));
 
 describe('Job board', () => {

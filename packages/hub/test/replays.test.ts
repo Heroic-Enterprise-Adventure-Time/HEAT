@@ -4,14 +4,12 @@ import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { range } from "es-toolkit";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type AdventureRecord, Repository } from "../src/db/repository.js";
-import { recruitHero } from "../src/recruit.js";
 import { REPLAYS_READ, replaysOf } from "../src/replays.js";
-import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { emptyResult, player, putSettledAdventure, reads, settledAdventure as settled, storedItem } from "./data.js";
+import { connected, emptyResult, minutesBefore, opened as openedBy, player, putSettledAdventure, reads, settledAdventure as settled, storedItem } from "./data.js";
 import { locationKeys, replayKeys } from "./keys.js";
 import { VERSION as version } from "./versions.js";
 
@@ -31,32 +29,24 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-const at = "millbrook";
 const timber = "timber-from-the-near-woods";
 
 /** Each read test its own job, which no content knows, so no other test's adventures are in its list. */
 const job = () => `test-${randomUUID()}`;
 const now = new Date("2026-11-11T12:00:00.000Z");
-const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+const minutesAgo = (minutes: number) => minutesBefore(now, minutes);
 
 const put = (record: AdventureRecord) => putSettledAdventure(db, tables.location, record);
 const stored = (adventureId: string) => storedItem(db, tables.location, locationKeys.adventure(adventureId));
 
-/** A player's adventure on the timber job, open, with the free villager. */
-async function opened(p: string) {
-  const villager = await recruitHero(repo, p, at, "villager", randomUUID());
-  return startAdventure(repo, p, version, randomUUID(), at, timber, [villager.id]);
-}
+const opened = (p: string) => openedBy(repo, p, version, timber);
 
 describe("the index's keys on the adventure record", () => {
   it("are absent while the adventure is open", async () => {

@@ -1,5 +1,4 @@
 import { constantCase, sumBy, uniq } from "es-toolkit";
-import { GraphQLError } from "graphql";
 import * as z from "zod/mini";
 
 import {
@@ -32,7 +31,7 @@ import { callerId } from "../context.js";
 import { type AdventureRecord, type Camp, campLevels, type Caravan, type EarnedUnlock, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "../db/statuses.js";
 import { discardAdventure } from "../discard.js";
-import { readAdventure } from "../read.js";
+import { jobOfAdventure, readAdventure, readOpenAdventure, readTimeline } from "../read.js";
 import { type RecentAdventure, recentAdventuresAt, type RecentHero } from "../recent.js";
 import { recruitHero } from "../recruit.js";
 import {
@@ -231,7 +230,7 @@ const SnapshotHeroRef = builder.objectRef<SnapshotHero>("SnapshotHero").implemen
     heroId: t.exposeID("heroId"),
     unitType: t.expose("unitType", { type: UnitTypeRef }),
     name: t.exposeString("name"),
-    spriteSet: t.exposeString("spriteSet"),
+    spriteSet: t.exposeString("spriteSet", { description: "The set's directory under art/heroes/." }),
     level: t.exposeInt("level"),
     stats: t.expose("stats", { type: UnitStatsRef }),
   }),
@@ -310,13 +309,6 @@ const CaravanRef = builder.objectRef<Caravan>("Caravan").implement({
   }),
 });
 
-/** The job an adventure names, which an adventure of another version may name and this one not know. */
-function knownJob(jobId: string): Job {
-  const job = jobOf(jobId);
-  if (!job) throw new GraphQLError(`no job ${jobId} in this version`, { extensions: { code: "NO_SUCH_JOB" } });
-  return job;
-}
-
 const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
   description: "An adventure as the hub issued it: what the client needs to play it with the seed, and once settled its result and its timeline.",
   fields: (t) => ({
@@ -325,8 +317,7 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
     startedAt: t.expose("startedAt", { type: "DateTime" }),
     settledAt: t.expose("settledAt", { type: "DateTime", nullable: true, description: "When the adventure settled. Null until it has." }),
     location: t.exposeID("location", { description: "The location's id in the static content." }),
-    // A job this version does not know means the adventure is another version's.
-    job: t.field({ type: JobRef, resolve: (adventure) => knownJob(adventure.jobId) }),
+    job: t.field({ type: JobRef, resolve: (adventure) => jobOfAdventure(adventure) }),
     snapshot: t.expose("snapshot", { type: SnapshotRef }),
     version: t.exposeString("version", { description: "The deploy that issued the adventure, and the only one that verifies it." }),
     status: t.field({ type: AdventureStatusRef, resolve: (adventure) => adventure.status }),
@@ -341,11 +332,7 @@ const AdventureRef = builder.objectRef<AdventureRecord>("Adventure").implement({
       type: "JSON",
       nullable: true,
       description: "The timeline the hub's replay wrote at settlement, the engine's AdventureTimeline, display only: any version of the client plays it. Null until the adventure is settled. Read from the store once per adventure, so it is asked of the one adventure being played, not of each in a list.",
-      resolve: async (adventure, _args, ctx) => {
-        if (adventure.status !== "SETTLED") return null;
-        const body = await ctx.timelines.get(adventure.adventureId);
-        return body === undefined ? null : (JSON.parse(body) as unknown);
-      },
+      resolve: (adventure, _args, ctx) => readTimeline(ctx.timelines, adventure),
     }),
   }),
 });
@@ -366,7 +353,7 @@ const RecentAdventureRef = builder.objectRef<RecentAdventure>("RecentAdventure")
   fields: (t) => ({
     id: t.exposeID("adventureId"),
     // The list leaves out an adventure whose job this version does not know (recent.ts).
-    job: t.field({ type: JobRef, resolve: (recent) => knownJob(recent.jobId) }),
+    job: t.field({ type: JobRef, resolve: (recent) => jobOfAdventure(recent) }),
     outcome: t.expose("outcome", { type: AdventureOutcomeRef }),
     stages: t.expose("stages", { type: [StageResultRef], description: "How each stage the party entered ended." }),
     credited: t.expose("credited", { type: [RewardRef], description: "What went into the warehouse." }),
@@ -419,10 +406,7 @@ const PlayerRef = builder.objectRef<Player>("Player").implement({
       type: AdventureRef,
       nullable: true,
       authScopes: (player) => ({ self: player.id }),
-      resolve: async (player, _args, ctx) => {
-        const open = await ctx.repo.openAdventure(player.id);
-        return open ? ctx.repo.getAdventure(open.adventureId) : undefined;
-      },
+      resolve: (player, _args, ctx) => readOpenAdventure(ctx.repo, player.id),
     }),
   }),
 });
@@ -566,8 +550,8 @@ const OverrideInputRef = builder.inputRef<OverrideInput>("OverrideInput").implem
       required: true,
     }),
     acceptedAtSimTime: t.field({ type: "NonNegativeInt", required: true, description: "Milliseconds on the adventure's clock." }),
-    unitId: t.string({ description: "The hero, for a UNIT entry." }),
-    abilityId: t.string({
+    unitId: t.id({ description: "The hero, for a UNIT entry." }),
+    abilityId: t.id({
       description: `The ability forced, for a UNIT entry: at most ${MAX_ABILITY_ID} characters.`,
       validate: z.string().check(z.maxLength(MAX_ABILITY_ID, `an ability id is at most ${MAX_ABILITY_ID} characters`)),
     }),
@@ -608,7 +592,10 @@ const BuildFacilityInput = builder.inputType("BuildFacilityInput", {
 
 const RetireHeroInput = builder.inputType("RetireHeroInput", {
   description: "Which hero to retire.",
-  fields: (t) => ({ heroId: t.id({ required: true }) }),
+  fields: (t) => ({
+    // One spelling per hero, as the party's ids in StartAdventureInput: the value is the record's key.
+    heroId: t.id({ required: true, validate: z.string().check(z.toLowerCase()) }),
+  }),
 });
 
 const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
@@ -638,7 +625,7 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
     jobId: t.id({ required: true, description: "A job the location posts, on its job board or at a facility the camp has built to the level the job needs." }),
     heroIds: t.idList({
       required: true,
-      description: "The party: one to four of the player's living heroes at that camp.",
+      description: `The party: 1 to ${MAX_PARTY} of the player's living heroes at that camp, each once.`,
       validate: z.array(z.string().check(z.toLowerCase())).check(
         z.minLength(1, PARTY_SIZE),
         z.maxLength(MAX_PARTY, PARTY_SIZE),
@@ -658,7 +645,7 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
     staying: t.idList({
       required: true,
       defaultValue: [],
-      description: "The heroes of the party who stay at a caravan's destination if it arrives. Empty for a job that delivers nothing.",
+      description: "The heroes of the party who stay at a caravan's destination if it arrives, each once. Empty for a job that delivers nothing.",
       validate: z.array(z.string().check(z.toLowerCase())).check(z.refine((ids) => uniq(ids).length === ids.length, "a hero stays twice")),
     }),
   }),
@@ -687,6 +674,7 @@ const DiscardAdventureInput = builder.inputType("DiscardAdventureInput", {
 
 /** A location of the static content, where a field does nothing else with the id (graphql.md, rule 14). */
 const knownLocation = z.string().check(z.refine((id) => location(id) !== undefined, { error: ({ input }) => `no location ${String(input)}` }));
+const KNOWN_LOCATION = "A location of the static content; any other id is refused.";
 const postedJob = z.string().check(z.refine((id) => jobOf(id) !== undefined, { error: ({ input }) => `no job ${String(input)}` }));
 
 builder.queryFields((t) => ({
@@ -722,7 +710,7 @@ builder.queryFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description: "A random few of other players' heroes seen at the location lately, never all of them and never the caller's own.",
-    args: { location: t.arg.id({ required: true, validate: knownLocation }) },
+    args: { location: t.arg.id({ required: true, description: KNOWN_LOCATION, validate: knownLocation }) },
     resolve: (_root, args, ctx) => heroesSeenAt(ctx.repo, callerId(ctx), args.location),
   }),
   recentAdventuresAt: t.field({
@@ -730,7 +718,7 @@ builder.queryFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description: "The adventures most recently settled at the location, newest first, at most 20 and none older than a week; the caller's own are among them like anyone's, and nothing says whose an adventure was.",
-    args: { location: t.arg.id({ required: true, validate: knownLocation }) },
+    args: { location: t.arg.id({ required: true, description: KNOWN_LOCATION, validate: knownLocation }) },
     resolve: (_root, args, ctx) => recentAdventuresAt(ctx.repo, args.location),
   }),
   replaysOf: t.field({
@@ -738,7 +726,7 @@ builder.queryFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description: "The job's replays: its adventures most recently settled, newest first, at most 20, whatever their outcome and whoever's they were, which nothing says. One settled a moment ago may not be listed yet. A job this version does not post is refused.",
-    args: { job: t.arg.id({ required: true, validate: postedJob }) },
+    args: { job: t.arg.id({ required: true, description: "A job of the static content; any other id is refused.", validate: postedJob }) },
     resolve: (_root, args, ctx) => replaysOf(ctx.repo, args.job),
   }),
 }));
@@ -787,7 +775,7 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      "Starts a job the location posts, on its job board or at a facility the camp has built, with a party of one to four of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.",
+      `Starts a job the location posts, on its job board or at a facility the camp has built, with a party of 1 to ${MAX_PARTY} of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.`,
     errors: answers("StartAdventure", { field: "adventure", what: "the adventure opened" }, [
       AdventureOpen,
       Requires,

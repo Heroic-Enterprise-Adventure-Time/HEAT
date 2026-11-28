@@ -13,7 +13,7 @@ import { fakeCampScene } from '../../testing/fake-camp-scene';
 import { fakeIcons } from '../../testing/fake-icons';
 import { fakeSession, PLAYER } from '../../testing/fake-session';
 import { testLayoutSizes } from '../../testing/layout-sizes';
-import { panel } from '../../testing/page';
+import { depart, panel } from '../../testing/page';
 import { renderAt } from '../../testing/render-at';
 import { wordsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
@@ -66,7 +66,6 @@ function renderCaravan(game: ReturnType<typeof fakeGame>) {
 }
 
 const CARAVAN = '/camp/millbrook/caravan-hub/jobs/caravan-to-highcrag';
-const depart = () => screen.getByRole('button', { name: 'Depart' });
 const group = (name: string) => within(screen.getByRole('group', { name }));
 const partyTile = (name: string) => group('Party').getByRole('button', { name });
 const stays = (name: string) => group('Who stays at Highcrag').getByRole('button', { name });

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { CART_CAPACITY, cartCapacity, hubLevelCarrying, JOBS, jobsPostedBy, MONSTERS, must, type SnapshotHero, STARTING_LOCATION } from "../../src/index.js";
-import { CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, party, played, ROAD, SEEDS, villagers } from "./helpers.js";
+import { CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, named, party, played, ROAD, SEEDS, villagers } from "./helpers.js";
 
 // "Caravan to Highcrag" (Issue-354, decision 0059): the caravan hub's
 // caravan, the first job of the content that delivers. Its road is the one
@@ -34,7 +34,6 @@ const WITH_A_FIGHTER = [PARTIES.fighterAndVillager, PARTIES.fighterAndRanger, PA
 /** Pairs with no fighter: they come through, and lose the cart on some runs. */
 const NO_FIGHTER = [PARTIES.twoVillagers, PARTIES.rangerAndVillager];
 
-const named = (heroes: readonly SnapshotHero[]) => heroes.map((h) => h.unitType).join(", ");
 
 describe("Caravan to Highcrag", () => {
   it("is posted by Millbrook's caravan hub, after the road job, and delivers to Highcrag", () => {

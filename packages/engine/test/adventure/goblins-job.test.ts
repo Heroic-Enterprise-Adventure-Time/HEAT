@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type AdventureResult, JOBS, jobsPostedBy, replay, STARTING_LOCATION, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { GOBLINS, haul, MILLBROOK_RECRUITS, ORE, party, played, rewardOf, SEAM, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { battleStage, GOBLINS, haul, MILLBROOK_RECRUITS, ORE, party, played, rewardOf, SEAM, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The first mixed stage (Issue-286, decision 0052): three ore veins hold the
 // front line and two goblin rock throwers stand behind them. Its numbers are
@@ -9,8 +9,7 @@ import { GOBLINS, haul, MILLBROOK_RECRUITS, ORE, party, played, rewardOf, SEAM, 
 // decision 0058.
 
 const goblins = JOBS[GOBLINS];
-const stage = goblins.stages[1];
-if (stage?.kind !== "gather") throw new Error("The goblins job gathers second");
+const stage = battleStage(goblins, "gather");
 /** What a party with a villager standing brings home from the three veins: each vein's drop at mining 1. */
 const VILLAGERS_ORE = haul("ore-vein", 1, 3);
 

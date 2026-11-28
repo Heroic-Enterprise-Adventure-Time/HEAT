@@ -24,7 +24,7 @@ import {
   type UnitType,
 } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type Camp, FacilityMissing, type Hero, LocationLocked, Repository } from "../src/db/repository.js";
 import { discardAdventure } from "../src/discard.js";
 import { readAdventure } from "../src/read.js";
@@ -33,7 +33,7 @@ import { AdventureOpen, Conflict, HallFull, InsufficientResources, Requires } fr
 import { type CaravanRequest, startAdventure } from "../src/start.js";
 import { type OverrideInput, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines, type Timelines } from "../src/timelines.js";
-import { balances, build, player, putParty, putUnlock, stock, storedItem } from "./data.js";
+import { balances, build, connected, ids, player, putParty, putUnlock, stock, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { everyInterleaving, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -57,10 +57,7 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const home = STARTING_LOCATION;
@@ -86,7 +83,6 @@ async function ready(unitTypes: readonly UnitType[], holdings: Partial<Record<Ma
   return { p, heroes };
 }
 
-const ids = (heroes: readonly Hero[]) => heroes.map((h) => h.id);
 
 /** Starts the caravan through the verb, on the seed given. */
 function start(r: Repository, p: string, heroes: readonly Hero[], request: CaravanRequest, seed = "caravan-0", requestId: string = randomUUID(), issuedBy = version) {

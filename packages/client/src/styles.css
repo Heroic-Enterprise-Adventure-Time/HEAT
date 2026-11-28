@@ -31,9 +31,16 @@
   --gold-dark: #8a5d1c;
   --rust: #8a2a17;
 
-  /* The scene's two, kept from the first palette so that a theme never recolours the scene (decision 0061). */
+  /*
+   * The scene's: two kept from the first palette, and the three a unit's
+   * health is drawn in, so that a theme never recolours the scene (decision
+   * 0061).
+   */
   --soot: #140d08;
   --bone: #e6d6b8;
+  --leaf: #6fbf4a;
+  --amber: #d9a441;
+  --ember: #c0392b;
 
   /* Surfaces. */
   --surface-page: var(--page);
@@ -70,6 +77,12 @@
   --scene-glyph: var(--bone);
   --scene-glyph-outline: var(--soot);
 
+  /* The scene's: a unit's health bar in a battle, its track and its fill while the health is high, middling and low, read at runtime (src/app/colour-role.ts). */
+  --scene-bar-track: var(--soot);
+  --scene-bar-high: var(--leaf);
+  --scene-bar-middle: var(--amber);
+  --scene-bar-low: var(--ember);
+
   /* The spacing scale. */
   --space-xs: 0.125rem;
   --space-sm: 0.25rem;
@@ -78,9 +91,11 @@
   --space-xl: 1rem;
   --space-2xl: 1.25rem;
 
-  /* The type sizes beside the base, 1rem. */
+  /* The type sizes beside the base, 1rem: a menu entry's label, the small and the large text, and the home page's title. */
+  --text-xs: 0.7rem;
   --text-sm: 0.9rem;
   --text-lg: 1.1rem;
+  --text-title: 3rem;
 
   /* The border widths. */
   --border-thin: 1px;

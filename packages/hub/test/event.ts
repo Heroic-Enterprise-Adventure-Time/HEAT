@@ -46,3 +46,12 @@ export function event(
     isBase64Encoded: false,
   };
 }
+
+/**
+ * The handler, imported when a file's set-up asks for it and never at the top
+ * of a test file: it reads its configuration at import time, after the global
+ * set-up has set the environment.
+ */
+export async function loadHandler(): Promise<Handler> {
+  return (await import("../src/handler.js")).handler as unknown as Handler;
+}

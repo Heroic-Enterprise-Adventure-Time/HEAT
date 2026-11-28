@@ -12,6 +12,7 @@ import {
   expandStages,
   isResourceType,
   type Job,
+  type JobId,
   largestStages,
   leastStages,
   location,
@@ -107,6 +108,18 @@ export function meets(job: Job, seed: string, type: string): boolean {
   return expandStages(job, seed).some((stage) => (stage.kind === "fight" || stage.kind === "gather") && stage.opponents.some((o) => o.type === type));
 }
 
+/** A party in words, for a test's name or a failure's message: its unit types in order. */
+export function named(heroes: readonly SnapshotHero[]): string {
+  return heroes.map((h) => h.unitType).join(", ");
+}
+
+/** A job's fight or gather, where the test expects it among the job's stages: second, after the travel, unless told otherwise. */
+export function battleStage(job: Job, kind: "fight" | "gather", index = 1) {
+  const stage = job.stages[index];
+  if (stage?.kind !== kind) throw new Error(`${job.name} has no ${kind} at stage ${index}`);
+  return stage;
+}
+
 export function ofKind<K extends AdventureEvent["kind"]>(events: readonly AdventureEvent[], kind: K): Extract<AdventureEvent, { kind: K }>[] {
   return events.filter((e): e is Extract<AdventureEvent, { kind: K }> => e.kind === kind);
 }
@@ -120,20 +133,25 @@ export function played(jobId: string, heroes: readonly SnapshotHero[]): { readon
   return seeds.map((seed) => ({ seed, result: replay(snapshot(jobId, heroes), seed, []).result }));
 }
 
-export const STICKS = "pick-up-sticks";
-export const WOLVES = "wolves-on-the-mill-road";
-export const TIMBER = "timber-from-the-near-woods";
-export const ORE = "ore-from-the-hill";
-export const GOBLINS = "goblins-in-the-old-workings";
-export const LUMBER = "lumber-from-the-deep-woods";
-export const ROAD = "scout-the-road-to-highcrag";
-export const CRAG = "ore-from-the-crag";
-export const CARAVAN = "caravan-to-highcrag";
-export const QUARRY_FACE = "stone-from-the-quarry-face";
-export const QUARRY_GOBLINS = "goblins-in-the-quarry";
-export const CARAVAN_BACK = "caravan-to-millbrook";
-export const SEAM = "the-deep-seam";
-export const STAND = "the-old-growth-stand";
+/**
+ * The jobs by id, each checked against the engine's union, so that a job
+ * renamed in the content fails to compile here and not at run time in a test
+ * (typescript.md, rule 31).
+ */
+export const STICKS = "pick-up-sticks" satisfies JobId;
+export const WOLVES = "wolves-on-the-mill-road" satisfies JobId;
+export const TIMBER = "timber-from-the-near-woods" satisfies JobId;
+export const ORE = "ore-from-the-hill" satisfies JobId;
+export const GOBLINS = "goblins-in-the-old-workings" satisfies JobId;
+export const LUMBER = "lumber-from-the-deep-woods" satisfies JobId;
+export const ROAD = "scout-the-road-to-highcrag" satisfies JobId;
+export const CRAG = "ore-from-the-crag" satisfies JobId;
+export const CARAVAN = "caravan-to-highcrag" satisfies JobId;
+export const QUARRY_FACE = "stone-from-the-quarry-face" satisfies JobId;
+export const QUARRY_GOBLINS = "goblins-in-the-quarry" satisfies JobId;
+export const CARAVAN_BACK = "caravan-to-millbrook" satisfies JobId;
+export const SEAM = "the-deep-seam" satisfies JobId;
+export const STAND = "the-old-growth-stand" satisfies JobId;
 
 /**
  * A caravan of the tests' own (Issue-353), kept apart from the content's

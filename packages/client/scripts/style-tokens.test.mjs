@@ -42,7 +42,11 @@ test("a palette colour in another form than six hex digits is refused", () => {
   assert.throws(() => paletteNames(":root {\n  --glass: #e8b55a80;\n}"), /--glass as #e8b55a80/);
 });
 
-test("the real stylesheet maps the scene's roles onto the scene's two colours", () => {
+test("the real stylesheet maps the scene's roles onto the scene's own colours", () => {
   assert.deepEqual(colourToken("--scene-glyph"), colourToken("--bone"));
   assert.deepEqual(colourToken("--scene-glyph-outline"), colourToken("--soot"));
+  assert.deepEqual(colourToken("--scene-bar-track"), colourToken("--soot"));
+  assert.deepEqual(colourToken("--scene-bar-high"), colourToken("--leaf"));
+  assert.deepEqual(colourToken("--scene-bar-middle"), colourToken("--amber"));
+  assert.deepEqual(colourToken("--scene-bar-low"), colourToken("--ember"));
 });

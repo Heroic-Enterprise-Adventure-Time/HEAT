@@ -28,7 +28,7 @@ export function retireHero(repo: Repository, playerId: string, heroId: string, n
 }
 
 async function retireOnce(repo: Repository, playerId: string, heroId: string, now: Date): Promise<Hero> {
-  const hero = await repo.getHero(playerId, heroId.toLowerCase());
+  const hero = await repo.getHero(playerId, heroId);
   if (!hero) badInput("no such hero");
   if (hero.status === "RETIRED") return hero;
   if (hero.adventureId !== null) refuseAdventuring(hero.id);

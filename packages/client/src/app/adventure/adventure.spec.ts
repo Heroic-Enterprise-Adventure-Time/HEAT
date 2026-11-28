@@ -9,7 +9,7 @@ import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
 import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
-import { itemHolding, listItems } from '../testing/page';
+import { button, itemHolding, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf, wordsOf } from '../testing/texts-of';
 import { Adventure } from './adventure';
@@ -139,7 +139,6 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBa
   return { run, router, user };
 }
 
-const button = (name: string) => screen.getByRole('button', { name });
 const link = (name: string) => screen.getByRole('link', { name });
 /** What a hero may do next: the group of its ability buttons. */
 const abilities = (hero: string) => within(screen.getByRole('group', { name: `${hero} next action` }));
@@ -228,6 +227,8 @@ describe('Adventure', () => {
     await user.click(button('Pause'));
     await run(1000);
     expect(onTheRoad()).toBeInTheDocument();
+    // The button's name says its state, so it carries no pressed state beside it.
+    expect(button('Resume')).not.toHaveAttribute('aria-pressed');
     await user.click(button('Resume'));
     await user.click(button('4×'));
     await waitFor(() => { expect(button('4×')).toHaveAttribute('aria-pressed', 'true'); });

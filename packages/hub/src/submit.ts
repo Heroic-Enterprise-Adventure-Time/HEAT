@@ -283,9 +283,10 @@ async function submitOnce(
     const camp = await repo.camp(playerId, record.location);
     const destination = record.caravan ? await repo.camp(playerId, record.caravan.destination) : undefined;
     const balances = new Map(camp.holdings.map((h) => [h.material, h.balance]));
-    const heroes = await Promise.all(record.snapshot.heroes.map((h) => repo.getHero(playerId, h.heroId)));
-    if (heroes.some((h) => h?.adventureId !== adventureId)) return closed(repo, adventureId);
-    const writes = settlement(record, result, camp.warehouseLevel, balances, heroes as Hero[], destination);
+    const read = await Promise.all(record.snapshot.heroes.map((h) => repo.getHero(playerId, h.heroId)));
+    const heroes = read.filter((h): h is Hero => h?.adventureId === adventureId);
+    if (heroes.length !== read.length) return closed(repo, adventureId);
+    const writes = settlement(record, result, camp.warehouseLevel, balances, heroes, destination);
     try {
       await repo.settle(playerId, writes, now);
       return { ...record, status: "SETTLED", result: writes.result, settledAt: now.toISOString() };

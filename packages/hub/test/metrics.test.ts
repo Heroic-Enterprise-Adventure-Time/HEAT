@@ -4,7 +4,8 @@ import type { Context as LambdaContext } from "aws-lambda";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, type MockInstance, vi } from "vitest";
 
 import { Repository, TransactionConflict } from "../src/db/repository.js";
-import { event, type Handler } from "./event.js";
+import { player } from "./data.js";
+import { event, type Handler, loadHandler } from "./event.js";
 
 /**
  * What the alarm reads, through the handler: a Conflict answered reaches the
@@ -25,8 +26,7 @@ vi.hoisted(() => {
 let handler: Handler;
 
 beforeAll(async () => {
-  // The handler reads its configuration at import time, as graphql.test.ts says.
-  handler = (await import("../src/handler.js")).handler as unknown as Handler;
+  handler = await loadHandler();
 });
 
 async function call(query: string, variables: Record<string, unknown>, playerId: string): Promise<unknown> {
@@ -46,14 +46,14 @@ describe("the handler's metrics", () => {
   });
 
   it("flushes a Conflict answered under the service alone", async () => {
-    const player = `p-${randomUUID()}`;
+    const p = player();
     const id = randomUUID();
-    await call(`mutation { joinGame { __typename } }`, {}, player);
-    await call(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) { __typename } }`, { id }, player);
+    await call(`mutation { joinGame { __typename } }`, {}, p);
+    await call(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) { __typename } }`, { id }, p);
     vi.spyOn(Repository.prototype, "retire").mockRejectedValue(new TransactionConflict("conflict"));
     emitted.mockClear();
 
-    const answered = await call(`mutation($id: ID!) { retireHero(input: { heroId: $id }) { __typename } }`, { id }, player);
+    const answered = await call(`mutation($id: ID!) { retireHero(input: { heroId: $id }) { __typename } }`, { id }, p);
     expect(answered).toMatchObject({ data: { retireHero: { __typename: "Conflict" } } });
 
     const lines = emitted.mock.calls.map(([line]) => JSON.parse(line as string) as Record<string, unknown> & { _aws: { CloudWatchMetrics: { Dimensions: string[][] }[] } });

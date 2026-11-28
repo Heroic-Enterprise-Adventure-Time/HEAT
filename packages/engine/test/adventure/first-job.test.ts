@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { AdventureEngine, type AdventureResult, JOBS, jobsPostedBy, MONSTERS, must, replay, STARTING_LOCATION, UNIT_PROFILES, type UnitType } from "../../src/index.js";
-import { atLargest, contentWithJob, haul, hero, meets, MILLBROOK_RECRUITS, RECRUITED_TYPES, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
+import { atLargest, battleStage, contentWithJob, haul, hero, meets, MILLBROOK_RECRUITS, RECRUITED_TYPES, rewardOf, SEEDS, seeds, snapshot, STICKS, TIMBER, WOLVES } from "./helpers.js";
 
 // The first progression (decision 0031, with the hauls of decision 0058): a
 // new player's free villager cannot fail "Pick up sticks", and one run pays
@@ -11,8 +11,7 @@ import { atLargest, contentWithJob, haul, hero, meets, MILLBROOK_RECRUITS, RECRU
 
 const lone = [hero("villager-1", "villager")];
 const sticks = JOBS[STICKS];
-const gather = sticks.stages[1];
-if (gather?.kind !== "gather") throw new Error("The sticks job gathers second");
+const gather = battleStage(sticks, "gather");
 /** The gather's time limit, which the job is to stay well inside. */
 const LIMIT_MS = gather.timeLimitMs;
 /** The job with its wolf on every seed: its largest roll, the hardest it can be. */

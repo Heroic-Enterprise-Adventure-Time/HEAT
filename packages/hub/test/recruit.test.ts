@@ -1,16 +1,16 @@
 import { randomUUID } from "node:crypto";
 
-import { type DynamoDBDocumentClient, GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { type DynamoDBDocumentClient, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { sortBy } from "es-toolkit";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { heroNames, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } from "@heat/engine";
+import { heroNames, location, type Material, must, SPRITE_SET_PRESENTATION, SPRITE_SETS } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type Hero, InsufficientBalance, RecruitRefused, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
-import { HallFull, InsufficientResources } from "../src/refusals.js";
-import { heroFixture, player, stock, whole } from "./data.js";
+import { HallFull, HallLevel, InsufficientResources } from "../src/refusals.js";
+import { connected, heroFixture, player, putCamp as putCampAt, stock } from "./data.js";
 import { playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -20,24 +20,13 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const at = "millbrook";
 
 /** A camp in a given state, as the transactions that kill heroes will leave it. */
-async function putCamp(p: string, activeHeroes: number, livingHeroes: number) {
-  await db.send(
-    new PutCommand({
-      TableName: tables.player,
-      Item: whole("camp", { ...playerKeys.camp(p, at), location: at, hallLevel: 1, warehouseLevel: 1, activeHeroes, livingHeroes }),
-    }),
-  );
-}
-
+const putCamp = (p: string, activeHeroes: number, livingHeroes: number) => putCampAt(db, tables, p, at, activeHeroes, livingHeroes);
 
 describe("recruitHero: the free villager", () => {
   it("gives a new player a villager drawn by the hub, and counts it into the camp", async () => {
@@ -223,6 +212,19 @@ describe("recruitHero: paid", () => {
     expect(await repo.holdings(p, at)).toEqual([{ material: "ore", balance: 0 }]);
   });
 
+  it("refuses a unit type the hall is too low for with the level it needs, before the price, and debits nothing", async () => {
+    // The first recruit this location offers above a new camp's hall, with its price in stock: the hall's level is the rule that answers.
+    const high = must(location(at)?.recruits.find((r) => r.hallLevel > 1), "a recruit that needs a higher hall");
+    const p = player();
+    const price = Object.fromEntries(high.cost.map((c) => [c.material, c.amount]));
+    await putPaidCamp(p, 1, price);
+    const refused = await refusal(recruitHero(repo, p, at, high.unitType, randomUUID()));
+    expect(refused).toBeInstanceOf(HallLevel);
+    expect(refused).toMatchObject({ hallLevel: high.hallLevel, message: `a ${high.unitType} needs a level ${high.hallLevel} hall` });
+    expect(sortBy(await repo.holdings(p, at), ["material"])).toEqual(sortBy(high.cost.map((c) => ({ material: c.material, balance: c.amount })), ["material"]));
+    expect(await repo.heroes(p)).toEqual([]);
+  });
+
   it("says what is short when the camp cannot pay, and debits nothing", async () => {
     const p = player();
     await putPaidCamp(p, 1, { timber: 19 });
@@ -267,6 +269,45 @@ describe("recruitHero: paid", () => {
       expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: 10 }]);
       expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: 2, livingHeroes: 2 });
     }
+  });
+
+  type Place = (k: number, winner: () => Promise<unknown>) => Race;
+  const before: Place = (k, winner) => winnerBefore(repo, k, winner);
+  const afterConflict: Place = (k, winner) => cancelled(repo, "recruit", new TransactionConflict("conflict"), k, winner);
+
+  /**
+   * A paid recruit with another request's recruit placed by `place`, at a camp
+   * with the given living heroes and timber: wherever the other commits first,
+   * this one is told `rule`, and the camp is left as the one recruit left it.
+   */
+  function lostRecruit(living: number, timber: number, rule: typeof HallFull | typeof InsufficientResources, place: Place): Promise<number> {
+    return everyInterleaving(async (k) => {
+      const p = player();
+      await putPaidCamp(p, living, { timber });
+      const late = place(k, () => recruitHero(repo, p, at, "villager", randomUUID()));
+      const lost = await refusal(recruitHero(late.repo, p, at, "villager", randomUUID()));
+      if (!late.ran()) return false;
+      expect(lost).toBeInstanceOf(rule);
+      expect(await repo.heroes(p)).toHaveLength(1);
+      expect(await repo.holdings(p, at)).toEqual([{ material: "timber", balance: timber - 20 }]);
+      expect(await repo.camp(p, at)).toMatchObject({ activeHeroes: living + 1, livingHeroes: living + 1 });
+      return true;
+    });
+  }
+
+  it("tells a recruit the hall is full wherever another request's recruit takes the last slot first (Issue-261)", async () => {
+    // Before each of getHero, camp, heroes and recruit.
+    expect(await lostRecruit(3, 100, HallFull, before)).toBe(4);
+  });
+
+  it("tells a recruit what is short wherever another request's recruit spends the timber first (Issue-261)", async () => {
+    expect(await lostRecruit(1, 30, InsufficientResources, before)).toBe(4);
+  });
+
+  it("retries a recruit cancelled by another request's, still committing, and tells it the rule that now fails", async () => {
+    // Before each of the next run's getHero, camp, heroes and recruit.
+    expect(await lostRecruit(3, 100, HallFull, afterConflict)).toBe(4);
+    expect(await lostRecruit(1, 30, InsufficientResources, afterConflict)).toBe(4);
   });
 
   it("holds the price in the transaction: a villager read as free is refused once a hero lives", async () => {

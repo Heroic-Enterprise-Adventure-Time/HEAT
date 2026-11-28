@@ -18,6 +18,25 @@ const testingImports = [
 ];
 const testBedImport = { name: '@angular/core/testing', importNames: ['TestBed', 'getTestBed'], message: 'Render the component through Testing Library.' };
 
+// What no-restricted-syntax refuses in every TypeScript file. A block that
+// adds to it for its own files spreads this list first, because a later
+// block's options replace an earlier block's.
+const restrictedSyntax = [
+  {
+    selector: 'TSAsExpression > MemberExpression.expression[computed=true]:not([property.value=type(string)])',
+    message: 'Narrow an indexed read, or read it through must(value, what): a cast hides that it may be absent.',
+  },
+];
+
+// A colour written in the client's TypeScript: a hex colour as a string, in
+// quotes or backticks, or as the six-digit hex number PixiJS takes.
+const COLOUR_LITERAL = 'Read a colour role of styles.css (readColourRole); no colour is written in TypeScript (docs/standards/angular.md, rule 17).';
+const colourLiterals = [
+  { selector: 'Literal[value=/^#[0-9a-f]{3,8}$/i]', message: COLOUR_LITERAL },
+  { selector: 'TemplateElement[value.raw=/^#[0-9a-f]{3,8}$/i]', message: COLOUR_LITERAL },
+  { selector: 'Literal[raw=/^0x[0-9a-f]{6}$/i]', message: COLOUR_LITERAL },
+];
+
 export default tseslint.config(
   // Build output, Angular's cache, the client's copy of the art, and the
   // client's generated GraphQL code (codegen.mjs), which is read as the
@@ -59,6 +78,12 @@ export default tseslint.config(
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_', ignoreRestSiblings: true },
       ],
+      // Under noUncheckedIndexedAccess an indexed read may be absent, and a
+      // cast on it is the non-null assertion in another spelling: the value is
+      // narrowed, or read through must (docs/standards/typescript.md, rule 6).
+      // A property read by its name in brackets, env["HEAT_VERSION"], is not an
+      // indexed read: a cast on it says the shape of an unknown value.
+      'no-restricted-syntax': ['error', ...restrictedSyntax],
     },
   },
 
@@ -122,6 +147,16 @@ export default tseslint.config(
       // that it lives as long as the component does.
       '@angular-eslint/use-injectable-provided-in': 'off',
     },
+  },
+  // The client's colours are the stylesheet's: what draws on a canvas reads a
+  // role at runtime, and Stylelint holds the same in the stylesheets
+  // (docs/standards/angular.md, rule 17; decision 0061). ground-sets.ts is
+  // excepted by name: the art build and scripts/icon-set.mjs read each
+  // ground's backdrop from it (docs/standards/typescript.md, rule 29).
+  {
+    files: ['packages/client/src/**/*.ts'],
+    ignores: ['packages/client/src/app/ground-sets.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...restrictedSyntax, ...colourLiterals] },
   },
   {
     files: ['packages/client/**/*.html'],
