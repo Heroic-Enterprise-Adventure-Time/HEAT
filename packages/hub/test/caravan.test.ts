@@ -310,7 +310,8 @@ describe("a caravan's settlement", () => {
   it("arriving with the cart standing: the cargo is delivered, the heroes who stay land there and the rest come home", async () => {
     const party: UnitType[] = ["fighter", "villager"];
     const { p, heroes } = await ready(party, { ore: 50, timber: 20 });
-    const [fighter, villager] = heroes as [Hero, Hero];
+    const fighter = must(heroes[0], "the fighter");
+    const villager = must(heroes[1], "the villager");
     const cargo: Reward[] = [{ material: "ore", amount: 30 }, { material: "timber", amount: 20 }];
     const started = await start(repo, p, heroes, { cargo, staying: [villager.id] }, seedFor(party, deliveredWhole));
     const settled = await submit(repo, p, started.adventureId);
@@ -534,7 +535,9 @@ describe("a caravan's riders at its start", () => {
 
   it("are part of what a repeat names: the same riders in any order are the adventure it started, and others are bad input", async () => {
     const { p, heroes, riders } = await ready(["fighter"], {}, 3);
-    const [a, b, c] = ids(riders) as [string, string, string];
+    const a = must(riders[0], "the first rider").id;
+    const b = must(riders[1], "the second rider").id;
+    const c = must(riders[2], "the third rider").id;
     const requestId = randomUUID();
     const started = await start(repo, p, heroes, { cargo: [], staying: [a, b] }, "caravan-0", requestId);
     expect(await start(repo, p, heroes, { cargo: [], staying: [b, a] }, "caravan-0", requestId)).toEqual(started);
@@ -545,7 +548,9 @@ describe("a caravan's riders at its start", () => {
 
   it("are refused as a hero of the party is, by the read, before any transaction: another player's is bad input, and one dead, retired or at another camp is refused by name", async () => {
     const { p, heroes, riders } = await ready(["fighter"], { ore: 50 }, 3);
-    const [dead, retired, away] = riders as [Hero, Hero, Hero];
+    const dead = must(riders[0], "the dead rider");
+    const retired = must(riders[1], "the retired rider");
+    const away = must(riders[2], "the rider at another camp");
     await alter(p, dead.id, { status: "DEAD" });
     await retireHero(repo, p, retired.id);
     await alter(p, away.id, { location: there });

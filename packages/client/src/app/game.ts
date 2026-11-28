@@ -551,8 +551,9 @@ export class Game {
 
   /**
    * Starts a job the location posts with a party of the player's heroes
-   * there, and for a caravan its cargo and who of the party stays at the
-   * destination (decision 0059); a job that delivers nothing sends neither.
+   * there, and for a caravan its cargo and who stays at the destination, of
+   * the party or riding along (decision 0059, amended by Issue-391); a job
+   * that delivers nothing sends neither.
    * Answers the open adventure, or throws the hub's refusal, a `Refusal`
    * named by its type, for the job's page to show in place. The player is
    * read again either way, since a refusal such as `AdventureOpen` means the

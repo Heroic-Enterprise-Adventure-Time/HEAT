@@ -352,7 +352,7 @@ Not chosen in Issue-391: **riders in the snapshot,** above; **one list of tiles 
 
 **A new gathering trait for stone, and a quarryman to carry it.** A new unit type and its art for the puzzle that a row with no chance already makes. Many traits remain the direction (decision 0058); this is not the place for the next one.
 
-**Passengers who do not fight.** A second kind of party member, with rules of its own for who protects it, for nothing the cart does not already do. Chosen after all, as riders, by the amendment of Issue-391, which gives them no rules in the battle: a rider is not a party member and nothing has to protect it.
+**Passengers who do not fight.** A second kind of party member, with rules of its own for who protects it, for nothing the cart does not already do.
 
 **The whole party staying at the destination.** A supply run would then move every hero that guards it, and the origin would empty as the destination filled.
 

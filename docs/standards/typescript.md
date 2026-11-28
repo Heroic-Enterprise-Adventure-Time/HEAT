@@ -99,3 +99,7 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 ### What a test starts
 
 33. **An image a test starts is named by an exact version and its digest, `name:version@sha256:…`,** in the `FROM` line of a `*.Dockerfile` beside the set-up, which `imageFrom` and `packages/hub/test/images.test.ts` refuse otherwise: the companion's "Rule 33" (Issue-396).
+
+### What a comment says a thing does
+
+34. **A comment that says what a function, a type or a field does is changed in the pull request that changes it.** The change searches the files it touches for the words it makes false, because a comment outside the hunks goes on stating the old behavior and nothing fails (`docs/README.md`, rule 5, holds a document to the same; the review of PR-436, Issue-391).
