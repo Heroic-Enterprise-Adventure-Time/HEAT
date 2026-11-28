@@ -2,22 +2,22 @@
 
 HEAT's production environment, `heat.dcg-games.com` in the `heat-prod` account, in one root and one apply, the shape of the `dev` root: the `base` module (the hosted zone, the certificate for the zone name and its wildcard, the account's one user pool with Google as its identity provider), the `environment` module on top of it (the two tables, the function, the HTTP API, the site at the zone apex, the browser client, the alarms) and the `login-domain` module last (`auth.heat.dcg-games.com`). Applied by the pipeline on every merge to `release`, through the release pull request, followed by the smoke test, the tag and the GitHub Release (decisions 0016 as confirmed, 0017, 0018 as amended, 0020, 0021 as amended; the overview's "Environments"). History: Issue-41.
 
-**Status: at `v2026.11.26` (262abd3), the fifteenth release, applied by the pipeline on 2026-11-26 by the `Release` run on the merge of PR-381 (Issue-380), run 45904669736, under the `prod` GitHub environment.** The run:
-- guarded the merge as pull request 381 from `main`
-- applied 0 added, 4 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code, layer and settings, its role's policy, and both aliases moved
+**Status: at `v2026.11.28` (9d66d55), the sixteenth release, applied by the pipeline on 2026-11-28 by the `Release` run on the merge of PR-438 (Issue-437), run 46114802750, under the `prod` GitHub environment.** The run:
+- passed the guard, "Release source", on the merge from `main`
+- applied 0 added, 3 changed, 0 destroyed from the bundles its no-role build job handed over: the function's new code and runtime, and both aliases moved
 - passed the allow-list check (33 resource types)
 - published the client and `config.json`
 - passed the anonymous smoke test
-- wrote the tag `v2026.11.26` and its GitHub Release
+- wrote the tag `v2026.11.28` and its GitHub Release
 
-It is the first release since step 3 began: unlocks, Highcrag as a second location, caravans, and what an adventure yields (PR-334 to PR-374). It is also the first in prod with the AWS Lambda Layer for OpenTelemetry (PR-331, decision 0055). The function now runs the layer's wrapper and carries the AWS SDK beside its bundle, and its role holds `xray:PutTraceSegments` alone. Read back at about 22:35 UTC:
-- **Through `audit-heat-prod`:** `heat-prod-hub` is on `nodejs24.x`, with the code hash the release pull request's plan showed. It has:
-  - `HEAT_VERSION` 262abd3 and `HEAT_PREVIOUS_VERSION` cd012d5 (`v2026.11.17.1`);
-  - the layer `AWSOpenTelemetryDistroJs:16`, with `AWS_LAMBDA_EXEC_WRAPPER` `/opt/otel-instrument`, `OTEL_SERVICE_NAME` `heat-hub` and `OTEL_AWS_APPLICATION_SIGNALS_ENABLED` `false`;
-  - `live` at version 15 and `previous` at 14.
-- **From the laptop:** `/config.json` reports version 262abd3, and an anonymous `POST /graphql` is 401.
-- **The owner** signed in at `https://heat.dcg-games.com` after the apply, played an adventure and saw the second location.
-- **The first traces from prod:** `scripts/trace-report.mjs --stack heat-prod`, through `plan-heat-prod` under decision 0055's standing yes, found 10 of the 10 requests the hub logged after the apply traced. These were the owner's session: `joinGame`, `me`, a start and a submit, and the location's reads.
+It brings prod the page redesigned as a casual mobile game in the daylight parchment theme (PR-387 to PR-394) and caravan riders (PR-436). It is also the first in prod on Node 26: the function's runtime moved from `nodejs24.x` to `nodejs26.x` (PR-425). Read back at about 06:10 UTC:
+- **Through `audit-heat-prod`:** `heat-prod-hub` is on `nodejs26.x`, with the code hash the release pull request's plan showed. It has:
+  - `HEAT_VERSION` 9d66d55 and `HEAT_PREVIOUS_VERSION` 262abd3 (`v2026.11.26`);
+  - the layer `AWSOpenTelemetryDistroJs:16` and its wrapper, as the fifteenth release left them;
+  - `live` at version 16 and `previous` at 15. Version 15 keeps `nodejs24.x`, the runtime it was published on, so an adventure opened before the deploy is verified on Node 24.
+- **From the laptop:** `/config.json` reports version 9d66d55, and an anonymous `POST /graphql` is 401.
+- **The owner** signed in at `https://heat.dcg-games.com` after the apply, played on the new page and sent a caravan with a rider.
+- **The traces from prod on Node 26:** `scripts/trace-report.mjs --stack heat-prod`, through `plan-heat-prod` under decision 0055's standing yes, found 114 of the 114 requests the hub logged after the apply traced, the starts and the submits of adventures among them.
 
 The first apply, below, is kept as the record of that apply and its read-back. Later releases have changed the root since.
 
