@@ -88,6 +88,10 @@ Rule 17, 2026-11-27 (Issue-408 and Issue-424, under Issue-269). `--text-xs` and 
 
 Tiers, 2026-11-27 (Issue-428). The loaded documents kept reaching their limits: on PR-425 `typescript.md` went over `packages/AGENTS.md`'s 30,000 twice, by 46 bytes and then 77, and each time was reworded back under. The owner asked for a structural fix and accepted the three tiers of decision 0060's amendment. `angular.md`'s "Held back" and "Why" moved to `angular-detail.md`, with the detail of its long rules and the whole of those it now writes as one line; no rule's number changed. Rules 20 to 22 came from `typescript.md`, rules 13 to 15.
 
+Rule 1, 2026-11-28 (Issue-440). The sentence on `linkedSignal` was added with the first state that needed it: a job's party pick, which opens with the last party sent on the job and starts again when the address names another job. The rule said how state is held and how it is derived, and nothing of state that is both written by the player and reset by what it follows; the other way to write it was an `effect` that sets a signal. The review of PR-442 found the sentence with no account here. It also found the pick following the job as posted, which is undefined while the job's facility reads as not built, and the cargo and who stays not starting again with the party; the three follow the address now.
+
+Rule 15, 2026-11-28 (Issue-440). The sentence on browser storage in the companion is a candidate rule from the review of PR-442, accepted by the owner that day. Five spec files cleared storage in a `beforeEach` of their own, and from Issue-440 a Depart keeps the job's last party, so any spec that departs and then opens a job's page would have needed the line too. `src/test-setup.ts` clears local and session storage after each test, and the five lines are gone.
+
 ## graphql.md
 
 The document. It was written on 2026-10-24 (Issue-145) from the code on `main` and from decisions 0012, 0013, 0014, 0023, 0024, 0029 and 0030, with the API shape accepted practice asks for stated as the rule; the code reached that shape on 2026-11-02 (Issue-155, decision 0038).

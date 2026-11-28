@@ -164,9 +164,6 @@ const tile = (name: string) => within(screen.getByRole('group', { name: 'Party' 
 const job = (name: string) => within(itemHolding('Jobs', 'link', name));
 
 describe('Job board', () => {
-  // A Depart keeps its party in the browser as the job's last (Issue-440), which the next test would open with.
-  beforeEach(() => { localStorage.clear(); });
-
   it("lists the board's jobs, easiest first, each with its pay and its bonus XP and nothing of what it drops, each linked to its detail", async () => {
     await renderJobs(fakeGame([]), '/camp/millbrook/job-board');
     expect(panel().getByRole('heading', { name: 'Job board', level: 2 })).toBeInTheDocument();
@@ -245,6 +242,24 @@ describe('Job board', () => {
     expect(await screen.findByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
     expect(tile('Wren')).toHaveAttribute('aria-pressed', 'false');
     expect(depart()).toBeDisabled();
+  });
+
+  it("keeps a party picked by hand while the job's facility reads as not built for a moment, in place of the last one sent (PR-442)", async () => {
+    saveLastParty('millbrook', 'ore-from-the-hill', ['h2']);
+    const game = fakeGame(party);
+    const { user } = await renderJobs(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    expect(tile('Moss')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(tile('Moss'));
+    await user.click(tile('Wren'));
+    await waitFor(() => { expect(tile('Wren')).toHaveAttribute('aria-pressed', 'true'); });
+
+    // The camp read with no mine, so that the mine posts nothing, and then read as it is.
+    const camp = game.camp();
+    game.camp.set({ ...camp, facilities: [] });
+    await waitFor(() => { expect(screen.queryByRole('group', { name: 'Party' })).not.toBeInTheDocument(); });
+    game.camp.set(camp);
+    await waitFor(() => { expect(tile('Wren')).toHaveAttribute('aria-pressed', 'true'); });
+    expect(tile('Moss')).toHaveAttribute('aria-pressed', 'false');
   });
 
   it("keeps the party that left as the job's last at that camp, and nothing of a party the hub refused (Issue-440)", async () => {

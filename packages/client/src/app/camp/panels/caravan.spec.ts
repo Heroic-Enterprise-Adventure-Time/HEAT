@@ -82,9 +82,6 @@ const amountOf = (material: string) => wordsOf([group(material).getByRole('statu
 const cargo = () => screen.getByRole('group', { name: 'Cargo' });
 
 describe("A caravan's page (Issue-355)", () => {
-  // A job's last party is kept in the browser (Issue-440), and one a test keeps would be picked when the next opens the page.
-  beforeEach(() => { localStorage.clear(); });
-
   it('opens with the last party sent on it picked, and with no cargo and nobody marked to stay (Issue-440)', async () => {
     saveLastParty('millbrook', 'caravan-to-highcrag', ['h1', 'h3']);
     await renderCaravan(fakeGame());
@@ -93,6 +90,27 @@ describe("A caravan's page (Issue-355)", () => {
     expect(tilesOf('Of the party')).toEqual(['Wren', 'Lark']);
     expect(stays('Wren')).toHaveAttribute('aria-pressed', 'false');
     expect(stays('Lark')).toHaveAttribute('aria-pressed', 'false');
+    expect(amountOf('timber')).toBe('timber 0');
+  });
+
+  it('starts again with no cargo and nobody marked to stay when the player comes back from another job, as the party does (PR-442)', async () => {
+    const { router, user } = await renderCaravan(fakeGame());
+    await user.click(partyTile('Wren'));
+    await waitFor(() => { expect(tilesOf('Of the party')).toEqual(['Wren']); });
+    await user.click(stays('Wren'));
+    await user.click(step('+1', 'timber'));
+    await waitFor(() => { expect(amountOf('timber')).toBe('timber 1'); });
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'true');
+
+    // A job of another facility is the same route, so the page is the same one and only what it follows changes.
+    await router.navigateByUrl('/camp/millbrook/mine/jobs/ore-from-the-hill');
+    await waitFor(() => { expect(screen.queryByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).not.toBeInTheDocument(); });
+    await router.navigateByUrl(CARAVAN);
+    expect(await screen.findByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).toBeInTheDocument();
+    // Nobody was sent on it, so the party is empty again; a mark that outlived it would send Wren as a rider.
+    expect(partyTile('Wren')).toHaveAttribute('aria-pressed', 'false');
+    expect(tilesOf('Riding along')).toEqual(['Wren', 'Moss', 'Lark']);
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'false');
     expect(amountOf('timber')).toBe('timber 0');
   });
 

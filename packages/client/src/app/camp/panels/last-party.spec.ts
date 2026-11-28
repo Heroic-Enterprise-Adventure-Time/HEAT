@@ -7,10 +7,6 @@ import { LAST_PARTY_PREFIX, loadLastParty, saveLastParty } from './last-party';
 const WOLVES = 'wolves-on-the-mill-road';
 
 describe("a job's last party, as the browser keeps it (Issue-440)", () => {
-  beforeEach(() => { localStorage.clear(); });
-
-  afterEach(() => { localStorage.clear(); });
-
   it('answers what was saved, for that job at that location alone', () => {
     saveLastParty('millbrook', WOLVES, ['h1', 'h3']);
     expect(loadLastParty('millbrook', WOLVES)).toEqual(['h1', 'h3']);

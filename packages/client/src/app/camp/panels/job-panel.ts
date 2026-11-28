@@ -91,6 +91,15 @@ export class JobPanel {
   private readonly routed = injectRoutedJob();
   protected readonly posterName = this.routed.posterName;
   protected readonly job = this.routed.job;
+  /**
+   * What the picks start again from: the camp on screen and the job id the
+   * address names. Not the job as posted, which is undefined while its
+   * facility reads as not built, as before the camp is read: a pick made by
+   * hand would be lost to a read that changed nothing (PR-442's review).
+   */
+  private readonly opened = computed(() => ({ location: this.game.location(), jobId: this.routed.jobId() }), {
+    equal: (a, b) => a.location === b.location && a.jobId === b.jobId,
+  });
   /** The job's secondary views, behind its "more" menu (decision 0061): its replays, a child of its route. */
   protected readonly more: readonly MoreItem[] = [{ label: 'Replays', to: 'replays' }];
   /** What a job with no pay says in its place, from the same words as the board's list. */
@@ -129,7 +138,8 @@ export class JobPanel {
     const destination = this.destination();
     return origin && destination ? cargoLines(origin, destination) : [];
   });
-  private readonly amounts = signal<ReadonlyMap<Material, number>>(new Map());
+  /** The cargo picked, by resource; none again when the address names another job, as the party starts again (`chosen`). */
+  private readonly amounts = linkedSignal<unknown, ReadonlyMap<Material, number>>({ source: this.opened, computation: () => new Map() });
   /** Each line's stepper, clamped to the camp's balance and the cart's room. */
   protected readonly cargoRows = computed(() => {
     const origin = this.game.camp();
@@ -159,11 +169,12 @@ export class JobPanel {
    * The heroes chosen, by id. A job's page opens with the last party sent on
    * that job from this camp, as this browser kept it (`last-party.ts`;
    * Issue-440), and starts from that again whenever the address names another
-   * job; `picked` leaves out whoever of it is no longer alive here.
+   * job or another camp (`opened`); `picked` leaves out whoever of it is no
+   * longer alive here.
    */
-  private readonly chosen = linkedSignal<string | undefined, ReadonlySet<string>>({
-    source: () => this.job()?.id,
-    computation: (jobId) => new Set(jobId ? loadLastParty(this.game.location(), jobId) : []),
+  private readonly chosen = linkedSignal<{ location: string; jobId: string | null }, ReadonlySet<string>>({
+    source: this.opened,
+    computation: ({ location, jobId }) => new Set(jobId ? loadLastParty(location, jobId) : []),
   });
   /** The heroes picked who are still alive here: a refusal reloads the camp, and one may have gone, as may one of the last party. */
   protected readonly picked = computed(() => {
@@ -181,7 +192,13 @@ export class JobPanel {
   protected readonly ridersTitle = RIDERS_TITLE;
   protected readonly ridersNote = RIDERS_NOTE;
   protected readonly noRiders = NO_RIDERS;
-  private readonly marked = signal<ReadonlySet<string>>(new Set());
+  /**
+   * The heroes marked to stay, by id; nobody again when the address names
+   * another job. The party starts again there (`chosen`), and a mark that
+   * outlived it would make a rider of a hero the kept party does not hold,
+   * which `toggle` is there to prevent (PR-442's review).
+   */
+  private readonly marked = linkedSignal<unknown, ReadonlySet<string>>({ source: this.opened, computation: () => new Set() });
   /** The heroes marked to stay who are still alive here, of the party or riding. */
   protected readonly staying = computed(() => {
     const living = new Set(this.game.livingHere().map((h) => h.id));

@@ -12,6 +12,8 @@ import { postedJob, posterOf } from './job-words';
 export interface RoutedJob {
   /** The poster's name, the facility in the address or the job board, for the back link; "Camp" for an address that names no facility. */
   readonly posterName: Signal<string>;
+  /** The job id as the address spells it, whether or not its poster posts it; null for an address that names none. */
+  readonly jobId: Signal<string | null>;
   /** The job the address names under its poster, which posts it only once built; undefined for no such job. */
   readonly job: Signal<Job | undefined>;
 }
@@ -27,14 +29,16 @@ export function injectRoutedJob(): RoutedJob {
   const camp = inject(CampState);
   const params = toSignal(inject(ActivatedRoute).paramMap);
   const poster = computed(() => posterOf(params()?.get('facility')));
+  const jobId = computed(() => params()?.get('job') ?? null);
   return {
     posterName: computed(() => {
       const kind = poster();
       return kind ? FACILITIES[kind].name : 'Camp';
     }),
+    jobId,
     job: computed(() => {
       const kind = poster();
-      return postedJob(game.location(), kind, kind ? (camp.facility(kind)?.level ?? 0) : 0, params()?.get('job'));
+      return postedJob(game.location(), kind, kind ? (camp.facility(kind)?.level ?? 0) : 0, jobId());
     }),
   };
 }
