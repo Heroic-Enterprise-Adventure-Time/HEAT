@@ -2,19 +2,23 @@
  * The page's regions (Issue-89; page-layout.ts holds the arithmetic). Nothing
  * overlaps. Narrow screens, the default here: the scene on top, the page's
  * width by the map's height, then the panel in the page's flow, and the menu
- * as a nav fixed to the bottom of the window, the panel padded by its height
+ * as a nav fixed to the bottom of the window, the page padded by its height
  * so that nothing is hidden under it (decision 0061). Landscape, from 4:3: the menu on the left, the scene filling
- * the middle, the panel on the right, always there.
+ * the middle, the panel on the right, always there. Each region is a card in
+ * the region frame (primitives.css, .region), with a gutter of the page
+ * between them and round them (Issue-444); page-layout.ts reckons with both.
  */
 .camp {
   display: flex;
   flex-direction: column;
+  gap: var(--region-gap);
   min-height: calc(100dvh - var(--header-height));
+  box-sizing: border-box;
+  padding: var(--region-gap) var(--region-gap) calc(var(--region-gap) + var(--menu-row-height));
   background: var(--surface-page);
 }
 
 .stage {
-  width: 100%;
   overflow: hidden;
   background: var(--surface-stage);
 }
@@ -30,6 +34,10 @@
   height: var(--menu-row-height);
   box-sizing: border-box;
   background: var(--surface-bar);
+}
+
+/* Stacked, the menu row is a bar along the window's foot, under a line; side by side it is a region in the frame. */
+.menu:not(.region) {
   border-top: var(--border) solid var(--line-frame);
 }
 
@@ -77,15 +85,15 @@
 
 .panel {
   flex: 1;
-  padding: var(--space-lg) var(--space-xl) calc(var(--space-lg) + var(--menu-row-height));
+  padding: var(--space-lg) var(--space-xl);
   background: var(--surface-panel);
   color: var(--on-panel);
 }
 
 /*
  * A phone's menu row has no room for six labels: icons only, the label kept
- * for screen readers, and shown on the entry whose panel is open, which takes
- * the room of two.
+ * for screen readers (primitives.css, .narrow-hidden), and shown on the
+ * entry whose panel is open, which takes the room of two.
  */
 @media (width <= 37.5rem) {
   .camp:not(.side) .entry {
@@ -95,31 +103,32 @@
   .camp:not(.side) .entry.active {
     flex: 2;
   }
-
-  .camp:not(.side) .entry:not(.active) .label {
-    position: absolute;
-    width: var(--pixel);
-    height: var(--pixel);
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
 }
 
-/* Side by side, where that leaves the scene scale 2 (page-layout.ts, isSideBySide): the menu, the scene and the panel in columns. */
+/*
+ * Side by side, where that leaves the scene scale 2 (page-layout.ts, isSideBySide): the menu, the scene and the panel in
+ * columns. The menu's column is its width and its frame, so the frame takes nothing from its icons and labels; the
+ * panel's column is --side-panel-width, which gives up the gutters and the frames, so the scene keeps the width
+ * page-layout.ts reckons.
+ */
 .camp.side {
+  --menu-frame: calc(var(--frame-region-left) + var(--frame-region-right));
+
   display: grid;
-  grid-template-columns: var(--menu-rail-width) minmax(0, 1fr) var(--panel-width);
+  grid-template-columns: calc(var(--menu-rail-width) + var(--menu-frame)) minmax(0, 1fr) var(--side-panel-width);
   grid-template-areas: 'menu stage panel';
   height: calc(100dvh - var(--header-height));
   min-height: 0;
+  padding: var(--region-gap);
 }
 
 .camp.side.labels {
-  grid-template-columns: var(--menu-labelled-width) minmax(0, 1fr) var(--panel-width);
+  grid-template-columns: calc(var(--menu-labelled-width) + var(--menu-frame)) minmax(0, 1fr) var(--side-panel-width);
 }
 
 .side .stage {
   grid-area: stage;
+  box-sizing: border-box;
   height: 100%;
 }
 
@@ -130,8 +139,6 @@
   justify-content: flex-start;
   height: auto;
   padding-top: var(--space-md);
-  border: none;
-  border-right: var(--border) solid var(--line-frame);
 }
 
 .side .entry {
@@ -164,11 +171,11 @@
   visibility: visible;
 }
 
+/* Positioned, so that a visually hidden label inside it is clipped by its scroll and does not give the page a scrollbar, which would take the scene's width (Issue-444). */
 .side .panel {
+  position: relative;
   grid-area: panel;
-  padding-bottom: var(--space-lg);
   overflow-y: auto;
-  border-left: var(--border-thick) solid var(--line-frame);
 }
 
 /* The message stands on a panel's surface of its own, so that it reads wherever it lands, over the scene or the ink menu rail. */

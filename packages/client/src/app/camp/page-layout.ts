@@ -32,6 +32,13 @@ export interface LayoutSizes {
   readonly panelShare: number;
   readonly panelMin: number;
   readonly panelMax: number;
+  /** The gutter of the page's colour between the regions and round their outer edge. */
+  readonly gap: number;
+  /** The region frame each region is drawn in, side by side as the art has it (art/frames/provenance.json, Issue-444). */
+  readonly frameTop: number;
+  readonly frameRight: number;
+  readonly frameBottom: number;
+  readonly frameLeft: number;
 }
 
 /** The token each length is read from. */
@@ -42,6 +49,11 @@ const LENGTH_TOKENS = {
   menuRow: '--menu-row-height',
   panelMin: '--panel-min-width',
   panelMax: '--panel-max-width',
+  gap: '--region-gap',
+  frameTop: '--frame-region-top',
+  frameRight: '--frame-region-right',
+  frameBottom: '--frame-region-bottom',
+  frameLeft: '--frame-region-left',
 } as const;
 const PANEL_SHARE_TOKEN = '--panel-share';
 
@@ -69,6 +81,11 @@ export function readLayoutSizes(root: Pick<CSSStyleDeclaration, 'fontSize' | 'ge
     panelShare: read(PANEL_SHARE_TOKEN, /^(\d*\.?\d+)vw$/) / 100,
     panelMin: length(LENGTH_TOKENS.panelMin),
     panelMax: length(LENGTH_TOKENS.panelMax),
+    gap: length(LENGTH_TOKENS.gap),
+    frameTop: length(LENGTH_TOKENS.frameTop),
+    frameRight: length(LENGTH_TOKENS.frameRight),
+    frameBottom: length(LENGTH_TOKENS.frameBottom),
+    frameLeft: length(LENGTH_TOKENS.frameLeft),
   };
 }
 
@@ -82,14 +99,42 @@ export function sceneScale(width: number, height: number): number {
   return Math.max(1, Math.floor(Math.min(width / MAP_CORE_WIDTH, height / MAP_HEIGHT)));
 }
 
-/** The panel beside the scene: its share of the window, held between its bounds, as the CSS's `--panel-width` clamps it. */
+/**
+ * The panel's column beside the scene, before the regions' frames come out
+ * of it: its share of the window, held between its bounds, as the CSS's
+ * `--panel-width` clamps it. Side by side, styles.css's `--side-panel-width`
+ * takes the gutters and the frames out of this column, so that the scene's
+ * width is what the menu and this column leave it.
+ */
 export function panelPx(width: number, sizes: LayoutSizes): number {
   return clamp(width * sizes.panelShare, sizes.panelMin, sizes.panelMax);
 }
 
-/** The scene's scale with the regions side by side and the given menu width. */
+/**
+ * What the gutters and a region's frame take off the scene's box across:
+ * the gutter on each side and the frame's left and right. The CSS draws the
+ * frame outside the box the scene measures (camp-scene.ts reads its client
+ * size).
+ */
+export function frameAcross(sizes: LayoutSizes): number {
+  return 2 * sizes.gap + sizes.frameLeft + sizes.frameRight;
+}
+
+/** What the gutters and a region's frame take off the scene's box down: the gutter above and below and the frame's top and bottom. */
+export function frameDown(sizes: LayoutSizes): number {
+  return 2 * sizes.gap + sizes.frameTop + sizes.frameBottom;
+}
+
+/**
+ * The scene's scale with the regions side by side and the given menu width.
+ * Across, the gutters and the frames come out of the panel's column
+ * (`--side-panel-width`), so the scene keeps the width the menu and the
+ * panel leave it, and a frame never costs it a step where the width is
+ * tight (Issue-444); down, the gutters above and below and the scene's
+ * frame.
+ */
 function sideScale(width: number, height: number, menu: number, sizes: LayoutSizes): number {
-  return sceneScale(width - menu - panelPx(width, sizes), height - sizes.header);
+  return sceneScale(width - menu - panelPx(width, sizes), height - sizes.header - frameDown(sizes));
 }
 
 /**
@@ -116,11 +161,12 @@ export function iconScale(width: number, height: number, sizes: LayoutSizes): nu
  * The scene's box height in CSS pixels when the regions stack: the map's
  * height at the largest scale, in device pixels, that fits both the page's
  * width and the height left under the header and the menu row, so the scene
- * and the menu stay on screen.
+ * and the menu stay on screen; each less the gutters and the scene's frame
+ * round it.
  */
 export function stackedStageHeight(width: number, height: number, sizes: LayoutSizes, ratio = 1): number {
-  const byHeight = Math.floor(((height - sizes.header - sizes.menuRow) * ratio) / MAP_HEIGHT);
-  return (MAP_HEIGHT * Math.max(1, Math.min(Math.floor((width * ratio) / MAP_CORE_WIDTH), byHeight))) / ratio;
+  const byHeight = Math.floor(((height - sizes.header - sizes.menuRow - frameDown(sizes)) * ratio) / MAP_HEIGHT);
+  return (MAP_HEIGHT * Math.max(1, Math.min(Math.floor(((width - frameAcross(sizes)) * ratio) / MAP_CORE_WIDTH), byHeight))) / ratio;
 }
 
 /**
