@@ -1,20 +1,15 @@
-import { readdirSync, readFileSync } from "node:fs";
-
 import { describe, expect, it } from "vitest";
 
-import { ABILITIES, ABILITY_EFFECTS, MONSTER_TYPES, must, UNIT_TYPES, WEAPON_SPRITES } from "../src/index.js";
-
-const art = new URL("../../../art/", import.meta.url);
+import { ABILITIES, ABILITY_EFFECTS, MONSTER_TYPES, UNIT_TYPES, WEAPON_SPRITES } from "../src/index.js";
+import { artSets, listed } from "./art.js";
 
 /** What each set under art/<kind>/ serves, by its provenance: the set for each wielder or ability. */
 function setByProvenance(kind: "weapons" | "effects", field: "wielders" | "abilities"): Record<string, string> {
-  const dir = new URL(`${kind}/`, art);
   const sets: Record<string, string> = {};
-  for (const set of readdirSync(dir).sort()) {
-    const provenance = JSON.parse(readFileSync(new URL(`${set}/provenance.json`, dir), "utf8")) as Record<string, string[]>;
-    for (const key of must(provenance[field], `${set}'s ${field}`)) {
+  for (const set of artSets(kind)) {
+    for (const key of listed(set, field)) {
       expect(sets[key], `${key} is served by two sets`).toBeUndefined();
-      sets[key] = set;
+      sets[key] = set.set;
     }
   }
   return sets;

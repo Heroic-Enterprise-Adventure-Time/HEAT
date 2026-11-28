@@ -1,24 +1,17 @@
-import { readdirSync, readFileSync } from "node:fs";
-
+import { mapValues } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
-import { CART_SPRITE_SETS, MONSTER_SPRITE_SETS, MONSTER_TYPES, must, PROP_SPRITE_SETS, RESOURCE_TYPES } from "../src/index.js";
-
-const art = new URL("../../../art/", import.meta.url);
+import { CART_SPRITE_SETS, MONSTER_SPRITE_SETS, MONSTER_TYPES, PROP_SPRITE_SETS, RESOURCE_TYPES } from "../src/index.js";
+import { artSets, listed } from "./art.js";
 
 /** Each set under art/<kind>/, grouped by what its provenance says it draws. */
 function setsByProvenance(kind: "monsters" | "props"): Record<string, string[]> {
-  const dir = new URL(`${kind}/`, art);
   const sets: Record<string, string[]> = {};
-  for (const set of readdirSync(dir).sort()) {
-    const provenance = JSON.parse(readFileSync(new URL(`${set}/provenance.json`, dir), "utf8")) as Record<string, string[]>;
-    for (const type of must(provenance[kind], `${set}'s ${kind}`)) (sets[type] ??= []).push(set);
-  }
+  for (const set of artSets(kind)) for (const type of listed(set, kind)) (sets[type] ??= []).push(set.set);
   return sets;
 }
 
-const sorted = (map: Readonly<Record<string, readonly string[] | undefined>>) =>
-  Object.fromEntries(Object.entries(map).map(([type, sets]) => [type, [...(sets ?? [])].sort()]));
+const sorted = (map: Readonly<Record<string, readonly string[] | undefined>>) => mapValues(map, (sets) => [...(sets ?? [])].sort());
 
 describe("monster and prop art", () => {
   it("lists the sprite sets of each monster exactly as the sets' provenance says", () => {
