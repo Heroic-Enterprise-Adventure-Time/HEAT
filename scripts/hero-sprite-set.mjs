@@ -298,9 +298,10 @@ for (const [name, spec] of Object.entries(SET)) {
     if (farPixels) review.push(`${name} ${d}: ${farPixels} px in colours far from any the character's rotations have`);
   }
   // One pair where every direction agrees, and by direction where they differ: what the engine's test of a
-  // provenance against its files reads (docs/process/assets.md, rule 5).
-  const distinct = new Set(Object.values(canvases).map((size) => size.join("x")));
-  entry.canvas = distinct.size === 1 ? Object.values(canvases)[0] : canvases;
+  // provenance against its files reads (docs/process/assets.md, rule 5). A direction that failed its frame
+  // count has no size, and then the animation is given no canvas: the failure is what the report says of it.
+  const each = spec.directions.map((d) => canvases[d]);
+  if (each.every(Boolean)) entry.canvas = new Set(each.map((size) => size.join("x"))).size === 1 ? each[0] : canvases;
 }
 
 // A failure the owner has looked at and accepted (rule 13) is recorded as waived, not failed.
