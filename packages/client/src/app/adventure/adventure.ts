@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { ABILITIES, type AbilityId, isPlayableTimeline, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
@@ -7,11 +7,16 @@ import { cargoWords, stayedWords } from '../camp/panels/caravan-words';
 import { rewardWords } from '../camp/panels/job-words';
 import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
+import { BackLink } from '../primitives/back-link';
+import { HeroTile, type TileHero } from '../primitives/hero-tile';
+import { Icon } from '../primitives/icon';
+import { ResourceChip } from '../primitives/resource-chip';
 import { BattleView } from './battle-view';
 import { jobCast, timelineCast } from './cast';
 import { secondsLeft, waitingWords } from './field';
 import { Play } from './play';
 import { Playback } from './playback';
+import { partyAfter } from './replay-words';
 import { earnedWords, outcomeWords, stageResultWords } from './result-words';
 
 /** What a result says while the player could not be read again after the run was sent. */
@@ -25,16 +30,17 @@ const UNREAD = 'Your camp could not be read again, so anything this run opened i
  * retreat, and in a stage's last ten seconds the time left before the party
  * turns back. When the run ends it is submitted, and the result takes the
  * controls' place, with each unlock the run earned that the player did not
- * hold (Issue-352), and for a caravan what became of its cargo and who
- * stayed (Issue-355), the replay, which plays the stored timeline in the
- * same scene with no engine, and Back to camp. With no adventure open and no
+ * hold (Issue-352), and for a caravan what became of its cargo, who
+ * stayed (Issue-355) and who rode along (Issue-391), the replay, which plays the stored timeline in the
+ * same scene with no engine, and the way out to the camp, which leaves the
+ * result behind. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
  * to load, and for the art of everyone this adventure sets against the party, so
  * that the party is seen running on from the start.
  */
 @Component({
   selector: 'heat-adventure',
-  imports: [BattleView, Playback],
+  imports: [BackLink, BattleView, HeroTile, Icon, Playback, ResourceChip],
   templateUrl: './adventure.html',
   styleUrl: './battle-panel.css',
   providers: [Play],
@@ -45,6 +51,16 @@ export class Adventure {
   private readonly router = inject(Router);
   protected readonly outcomeWords = outcomeWords;
   /** Each stage of the settled result in words, "fight: won". */
+  /**
+   * Each hero's tile by id, from the snapshot the adventure set out with: at
+   * the level the result gave it once settled, else the level it set out at.
+   * Read once for the party in battle and the result's heroes.
+   */
+  protected readonly tiles = computed((): ReadonlyMap<string, TileHero> => {
+    const settled = this.game.settled();
+    const setOut = (settled?.adventure ?? this.game.adventure())?.snapshot.heroes ?? [];
+    return new Map(partyAfter(setOut, settled?.result?.heroes).map((h) => [h.heroId, h]));
+  });
   protected readonly stages = computed(() => stageResultWords(this.game.settled()?.result?.stages ?? []));
   /**
    * What the player is told for each unlock this run earned that they did
@@ -68,8 +84,7 @@ export class Adventure {
     const caravan = settled?.adventure.caravan;
     if (!settled || !caravan) return null;
     const destination = location(caravan.destination)?.name ?? caravan.destination;
-    const stayed = stayedWords(caravan, settled.result, destination, (id) => this.heroName(id));
-    const lines = [...cargoWords(caravan, settled.result, this.from(), destination), ...(stayed ? [stayed] : [])];
+    const lines = [...cargoWords(caravan, settled.result, this.from(), destination), ...stayedWords(caravan, settled.result, this.from(), destination, (id) => this.heroName(id))];
     return lines.length > 0 ? lines : null;
   });
   /**
@@ -122,6 +137,8 @@ export class Adventure {
   protected readonly abilitiesWaitId = computed(() => (this.abilitiesWait() ? 'abilities-wait' : null));
 
   constructor() {
+    // The result is shown once: leaving it, by its way out or any other, puts it away, and the camp the player is read again for shows what it changed.
+    inject(DestroyRef).onDestroy(() => { this.game.settled.set(null); });
     effect(() => {
       const adventure = this.game.adventure();
       if (!adventure || this.game.settled() || !this.view().ready() || this.startedId === adventure.id) return;
@@ -190,10 +207,4 @@ export class Adventure {
     return this.game.settled()?.adventure.snapshot.heroes.find((h) => h.heroId === heroId)?.level ?? 1;
   }
 
-  /** Back to the camp the adventure left from, which the player was read again for; a reload waiting for this happens now. */
-  protected async backToCamp(): Promise<void> {
-    const at = this.game.settled()?.adventure.location ?? this.game.location();
-    await this.router.navigate(['/camp', at]);
-    this.game.settled.set(null);
-  }
 }

@@ -9,9 +9,9 @@ import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
 import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
 import { testLayoutSizes } from '../testing/layout-sizes';
-import { itemHolding, listItems } from '../testing/page';
+import { button, itemHolding, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
-import { textsOf } from '../testing/texts-of';
+import { textsOf, wordsOf } from '../testing/texts-of';
 import { Adventure } from './adventure';
 import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
 import { isEntry } from './field';
@@ -139,7 +139,7 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBa
   return { run, router, user };
 }
 
-const button = (name: string) => screen.getByRole('button', { name });
+const link = (name: string) => screen.getByRole('link', { name });
 /** What a hero may do next: the group of its ability buttons. */
 const abilities = (hero: string) => within(screen.getByRole('group', { name: `${hero} next action` }));
 /** A hero's item in the party, which holds what it will do next. */
@@ -227,6 +227,8 @@ describe('Adventure', () => {
     await user.click(button('Pause'));
     await run(1000);
     expect(onTheRoad()).toBeInTheDocument();
+    // The button's name says its state, so it carries no pressed state beside it.
+    expect(button('Resume')).not.toHaveAttribute('aria-pressed');
     await user.click(button('Resume'));
     await user.click(button('4×'));
     await waitFor(() => { expect(button('4×')).toHaveAttribute('aria-pressed', 'true'); });
@@ -429,18 +431,18 @@ describe('Adventure', () => {
     expect(loadRun('a1')).toBeNull();
     expect(await screen.findByText('Job done.')).toBeInTheDocument();
     expect(textsOf(listItems('Stages'))).toEqual(['travel: done', 'gather: won', 'fight: won', 'arrive: done']);
-    expect(textsOf(listItems('Rewards'))).toEqual(['60 timber', '3 cloth']);
-    expect(screen.getByText('10 timber lost: the warehouse was full.')).toBeInTheDocument();
+    expect(wordsOf(listItems('Rewards'))).toEqual(['timber 60', 'cloth 3']);
+    expect(wordsOf([screen.getByText(/lost: the warehouse was full/)])).toEqual(['timber 10 lost: the warehouse was full.']);
     expect(screen.queryByText(/cloth lost/)).not.toBeInTheDocument();
-    expect(textsOf(listItems('Heroes'))).toEqual(['Wat +15 XP, level 2 level up', 'Wren died']);
+    expect(wordsOf(listItems('Heroes'))).toEqual(['Wat fighter, level 2 +15 XP level up', 'Wren villager, level 1 died']);
 
-    await user.click(button('Back to Millbrook'));
+    await user.click(link('Back to Millbrook'));
     await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
     expect(game.settled()).toBeNull();
   });
 
   it('says what a caravan delivered, what the cap lost and who stayed (Issue-355)', async () => {
-    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 40 }], staying: ['h2'] };
+    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 40 }], staying: ['h2'], riders: [] };
     const delivered = { ...result, delivered: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 30 }], deliveryLost: [{ material: 'timber', amount: 0 }, { material: 'ore', amount: 10 }] };
     const { run } = await renderAdventure(fakeGame(() => delivered, { ...adventure, caravan }));
     await run(120_000);
@@ -448,8 +450,19 @@ describe('Adventure', () => {
     expect(textsOf(listItems('Caravan'))).toEqual(['Delivered to Highcrag: 60 timber and 30 ore.', "10 ore lost: Highcrag's warehouse was full.", 'Stayed at Highcrag: Wren.']);
   });
 
+  // Cora is of no party, so the snapshot does not hold her: the caravan names her (Issue-391).
+  it.each([
+    ['who rode along with a caravan that arrived', 'complete' as const, ['Stayed at Highcrag: Wren.', 'Rode along to Highcrag: Cora.']],
+    ['that a rider is back where the party went down', 'defeat' as const, ['Nobody stayed at Highcrag: the caravan did not arrive.', 'Cora rode along and is back at Millbrook.']],
+  ])('says %s, by the name the caravan holds', async (_what, outcome, lines) => {
+    const caravan = { destination: 'highcrag', cargo: [], staying: ['h2', 'h9'], riders: [{ heroId: 'h9', name: 'Cora' }] };
+    const { run } = await renderAdventure(fakeGame(() => ({ ...result, outcome }), { ...adventure, caravan }));
+    await run(120_000);
+    await waitFor(() => { expect(textsOf(listItems('Caravan'))).toEqual(lines); });
+  });
+
   it("says a discarded caravan's cargo went back to the camp it left", async () => {
-    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: ['h2'] };
+    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: ['h2'], riders: [] };
     const { run } = await renderAdventure(fakeGame(() => null, { ...adventure, caravan }));
     await run(120_000);
     expect(await screen.findByText(/lost to a game update/)).toBeInTheDocument();
@@ -555,7 +568,7 @@ describe('Adventure', () => {
     const { run } = await renderAdventure(fakeGame(() => null));
     await run(120_000);
     expect(await screen.findByText('This adventure was lost to a game update. The party came home with nothing.')).toHaveRole('alert');
-    expect(button('Back to Millbrook')).toBeInTheDocument();
+    expect(link('Back to Millbrook')).toHaveAttribute('href', '/camp/millbrook');
   });
 
   it('keeps the log and offers to try again when the hub cannot be reached', async () => {

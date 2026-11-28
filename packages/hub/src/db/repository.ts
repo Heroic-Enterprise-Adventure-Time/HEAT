@@ -205,15 +205,29 @@ export interface AdventureRecord {
 }
 
 /**
+ * A rider (Issue-391, amending decision 0059): a hero who stays at a
+ * caravan's destination without being of its party, by its id and the name
+ * it had at the start. It is not in the snapshot, since it does not fight,
+ * and a settled adventure is read by anyone, so the record is what names it.
+ */
+export interface CaravanRider {
+  heroId: string;
+  name: string;
+}
+
+/**
  * A caravan as its start wrote it (decision 0059): the location it delivers
  * to, each resource of the cargo once, debited from the origin's holdings,
- * and the heroes of the party marked to stay, whose slots are held at the
- * destination until the adventure ends.
+ * and everyone marked to stay, the heroes of the party and the riders alike,
+ * whose slots are held at the destination until the adventure ends. The
+ * riders are named again in `riders`; a caravan written before Issue-391 has
+ * none and is read so.
  */
 export interface Caravan {
   destination: string;
   cargo: Reward[];
   staying: string[];
+  riders: CaravanRider[];
 }
 
 /** What a caravan's start writes beside the adventure: the destination camp as read, for the slots it holds there. */
@@ -280,7 +294,7 @@ export interface CaravanSettlement {
   stored: boolean;
   /** Each resource of the cargo up to the destination's cap; none unless the run arrived with the cart standing. */
   deliveries: CappedCredit[];
-  /** The heroes marked to stay, on arrival, alive or dead; none on any other end. */
+  /** Everyone marked to stay, of the party or riding, on arrival, alive or dead; none on any other end. */
   landed: string[];
   /** The slots held at the destination that are let go: one per hero marked to stay, on any end but arrival. */
   released: number;
@@ -306,6 +320,8 @@ export interface Settlement {
   holdings: CappedCredit[];
   survivors: { hero: Hero; xp: number; level: number }[];
   dead: Hero[];
+  /** A caravan's riders as read, each alive and on this adventure: none of them fought, so none gains XP or dies (Issue-391). */
+  riders: Hero[];
   result: SettledResult;
   /** A caravan's writes at its destination; absent for a job that delivers nothing. */
   caravan?: CaravanSettlement | undefined;
@@ -433,10 +449,26 @@ function readResult(result: MayLack<SettledResult, "unlocks" | "delivered" | "de
   return { ...result, unlocks: (result.unlocks ?? []).filter(isUnlockId), delivered: result.delivered ?? [], deliveryLost: result.deliveryLost ?? [] };
 }
 
+/** A caravan as this deploy reads it: one written before riders (Issue-391) names none, and carried none. */
+function readCaravan(caravan: MayLack<Caravan, "riders">): Caravan {
+  return { ...caravan, riders: caravan.riders ?? [] };
+}
+
 /** A record from before Issue-113 has no snapshot and is answered as it is. */
 function toAdventure(i: Stored<"adventure">): AdventureRecord {
-  const record: AdventureRecord = hasSnapshot(i) ? { ...i, snapshot: withTraits(i.snapshot) } : i;
+  const stored: AdventureRecord = hasSnapshot(i) ? { ...i, snapshot: withTraits(i.snapshot) } : i;
+  const record: AdventureRecord = stored.caravan ? { ...stored, caravan: readCaravan(stored.caravan) } : stored;
   return record.result ? { ...record, result: readResult(record.result) } : record;
+}
+
+/**
+ * The heroes an adventure's start marks with its id, each once: the party,
+ * and a caravan's riders, who are of no party (Issue-391). The start and the
+ * discard read it here, so that one cannot mark a hero the other leaves
+ * marked.
+ */
+function marked(record: AdventureRecord): string[] {
+  return [...record.snapshot.heroes.map((h) => h.heroId), ...(record.caravan?.riders ?? []).map((r) => r.heroId)];
 }
 
 /** The entities as a transaction's callback is handed them. */
@@ -657,10 +689,12 @@ export class Repository {
 
   /**
    * Start: write the open-adventure item only if the player has none, the
-   * adventure record only if the id is new, and mark each hero of the party
-   * with the adventure's id only if it is still alive, at the adventure's
-   * location and on no adventure, so a retire, a death or a move that races
-   * the start fails one side or the other; and check that each facility the
+   * adventure record only if the id is new, and mark each hero of the party,
+   * and each rider of a caravan (Issue-391), with the adventure's id only if
+   * it is still alive, at the adventure's location and on no adventure, so a
+   * retire, a death or a move that races the start fails one side or the
+   * other, and a rider can no more retire or set out again than a hero of
+   * the party can; and check that each facility the
    * job needs, the one that posts it, is built at its level or above
    * (Issue-133); and, where the location needs an unlock, that the player
    * holds it (decision 0059). Throws AdventureAlreadyOpen when the first
@@ -676,7 +710,7 @@ export class Repository {
   ): Promise<AdventureRecord> {
     const started: AdventureRecord = { ...record, playerId, status: "OPEN", ...(caravan ? { caravan: caravan.caravan } : {}) };
     const { adventureId, seed, startedAt, location } = record;
-    const heroIds = record.snapshot.heroes.map((h) => h.heroId);
+    const heroIds = marked(started);
     const failures: Failure[] = [];
     const on = failing(failures);
     const result = await this.service.transaction
@@ -823,7 +857,9 @@ export class Repository {
    * there: its location is set, `recruitedIn` written from where it was if
    * the item has none, its sighting moved there if it lives and deleted if it
    * died, and the origin's counts let go of it, the active count always and
-   * the living count if it lives, beside the dead's.
+   * the living count if it lives, beside the dead's. A rider (Issue-391) is
+   * written as a survivor with the XP and the level it had: its mark removed,
+   * and moved as any hero who lands is.
    *
    * Throws AdventureClosed when the open item or the record has moved on,
    * which is a repeat or a race with a discard; CampChanged when a balance
@@ -839,7 +875,9 @@ export class Repository {
     // and of each who lives its living count too, beside the dead's.
     const landed = new Set(s.caravan?.landed ?? []);
     const destination = s.caravan?.destination ?? location;
-    const landsAlive = s.survivors.filter(({ hero }) => landed.has(hero.id)).length;
+    // A rider is written as a survivor is, with the XP and the level it had: it lands or it is home, and it gained nothing (Issue-391).
+    const alive = [...s.survivors, ...s.riders.map((hero) => ({ hero, xp: hero.xp, level: hero.level }))];
+    const landsAlive = alive.filter(({ hero }) => landed.has(hero.id)).length;
     const leaveLiving = dead.length + landsAlive;
     const leaveActive = landed.size;
     /** Where a hero is after settlement: the destination if it lands, and home otherwise. */
@@ -875,7 +913,7 @@ export class Repository {
                 .where((a, op) => op.eq(a.warehouseLevel, warehouseLevel))
                 .commit(),
         ),
-        ...s.survivors.flatMap(({ hero, xp, level }) => [
+        ...alive.flatMap(({ hero, xp, level }) => [
           on(
             HeroChanged,
             items.hero
@@ -982,8 +1020,8 @@ export class Repository {
    * Discard: close an open adventure with nothing credited (decision 0030).
    * The open item is deleted only if it is this adventure, the record marked
    * discarded only if it is still open and the caller's, and each hero's mark
-   * removed only if it is this adventure's, so the party is back at the camp
-   * as it set out. A caravan's cargo goes back to the origin's warehouse up
+   * removed only if it is this adventure's, so the party, and a caravan's
+   * riders with it, is back at the camp as it set out. A caravan's cargo goes back to the origin's warehouse up
    * to its cap, each holding on the condition that its balance and the
    * warehouse are those read, with a ledger entry `return` saying what came
    * back and what the cap lost; the slots held at the destination are let go
@@ -993,7 +1031,7 @@ export class Repository {
   async discard(playerId: string, record: AdventureRecord, now = new Date(), returning?: CaravanReturn): Promise<void> {
     const { adventureId, location } = record;
     const staying = record.caravan?.staying.length ?? 0;
-    const heroIds = record.snapshot.heroes.map((h) => h.heroId);
+    const heroIds = marked(record);
     const failures: Failure[] = [];
     const on = failing(failures);
     const result = await this.service.transaction

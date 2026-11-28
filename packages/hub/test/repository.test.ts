@@ -2,20 +2,20 @@ import { randomUUID } from "node:crypto";
 
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { configFromEnv, createDocumentClient } from "../src/db/client.js";
+import { must } from "@heat/engine";
+
 import {
   AdventureAlreadyOpen,
   AlreadyApplied,
   InsufficientBalance,
   Repository,
 } from "../src/db/repository.js";
-import { player } from "./data.js";
+import { connected, player } from "./data.js";
 
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  repo = new Repository(createDocumentClient(config), config.tables);
+  ({ repo } = connected());
 });
 
 const at = "millbrook";
@@ -52,9 +52,9 @@ describe("start: one open adventure per player", () => {
     const lost = results.filter((r) => r.status === "rejected");
     expect(won).toHaveLength(1);
     expect(lost).toHaveLength(1);
-    expect((lost[0] as PromiseRejectedResult).reason).toBeInstanceOf(AdventureAlreadyOpen);
+    expect(must(lost[0], "the start that lost").reason).toBeInstanceOf(AdventureAlreadyOpen);
     const open = await repo.openAdventure(p);
-    expect(open?.adventureId).toBe((won[0] as PromiseFulfilledResult<{ adventureId: string }>).value.adventureId);
+    expect(open?.adventureId).toBe(must(won[0], "the start that won").value.adventureId);
   });
 });
 

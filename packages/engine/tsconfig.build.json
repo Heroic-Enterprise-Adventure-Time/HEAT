@@ -3,7 +3,11 @@
   "compilerOptions": {
     "noEmit": false,
     "rootDir": "src",
-    "outDir": "dist"
+    "outDir": "dist",
+    // The source is built without Node's types, because the client runs it in a
+    // browser: a use of Node in src fails here. Only the tests, which
+    // tsconfig.json covers, take them (typescript.md, rule 8).
+    "types": []
   },
   "include": ["src"]
 }

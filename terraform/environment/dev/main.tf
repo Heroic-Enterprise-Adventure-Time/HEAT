@@ -10,8 +10,8 @@
 # client, the alarms), and the pool's managed login domain last, because
 # Cognito checks that the domain's parent, heat-dev.dcg-games.com, has an A
 # record, and that record is the site's alias, written by the environment
-# module (terraform/modules/login-domain). The sandbox base has a placeholder
-# apex record instead; dev's apex is the game.
+# module (terraform/modules/login-domain). The sandbox base has that module
+# write a placeholder apex record instead; dev's apex is the game.
 
 locals {
   zone_name = "heat-dev.dcg-games.com"
@@ -89,6 +89,9 @@ module "login_domain" {
   zone_name       = module.base.zone_name
   zone_id         = module.base.zone_id
   certificate_arn = module.base.certificate_arn
+
+  # The apex is the game: the site's alias is the parent record.
+  apex_placeholder = false
 
   depends_on = [module.environment]
 }

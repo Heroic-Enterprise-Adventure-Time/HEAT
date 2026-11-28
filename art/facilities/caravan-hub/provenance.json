@@ -84,6 +84,6 @@
       "why": "Level 0: on a ground patch, and reads as nearly finished."
     }
   ],
-  "chosenBy": "Agent's picks, 2026-10-20 (Issue-89), shown to the owner in a mock-up of the 400×225 Millbrook at 3× (art/mockups/millbrook-400x225-3x.png) beside every candidate; the owner reviews them on PR-92 and may swap any.",
+  "chosenBy": "Agent's picks, 2026-10-20 (Issue-89), shown to the owner in a mock-up of the 400×225 Millbrook at 3× (art/mockups/millbrook-400x225-3x.png) beside every candidate. The owner reviewed them on PR-92 and merged it on 2026-10-21 with each pick as it stood.",
   "verified": "Each level-<n>.png is byte-identical to a second download from /mcp/map-objects/<id>/download, 2026-10-20."
 }

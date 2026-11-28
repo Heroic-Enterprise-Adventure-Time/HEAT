@@ -1,6 +1,7 @@
 import { GenericContainer, type StartedTestContainer } from "testcontainers";
 
 import { PREVIOUS_VERSION, VERSION } from "../versions.js";
+import { imageFrom } from "./image.js";
 import { ensureTables } from "./table.js";
 
 /**
@@ -13,7 +14,7 @@ import { ensureTables } from "./table.js";
 let container: StartedTestContainer | undefined;
 
 export async function setup(): Promise<void> {
-  container = await new GenericContainer("amazon/dynamodb-local:latest")
+  container = await new GenericContainer(imageFrom(new URL("dynamodb.Dockerfile", import.meta.url)))
     .withCommand(["-jar", "DynamoDBLocal.jar", "-inMemory", "-sharedDb"])
     .withExposedPorts(8000)
     .start();

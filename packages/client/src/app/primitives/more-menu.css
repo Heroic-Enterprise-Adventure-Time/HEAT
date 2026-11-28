@@ -1,0 +1,22 @@
+:host {
+  position: relative;
+  flex: none;
+}
+
+/* The list stands on a panel's frame of its own, under the button and over what follows it in the panel. */
+.items {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  z-index: 3;
+  min-width: 12rem;
+  margin: var(--space-xs) 0 0;
+  list-style: none;
+}
+
+.item {
+  display: block;
+  padding: var(--space-sm) var(--space-md);
+  color: inherit;
+  font-weight: bold;
+}

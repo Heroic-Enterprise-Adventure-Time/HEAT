@@ -1,6 +1,6 @@
 # 0034: The checkup's findings are issues, and a closed `excused` issue is the suppression record
 
-- **Status:** Decided. The filing shape, the cap and candidate rules superseded by 0049 on 2026-11-10 (Issue-273); a finding is still an issue, and `excused` still the suppression record.
+- **Status:** Decided. The filing shape, the cap and candidate rules superseded by 0049 on 2026-11-10 (Issue-273); a finding is still an issue, and `excused` still the suppression record. Amended by 0060 on 2026-11-27 (Issue-428): a standard's "Held back" is in its detail file.
 - **Date:** 2026-10-26
 - **Settles:** Issue-147: where a whole-tree finding goes, how one that is not to be fixed is remembered, and how much one run may file. Decision 0033 settles that the checkup exists, runs at a pause from a session on the subscription, and starts where lint and the review skill stop; it does not settle the surface.
 

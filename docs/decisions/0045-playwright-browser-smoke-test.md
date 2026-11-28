@@ -1,6 +1,6 @@
 # 0045: A Playwright smoke test of the page on every stack, its trace encrypted to a committed certificate
 
-- **Status:** Decided. Amended by 0046 on 2026-11-06: the browser's job holds no role, and `.github/actions/stack-test` calls `.github/actions/browser-test`. "The workflow holds no secret" below no longer holds for the workflow as a whole: the repository secret `HEAT_E2E_HANDOVER_KEY` seals the test user's password. The trace's encryption still needs no secret.
+- **Status:** Decided. Amended by 0046 on 2026-11-06: the browser's job holds no role, and `.github/actions/stack-test` calls `.github/actions/browser-test`. "The workflow holds no secret" below no longer holds for the workflow as a whole: the repository secret `HEAT_E2E_HANDOVER_KEY` seals the test user's password. The trace's encryption still needs no secret. Amended by Issue-396 on 2026-11-27: the browser checked against a pinned checksum.
 - **Date:** 2026-11-04
 - **Settles:** Issue-202, from the library review of 2026-11-03 (row 22): the pipeline tested a stack through its API and the page by hand, so nothing showed that a real browser could get from the hostname to a drawn camp.
 
@@ -17,6 +17,12 @@
 **No role's credentials in the browser.** `scripts/browser-test.mjs` reads the stack's parameters under the job's role, then starts Playwright with every `AWS_` variable removed, and the browser's install step blanks them too (`docs/process/best-practices.md`, rule 13). The steps live once, in `.github/actions/browser-test`, because `deploy.yml`'s copy runs only on `main` and a drifted copy would show first on `dev`.
 
 **A failed run's trace is encrypted before it leaves the runner.** A trace is kept on failure only, because it is what makes a browser failure readable. It holds the test user's password, its access token and its refresh token (see "Facts checked"), and the repository is public, so a plain artifact would publish them. `scripts/seal-browser-trace.sh` packs the results and encrypts them with `openssl cms` to `scripts/browser-trace-recipient.pem`, a committed certificate, and the workflow uploads only the result, as the artifact `browser-trace`, for 7 days. The workflow holds no secret, which keeps decision 0020's "the stacks take no secret". The private key is `docs/private/heat-browser-trace-key.pem`, git-ignored on the owner's laptop, where an agent's session can read a failed trace too. It is held nowhere else: if it is lost, a new pair replaces the certificate and only old artifacts become unreadable. The certificate carries no other trust.
+
+## Amendment: the browser checked against a pinned checksum (Issue-396, 2026-11-27)
+
+**The browser is no longer installed by `npx playwright install --with-deps chromium`,** which checks no digest. `.github/actions/browser-test` downloads the headless shell of the revision the locked Playwright names, the one a headless launch uses, checks it against a SHA-256 pinned in the action before it runs (`docs/process/best-practices.md`, rule 14), and unpacks it where Playwright looks, with the marker Playwright's own install writes. `npx playwright install-deps chromium` installs the OS packages alone, from the runner's apt sources. The action refuses a revision other than the locked Playwright's, and `packages/client/scripts/browser-pin.test.mjs` makes the same check in "Build and test", because a Dependabot pull request for Playwright has no stack to run the action on.
+
+**Why.** The browser runs in a job with no role, but it is still code the pipeline downloads and runs, and rule 14 asks that it be checked first. Chrome for Testing publishes no signature, so the checksum was read from Playwright's CDN and from Google's `chrome-for-testing-public` bucket, which served the same bytes.
 
 ## Considered and not chosen
 

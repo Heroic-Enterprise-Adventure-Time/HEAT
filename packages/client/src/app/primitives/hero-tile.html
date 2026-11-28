@@ -1,0 +1,32 @@
+@if (hero(); as hero) {
+  @if (link(); as link) {
+    <a class="tile" [attr.aria-labelledby]="nameId" [attr.aria-describedby]="detailId" [routerLink]="link"><ng-container *ngTemplateOutlet="about; context: { $implicit: hero }" /></a>
+  } @else if (still()) {
+    <span class="tile"><ng-container *ngTemplateOutlet="about; context: { $implicit: hero }" /></span>
+  } @else {
+    <button
+      type="button"
+      class="tile"
+      [class.picked]="picked()"
+      [attr.aria-labelledby]="nameId"
+      [attr.aria-describedby]="detailId"
+      [attr.aria-pressed]="picked()"
+      [disabled]="disabled()"
+      (click)="toggled.emit()"
+    >
+      <ng-container *ngTemplateOutlet="about; context: { $implicit: hero }" />
+    </button>
+  }
+} @else {
+  <span class="tile empty">Empty slot</span>
+}
+
+<ng-template #about let-hero>
+  @if (icons.portrait(hero.spriteSet); as portrait) {
+    <img class="portrait" alt="" [ngSrc]="portrait" [width]="portraitPx" [height]="portraitPx" />
+  }
+  <span class="about">
+    <span class="name" [id]="nameId">{{ hero.name }}</span>
+    <span class="detail" [id]="detailId">{{ hero.unitType }}, level {{ hero.level }}</span>
+  </span>
+</ng-template>

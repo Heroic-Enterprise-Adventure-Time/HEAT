@@ -5,6 +5,7 @@ import { range } from "es-toolkit";
 import type { UnitType } from "@heat/engine";
 
 import type { Hero, Repository } from "./db/repository.js";
+import type { Random } from "./random.js";
 
 /**
  * The heroes seen at a location (decision 0029): a hero's public fields,
@@ -31,8 +32,6 @@ export interface Sighting {
   /** Epoch seconds, the location table's TTL attribute. */
   expiresAt: number;
 }
-
-export type Random = (max: number) => number;
 
 /** The hero's public fields, seen at its location at the given time. */
 export function sightingOf(hero: Hero, at: Date): Sighting {
@@ -73,6 +72,7 @@ export async function heroesSeenAt(
 
   const own = new Set((await repo.heroes(playerId)).map((h) => h.id));
   const others = [...first.sightings, ...wrapped.sightings].filter((s) => !own.has(s.heroId));
+  // A Fisher-Yates shuffle by the draw given (`random.ts` says why not es-toolkit's `shuffle`).
   for (let i = others.length - 1; i > 0; i--) {
     const j = random(i + 1);
     const a = others[i];

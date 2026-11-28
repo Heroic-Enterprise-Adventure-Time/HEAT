@@ -276,6 +276,142 @@
           "quarry"
         ]
       }
+    },
+    "recruit": {
+      "file": "recruit.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fifthPack",
+      "candidate": 6,
+      "pixellab": {
+        "objectId": "913b05c6-84a5-4562-92c5-ba2b79d8f117",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "recruit"
+        ]
+      }
+    },
+    "build": {
+      "file": "build.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fifthPack",
+      "candidate": 8,
+      "pixellab": {
+        "objectId": "530950ed-956c-4362-b748-cdb1439ae7e8",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "build"
+        ]
+      }
+    },
+    "more": {
+      "file": "more.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fifthPack",
+      "candidate": 15,
+      "pixellab": {
+        "objectId": "1df04766-ad5d-4604-9883-e83467892370",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "more"
+        ]
+      }
+    },
+    "replays": {
+      "file": "replays.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fifthPack",
+      "candidate": 19,
+      "pixellab": {
+        "objectId": "ea2348ee-3d69-46f7-96bc-48d4c8881cb1",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "replays"
+        ]
+      }
+    },
+    "settings": {
+      "file": "settings.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "fifthPack",
+      "candidate": 22,
+      "pixellab": {
+        "objectId": "27dd132b-7408-4531-ab69-2b0345793298",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "settings"
+        ]
+      }
+    },
+    "depart": {
+      "file": "depart.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "sixthPack",
+      "candidate": 0,
+      "pixellab": {
+        "objectId": "fcc56016-fa9b-4b6e-95f0-27284ad7d8ce",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "depart"
+        ]
+      }
+    },
+    "close": {
+      "file": "close.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "sixthPack",
+      "candidate": 13,
+      "pixellab": {
+        "objectId": "1186250c-743d-417e-b5b4-95c31315979b",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "close"
+        ]
+      }
+    },
+    "back": {
+      "file": "back.png",
+      "canvas": [
+        32,
+        32
+      ],
+      "pack": "sixthPack",
+      "candidate": 18,
+      "pixellab": {
+        "objectId": "560e57d2-0394-4208-8e2e-703af84bc9b7",
+        "tags": [
+          "heat",
+          "ui-icon",
+          "back"
+        ]
+      }
     }
   },
   "secondPack": {
@@ -321,7 +457,7 @@
     "candidates": 64,
     "generations": 10,
     "note": "Ideas for later facilities were rolled in the same pack; the ones not kept stay in the review object, tagged rejected, and can be promoted when their facility is added.",
-    "chosenBy": "The agent's picks (mine 2, lumber camp 6, caravan hub 10), 2026-10-20, for the owner to review on PR-92.",
+    "chosenBy": "The agent's picks (mine 2, lumber camp 6, caravan hub 10), 2026-10-20. The owner reviewed them on PR-92 and merged it on 2026-10-21 with each pick as it stood.",
     "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20.",
     "rejects": "The candidates not kept stay in the review object e5f78cf5-6d73-4be5-98da-ef94d365e89b, tagged rejected."
   },
@@ -405,5 +541,100 @@
     "chosenBy": "The owner's picks from a numbered sheet of candidates 0 to 11 at 3×, 2026-11-26 (Issue-356): stone 0, the agent's recommendation, and quarry 7, the owner's own choice over the agent's 6.",
     "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download and to its candidate frame in the review object, saved before it was promoted: stone.png and quarry.png on 2026-11-26.",
     "rejects": "The 62 candidates not kept stay in the review object 1e46b7d4-375d-4144-9bbf-6062668fea72, tagged heat, ui-icon and rejected, with their indices as rolled."
+  },
+  "fifthPack": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-26",
+    "reviewObjectId": "7c4f0236-1a29-4274-8f32-629672f9191e",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 05",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "depart icon: boot stepping onto a dirt road",
+        "depart icon: wooden signpost with an arrow pointing right",
+        "depart icon: crossed sword and travel pack",
+        "depart icon: open gate with a road leading out",
+        "recruit icon: helmet with a plus sign beside it",
+        "recruit icon: hand holding out a rolled contract scroll",
+        "recruit icon: quill pen over a signed parchment",
+        "recruit icon: shield with a small plus emblem",
+        "build icon: hammer crossed with a saw",
+        "build icon: hammer over a stack of planks",
+        "build icon: wooden scaffold frame with a hammer",
+        "build icon: trowel and a brick",
+        "back icon: wooden arrow pointing left",
+        "back icon: curved arrow turning back to the left",
+        "back icon: wooden signpost pointing left",
+        "more icon: three gold dots in a row",
+        "more icon: three small round pebbles in a row",
+        "more icon: three brass studs in a row",
+        "replays icon: rolled parchment scroll with a red ribbon",
+        "replays icon: open book with a bookmark",
+        "replays icon: hourglass with sand running",
+        "replays icon: crossed swords over a small scroll",
+        "settings icon: brass cogwheel",
+        "settings icon: two interlocking brass gears",
+        "settings icon: wrench crossed with a screwdriver",
+        "settings icon: wooden lever switch"
+      ]
+    },
+    "candidates": 64,
+    "candidatesNote": "Indices 0 to 25 follow itemDescriptions; 26 to 63 were drawn by the service from the description alone.",
+    "generations": 10,
+    "note": "The page’s action icons (Issue-385, decision 0061): four ideas for each of depart, recruit and build, three for back, and three or four for more, replays and settings. No earlier pack held an idea for any, so a pack of their own was rolled with the same style image as the others.",
+    "chosenBy": "The owner’s picks from a numbered sheet of all 64 candidates at 3×, 2026-11-26 (Issue-385): recruit 6, the quill over a signed parchment, over the agent’s 4; build 8, more 15 and settings 22, the agent’s; replays 19, the open book, over the agent’s 21. Depart and back were rolled again in sixthPack.",
+    "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download and to its candidate frame in the review object, saved before it was promoted: recruit.png, build.png, more.png, replays.png and settings.png on 2026-11-26.",
+    "rejects": "The 59 candidates not kept stay in the review object 7c4f0236-1a29-4274-8f32-629672f9191e, tagged heat, ui-icon and rejected, with their indices as rolled."
+  },
+  "sixthPack": {
+    "tool": "create_1_direction_object",
+    "via": "MCP",
+    "createdAt": "2026-11-26",
+    "reviewObjectId": "d667a5db-ca5e-47cd-8271-cfcb35f84f60",
+    "parameters": {
+      "description": "small game menu icon, black outline, warm earthy tones, NES-era retro pixel art, few colors",
+      "name": "heat ui icons 06",
+      "view": "top-down",
+      "size": null,
+      "styleImages": [
+        "art/facilities/job-board/level-1.png (32×32, which sets the output size)"
+      ],
+      "itemDescriptions": [
+        "depart icon: two steel swords crossed in an X, hilts down, nothing else",
+        "depart icon: two crossed swords with brown leather grips, plain",
+        "depart icon: crossed sword and axe, blades up",
+        "depart icon: two crossed swords behind a round wooden shield",
+        "depart icon: crossed swords with a small gold star above",
+        "depart icon: single sword raised point up with a gleam",
+        "depart icon: two crossed swords, gold hilts, bold and simple",
+        "depart icon: crossed sword and spear",
+        "depart icon: sword and shield side by side",
+        "depart icon: two crossed swords over a small red banner",
+        "close icon: bold red X with a black outline",
+        "close icon: thick red cross mark, two crossed strokes",
+        "close icon: red X on a small dark round button",
+        "close icon: chunky red X with a lighter red highlight",
+        "close icon: red X brush strokes",
+        "close icon: red X on a parchment square",
+        "close icon: red X inside a red circle outline",
+        "close icon: simple red X, square ends",
+        "back icon: green arrow pointing left",
+        "back icon: green curved arrow turning back to the left",
+        "back icon: green arrow pointing left on a round button"
+      ]
+    },
+    "candidates": 64,
+    "candidatesNote": "Indices 0 to 20 follow itemDescriptions; 21 to 63 were drawn by the service from the description alone.",
+    "generations": 10,
+    "note": "Depart, close and back again (Issue-385), at the owner’s asking: depart as a combat action, crossed swords with nothing beside them, since the fifth pack’s swords came with a pack or a scroll; a red X to close what sits over the camp, preferred to an arrow; and a green arrow for where back has to mean back.",
+    "chosenBy": "The owner’s picks from a numbered sheet of candidates 0 to 20 at 3×, 2026-11-26 (Issue-385): depart 0 and close 13, the agent’s recommendations, and back 18, kept beside close for where a view steps back rather than closes.",
+    "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download and to its candidate frame in the review object, saved before it was promoted: depart.png, close.png and back.png on 2026-11-26.",
+    "rejects": "The 61 candidates not kept stay in the review object d667a5db-ca5e-47cd-8271-cfcb35f84f60, tagged heat, ui-icon and rejected, with their indices as rolled."
   }
 }

@@ -1,5 +1,6 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 
+import { mapValues } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -20,6 +21,7 @@ import {
   nextLevel,
   PRESENTATIONS,
   recruitCost,
+  recruitRefusal,
   SPRITE_SET_PRESENTATION,
   SPRITE_SETS,
   STARTING_LOCATION,
@@ -31,19 +33,17 @@ import {
   warehouseCapacity,
 } from "../src/index.js";
 import { HIGHCRAG } from "./adventure/helpers.js";
+import { artDir, artSets, listed } from "./art.js";
 
-const heroes = new URL("../../../art/heroes/", import.meta.url);
-const facilities = new URL("../../../art/facilities/", import.meta.url);
+const facilities = artDir("facilities");
 
 describe("static content", () => {
-  const provenances = readdirSync(heroes)
-    .sort()
-    .map((set) => ({ set, ...(JSON.parse(readFileSync(new URL(`${set}/provenance.json`, heroes), "utf8")) as { classes: string[]; presentation: string }) }));
+  const provenances = artSets("heroes").map((set) => ({ set: set.set, classes: listed(set, "classes"), presentation: set.provenance["presentation"] }));
 
   it("lists the sprite sets each unit type allows exactly as the sets' provenance says", () => {
     const fromArt: Record<string, string[]> = {};
     for (const { set, classes } of provenances) for (const unitType of classes) (fromArt[unitType] ??= []).push(set);
-    const fromContent = Object.fromEntries(Object.entries(SPRITE_SETS).map(([u, sets]) => [u, [...sets].sort()]));
+    const fromContent = mapValues(SPRITE_SETS, (sets) => [...sets].sort());
     expect(fromContent).toEqual(fromArt);
     expect(Object.keys(SPRITE_SETS).sort()).toEqual([...UNIT_TYPES].sort());
   });
@@ -185,6 +185,19 @@ describe("static content", () => {
     expect(buildRefusal(poor, "caravan-hub")).toMatchObject({ code: "REQUIRES", missing: [{ kind: "warehouse", level: 2 }] });
     expect(buildRefusal(poor, "mine")).toMatchObject({ code: "INSUFFICIENT_RESOURCES", short: [{ material: "cloth", amount: 3, balance: 0 }] });
     expect(buildRefusal({ ...poor, holdings: [{ material: "timber", balance: 60 }, { material: "cloth", balance: 3 }] }, "mine")).toBeNull();
+  });
+
+  it("refuses a recruit for the hall's level, then for a full hall, then for the price, and never the free villager for its price", () => {
+    const villager = must(location(STARTING_LOCATION)?.recruits.find((r) => r.unitType === "villager"), "the starting location's villager");
+    const camp = { hallLevel: villager.hallLevel, activeHeroes: 1, livingHeroes: 1, holdings: [] };
+    const price = villager.cost.map(({ material, amount }) => ({ material, amount, balance: 0 }));
+    expect(recruitRefusal({ ...camp, hallLevel: villager.hallLevel - 1 }, villager)).toMatchObject({ code: "HALL_LEVEL", hallLevel: villager.hallLevel });
+    expect(recruitRefusal({ ...camp, activeHeroes: hallCapacity(camp.hallLevel) }, villager)?.code).toBe("HALL_FULL");
+    expect(recruitRefusal(camp, villager)).toMatchObject({ code: "INSUFFICIENT_RESOURCES", short: price });
+    expect(recruitRefusal({ ...camp, holdings: price.map((p) => ({ material: p.material, balance: p.amount })) }, villager)).toBeNull();
+    // With a free slot and nobody alive, the villager costs nothing; a full hall is full before anything is free.
+    expect(recruitRefusal({ ...camp, livingHeroes: 0 }, villager)).toBeNull();
+    expect(recruitRefusal({ ...camp, activeHeroes: hallCapacity(camp.hallLevel), livingHeroes: 0 }, villager)?.code).toBe("HALL_FULL");
   });
 
   it("has enough distinct names for every presentation that a full hall never runs out", () => {

@@ -1,0 +1,28 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) var(--space-md) var(--space-xs) var(--space-xs);
+  border: var(--frame-outline) solid var(--line-frame);
+  border-radius: var(--frame-corner);
+  background: var(--surface-panel-soft);
+  color: var(--on-panel);
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+/* A cost the camp cannot meet: rust, and dashed so that it does not rest on colour alone. */
+.chip.short {
+  border-style: dashed;
+  border-color: var(--refusal);
+  color: var(--refusal);
+}
+
+.chip img {
+  image-rendering: pixelated;
+}
+
+.name {
+  padding-left: var(--space-sm);
+  font-weight: normal;
+}

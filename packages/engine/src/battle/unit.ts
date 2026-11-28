@@ -13,10 +13,9 @@
 import type { Material, MonsterType, ResourceType, UnitType } from "../index.js";
 import type { AbilityDefinition } from "./ability.js";
 
-/** A side's lines, nearest the other side first. */
-export type Line = "front" | "near" | "far" | "back";
-
-export const LINES: readonly Line[] = ["front", "near", "far", "back"];
+/** A side's lines, nearest the other side first. The list declares the union (typescript.md, rule 18). */
+export const LINES = ["front", "near", "far", "back"] as const;
+export type Line = (typeof LINES)[number];
 
 /** 0 for the front line, 3 for the back. */
 export function lineIndex(line: Line): number {

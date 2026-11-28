@@ -1,7 +1,10 @@
 /*
  * What a battle page's content area holds (battle-view.ts), shared by the
  * pages that project into it, the open adventure and a replay, and by the
- * playback controls they both show, as the panels share panel.css.
+ * playback controls they both show, as the panels share panel.css. A page
+ * builds its controls from the shared primitives (decision 0061) and styles
+ * no button of its own: an element rule here would be scoped to the page and
+ * outrank the global .button (found in the review of PR-388).
  */
 h2 {
   margin: 0 0 var(--space-sm);
@@ -17,13 +20,17 @@ p {
   margin: 0 0 var(--space-md);
 }
 
-button {
-  font: inherit;
+/* A panel's title, with its way out at the end of the line where it has one. */
+.title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
 }
 
-button[aria-pressed='true'] {
-  background: var(--gold);
-  color: var(--ink);
+.title h2 {
+  margin: 0;
 }
 
 .playback,
@@ -39,6 +46,10 @@ button[aria-pressed='true'] {
   margin-top: var(--space-md);
 }
 
+.playback {
+  margin-bottom: var(--space-md);
+}
+
 .after {
   display: flex;
   flex-wrap: wrap;
@@ -47,20 +58,31 @@ button[aria-pressed='true'] {
 
 .party,
 .heroes,
-.rewards,
+.chips,
 .caravan {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.party li {
+.party li,
+.heroes li {
   margin-bottom: var(--space-md);
 }
 
+.heroes li,
 .who {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--space-md);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
 }
 
 .health {
@@ -75,12 +97,12 @@ meter {
 .dead,
 .lost,
 .note {
-  color: var(--rust);
+  color: var(--refusal);
 }
 
 .countdown {
   font-weight: bold;
-  color: var(--rust);
+  color: var(--refusal);
 }
 
 .queued {
@@ -106,11 +128,6 @@ meter {
  */
 .unlocked p {
   padding-left: var(--space-sm);
-  border-left: var(--border-thick) solid var(--gold);
-  font-weight: bold;
-}
-
-.link {
-  color: inherit;
+  border-left: var(--border-thick) solid var(--marker-active);
   font-weight: bold;
 }

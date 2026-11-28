@@ -23,11 +23,13 @@ updates:
         patterns: ["@graphql-codegen/*"]
         update-types: [major]
     # What the standards hold back, majors and one minor, each with its
-    # reason under "Held back" in docs/standards/typescript-dependencies.md.
+    # reason under "Held back" in docs/standards/typescript-detail.md.
     # An entry leaves this list and that list in the same pull request.
     ignore:
       - dependency-name: graphql
         update-types: ["version-update:semver-major"]
+      # Not held back but held for good: the types' major is .node-version's
+      # and moves only with it (docs/standards/typescript.md, rule 1).
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
       - dependency-name: typescript
@@ -47,6 +49,16 @@ updates:
       # angular-eslint's major tracks Angular's, so it moves with them.
       - dependency-name: angular-eslint
         update-types: ["version-update:semver-major"]
+
+  # The images tests start, each the FROM line of a *.Dockerfile that
+  # nothing builds, pinned by version and digest; Dependabot moves both
+  # together (docs/standards/typescript.md, rule 33). A new one is listed
+  # here, which packages/hub/test/images.test.ts checks.
+  - package-ecosystem: docker
+    directories:
+      - /packages/hub/test/setup
+    schedule:
+      interval: weekly
 
   - package-ecosystem: github-actions
     # The workflows, and the composite actions they share. GitHub documents

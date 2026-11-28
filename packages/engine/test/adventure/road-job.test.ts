@@ -2,7 +2,7 @@ import { isEqual } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { type AdventureResult, FACILITIES, JOBS, jobsPostedBy, largestStages, location, MONSTERS, must, type SnapshotHero, STARTING_LOCATION } from "../../src/index.js";
-import { CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, party, played, RECRUITED_TYPES, ROAD, SEEDS, STAND, villagers, WOLVES } from "./helpers.js";
+import { battleStage, CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, named, party, played, RECRUITED_TYPES, ROAD, SEEDS, STAND, villagers, WOLVES } from "./helpers.js";
 
 // "Scout the road to Highcrag" (Issue-352, decision 0059): the caravan hub's
 // first job, the first that grants an unlock, and the bandit's first job. A
@@ -11,8 +11,7 @@ import { CARAVAN, CARAVAN_BACK, enemiesXp, HIGHCRAG, party, played, RECRUITED_TY
 // hero doing it, and which do not come back.
 
 const road = JOBS[ROAD];
-const fight = road.stages[1];
-if (fight?.kind !== "fight") throw new Error("The road job fights second");
+const fight = battleStage(road, "fight");
 const UNLOCK = must(must(location(HIGHCRAG), "Highcrag").unlock, "the unlock Highcrag needs");
 
 /**
@@ -38,7 +37,6 @@ const FALL = [...LONE, PARTIES.twoVillagers, PARTIES.rangerAndVillager];
 /** The parties that open the road on every seed with nobody lost. */
 const SAFE = [PARTIES.twoFighters, PARTIES.fighterRangerAndVillager, PARTIES.fighterAndThreeVillagers];
 
-const named = (heroes: readonly SnapshotHero[]) => heroes.map((h) => h.unitType).join(", ");
 
 /** The run arrived: the road is open, nothing came home, and each survivor has the wolves job's 20 XP. */
 function expectOpened(result: AdventureResult, seed: string): void {

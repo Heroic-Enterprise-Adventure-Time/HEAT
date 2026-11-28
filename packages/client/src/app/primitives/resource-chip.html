@@ -1,0 +1,11 @@
+<span class="chip" [class.short]="short()">
+  @if (icons.src(material()); as icon) {
+    <img [alt]="material()" [ngSrc]="icon" [width]="iconPx" [height]="iconPx" />
+  } @else {
+    <span class="name">{{ material() }}</span>
+  }
+  <span class="amount">{{ amount() }}</span>
+  @if (short()) {
+    <span class="visually-hidden">, more than the camp has</span>
+  }
+</span>

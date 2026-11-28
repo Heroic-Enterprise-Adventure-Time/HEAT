@@ -49,7 +49,7 @@
       "groupId": "2ba76298-75f4-4c2d-95b6-d6defa0f07b0",
       "directions": ["south", "east", "north"],
       "framesPerDirection": 6,
-      "canvas": [64, 64],
+      "canvas": { "south": [48, 48], "east": [64, 64], "north": [64, 64] },
       "files": "walk-<direction>-<0..5>.png",
       "calls": [
         {

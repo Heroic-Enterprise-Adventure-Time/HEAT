@@ -3,10 +3,13 @@
  * All randomness in a battle flows through this class.
  *
  * Copied from BattleScript Online, bso-game-shared/src/combat/rng.ts,
- * unchanged but for this header. The hub issues the seed at the start of an
- * adventure; given the same seed and the same sequence of calls, this always
- * produces identical output.
+ * unchanged but for this header and for `must` on an element read by index,
+ * in place of a cast, which draws nothing more. The hub issues the seed at
+ * the start of an adventure; given the same seed and the same sequence of
+ * calls, this always produces identical output.
  */
+import { must } from "../must.js";
+
 export class SeededRng {
   private state: number;
 
@@ -31,8 +34,8 @@ export class SeededRng {
   shuffle<T>(array: T[]): T[] {
     for (let i = array.length - 1; i > 0; i--) {
       const j = this.nextInt(0, i);
-      const temp = array[i] as T;
-      array[i] = array[j] as T;
+      const temp = must(array[i], "the shuffle's element at i");
+      array[i] = must(array[j], "the shuffle's element at j");
       array[j] = temp;
     }
     return array;
@@ -43,7 +46,7 @@ export class SeededRng {
     if (array.length === 0) {
       throw new Error("Cannot pick from an empty array");
     }
-    return array[this.nextInt(0, array.length - 1)] as T;
+    return must(array[this.nextInt(0, array.length - 1)], "the picked element");
   }
 
   /** Hashes a string seed into a 32-bit integer. Uses djb2. */

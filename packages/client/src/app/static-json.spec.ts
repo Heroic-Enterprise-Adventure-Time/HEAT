@@ -1,13 +1,11 @@
 import { TilesetJsonSchema } from './camp/scene/ground';
 import { fetchJson } from './static-json';
+import { answering } from './testing/fetch';
 
 const tileset = {
   tile_size: { width: 16, height: 16 },
   tileset_data: { tiles: [{ corners: { NE: 'upper', NW: 'lower', SE: 'lower', SW: 'lower' }, bounding_box: { x: 0, y: 0, width: 16, height: 16 } }] },
 };
-
-/** A fetch that answers every request with the body and the status. */
-const answering = (body: unknown, status = 200): typeof fetch => () => Promise.resolve(new Response(JSON.stringify(body), { status }));
 
 describe('fetchJson', () => {
   it('answers a static file that matches its schema', async () => {

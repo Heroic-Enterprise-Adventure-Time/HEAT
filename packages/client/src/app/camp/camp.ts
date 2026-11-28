@@ -6,6 +6,7 @@ import { ActivatedRoute, Router, RouterLink, RouterLinkActive, RouterOutlet } fr
 import { type FacilityKind, STARTING_LOCATION } from '@heat/engine';
 
 import { Game, type HeroView, type SeenHeroView } from '../game';
+import { ICON_PX } from '../icon-names';
 import { Icons } from '../icons';
 import { CampState } from './camp-state';
 import { LAYOUT_SIZES } from './layout-sizes';
@@ -66,7 +67,7 @@ export class Camp {
   private readonly viewport = signal(this.measured());
   protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height, this.viewport().sizes));
   protected readonly labels = computed(() => menuLabels(this.viewport().width, this.viewport().height, this.viewport().sizes));
-  protected readonly iconPx = computed(() => 32 * iconScale(this.viewport().width, this.viewport().height, this.viewport().sizes));
+  protected readonly iconPx = computed(() => ICON_PX * iconScale(this.viewport().width, this.viewport().height, this.viewport().sizes));
   /** Stacked, the scene's box is the page's width by the map's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() =>
     this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height, this.viewport().sizes, this.viewport().ratio),

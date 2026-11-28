@@ -4,7 +4,18 @@
       @let lock = locked(job);
       <li [class.locked]="lock !== null">
         <a class="link" [routerLink]="['jobs', job.id]">{{ job.name }}</a>
-        <span>{{ lock ?? pays(job) }}</span>
+        @if (lock) {
+          <span>{{ lock }}</span>
+        } @else {
+          <span class="pays">
+            @for (reward of job.pay; track reward.material) {
+              <heat-resource-chip [material]="reward.material" [amount]="reward.amount" />
+            } @empty {
+              <span>{{ noPay }}</span>
+            }
+            <span>{{ bonus(job) }}</span>
+          </span>
+        }
       </li>
     }
   </ul>

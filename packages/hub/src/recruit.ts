@@ -5,6 +5,7 @@ import {
   heroNames,
   type Recruit,
   recruitCost,
+  recruitRefusal,
   SPRITE_SET_PRESENTATION,
   SPRITE_SETS,
 } from "@heat/engine";
@@ -20,6 +21,7 @@ import {
   type Repository,
 } from "./db/repository.js";
 import { campLocation, refuseNoCamp } from "./locations.js";
+import type { Random } from "./random.js";
 import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Refusal } from "./refusals.js";
 
 /**
@@ -47,26 +49,25 @@ import { badInput, Conflict, HallFull, HallLevel, InsufficientResources, type Re
  * lower-case UUID by the time it arrives (`RecruitHeroInput`).
  */
 
-export type Random = (max: number) => number;
-
+/** One of the items, by the draw given (`random.ts` says why not es-toolkit's `sample`). */
 function pick<T>(items: readonly T[], random: Random): T {
   const item = items[random(items.length)];
   if (item === undefined) throw new Error("pick from an empty list");
   return item;
 }
 
-/** The first rule the camp fails, in the order the hall shows them, or nothing if it fails none. */
+/** The first rule the camp fails, in the order the hall shows them, or nothing if it fails none: the engine's rule (`recruitRefusal`), as this API's refusal. */
 function barred(camp: Camp, recruit: Recruit): Refusal | undefined {
-  if (camp.hallLevel < recruit.hallLevel) return new HallLevel(`a ${recruit.unitType} needs a level ${recruit.hallLevel} hall`, recruit.hallLevel);
-  if (camp.activeHeroes >= hallCapacity(camp.hallLevel)) return new HallFull("the heroes hall is full");
-  const short = recruitCost(recruit, camp.livingHeroes)
-    .map(({ material, amount }) => ({ material, amount, balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0 }))
-    .filter((s) => s.balance < s.amount);
-  if (short.length > 0) {
-    const words = short.map((s) => `${s.amount} ${s.material}, and the camp has ${s.balance}`).join("; ");
-    return new InsufficientResources(`a ${recruit.unitType} costs ${words}`, short);
+  const refusal = recruitRefusal(camp, recruit);
+  if (!refusal) return undefined;
+  switch (refusal.code) {
+    case "HALL_LEVEL":
+      return new HallLevel(refusal.message, refusal.hallLevel);
+    case "HALL_FULL":
+      return new HallFull(refusal.message);
+    case "INSUFFICIENT_RESOURCES":
+      return new InsufficientResources(refusal.message, refusal.short);
   }
-  return undefined;
 }
 
 /**

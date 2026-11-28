@@ -15,6 +15,13 @@ variable "environment" {
 variable "github_environment" {
   description = "The GitHub Actions environment whose jobs may assume the apply role, as a StringLike pattern: dev and prod exactly, sandbox-* for the per-stack environments of the sandbox account."
   type        = string
+
+  # The subject the apply role trusts: a typo here widens that trust or
+  # breaks it, and nothing else would refuse it before the owner's apply.
+  validation {
+    condition     = contains(["dev", "prod", "sandbox-*"], var.github_environment)
+    error_message = "github_environment must be dev, prod or sandbox-*."
+  }
 }
 
 variable "plan_github_environment" {

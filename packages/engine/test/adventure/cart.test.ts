@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 
 import { type AdventureContent, type AdventureResult, type AdventureTimeline, CART, CART_UNIT_ID, JOBS, must, replay, type SnapshotHero } from "../../src/index.js";
-import { CARAVAN_CONTENT, CARAVAN_JOB, ofKind, party, ROAD, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { CARAVAN_CONTENT, CARAVAN_JOB, named, ofKind, party, ROAD, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 /** The tests' caravan played by a party on a seed, with what the log orders. */
 function run(heroes: readonly SnapshotHero[], seed: string, content: AdventureContent = CARAVAN_CONTENT, log: Parameters<typeof replay>[2] = []) {
@@ -28,7 +28,6 @@ function broke(timeline: AdventureTimeline): boolean {
 /** The caravan's content with the cart at one health, so a bandit's first blow breaks it. */
 const FRAGILE: AdventureContent = { ...CARAVAN_CONTENT, battle: { ...CARAVAN_CONTENT.battle, cart: { ...CART, health: 1 } } };
 
-const named = (heroes: readonly SnapshotHero[]) => heroes.map((h) => h.unitType).join(", ");
 
 /** The rule `delivered` follows: a caravan's result carries it, true exactly when the run arrived with the cart standing. */
 function expectDeliveredByRule(result: AdventureResult, timeline: AdventureTimeline, seed: string): void {

@@ -66,4 +66,4 @@ Read on 2026-10-20 for Issue-86:
 
 ## Where it is described
 
-`docs/architecture/overview.md`, "Services and data" and "Environments". `terraform/modules/environment/sign_in.tf` and its README; `terraform/modules/login-domain`; `terraform/environment/sandbox/README.md`. `packages/client/src/app/session.ts`, `config.ts`, `proxy.conf.mjs`. `docs/process/development.md`, `docs/standards/typescript.md` rule 15.
+`docs/architecture/overview.md`, "Services and data" and "Environments". `terraform/modules/environment/sign_in.tf` and its README; `terraform/modules/login-domain`; `terraform/environment/sandbox/README.md`. `packages/client/src/app/session.ts`, `config.ts`, `proxy.conf.mjs`. `docs/process/development.md`, `docs/standards/angular.md` rule 22.

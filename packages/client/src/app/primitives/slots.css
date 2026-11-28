@@ -1,0 +1,17 @@
+.slots {
+  display: inline-flex;
+  gap: var(--space-xs);
+  vertical-align: middle;
+}
+
+.slot {
+  width: var(--space-lg);
+  height: var(--space-lg);
+  border: var(--frame-outline) solid var(--line-frame);
+  border-radius: 50%;
+  background: var(--surface-panel);
+}
+
+.slot.filled {
+  background: var(--line-frame);
+}

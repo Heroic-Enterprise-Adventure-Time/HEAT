@@ -1,27 +1,23 @@
+# The Terraform state bucket for every stack in this repository, and its
+# policy (decision 0008, amended by 0017 for the workload accounts' roles).
+# The resources are in this root and not in a module, the exception
+# terraform.md's rule 1 names: the stack has one instance and no
+# environment, and it began as a copy of the dcg-platform repository's
+# (README.md).
+# Not here: a lock table, since locking is S3's own lock file, and a
+# customer managed key (decision 0008).
 locals {
   bucket_name = "heat-platform-terraform-state"
-
-  tags = {
-    Project     = "heat"
-    Environment = "platform"
-    ManagedBy   = "terraform"
-  }
 }
 
-provider "aws" {
-  region = "us-east-1"
-
-  # Refuses to run with credentials for any other AWS account.
-  allowed_account_ids = [var.platform_account_id]
-
-  default_tags {
-    tags = local.tags
-  }
-}
-
-# The Terraform state bucket for every stack in this repository.
+# prevent_destroy (terraform.md, rule 11): the bucket holds every stack's
+# state and its versions, and nothing else knows what those stacks manage.
 resource "aws_s3_bucket" "state" {
   bucket = local.bucket_name
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }
 
 # Every write keeps the previous version, so a bad apply can be rolled back.

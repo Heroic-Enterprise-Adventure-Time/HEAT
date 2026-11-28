@@ -7,7 +7,8 @@ import type { Context as LambdaContext } from "aws-lambda";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { VERSION_ATTRIBUTE } from "../src/observability.js";
-import { event, type Handler } from "./event.js";
+import { player } from "./data.js";
+import { event, type Handler, loadHandler } from "./event.js";
 import { VERSION } from "./versions.js";
 
 /**
@@ -28,8 +29,7 @@ let handler: Handler;
 beforeAll(async () => {
   context.setGlobalContextManager(new AsyncLocalStorageContextManager().enable());
   trace.setGlobalTracerProvider(new BasicTracerProvider({ spanProcessors: [new SimpleSpanProcessor(exporter)] }));
-  // The handler reads its configuration at import time, as graphql.test.ts says.
-  handler = (await import("../src/handler.js")).handler as unknown as Handler;
+  handler = await loadHandler();
 });
 
 beforeEach(() => {
@@ -48,11 +48,11 @@ async function traced(query: string, variables: Record<string, unknown>, playerI
 
 describe("the hub's spans", () => {
   it("names a span for each root field, under the function's, with the field and the version as annotations", async () => {
-    const player = `p-${randomUUID()}`;
-    await traced(`mutation { joinGame { __typename } }`, {}, player);
+    const p = player();
+    await traced(`mutation { joinGame { __typename } }`, {}, p);
     exporter.reset();
 
-    const { spans, parent } = await traced(`query Anything { me { id } version }`, {}, player);
+    const { spans, parent } = await traced(`query Anything { me { id } version }`, {}, p);
 
     expect(spans.map((span) => span.name).sort()).toEqual(["Query.me", "Query.version"]);
     for (const span of spans) {
@@ -64,15 +64,15 @@ describe("the hub's spans", () => {
   });
 
   it("records nothing of the request: not its variables, its document, the caller or the answer", async () => {
-    const player = `p-${randomUUID()}`;
+    const p = player();
     const requestId = randomUUID();
-    await traced(`mutation { joinGame { __typename } }`, {}, player);
+    await traced(`mutation { joinGame { __typename } }`, {}, p);
     exporter.reset();
 
     const { body, spans } = await traced(
       `mutation Zzyzx($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: VILLAGER, requestId: $id }) { __typename ... on RecruitHeroSuccess { hero { id name } } } }`,
       { id: requestId },
-      player,
+      p,
     );
 
     const reply = JSON.parse(body) as { data: { recruitHero: { __typename: string; hero: { id: string; name: string } } } };
@@ -83,18 +83,18 @@ describe("the hub's spans", () => {
     expect(Object.keys(span?.attributes ?? {}).sort()).toEqual(["aws.xray.annotations", "graphql.field.name", "graphql.field.path", "graphql.field.type", VERSION_ATTRIBUTE].sort());
     expect(span?.events).toEqual([]);
     const recorded = JSON.stringify(spans.map((finished) => [finished.name, finished.attributes, finished.events, finished.links]));
-    for (const secret of [requestId, player, reply.data.recruitHero.hero.id, reply.data.recruitHero.hero.name, "Zzyzx", "VILLAGER"]) {
+    for (const secret of [requestId, p, reply.data.recruitHero.hero.id, reply.data.recruitHero.hero.name, "Zzyzx", "VILLAGER"]) {
       expect(recorded).not.toContain(secret);
     }
   });
 
   it("records no exception for a refusal, which is an answer and not a failure", async () => {
-    const player = `p-${randomUUID()}`;
-    await traced(`mutation { joinGame { __typename } }`, {}, player);
+    const p = player();
+    await traced(`mutation { joinGame { __typename } }`, {}, p);
     exporter.reset();
 
     // A new camp has no ore, so a fighter is refused, as data (graphql.md, rule 6).
-    const { body, spans } = await traced(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: FIGHTER, requestId: $id }) { __typename } }`, { id: randomUUID() }, player);
+    const { body, spans } = await traced(`mutation($id: UUID!) { recruitHero(input: { location: "millbrook", unitType: FIGHTER, requestId: $id }) { __typename } }`, { id: randomUUID() }, p);
 
     const reply = JSON.parse(body) as { data: { recruitHero: { __typename: string } }; errors?: unknown };
     expect(reply.errors).toBeUndefined();

@@ -12,6 +12,7 @@
 
 import type { AdventureContent, Job, RetreatRule } from "./adventure/index.js";
 import type { AbilityDefinition, BattleContent, CartProfile, CombatProfile, LineReach, MonsterProfile, ResourceNodeProfile } from "./battle/index.js";
+import { LINES } from "./battle/unit.js";
 import type { Material } from "./index.js";
 
 /** The unit types that have a sprite set. Those with a combat profile are in `UNIT_PROFILES`. The list declares the union (typescript.md, rule 18). */
@@ -202,6 +203,40 @@ export function recruitCost(recruit: Recruit, livingHeroes: number): Cost {
   return recruit.unitType === "villager" && livingHeroes === 0 ? [] : recruit.cost;
 }
 
+/** A camp as recruiting reads it: its hall's level, the heroes that hold a slot, the living among them, and its stock. */
+export interface RecruitingCamp {
+  hallLevel: number;
+  activeHeroes: number;
+  livingHeroes: number;
+  holdings: readonly { material: string; balance: number }[];
+}
+
+/** Why a unit type cannot be recruited, in the order the hall shows them; `hallLevel` and `short` say exactly what is lacking. */
+export type RecruitRefusal =
+  | { code: "HALL_LEVEL"; message: string; hallLevel: number }
+  | { code: "HALL_FULL"; message: string }
+  | { code: "INSUFFICIENT_RESOURCES"; message: string; short: readonly { material: Material; amount: number; balance: number }[] };
+
+/**
+ * Why the camp cannot recruit the unit type now, or null when it can: the
+ * hall's level, then a free slot, then the price. One rule, which the hub
+ * checks and the hall shows, as `buildRefusal` is for a build (Issue-165).
+ */
+export function recruitRefusal(camp: RecruitingCamp, recruit: Recruit): RecruitRefusal | null {
+  if (camp.hallLevel < recruit.hallLevel) {
+    return { code: "HALL_LEVEL", message: `a ${recruit.unitType} needs a level ${recruit.hallLevel} hall`, hallLevel: recruit.hallLevel };
+  }
+  if (camp.activeHeroes >= hallCapacity(camp.hallLevel)) return { code: "HALL_FULL", message: "the heroes hall is full" };
+  const short = recruitCost(recruit, camp.livingHeroes)
+    .map(({ material, amount }) => ({ material, amount, balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0 }))
+    .filter((s) => s.balance < s.amount);
+  if (short.length > 0) {
+    const words = short.map((s) => `${s.amount} ${s.material}, and the camp has ${s.balance}`).join("; ");
+    return { code: "INSUFFICIENT_RESOURCES", message: `a ${recruit.unitType} costs ${words}`, short };
+  }
+  return null;
+}
+
 /**
  * The unlocks: what a player earns once and holds for good (game.md,
  * "Unlocks"; decision 0059). One closed list for every kind of unlock; the
@@ -339,11 +374,11 @@ export const SPRITE_SETS: Readonly<Record<UnitType, readonly string[]>> = {
 
 /**
  * How a sprite set or a name reads, so that a hero's name suits its sprite
- * (game.md, "Heroes"). "either" fits both.
+ * (game.md, "Heroes"). "either" fits both. The list declares the union
+ * (typescript.md, rule 18).
  */
-export type Presentation = "masculine" | "feminine" | "either";
-
-export const PRESENTATIONS: readonly Presentation[] = ["masculine", "feminine", "either"];
+export const PRESENTATIONS = ["masculine", "feminine", "either"] as const;
+export type Presentation = (typeof PRESENTATIONS)[number];
 
 /**
  * Every sprite set's presentation, by its directory under art/heroes/. The
@@ -422,10 +457,7 @@ export type AbilityId = "strike" | "strike-weakest" | "strike-cart" | "bite" | "
 
 const FRONT_ONLY: readonly LineReach[] = [{ actorLine: "front", targetLines: ["front"] }];
 
-const ANY_LINE: readonly LineReach[] = (["front", "near", "far", "back"] as const).map((actorLine) => ({
-  actorLine,
-  targetLines: ["front", "near", "far", "back"],
-}));
+const ANY_LINE: readonly LineReach[] = LINES.map((actorLine) => ({ actorLine, targetLines: LINES }));
 
 /**
  * Every ability a unit type or monster's list names (battle.md).
@@ -771,8 +803,9 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
     pay: [{ material: "cloth", amount: 3 }],
     bonusXp: 4,
   },
-  // A lone villager dies here on every seed; a fighter with a villager, or
-  // three villagers, clear it (decision 0031).
+  // The first job a party can be lost on: two wolves, which a lone villager
+  // does not come back from and a fighter with a villager clears (decision
+  // 0031; `test/adventure/engine.test.ts` plays both on one seed).
   "wolves-on-the-mill-road": {
     id: "wolves-on-the-mill-road",
     name: "Wolves on the mill road",
@@ -879,10 +912,10 @@ export const JOBS: Readonly<Record<JobId, Job>> = {
   // The caravan hub's caravan (Issue-354, decision 0059): the first job that
   // delivers, so its party has the cart beside it in both fights, the cart's
   // health carried between them. One bandit a fight, with a wolf on half the
-  // seeds, where two bandits a fight lose the cart to nearly every party
-  // (decision 0059, Issue-353's amendment). No pay: the delivery is the
-  // reward, and the bonus brings the job's XP to the road job's 20. What the
-  // cart carries, and who stays, is the hub's; the engine knows none of it.
+  // seeds; why not two bandits a fight is decision 0059, under Issue-353's
+  // amendment. No pay: the delivery is the reward, and the bonus brings the
+  // job's XP to the road job's 20. What the cart carries, and who stays, is
+  // the hub's; the engine knows none of it.
   "caravan-to-highcrag": {
     id: "caravan-to-highcrag",
     name: "Caravan to Highcrag",

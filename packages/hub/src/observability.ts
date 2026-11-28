@@ -67,6 +67,10 @@ export const traceRootField = createOpenTelemetryWrapper<boolean>(trace.getTrace
  * whether it carried errors, and one warning per error, so a failing
  * request can be found in the log group without reading bodies. Nothing
  * logs variables or responses: those can hold private data.
+ *
+ * An error's text goes under `error`. The logger keeps `message` for the
+ * line's own, with `level`, `service`, `timestamp` and `sampling_rate`, and
+ * drops a key of one of those names with a warning of its own.
  */
 export function requestLogging(): ApolloServerPlugin<Context> {
   // Apollo's hooks return promises; nothing here waits.
@@ -76,7 +80,7 @@ export function requestLogging(): ApolloServerPlugin<Context> {
       return Promise.resolve({
         didEncounterErrors({ errors }) {
           for (const error of errors) {
-            logger.warn("graphql error", { message: error.message, path: error.path ?? null });
+            logger.warn("graphql error", { error: error.message, path: error.path ?? null });
           }
           return Promise.resolve();
         },

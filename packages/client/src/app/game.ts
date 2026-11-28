@@ -24,6 +24,7 @@ import {
   must,
   nextLevel,
   recruitCost,
+  recruitRefusal,
   STAGE_ENDINGS,
   STAGE_KINDS,
   STARTING_LOCATION,
@@ -286,7 +287,7 @@ interface Loaded {
   readonly error: unknown;
 }
 
-/** What a caravan's start sends beside its party: what it carries, each resource once, and the heroes of the party who stay at the destination. */
+/** What a caravan's start sends beside its party: what it carries, each resource once, and the heroes who stay at the destination: those of the party, and the riders, who are not of it (Issue-391). */
 export interface CaravanStart {
   readonly cargo: readonly { readonly material: Material; readonly amount: number }[];
   readonly staying: readonly string[];
@@ -327,6 +328,19 @@ function levelGives(at: string, kind: FacilityKind, level: number): string | nul
   if (kind === 'caravan-hub') return `The cart carries ${cartCapacity(level)} in all.`;
   const posted = jobsPostedBy(at, kind).filter((job) => jobFacilityLevel(job) === level);
   return posted.length === 0 ? null : `Posts a new job: ${posted.map((job) => job.name).join(' and ')}.`;
+}
+
+/** Why the hall cannot recruit a unit type now, in the player's words, or null when it can. */
+function recruitReason(refusal: ReturnType<typeof recruitRefusal>): string | null {
+  if (!refusal) return null;
+  switch (refusal.code) {
+    case 'HALL_LEVEL':
+      return `Needs a level ${refusal.hallLevel} hall.`;
+    case 'HALL_FULL':
+      return 'The hall is full.';
+    case 'INSUFFICIENT_RESOURCES':
+      return `Not enough ${refusal.short.map((s) => s.material).join(' or ')}.`;
+  }
 }
 
 /**
@@ -455,7 +469,7 @@ export class Game {
   /**
    * What the hall offers: each unit type on the location's list, its price
    * to this camp beside the camp's balance, and why it cannot be had now,
-   * by the hub's rules in the hub's order (`packages/hub/src/recruit.ts`).
+   * by the engine's rule (`recruitRefusal`, which the hub checks too).
    */
   readonly recruits = computed((): readonly RecruitOffer[] => {
     const camp = this.camp();
@@ -467,16 +481,7 @@ export class Game {
         amount,
         balance: camp.holdings.find((h) => h.material === material)?.balance ?? 0,
       }));
-      const short = cost.filter((c) => c.balance < c.amount).map((c) => c.material);
-      const reason =
-        camp.hallLevel < recruit.hallLevel
-          ? `Needs a level ${recruit.hallLevel} hall.`
-          : camp.activeHeroes >= camp.heroCapacity
-            ? 'The hall is full.'
-            : short.length > 0
-              ? `Not enough ${short.join(' or ')}.`
-              : null;
-      return { unitType: recruit.unitType, cost, reason };
+      return { unitType: recruit.unitType, cost, reason: recruitReason(recruitRefusal(camp, recruit)) };
     });
   });
 
@@ -546,8 +551,9 @@ export class Game {
 
   /**
    * Starts a job the location posts with a party of the player's heroes
-   * there, and for a caravan its cargo and who of the party stays at the
-   * destination (decision 0059); a job that delivers nothing sends neither.
+   * there, and for a caravan its cargo and who stays at the destination, of
+   * the party or riding along (decision 0059, amended by Issue-391); a job
+   * that delivers nothing sends neither.
    * Answers the open adventure, or throws the hub's refusal, a `Refusal`
    * named by its type, for the job's page to show in place. The player is
    * read again either way, since a refusal such as `AdventureOpen` means the

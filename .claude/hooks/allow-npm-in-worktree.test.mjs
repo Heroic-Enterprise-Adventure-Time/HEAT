@@ -55,6 +55,8 @@ describe('allow-npm-in-worktree', () => {
       'npm run lint 2>&1 | tail -20',
       'npm test 2>&1 | grep -i "failed" | head -5',
       'npm test | wc -l',
+      'npm test | cut -c1-80',
+      "npm test | tr -d '\\r'",
       'npm run lint; echo done',
       'npm ci && npm test',
     ]) {

@@ -1,10 +1,11 @@
 import { DatePipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, RouterLink } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
 import { Game, type RetireRefusal } from '../../game';
 import { refusalWords } from '../../hub';
+import { BackLink } from '../../primitives/back-link';
 import { CampState } from '../camp-state';
 
 /** The hub's refusals of a retirement, by type, in the player's words; any other is shown as the hub put it. */
@@ -22,7 +23,7 @@ const REFUSALS: Readonly<Record<RetireRefusal, string>> = {
  */
 @Component({
   selector: 'heat-hero-card',
-  imports: [DatePipe, RouterLink],
+  imports: [BackLink, DatePipe],
   templateUrl: './hero-card.html',
   styleUrl: './panel.css',
 })

@@ -48,9 +48,12 @@ export function spots(units: readonly { readonly unitId: string; readonly side: 
   return out;
 }
 
+/** How far beyond the stage's right edge the nearest of the other side starts, in art pixels: half a sprite's canvas, 48 across, so that none of it shows yet. */
+const ENTRY_MARGIN = 24;
+
 /** How far the other side starts to the right of its spots, so that every one of it comes on from beyond the stage's edge. */
 export function entryOffset(xs: readonly number[]): number {
-  return xs.length === 0 ? 0 : STAGE_WIDTH + 24 - Math.min(...xs);
+  return xs.length === 0 ? 0 : STAGE_WIDTH + ENTRY_MARGIN - Math.min(...xs);
 }
 
 export interface BattleView {

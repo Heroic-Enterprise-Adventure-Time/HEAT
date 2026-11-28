@@ -1,9 +1,10 @@
-<h2 id="panel-title">Job board</h2>
+<div class="title">
+  <h2 id="panel-title">Job board</h2>
+  <heat-more-menu [items]="more" />
+</div>
 <p>{{ description }}</p>
 @if (game.adventure(); as adventure) {
-  <p class="note">An adventure is under way: <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>.</p>
+  <p class="note">An adventure is under way.</p>
+  <a class="link" routerLink="/adventure">{{ adventure.job.name }}</a>
 }
 <heat-job-list [jobs]="jobs()" />
-
-<h3 id="recent-title">Recently here</h3>
-<heat-replay-list empty="Nothing was done here in the last week." labelledBy="recent-title" [failed]="recentFailed()" [lines]="recentLines()" [withJob]="true" />

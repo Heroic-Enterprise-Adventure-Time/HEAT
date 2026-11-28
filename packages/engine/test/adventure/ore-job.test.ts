@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { FACILITIES, JOBS, jobsPostedBy, replay, STARTING_LOCATION } from "../../src/index.js";
-import { haul, MILLBROOK_RECRUITS, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
+import { battleStage, haul, MILLBROOK_RECRUITS, ORE, party, rewardOf, SEEDS, seeds, snapshot, villagers } from "./helpers.js";
 
 // The mine's first job (Issue-133, decision 0031, with the hauls of decision
 // 0058): posted by the mine, not the job board, and one run of it by
 // villagers pays for a fighter, at its worst roll.
 
 const ore = JOBS[ORE];
-const gather = ore.stages[1];
-if (gather?.kind !== "gather") throw new Error("The ore job gathers second");
+const gather = battleStage(ore, "gather");
 /** What villagers bring home from the two veins: each vein's drop at mining 1. */
 const VILLAGERS_ORE = haul("ore-vein", 1, 2);
 

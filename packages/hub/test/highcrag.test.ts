@@ -5,14 +5,14 @@ import { beforeAll, describe, expect, it } from "vitest";
 
 import { type AdventureResult, jobsPostedBy, LOCATIONS, must, replay, STARTING_LOCATION, type UnitType } from "@heat/engine";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type Hero, Repository } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { InsufficientResources, Requires } from "../src/refusals.js";
 import { startAdventure } from "../src/start.js";
 import { submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { balances, build, player, putParty, putUnlock, stock } from "./data.js";
+import { balances, build, connected, ids, player, putParty, putUnlock, stock } from "./data.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
 import { seedWhere } from "./seeds.js";
 import { VERSION as version } from "./versions.js";
@@ -30,10 +30,7 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const highcrag = must(LOCATIONS.find((l) => l.unlock !== undefined), "a location that needs an unlock");
@@ -51,7 +48,6 @@ async function camped(unitTypes: readonly UnitType[], holdings: Parameters<typeo
   return { p, heroes };
 }
 
-const ids = (heroes: readonly Hero[]) => heroes.map((h) => h.id);
 const whole = (r: AdventureResult) => r.outcome === "complete" && r.dead.length === 0;
 
 describe("the knight at Highcrag", () => {
@@ -119,7 +115,7 @@ describe("a caravan from Highcrag to Millbrook", () => {
 
     const seed = seedWhere(back.id, party, (r) => whole(r) && r.delivered === true);
     const started = await startAdventure(repo, p, version, randomUUID(), highcrag.id, back.id, ids(heroes), { cargo: [{ material: "stone", amount: 40 }], staying: [] }, undefined, () => seed);
-    expect(started.caravan).toEqual({ destination, cargo: [{ material: "stone", amount: 40 }], staying: [] });
+    expect(started.caravan).toEqual({ destination, cargo: [{ material: "stone", amount: 40 }], staying: [], riders: [] });
     expect((await balances(repo, p, highcrag.id))["stone"]).toBe(0);
 
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);

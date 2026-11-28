@@ -24,6 +24,8 @@ Rule 14. From Issue-318, which found the dev server's procedure, the shell's qui
 
 Rule 15. A candidate rule from the review of PR-342 (Issue-336), accepted by the owner on 2026-11-20: decision 0058 marked five items of `design/game.md` and missed two, and amended three records and missed 0052.
 
+Rule 15, its last sentence. A candidate rule from the review of PR-387 (Issue-383), accepted by the owner on 2026-11-26: decision 0061 and `process/assets.md`, rule 39, named the art build's glyphs moving to scene roles, and the search of the documents missed `scripts/icon-set.mjs`, which reads the same two colours for its sheet's numbers.
+
 Rule 16. A candidate rule from the review of PR-345 (Issue-339), accepted by the owner on 2026-11-20: `GatheringTrait` was added to the engine's enums, and the lists of them in `standards/graphql.md`, rule 4, and `standards/typescript.md`, rule 18, were found by a search for `StageEnding` and by no search for what the change removed.
 
 Rule 17. Done in two steps. Issue-363 cut what the root `AGENTS.md` loads and the decision index, while the standards, the design documents and this document's own rules still carried their accounts; Issue-364 cut those, and moved "The battle" out of `design/game.md` into `design/battle.md` (decision 0060).
@@ -33,3 +35,7 @@ Rule 18. A candidate rule from the review of PR-369 (Issue-353), accepted by the
 Rule 19. A candidate rule from the review of PR-376 (Issue-375), accepted by the owner on 2026-11-26: the comment on `packages/AGENTS.md`'s new limit said "about 2K of room", was corrected to 1.5K before the pull request opened, and would have gone stale at the next rule added to `typescript.md`.
 
 Rule 20. A candidate rule from the review of PR-376 (Issue-375), accepted by the owner on 2026-11-26: `standards/typescript-dependencies.md` was the first document of its kind, with neither a Rules nor a Why section, and its occasions for reading were listed three times, in its opening, in `packages/AGENTS.md` and in this index, each differently.
+
+Rules 2, 3 and 20, 2026-11-27 (Issue-428). The standards' rules were sorted into the three tiers of decision 0060, as amended by Issue-428, and each standard was given a detail file, `<standard>-detail.md`, after `typescript-dependencies.md`, the first, was renamed. Rule 20 now says what such a file holds besides a rule's detail, rule 2 that a standard's reasons are there, and rule 3 that the tiers are how a standard makes room.
+
+Rules 11 and 19, 2026-11-27 (Issue-428). Two candidate rules from the review of PR-431, accepted by the owner. `typescript.md`'s retired rules 13 to 15 named only the issue, while the reason was in decision 0060, and rule 11's "the record that retired it" could be read as either. `packages/client/AGENTS.md`'s limit had been raised by the 5,000 bytes `packages/AGENTS.md` gave up, though its loader held 18,802 bytes and needed none of them; the raise was undone in the same pull request.

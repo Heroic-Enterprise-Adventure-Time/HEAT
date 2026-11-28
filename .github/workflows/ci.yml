@@ -3,11 +3,12 @@
 # The gate on every pull request and on main: does the repository build, does
 # it lint clean, do its tests pass, does the client build for production, is
 # the committed GraphQL schema current and the client's generated code with
-# it, does every function bundle, is every Terraform root formatted, valid
-# and clean under tflint and trivy, does every workflow lint clean under
-# actionlint, and does the actions lockfile cover it. It runs with no AWS
-# credentials; the integration tests start their own containers (decision
-# 0009) and the Terraform roots are initialised without a backend.
+# it, does every function bundle, do the stylesheets lint clean, is every
+# Terraform root formatted, valid and clean under tflint and trivy, does every
+# workflow lint clean under actionlint, and does the actions lockfile cover
+# it. It runs with no AWS credentials; the integration tests start their own
+# containers (decision 0009) and the Terraform roots are initialised without a
+# backend.
 # It never deploys anything: deploy.yml plans and applies the permanent
 # roots, under their GitHub environments, and sandbox.yml the per-issue
 # stacks (decision 0017).
@@ -81,6 +82,29 @@ jobs:
 
       - name: Bundle every function for Lambda
         run: npm run bundle
+
+  stylesheets:
+    name: Lint the stylesheets
+    runs-on: ubuntu-latest
+    # Declared, not inherited: this job runs npm (docs/process/best-practices.md,
+    # rule 13).
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node, pinned and checked
+        uses: $/.github/actions/node
+
+      - name: Install exactly what package-lock.json records
+        run: npm ci
+
+      # Stylelint's published set and decision 0061's rules (stylelint.config.mjs):
+      # outside the client's styles.css, no colour literal, no px length and no
+      # palette name, only the role tokens.
+      - name: Lint every stylesheet
+        run: npm run lint:styles
 
   terraform:
     name: Terraform format, validate, lint and scan

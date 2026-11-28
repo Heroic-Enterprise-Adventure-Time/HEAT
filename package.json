@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "engines": {
-    "node": "24.x"
+    "node": "26.x"
   },
   "scripts": {
     "build": "npm run build --workspaces --if-present",
@@ -15,6 +15,7 @@
     "test:scripts": "node --test \"scripts/*.test.mjs\"",
     "typecheck": "npm run build --workspace @heat/engine && npm run typecheck --workspaces --if-present",
     "lint": "npm run build --workspace @heat/engine && eslint . --max-warnings 0",
+    "lint:styles": "stylelint \"**/*.css\" --max-warnings 0",
     "bundle": "npm run build --workspace @heat/engine && node scripts/bundle.mjs",
     "schema:print": "npm run schema:print --workspace @heat/hub",
     "codegen": "graphql-codegen --config codegen.mjs"
@@ -24,8 +25,8 @@
     "@graphql-codegen/cli": "8.0.0",
     "@graphql-codegen/client-preset": "7.0.0",
     "@graphql-codegen/fragment-matcher": "8.0.0",
-    "@graphql-eslint/eslint-plugin": "4.4.2",
-    "@types/node": "24.19.2",
+    "@graphql-eslint/eslint-plugin": "5.0.0",
+    "@types/node": "26.6.11",
     "@vercel/nft": "1.11.7",
     "angular-eslint": "22.6.0",
     "esbuild": "0.28.2",
@@ -36,15 +37,14 @@
     "globals": "17.14.0",
     "jsdom": "31.0.1",
     "sharp": "0.35.5",
+    "stylelint": "18.1.0",
+    "stylelint-config-standard": "41.1.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.2",
     "vitest": "5.1.0"
   },
   "overrides": {
     "@apollo/server": {
-      "@graphql-tools/utils": "12.1.0"
-    },
-    "@graphql-eslint/eslint-plugin": {
       "@graphql-tools/utils": "12.1.0"
     }
   },

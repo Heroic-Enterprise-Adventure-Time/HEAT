@@ -1,31 +1,36 @@
 /*
  * The page's regions (Issue-89; page-layout.ts holds the arithmetic). Nothing
  * overlaps. Narrow screens, the default here: the scene on top, the page's
- * width by the map's height, then the menu as a row, then the panel in the
- * page's flow. Landscape, from 4:3: the menu on the left, the scene filling
+ * width by the map's height, then the panel in the page's flow, and the menu
+ * as a nav fixed to the bottom of the window, the panel padded by its height
+ * so that nothing is hidden under it (decision 0061). Landscape, from 4:3: the menu on the left, the scene filling
  * the middle, the panel on the right, always there.
  */
 .camp {
   display: flex;
   flex-direction: column;
   min-height: calc(100dvh - var(--header-height));
-  background: var(--night);
+  background: var(--surface-page);
 }
 
 .stage {
   width: 100%;
   overflow: hidden;
-  background: var(--night);
+  background: var(--surface-stage);
 }
 
 .menu {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
   display: flex;
   justify-content: space-around;
   height: var(--menu-row-height);
-  flex: none;
-  background: var(--bar);
-  border-top: var(--border) solid var(--ink);
-  border-bottom: var(--border) solid var(--ink);
+  box-sizing: border-box;
+  background: var(--surface-bar);
+  border-top: var(--border) solid var(--line-frame);
 }
 
 .entry {
@@ -36,8 +41,8 @@
   gap: var(--space-xs);
   flex: 1;
   min-width: 0;
-  color: var(--light);
-  font-size: 0.7rem;
+  color: var(--on-bar);
+  font-size: var(--text-xs);
   text-decoration: none;
   white-space: nowrap;
 }
@@ -52,29 +57,29 @@
 }
 
 .entry.unbuilt .label {
-  color: #a8987c;
+  color: var(--on-bar-quiet);
 }
 
 .entry:hover,
 .entry:focus-visible {
-  background: #2a1d13;
+  background: var(--surface-bar-raised);
 }
 
 .entry.active {
-  background: #33241a;
-  box-shadow: inset 0 calc(-1 * var(--border-thick)) 0 var(--gold);
+  background: var(--surface-bar-active);
+  box-shadow: inset 0 calc(-1 * var(--border-thick)) 0 var(--marker-active);
 }
 
 .entry:focus-visible {
-  outline: var(--border) solid var(--gold);
+  outline: var(--border) solid var(--focus-on-bar);
   outline-offset: calc(-1 * var(--border));
 }
 
 .panel {
   flex: 1;
-  padding: var(--space-lg) var(--space-xl);
-  background: var(--parchment);
-  color: var(--ink);
+  padding: var(--space-lg) var(--space-xl) calc(var(--space-lg) + var(--menu-row-height));
+  background: var(--surface-panel);
+  color: var(--on-panel);
 }
 
 /*
@@ -82,7 +87,7 @@
  * for screen readers, and shown on the entry whose panel is open, which takes
  * the room of two.
  */
-@media (max-width: 37.5rem) {
+@media (width <= 37.5rem) {
   .camp:not(.side) .entry {
     position: relative;
   }
@@ -93,8 +98,8 @@
 
   .camp:not(.side) .entry:not(.active) .label {
     position: absolute;
-    width: 1px;
-    height: 1px;
+    width: var(--pixel);
+    height: var(--pixel);
     overflow: hidden;
     clip-path: inset(50%);
   }
@@ -119,13 +124,14 @@
 }
 
 .side .menu {
+  position: static;
   grid-area: menu;
   flex-direction: column;
   justify-content: flex-start;
   height: auto;
   padding-top: var(--space-md);
   border: none;
-  border-right: var(--border) solid var(--ink);
+  border-right: var(--border) solid var(--line-frame);
 }
 
 .side .entry {
@@ -139,7 +145,7 @@
 }
 
 .side .entry.active {
-  box-shadow: inset var(--border-thick) 0 0 var(--gold);
+  box-shadow: inset var(--border-thick) 0 0 var(--marker-active);
 }
 
 /* The rail shows each label beside it on hover and on focus. */
@@ -148,7 +154,7 @@
   left: calc(100% + var(--space-sm));
   z-index: 2;
   padding: var(--space-xs) var(--space-md);
-  background: var(--bar);
+  background: var(--surface-bar);
   pointer-events: none;
   visibility: hidden;
 }
@@ -160,13 +166,24 @@
 
 .side .panel {
   grid-area: panel;
+  padding-bottom: var(--space-lg);
   overflow-y: auto;
-  border-left: var(--border-thick) solid var(--ink);
+  border-left: var(--border-thick) solid var(--line-frame);
 }
 
+/* The message stands on a panel's surface of its own, so that it reads wherever it lands, over the scene or the ink menu rail. */
 .error {
   position: fixed;
-  bottom: var(--space-md);
+  bottom: calc(var(--space-md) + var(--menu-row-height));
   left: var(--space-xl);
-  color: var(--ember);
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  border: var(--frame-outline) solid var(--line-frame);
+  border-radius: var(--frame-corner);
+  background: var(--surface-panel);
+  color: var(--refusal);
+}
+
+.side .error {
+  bottom: var(--space-md);
 }

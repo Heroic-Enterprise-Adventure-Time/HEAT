@@ -1,0 +1,5 @@
+<span class="slots" role="img" [attr.aria-label]="label()">
+  @for (taken of circles(); track $index) {
+    <span class="slot" [class.filled]="taken"></span>
+  }
+</span>

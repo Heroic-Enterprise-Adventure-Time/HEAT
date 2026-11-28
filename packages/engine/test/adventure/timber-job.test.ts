@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import { FACILITIES, JOBS, replay, WAREHOUSE_CAPACITY } from "../../src/index.js";
-import { haul, party, rewardOf, SEEDS, seeds, snapshot, TIMBER, villagers } from "./helpers.js";
+import { battleStage, haul, party, rewardOf, SEEDS, seeds, snapshot, TIMBER, villagers } from "./helpers.js";
 
 // The villagers' timber run (decision 0031, with the hauls of decision 0058):
 // one run of it pays for the mine, at its worst roll.
 
 const timber = JOBS[TIMBER];
-const gather = timber.stages[1];
-if (gather?.kind !== "gather") throw new Error("The timber job gathers second");
+const gather = battleStage(timber, "gather");
 /** What villagers bring home from the two trees: each tree's drop at woodcutting 1. */
 const VILLAGERS_TIMBER = haul("tree", 1, 2);
 

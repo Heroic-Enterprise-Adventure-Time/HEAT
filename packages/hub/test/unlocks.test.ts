@@ -22,7 +22,7 @@ import {
 } from "@heat/engine";
 
 import { buildFacility } from "../src/build.js";
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { type AdventureRecord, type EarnedUnlock, type Hero, LocationLocked, Repository, TransactionConflict } from "../src/db/repository.js";
 import { recruitHero } from "../src/recruit.js";
 import { InsufficientResources, Requires } from "../src/refusals.js";
@@ -30,7 +30,7 @@ import { schema } from "../src/schema/schema.js";
 import { startAdventure } from "../src/start.js";
 import { type OverrideInput, submitAdventure } from "../src/submit.js";
 import { MemoryTimelines } from "../src/timelines.js";
-import { balances, build, player, putParty, putUnlock, stock, storedItem } from "./data.js";
+import { balances, build, connected, player, putParty, putUnlock, stock, storedItem } from "./data.js";
 import { locationKeys, playerKeys } from "./keys.js";
 import { cancelled, everyInterleaving, type Race, winnerBefore } from "./race.js";
 import { BAD_USER_INPUT, refusal } from "./refusal.js";
@@ -60,10 +60,7 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 const home = STARTING_LOCATION;

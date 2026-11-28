@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { JOBS, jobsPostedBy, must, type SnapshotHero, UNIT_PROFILES, WEAPON_SPRITES } from "../../src/index.js";
-import { CARAVAN, CARAVAN_BACK, HIGHCRAG, party, played, SEEDS, WOLVES } from "./helpers.js";
+import { JOBS, jobsPostedBy, must, UNIT_PROFILES, WEAPON_SPRITES } from "../../src/index.js";
+import { CARAVAN, CARAVAN_BACK, HIGHCRAG, named, party, played, SEEDS, WOLVES } from "./helpers.js";
 
 // The knight (Issue-356, decision 0059): Highcrag's own, a heavier fighter,
 // slower and harder to put down, with the fighter's list.
@@ -39,7 +39,6 @@ const PARTIES = {
   knightAndTwoMiners: party("knight", "miner", "miner"),
   knight: party("knight"),
 };
-const named = (heroes: readonly SnapshotHero[]) => heroes.map((h) => h.unitType).join(", ");
 
 describe("Caravan to Millbrook", () => {
   const back = JOBS[CARAVAN_BACK];

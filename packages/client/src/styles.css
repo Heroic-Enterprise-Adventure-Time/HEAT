@@ -1,24 +1,87 @@
-/* Global styles. Component styles live beside their component. */
+/*
+ * Global styles: the tokens, and the few rules every page shares. A component's
+ * styles live beside it; the shared primitives are primitives.css.
+ */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   font-family: system-ui, sans-serif;
   line-height: 1.5;
 
   /*
-   * The tokens (docs/standards/angular.md, rule 17): what more than one
-   * component reads, named for what it is. A value one component uses once
-   * is a literal in that component.
+   * The tokens (docs/standards/angular.md, rule 17; decision 0061). Colour is
+   * two layers. The palette is each colour named for what it is, and only this
+   * file reads it. The roles below it are named for what they do, and a
+   * component reads only those, so a theme changes here and nowhere else.
+   * Stylelint (stylelint.config.mjs) refuses a colour literal, a px length and
+   * a palette name in any other stylesheet; it reads the palette's names from
+   * this block, every token whose value is a colour.
    */
 
-  /* The palette. */
-  --night: #0b0806;
-  --ink: #140d08;
-  --bar: #1a120c;
-  --parchment: #94805c;
-  --gold: #d9a441;
-  --light: #e6d6b8;
-  --rust: #3d140c; /* a refusal, a loss or a note, on parchment */
-  --ember: #ff8a8a; /* an error, on night */
+  /* The palette: A2, daylight parchment. */
+  --page: #d9c7a3;
+  --card: #f7eedb;
+  --card-soft: #ecdcbc;
+  --tan: #c9b48e;
+  --ink: #5a4330;
+  --ink-quiet: #76604b;
+  --ink-raised: #6b5240;
+  --ink-active: #7a5f49;
+  --gold: #e8b55a;
+  --gold-light: #f6d590;
+  --gold-dark: #8a5d1c;
+  --rust: #8a2a17;
+
+  /*
+   * The scene's: two kept from the first palette, and the three a unit's
+   * health is drawn in, so that a theme never recolours the scene (decision
+   * 0061).
+   */
+  --soot: #140d08;
+  --bone: #e6d6b8;
+  --leaf: #6fbf4a;
+  --amber: #d9a441;
+  --ember: #c0392b;
+
+  /* Surfaces. */
+  --surface-page: var(--page);
+  --surface-stage: var(--page);
+  --surface-bar: var(--ink);
+  --surface-bar-raised: var(--ink-raised);
+  --surface-bar-active: var(--ink-active);
+  --surface-panel: var(--card);
+  --surface-panel-soft: var(--card-soft);
+
+  /* Text, by what it stands on. */
+  --on-page: var(--ink);
+  --on-panel: var(--ink);
+  --on-panel-quiet: var(--ink-quiet);
+  --on-bar: var(--card);
+  --on-bar-quiet: var(--tan);
+  --on-action: var(--ink);
+  --link-on-bar: var(--gold-light);
+  --refusal: var(--rust); /* a refusal, a loss, a note or an error */
+
+  /* Lines. */
+  --line-frame: var(--ink); /* a frame's outline, a region's border, the picked hero */
+  --line-edge: color-mix(in srgb, var(--ink) 35%, transparent); /* a frame's lower edge, faded so it reads as a soft shadow */
+  --line-soft: var(--tan); /* a hero not picked */
+  --marker-active: var(--gold); /* the open panel's entry, an unlock's line */
+  --focus-on-panel: var(--gold-dark);
+  --focus-on-bar: var(--gold);
+
+  /* Actions: the main action's fill where no frame draws it, and a disabled button's label; a button's face is its frame's art. */
+  --action: var(--gold);
+  --on-action-disabled: var(--ink-quiet);
+
+  /* The scene's: a drop's digits, drawn by the art build and scripts/icon-set.mjs (docs/process/assets.md, rule 39). */
+  --scene-glyph: var(--bone);
+  --scene-glyph-outline: var(--soot);
+
+  /* The scene's: a unit's health bar in a battle, its track and its fill while the health is high, middling and low, read at runtime (src/app/colour-role.ts). */
+  --scene-bar-track: var(--soot);
+  --scene-bar-high: var(--leaf);
+  --scene-bar-middle: var(--amber);
+  --scene-bar-low: var(--ember);
 
   /* The spacing scale. */
   --space-xs: 0.125rem;
@@ -28,14 +91,31 @@
   --space-xl: 1rem;
   --space-2xl: 1.25rem;
 
-  /* The type sizes beside the base, 1rem. */
+  /* The type sizes beside the base, 1rem: a menu entry's label, the small and the large text, and the home page's title. */
+  --text-xs: 0.7rem;
   --text-sm: 0.9rem;
   --text-lg: 1.1rem;
+  --text-title: 3rem;
 
   /* The border widths. */
   --border-thin: 1px;
   --border: 2px;
   --border-thick: 3px;
+
+  /*
+   * Pixels of the art, drawn at a whole-number scale, which is where a pixel
+   * is a pixel (docs/process/best-practices.md, rule 10): a frame's outline,
+   * its lower edge below the outline, and its corner's radius (decision
+   * 0061), how far a pressed button's label sinks, and one pixel of the
+   * screen, as the box a visually hidden label keeps. A hero's portrait,
+   * --portrait, is the build's, in generated/frames.css, from PORTRAIT in
+   * src/app/sprite-sets.ts.
+   */
+  --frame-outline: 2px;
+  --frame-edge: 2px;
+  --frame-corner: 4px;
+  --button-press: 2px;
+  --pixel: 1px;
 
   /*
    * The page's regions, in rem so they follow the player's font size. The
@@ -55,4 +135,6 @@
 
 body {
   margin: 0;
+  background: var(--surface-page);
+  color: var(--on-page);
 }

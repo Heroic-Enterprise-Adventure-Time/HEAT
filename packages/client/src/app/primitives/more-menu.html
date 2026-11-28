@@ -1,0 +1,14 @@
+<button #button type="button" class="button secondary" aria-label="More" [attr.aria-controls]="listId" [attr.aria-expanded]="open()" (click)="open.set(!open())">
+  @if (open()) {
+    <heat-icon name="close" />
+  } @else {
+    <heat-icon name="more" />
+  }
+</button>
+@if (open()) {
+  <ul class="items frame" [id]="listId">
+    @for (item of items(); track item.label) {
+      <li><a class="item" [routerLink]="item.to">{{ item.label }}</a></li>
+    }
+  </ul>
+}

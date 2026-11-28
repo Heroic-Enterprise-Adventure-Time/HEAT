@@ -63,8 +63,9 @@ import type { Timelines } from "./timelines.js";
  *    capped credits, the XP and the deaths, and writes them in one
  *    conditional transaction, with the unlocks the replay says the run
  *    earned, and for a caravan its destination camp's writes: the cargo
- *    delivered up to its cap and the heroes who land (decision 0059); a balance that moved in between is read again, up to
- *    SETTLE_ATTEMPTS times, then the refusal is Conflict.
+ *    delivered up to its cap and the heroes who land, its riders with them
+ *    (decision 0059, Issue-391); a balance that moved in between is read
+ *    again, up to SETTLE_ATTEMPTS times, then the refusal is Conflict.
  *
  * The content the replay reads is the engine's, as the engine of the issuing
  * version has it; a test passes its own, as it passes a store or a version,
@@ -136,7 +137,9 @@ function byMaterial(rewards: readonly Reward[]): Map<Material, number> {
  * each survivor's XP added and its level from the content's thresholds,
  * never lowered; the dead; and the unlocks the run earned, as the engine's
  * result lists them, with nothing read of what the player holds (decision
- * 0059).
+ * 0059). A caravan's riders are no part of the result, which is the party's:
+ * they gain nothing and none dies, and they are carried as read, to land or
+ * to be let go (Issue-391).
  */
 export function settlement(
   record: AdventureRecord,
@@ -145,10 +148,11 @@ export function settlement(
   balances: ReadonlyMap<string, number>,
   heroes: readonly Hero[],
   destination?: Camp,
+  riders: readonly Hero[] = [],
 ): Settlement {
   const holdings = cappedCredits(result.rewards, warehouseLevel, balances);
   if (record.caravan && !destination) throw new Error("a caravan is settled with its destination camp as read");
-  const caravan =record.caravan && destination ? caravanSettlement(record.caravan, result, destination) : undefined;
+  const caravan = record.caravan && destination ? caravanSettlement(record.caravan, result, destination) : undefined;
   const dead = new Set(result.dead);
   const gained = new Map(result.xp.map((x) => [x.heroId, x.xp]));
   const health = new Map(result.health.map((h) => [h.heroId, h.health]));
@@ -177,6 +181,7 @@ export function settlement(
     holdings,
     survivors,
     dead: heroes.filter((h) => dead.has(h.id)),
+    riders: [...riders],
     result: {
       outcome: result.outcome,
       endedAtMs: result.endedAtMs,
@@ -207,10 +212,11 @@ export function cappedCredits(rewards: readonly Reward[], warehouseLevel: number
 
 /**
  * A caravan's part of settlement (decision 0059), from the destination camp
- * as read. On arrival the heroes marked to stay land, alive or dead, and the
- * cargo is credited there up to its warehouse's cap if the cart stands; a
- * broken cart's cargo is lost whole and credits nothing, and a retreat or a
- * defeat lands nobody and lets go of the slots held for them.
+ * as read. On arrival the heroes marked to stay land, alive or dead, the
+ * riders among them (Issue-391), and the cargo is credited there up to its
+ * warehouse's cap if the cart stands; a broken cart's cargo is lost whole and
+ * credits nothing, and a retreat or a defeat lands nobody and lets go of the
+ * slots held for them, so a rider is home, and alive, after a party all down.
  */
 export function caravanSettlement(caravan: Caravan, result: AdventureResult, destination: Camp): CaravanSettlement {
   const arrived = result.outcome === "complete";
@@ -283,9 +289,16 @@ async function submitOnce(
     const camp = await repo.camp(playerId, record.location);
     const destination = record.caravan ? await repo.camp(playerId, record.caravan.destination) : undefined;
     const balances = new Map(camp.holdings.map((h) => [h.material, h.balance]));
-    const heroes = await Promise.all(record.snapshot.heroes.map((h) => repo.getHero(playerId, h.heroId)));
-    if (heroes.some((h) => h?.adventureId !== adventureId)) return closed(repo, adventureId);
-    const writes = settlement(record, result, camp.warehouseLevel, balances, heroes as Hero[], destination);
+    const onIt = async (heroIds: readonly string[]): Promise<Hero[] | undefined> => {
+      const read = await Promise.all(heroIds.map((id) => repo.getHero(playerId, id)));
+      const marked = read.filter((h): h is Hero => h?.adventureId === adventureId);
+      return marked.length === read.length ? marked : undefined;
+    };
+    const heroes = await onIt(record.snapshot.heroes.map((h) => h.heroId));
+    // A caravan's riders are marked as the party is, and are read as it is: one no longer on this adventure means it has closed.
+    const riders = await onIt((record.caravan?.riders ?? []).map((r) => r.heroId));
+    if (!heroes || !riders) return closed(repo, adventureId);
+    const writes = settlement(record, result, camp.warehouseLevel, balances, heroes, destination, riders);
     try {
       await repo.settle(playerId, writes, now);
       return { ...record, status: "SETTLED", result: writes.result, settledAt: now.toISOString() };

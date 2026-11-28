@@ -1,13 +1,12 @@
-import { randomUUID } from "node:crypto";
 
 import type { DynamoDBDocumentClient } from "@aws-sdk/lib-dynamodb";
 import { range } from "es-toolkit";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { configFromEnv, createDocumentClient, type Tables } from "../src/db/client.js";
+import { type Tables } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
 import { RECENT_READ, RECENT_TTL_SECONDS, type RecentAdventure, recentAdventuresAt } from "../src/recent.js";
-import { putRecentAdventure, reads, recentAdventure as recent } from "./data.js";
+import { connected, minutesBefore, place, putRecentAdventure, reads, recentAdventure as recent } from "./data.js";
 
 /**
  * The adventures recently completed at a location, as they are read
@@ -23,20 +22,15 @@ let tables: Tables;
 let repo: Repository;
 
 beforeAll(() => {
-  const config = configFromEnv();
-  db = createDocumentClient(config);
-  tables = config.tables;
-  repo = new Repository(db, tables);
+  ({ db, tables, repo } = connected());
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/** Each test its own location, so no other test's adventures are in its list. */
-const place = () => `test-${randomUUID()}`;
 const now = new Date("2026-11-10T12:00:00.000Z");
-const minutesAgo = (minutes: number) => new Date(now.getTime() - minutes * 60_000);
+const minutesAgo = (minutes: number) => minutesBefore(now, minutes);
 
 const put = (item: RecentAdventure) => putRecentAdventure(db, tables.location, item);
 

@@ -15,6 +15,17 @@
 # create_before_destroy, the provider's own recommendation: should the
 # certificate ever be replaced, the new one is issued before the old one,
 # still attached to the distributions, is removed.
+#
+# prevent_destroy beside it (Issue-262), because that order holds only where
+# the distributions are in this root's state. In the sandbox account each
+# per-issue stack's distribution holds the certificate from a state of its
+# own, so ACM would refuse to delete the old one ("You cannot delete an ACM
+# certificate that is being used by another AWS service"; the ACM user
+# guide, "Delete certificates managed by AWS Certificate Manager", read
+# 2026-11-27) and the base's apply on main would fail half done. The guard
+# refuses the plan instead: replacing
+# the certificate is lifting it on purpose, in a reviewed change that says
+# how the stacks move to the new one.
 resource "aws_acm_certificate" "this" {
   domain_name               = var.zone_name
   subject_alternative_names = ["*.${var.zone_name}"]
@@ -22,6 +33,7 @@ resource "aws_acm_certificate" "this" {
 
   lifecycle {
     create_before_destroy = true
+    prevent_destroy       = true
   }
 }
 
