@@ -26,7 +26,7 @@ type ReplayState = 'loading' | 'missing' | 'failed' | 'unreadable' | 'unavailabl
 /**
  * Any settled adventure's replay, `/replays/<id>` (Issue-290; game.md, "The
  * page"): its stored timeline played in the battle scene, with no engine and
- * the same pause and speeds as the player's own replay (decision 0030), and
+ * the same pause and speeds as the adventure's own page (decision 0030), and
  * beside it the job, where and when, how it ended, its stages and its party,
  * never whose it was. It plays as soon as the scene is up, and again from the
  * start on asking. A timeline written under an older schema is not played,

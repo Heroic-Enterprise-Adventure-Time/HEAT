@@ -1,0 +1,79 @@
+/*
+ * A gains block (gains.ts): the resources as a row of chips, then a row for
+ * each hero, its tile with what it gained beside it. Each item holds what is
+ * seen, hidden from a screen reader while it counts, and its whole gain in
+ * words for a screen reader alone, which is placed against the item.
+ */
+:host {
+  display: block;
+}
+
+.chips,
+.heroes {
+  margin: 0 0 var(--space-md);
+  padding: 0;
+  list-style: none;
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+li {
+  position: relative;
+}
+
+.heroes li + li {
+  margin-top: var(--space-sm);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+/* The digits keep one width each, so the line does not shake as it counts. */
+.xp {
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+}
+
+.died {
+  color: var(--refusal);
+}
+
+/* A level gained: the one mark of the block that is news, in the main action's gold. */
+.up {
+  padding: 0 var(--space-md);
+  border: var(--frame-outline) solid var(--line-frame);
+  border-radius: var(--frame-corner);
+  background: var(--action);
+  color: var(--on-action);
+}
+
+/* The mark pops as it arrives, for a player who has not asked for less motion (angular.md, rule 23). */
+@media (prefers-reduced-motion: no-preference) {
+  .up {
+    animation: pop 0.3s ease-out;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+
+  60% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}

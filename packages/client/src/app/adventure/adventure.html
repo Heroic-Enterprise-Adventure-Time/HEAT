@@ -1,93 +1,5 @@
 <heat-battle-view>
-  @if (game.settled(); as settled) {
-    <div class="title">
-      <h2 id="panel-title">{{ settled.adventure.job.name }}</h2>
-      <heat-back-link kind="close" [to]="['/camp', settled.adventure.location]" [label]="from()" />
-    </div>
-    @if (play.replaying()) {
-      <p class="note">Replay</p>
-      <heat-playback [health]="true" />
-      <div class="after">
-        <button type="button" class="button secondary" (click)="play.endReplay()"><heat-icon name="back" />Back to the result</button>
-      </div>
-    } @else if (settled.result; as result) {
-      <p class="outcome">{{ outcomeWords(result.outcome) }}.</p>
-      <div class="unlocked" role="status">
-        @for (words of unlocked(); track words) {
-          <p>{{ words }}</p>
-        }
-      </div>
-      @if (unread(); as words) {
-        <p class="lost" role="alert">{{ words }}</p>
-        <button type="button" class="button secondary" [disabled]="reading()" (click)="readAgain()">Read again</button>
-      }
-
-      <h3 id="stages-title">Stages</h3>
-      <ol class="stages" aria-labelledby="stages-title">
-        @for (stage of stages(); track stage.stage) {
-          <li>{{ stage.words }}</li>
-        }
-      </ol>
-
-      <h3 id="rewards-title">Rewards</h3>
-      @if (result.rewards.length === 0) {
-        <p>Nothing came home.</p>
-      } @else {
-        <ul class="chips" aria-labelledby="rewards-title">
-          @for (reward of result.rewards; track reward.material) {
-            <li><heat-resource-chip [material]="reward.material" [amount]="reward.amount" /></li>
-          }
-        </ul>
-        @for (lost of result.lost; track lost.material) {
-          @if (lost.amount > 0) {
-            <p class="lost"><heat-resource-chip [material]="lost.material" [amount]="lost.amount" /> lost: the warehouse was full.</p>
-          }
-        }
-      }
-
-      @if (caravan(); as lines) {
-        <h3 id="caravan-title">Caravan</h3>
-        <ul class="caravan" aria-labelledby="caravan-title">
-          @for (words of lines; track words) {
-            <li>{{ words }}</li>
-          }
-        </ul>
-      }
-
-      <h3 id="heroes-title">Heroes</h3>
-      <ul class="heroes" aria-labelledby="heroes-title">
-        @for (hero of result.heroes; track hero.heroId) {
-          <li>
-            <heat-hero-tile [hero]="tiles().get(hero.heroId) ?? null" [still]="true" />
-            @if (hero.dead) {
-              <span class="dead">died</span>
-            } @else {
-              <span>
-                +{{ hero.xpGained }} XP
-                @if (hero.level > startLevel(hero.heroId)) {
-                  <strong class="up">level up</strong>
-                }
-              </span>
-            }
-          </li>
-        }
-      </ul>
-      <div class="after">
-        <button type="button" class="button secondary" [disabled]="replayState() === 'loading'" (click)="replay()"><heat-icon name="replays" />Watch the replay</button>
-      </div>
-      @if (replayState() === 'failed') {
-        <p class="lost" role="alert">The replay could not be read.</p>
-      }
-      @if (replayState() === 'unavailable') {
-        <p class="lost" role="alert">Replay unavailable: this adventure was played before the battles changed.</p>
-      }
-    } @else {
-      <p class="lost" role="alert">This adventure was lost to a game update. The party came home with nothing.</p>
-      @for (words of caravan() ?? []; track words) {
-        <p>{{ words }}</p>
-      }
-    }
-  } @else if (game.adventure(); as adventure) {
+  @if (shown(); as adventure) {
     <h2 id="panel-title">{{ adventure.job.name }}</h2>
     @if (countdown(); as seconds) {
       <p class="countdown" role="timer">Turning back in {{ seconds }}</p>
@@ -162,3 +74,39 @@
     <p>Loading…</p>
   }
 </heat-battle-view>
+
+@if (game.settled(); as settled) {
+  <heat-dialog [heading]="title()" (closed)="leave()">
+    @if (settled.result; as result) {
+      <div class="unlocked" role="status">
+        @for (words of unlocked(); track words) {
+          <p>{{ words }}</p>
+        }
+      </div>
+      @if (unread(); as words) {
+        <p class="lost" role="alert">{{ words }}</p>
+        <p><button type="button" class="button secondary" [disabled]="reading()" (click)="readAgain()">Read again</button></p>
+      }
+
+      <heat-gains [heroes]="gained()" [resources]="result.rewards">
+        @if (result.rewards.length === 0) {
+          <p>Nothing came home.</p>
+        }
+        @for (lost of result.lost; track lost.material) {
+          @if (lost.amount > 0) {
+            <p class="lost"><heat-resource-chip [material]="lost.material" [amount]="lost.amount" /> lost: the warehouse was full.</p>
+          }
+        }
+      </heat-gains>
+    } @else {
+      <p class="lost" role="alert">This adventure was lost to a game update. The party came home with nothing.</p>
+    }
+    @if (caravan(); as lines) {
+      <ul class="caravan" aria-label="Caravan">
+        @for (words of lines; track words) {
+          <li>{{ words }}</li>
+        }
+      </ul>
+    }
+  </heat-dialog>
+}

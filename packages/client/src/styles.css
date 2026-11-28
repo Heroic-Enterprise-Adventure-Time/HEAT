@@ -52,6 +52,7 @@
   --surface-panel: var(--card);
   --surface-panel-soft: var(--card-soft);
   --surface-picked: var(--sage); /* a picked hero's tile */
+  --surface-scrim: color-mix(in srgb, var(--soot) 55%, transparent); /* what a dialog dims the page behind it with */
 
   /* Text, by what it stands on. */
   --on-page: var(--ink);

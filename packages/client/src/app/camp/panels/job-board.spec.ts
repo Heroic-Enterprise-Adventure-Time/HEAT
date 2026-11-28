@@ -3,8 +3,9 @@ import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
 import { JOBS, jobsPostedBy, must, UNIT_PROFILES } from '@heat/engine';
 
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/battle-view';
+import { BATTLE_SCENE_FACTORY } from '../../adventure/battle-view';
 import { routes } from '../../app.routes';
+import { FRAME_LOOP } from '../../frame-loop';
 import { type AdventureView, Game, type HeroView, type RecentAdventureView, type ReplayView } from '../../game';
 import { Refusal } from '../../hub';
 import { Session } from '../../session';

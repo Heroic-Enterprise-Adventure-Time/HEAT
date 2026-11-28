@@ -88,3 +88,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0062](0062-the-pages-frames-as-drawn.md) | The page's frames as drawn: PixelLab's 9-slice art at 1×, the buttons' states in CSS, and the actions' icons | Decided, amended |
 | [0063](0063-the-scale-downs-trivy-would-fail.md) | The scale-downs trivy would fail: no customer-managed keys, no WAF, and no edge or bucket access logs | Decided |
 | [0064](0064-a-jobs-last-party-in-the-browser.md) | A job's last party is kept in the browser | Decided, amended |
+| [0065](0065-a-dialog-over-the-pages-regions.md) | A dialog over the page's regions, and the result of an adventure in one | Decided, amended |

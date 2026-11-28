@@ -93,6 +93,27 @@
     </div>
   </section>
 
+  <section aria-labelledby="gains">
+    <h2 id="gains">Gains</h2>
+    <p>What was gained, each amount counted up from nothing when the block is shown, and a level gained marked when its hero's XP is whole. With less motion asked for, everything is whole at once.</p>
+    <div class="frame">
+      <heat-gains [heroes]="gainedHeroes" [resources]="gainedResources" />
+    </div>
+  </section>
+
+  <section aria-labelledby="dialog">
+    <h2 id="dialog">Dialog</h2>
+    <p>What the page tells the player over its regions and waits for them to put away, by its one button or Escape. Each opening counts its gains again.</p>
+    <div class="row">
+      <button type="button" class="button primary" (click)="dialogOpen.set(true)">Open the dialog</button>
+    </div>
+    @if (dialogOpen()) {
+      <heat-dialog heading="Victory!" (closed)="dialogOpen.set(false)">
+        <heat-gains [heroes]="gainedHeroes" [resources]="gainedResources" />
+      </heat-dialog>
+    }
+  </section>
+
   <section aria-labelledby="bar">
     <h2 id="bar">The bar</h2>
     <div class="bar">

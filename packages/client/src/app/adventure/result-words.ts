@@ -16,6 +16,26 @@ const OUTCOMES: Readonly<Record<AdventureOutcome, string>> = {
   defeat: 'The party fell',
 };
 
+/**
+ * How an adventure ended, as the title of its result's dialog: one word and
+ * its mark, where a list of replays says it in a phrase (the owner,
+ * 2026-11-28, Issue-441).
+ */
+const TITLES: Readonly<Record<AdventureOutcome, string>> = {
+  complete: 'Victory!',
+  retreat: 'Retreat!',
+  defeat: 'Defeat!',
+};
+
+/** The title of a result with no outcome: an adventure no deploy could verify any more, discarded (decision 0030). */
+const LOST_TITLE = 'Adventure lost';
+
+/** The title of a result's dialog, "Victory!"; with no outcome, an adventure lost to a game update; an outcome this client's engine lacks, as the hub put it (angular.md, rule 6). */
+export function resultTitle(outcome: string | null): string {
+  if (outcome === null) return LOST_TITLE;
+  return Object.hasOwn(TITLES, outcome) ? TITLES[outcome as AdventureOutcome] : outcome;
+}
+
 /** A stage's ending in the player's words; one this client's engine lacks, sent by a newer deploy, as the hub put it (angular.md, rule 6). */
 export function endingWords(ended: string): string {
   return Object.hasOwn(ENDINGS, ended) ? ENDINGS[ended as StageEnding] : ended;

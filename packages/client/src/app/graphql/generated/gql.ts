@@ -33,7 +33,6 @@ type Documents = {
     "fragment SeenHeroFields on SeenHero {\n  id\n  level\n  name\n  spriteSet\n  unitType\n}": typeof types.SeenHeroFieldsFragmentDoc,
     "mutation StartAdventure($input: StartAdventureInput!) {\n  startAdventure(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on StartAdventureSuccess {\n      adventure {\n        ...AdventureFields\n      }\n    }\n  }\n}": typeof types.StartAdventureDocument,
     "mutation SubmitAdventure($input: SubmitAdventureInput!) {\n  submitAdventure(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on SubmitAdventureSuccess {\n      adventure {\n        id\n        result {\n          ...ResultFields\n        }\n      }\n    }\n  }\n}": typeof types.SubmitAdventureDocument,
-    "query Timeline($id: ID!) {\n  adventure(id: $id) {\n    id\n    timeline\n  }\n}": typeof types.TimelineDocument,
 };
 const documents: Documents = {
     "fragment AdventureFields on Adventure {\n  id\n  location\n  seed\n  startedAt\n  version\n  caravan {\n    destination\n    staying\n    cargo {\n      amount\n      material\n    }\n    riders {\n      heroId\n      name\n    }\n  }\n  job {\n    id\n    description\n    name\n  }\n  snapshot {\n    jobId\n    version\n    heroes {\n      heroId\n      level\n      name\n      spriteSet\n      unitType\n      stats {\n        damage\n        maxHealth\n        speed\n        traits {\n          level\n          trait\n        }\n      }\n    }\n  }\n}": types.AdventureFieldsFragmentDoc,
@@ -55,7 +54,6 @@ const documents: Documents = {
     "fragment SeenHeroFields on SeenHero {\n  id\n  level\n  name\n  spriteSet\n  unitType\n}": types.SeenHeroFieldsFragmentDoc,
     "mutation StartAdventure($input: StartAdventureInput!) {\n  startAdventure(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on StartAdventureSuccess {\n      adventure {\n        ...AdventureFields\n      }\n    }\n  }\n}": types.StartAdventureDocument,
     "mutation SubmitAdventure($input: SubmitAdventureInput!) {\n  submitAdventure(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on SubmitAdventureSuccess {\n      adventure {\n        id\n        result {\n          ...ResultFields\n        }\n      }\n    }\n  }\n}": types.SubmitAdventureDocument,
-    "query Timeline($id: ID!) {\n  adventure(id: $id) {\n    id\n    timeline\n  }\n}": types.TimelineDocument,
 };
 
 /**
@@ -148,10 +146,6 @@ export function graphql(source: "mutation StartAdventure($input: StartAdventureI
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "mutation SubmitAdventure($input: SubmitAdventureInput!) {\n  submitAdventure(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on SubmitAdventureSuccess {\n      adventure {\n        id\n        result {\n          ...ResultFields\n        }\n      }\n    }\n  }\n}"): (typeof documents)["mutation SubmitAdventure($input: SubmitAdventureInput!) {\n  submitAdventure(input: $input) {\n    __typename\n    ... on Error {\n      message\n    }\n    ... on SubmitAdventureSuccess {\n      adventure {\n        id\n        result {\n          ...ResultFields\n        }\n      }\n    }\n  }\n}"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "query Timeline($id: ID!) {\n  adventure(id: $id) {\n    id\n    timeline\n  }\n}"): (typeof documents)["query Timeline($id: ID!) {\n  adventure(id: $id) {\n    id\n    timeline\n  }\n}"];
 
 export function graphql(source: string) {
   return (documents as any)[source] ?? {};

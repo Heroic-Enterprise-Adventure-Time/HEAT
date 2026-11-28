@@ -59,8 +59,6 @@ export class Play {
   readonly speed = signal<Speed>(1);
   /** True while the clock waits at an entry for the scene. */
   readonly entering = signal(false);
-  /** True while a stored timeline is played rather than the engine. */
-  readonly replaying = signal(false);
   /** Forced actions waiting for their hero's next turn, by hero. */
   readonly queued = signal<ReadonlyMap<string, string>>(new Map());
   /** Whether the run was picked up from a saved log rather than started afresh. */
@@ -79,29 +77,23 @@ export class Play {
     this.resumed.set(saved !== null);
     this.savedAt = run.simTime;
     this.savedEntries = run.log.length;
-    this.begin(run, emptyField(adventure.snapshot.heroes, jobCart(adventure.snapshot.jobId)), false);
+    this.begin(run, emptyField(adventure.snapshot.heroes, jobCart(adventure.snapshot.jobId)));
     if (run.complete) void this.finish();
   }
 
-  /** Plays a stored timeline from its start, as the replay of an adventure already settled. */
+  /** Plays a stored timeline from its start, as the replay of a settled adventure. */
   replay(timeline: AdventureTimeline): void {
     this.live = null;
     this.paused.set(false);
     this.resumed.set(false);
-    this.begin(new TimelineRun(timeline), emptyField(timeline.party, timelineCart(timeline.events)), true);
+    this.begin(new TimelineRun(timeline), emptyField(timeline.party, timelineCart(timeline.events)));
   }
 
   /** Stops what was playing, the run and its field gone, until the next start or replay; a page that leaves a replay for another does. */
   stop(): void {
     this.run = null;
     this.live = null;
-    this.replaying.set(false);
     this.field.set(null);
-  }
-
-  /** Leaves the replay; the result shows again. */
-  endReplay(): void {
-    this.replaying.set(false);
   }
 
   /** Moves the run on by `wallMs` of wall-clock time at the chosen speed, and answers the events that happened. */
@@ -172,9 +164,8 @@ export class Play {
   }
 
   /** The field so far; held at the start of a fresh run or a replay, which the scene brings on. */
-  private begin(run: Run, start: Field, replaying: boolean): void {
+  private begin(run: Run, start: Field): void {
     this.run = run;
-    this.replaying.set(replaying);
     this.queued.set(new Map());
     this.held = 0;
     this.ending = false;

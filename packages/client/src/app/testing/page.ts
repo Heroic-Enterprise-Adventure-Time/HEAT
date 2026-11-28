@@ -15,8 +15,17 @@ export const panel = () => within(panelBox());
 /** The camp's menu of facilities, to query within. */
 export const menu = () => within(screen.getByRole('navigation', { name: 'Facilities' }));
 
+/** A list's items; a spec reads a list through one of the three below, by where the list is (angular-detail.md, "Rule 15"). */
+const itemsOf = (list: HTMLElement) => within(list).getAllByRole('listitem');
+
 /** The items of the panel's list of that name. */
-export const listItems = (list: string) => within(panel().getByRole('list', { name: list })).getAllByRole('listitem');
+export const listItems = (list: string) => itemsOf(panel().getByRole('list', { name: list }));
+
+/** The items of the list of that name in the page's dialog. */
+export const dialogItems = (list: string) => itemsOf(within(screen.getByRole('dialog')).getByRole('list', { name: list }));
+
+/** The items of the page's list of that name, for a component rendered alone, in no panel and no dialog. */
+export const pageItems = (list: string) => itemsOf(screen.getByRole('list', { name: list }));
 
 /** The item of the panel's list of that name that holds the given element. */
 export const itemHolding = (list: string, role: ByRoleMatcher, name: string) =>

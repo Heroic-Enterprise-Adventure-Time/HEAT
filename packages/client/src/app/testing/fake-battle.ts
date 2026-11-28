@@ -1,9 +1,9 @@
 import type { AdventureEvent } from '@heat/engine';
 
-import { type FrameLoop, MAX_FRAME_MS } from '../adventure/battle-view';
 import type { BattleSceneCallbacks } from '../adventure/battle/battle-scene';
 import type { CastMember } from '../adventure/cast';
 import { type Field, isEntry } from '../adventure/field';
+import { type FrameLoop, MAX_FRAME_MS } from '../frame-loop';
 
 /**
  * A battle scene that draws nothing, since jsdom has no WebGL, and records
@@ -78,17 +78,22 @@ export async function runToBlow(run: (ms: number) => Promise<void>, scene: { rea
   throw new Error('no blow landed in 100 frames');
 }
 
-/** A frame loop the test drives by hand: `advance` runs `ms` of wall-clock time in frames of at most the page's own limit, as the browser would. */
+/**
+ * A frame loop the test drives by hand: `advance` runs `ms` of wall-clock
+ * time in frames of at most the page's own limit, as the browser would, for
+ * everything on the page that asked for frames and has not stopped, the
+ * battle and an amount counted up alike.
+ */
 export function fakeFrameLoop() {
-  let onFrame: (ms: number) => void = () => undefined;
-  const loop: FrameLoop = (given) => {
-    onFrame = given;
-    return () => undefined;
+  const running = new Set<(ms: number) => void>();
+  const loop: FrameLoop = (onFrame) => {
+    running.add(onFrame);
+    return () => { running.delete(onFrame); };
   };
   return {
     loop,
     advance: (ms: number) => {
-      for (let left = ms; left > 0; left -= MAX_FRAME_MS) onFrame(Math.min(MAX_FRAME_MS, left));
+      for (let left = ms; left > 0; left -= MAX_FRAME_MS) for (const onFrame of [...running]) onFrame(Math.min(MAX_FRAME_MS, left));
     },
   };
 }

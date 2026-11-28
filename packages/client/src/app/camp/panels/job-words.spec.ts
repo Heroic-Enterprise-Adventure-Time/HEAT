@@ -1,6 +1,6 @@
 import { JOBS } from '@heat/engine';
 
-import { bonusWords, bonusXpWords, jobAt, jobsAt, lockedWords, postedJob, posterOf, retreatWords, rewardWords } from './job-words';
+import { bonusWords, bonusXpWords, jobAt, jobsAt, lockedWords, postedJob, posterOf, retreatWords } from './job-words';
 
 const sticks = JOBS['pick-up-sticks'];
 const wolves = JOBS['wolves-on-the-mill-road'];
@@ -55,10 +55,6 @@ describe('job words', () => {
     expect(lockedWords(seam, null, [{ kind: 'mine', level: 1 }])).toBe('Needs a level 2 mine.');
     expect(lockedWords(seam, ['millbrook'], [{ kind: 'mine', level: 2 }])).toBeNull();
     expect(lockedWords(ore, ['millbrook'], [{ kind: 'mine', level: 1 }])).toBeNull();
-  });
-
-  it("says one resource of a job's pay", () => {
-    expect(rewardWords({ amount: 3, material: 'cloth' })).toBe('3 cloth');
   });
 
   it("says a job's bonus XP on the board, beside its pay's chips", () => {
