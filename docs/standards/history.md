@@ -136,4 +136,6 @@ Rule 17, trivy. The floor gained trivy on 2026-11-02 (Issue-157). Its first run 
 
 Held back, the scale-downs trivy would fail. Excused by id in `terraform/.trivyignore` on 2026-11-02 (Issue-157).
 
+Held back, a standing scale-down needs no open issue. A rule the owner accepted on 2026-11-27, from the checkup of `6df7d6e`: the checkup had raised this item, and `graphql.md`'s snapshot read, as stale because Issue-157 and Issue-175 are closed, where neither waits on a release that an issue could track. Issue-271 wrote the rule into `docs/runbooks/checkup.md`, rule 5, and a line above each item.
+
 Tiers, 2026-11-27 (Issue-428). The loaded documents kept reaching their limits: on PR-425 `typescript.md` went over `packages/AGENTS.md`'s 30,000 twice, by 46 bytes and then 77, and each time was reworded back under. The owner asked for a structural fix and accepted the three tiers of decision 0060's amendment. `terraform.md`'s "Held back" and "Why" moved to `terraform-detail.md`, with the detail of its long rules and the whole of those it now writes as one line; no rule's number changed.
