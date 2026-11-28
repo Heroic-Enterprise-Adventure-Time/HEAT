@@ -31,8 +31,9 @@
 
 ## Facts checked
 
-- `HTMLDialogElement.showModal()` and the `::backdrop` pseudo-element are in every current browser, Baseline since March 2022 (MDN, "HTMLDialogElement: showModal() method", read 2026-11-28).
-- jsdom 31.0.1, which the client's specs run in, has the `dialog` element and none of `showModal`, `close` or `requestClose`, and no `window.matchMedia`: checked by a script in the issue's worktree on 2026-11-28. So the component checks for the methods before calling them (`docs/standards/angular-detail.md`, "Rule 15"), and that Escape closes the dialog, that the focus stays inside it and that the page behind is inert were seen in a browser, not in a spec.
+- `HTMLDialogElement.showModal()` and the `::backdrop` pseudo-element are in every current browser, Baseline since March 2022, and a dialog opened with `showModal()` makes the rest of the document inert (MDN, "HTMLDialogElement: showModal() method", read 2026-11-28). That page says nothing of Escape.
+- jsdom 31.0.1, which the client's specs run in, has the `dialog` element and none of `showModal`, `close` or `requestClose`, and no `window.matchMedia`: checked by a script in the issue's worktree on 2026-11-28. So the component checks for the methods before calling them (`docs/standards/angular-detail.md`, "Rule 15"), and what the browser does is seen in a browser, not in a spec.
+- Seen in the session's browser, a Chromium, on `/gallery` on 2026-11-28: the dialog matches `:modal` and opens with the focus on its button; Escape closes it and the focus goes back to the button that opened it; a click on the scrim leaves it open; Tab leaves the focus on its one button; and the button behind it cannot be focused or reached by a click, the scrim taking the click. Not seen: any other browser, a screen reader, and a system set to reduce motion, which the session cannot set and `gains.spec.ts` covers.
 
 ## Where it is described
 
