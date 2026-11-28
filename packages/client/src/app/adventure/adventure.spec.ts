@@ -155,8 +155,6 @@ const carryingLine = () => screen.getByRole('status');
 const carrying = () => carryingLine().textContent || null;
 
 describe('Adventure', () => {
-  beforeEach(() => { localStorage.clear(); });
-
   it("shows the job and each hero's abilities, usable only in a fight or a gather, and lists none of the job's stages", async () => {
     const { run } = await renderAdventure(fakeGame());
     expect(screen.getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();

@@ -25,10 +25,6 @@ function playLive(run: AdventureRun, until = Infinity): void {
 }
 
 describe('AdventureRun', () => {
-  beforeEach(() => { localStorage.clear(); });
-  // And after, so a failed expectation leaves nothing saved for the specs that follow.
-  afterEach(() => { localStorage.clear(); });
-
   it("keeps the log the engine keeps, so the hub's replay of it gives the same timeline and result", () => {
     const run = new AdventureRun(SNAPSHOT, 'seed-1');
     playLive(run);

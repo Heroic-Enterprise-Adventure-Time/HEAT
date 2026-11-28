@@ -1,6 +1,6 @@
 # 0061: The daylight parchment theme: role tokens over the palette, shared primitives and pixel-art frames
 
-- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css` and amended the frame's edge and corner and added the slot circles and the short chip (the amendments below); the frames, the action icons and the heroes' portraits built by Issue-385, whose frames are drawn as decision 0062 records, superseding "**The raised edge is subtle.**" and the first amendment's edge and corner for the frames; the header, the bottom nav and the camp's panels built by Issue-386; the battle pages built by Issue-390.
+- **Status:** Decided; the tokens, the primitives, the gallery and the lint built by Issue-384, which set the palette's exact values in `packages/client/src/styles.css` and amended the frame's edge and corner and added the slot circles and the short chip (the amendments below); the frames, the action icons and the heroes' portraits built by Issue-385, whose frames are drawn as decision 0062 records, superseding "**The raised edge is subtle.**" and the first amendment's edge and corner for the frames; the header, the bottom nav and the camp's panels built by Issue-386; the battle pages built by Issue-390. Amended by Issue-440: a picked hero's tile is filled in sage green, a colour added to the palette (the third amendment below).
 - **Date:** 2026-11-26
 - **Settles:** Issue-383: how the page looks once it reads as a casual mobile game, with less text and with buttons for actions. These are the owner's calls of 2026-11-26.
 - **Amends:** 0037, "read by the components with `var()`: the palette, a spacing scale, ...". From Issue-384 on, a component reads a role token, and only `styles.css` reads the palette.
@@ -45,6 +45,12 @@ The owner softened the raised edge and rounded the corners in review of Issue-38
 ## Amendment: slot circles and the short chip (Issue-384, 2026-11-26)
 
 The owner asked for less text in review of Issue-384's gallery, so two pieces join the primitives. Slot circles show a count of slots, filled for each one taken and empty for each one free, as one picture named for the count, "2 of 4 heroes"; they differ by fill, not by colour. A resource chip given the camp's balance is short when the balance is less than the amount: rust, with a dashed outline so that it does not rest on colour alone (WCAG 1.4.1), and named "more than the camp has" to a screen reader through visually hidden text. The balance itself is not written beside each cost. An accessible name alone was weighed and not chosen, because it reaches a screen reader and not a sighted player who does not tell rust from ink; the balance written beside each chip was weighed and not chosen, because it is the text the owner wants cut. Issue-386 puts them in the panels (`docs/design/game.md`, "The page").
+
+## Amendment: the picked hero's fill (Issue-440, 2026-11-28)
+
+The owner asked for a picked hero to read as selected at a glance, and green says selected: something subtle and earthy, so that it sits in the parchment. The palette gains sage, `#cfd6a8`, and a role over it, `--surface-picked`, which is the fill of a picked hero's tile wherever a tile is a toggle: the party, and both groups of who stays at a caravan's destination. The tile keeps its ink outline and its lower edge, so that picked does not rest on colour alone (WCAG 1.4.1); only its fill changes, from the panel's cream. Ink on sage is about 6 to 1. The toggle buttons, the speeds, the orders and a hero's abilities, keep the gold frame of decision 0062's amendment.
+
+The owner chose sage from three swatches on the palette's own parchment, shown in the Issue-440 session. Shown beside it and not chosen: a quieter lichen, `#dfe2bd`, and a stronger moss, `#b9c48a`. The scene's leaf green, `#6fbf4a`, was not offered: it is a health bar's colour, and far more vivid than anything on the page.
 
 ## Considered and not chosen
 
