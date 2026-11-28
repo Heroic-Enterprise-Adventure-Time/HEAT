@@ -260,13 +260,16 @@ for (const [name, spec] of Object.entries(SET)) {
   const source = state.frames.animations?.[sourceName[name]];
   const entry = (report.animations[name] = { source: sourceName[name], directions: {} });
   if (!source) { failures.push(`no animation named ${sourceName[name]} for ${name}`); continue; }
+  // Each direction's canvas, as its frames are: a walk's south has come back at the character's canvas and its
+  // east and north at a larger one, so the animation's canvas is not any one frame's (Issue-271).
+  const canvases = {};
   for (const d of spec.directions) {
     const paths = source[d];
     if (!paths || paths.length !== spec.frames) {
       failures.push(`${name} ${d}: ${paths?.length ?? 0} frames, expected ${spec.frames}`);
       continue;
     }
-    const heights = [], stray = {}, loose = [];
+    const heights = [], stray = {}, loose = [], sizes = new Set();
     paths.forEach((path, i) => {
       const img = decodePng(zip.get(path));
       write(`${name}-${d}-${i}.png`, zip.get(path), path);
@@ -279,8 +282,10 @@ for (const [name, spec] of Object.entries(SET)) {
         stray[hex(c)] ??= { ...nearest(c), at: [] };
         stray[hex(c)].at.push(`${i}:${(p / 4) % img.width},${Math.floor(p / 4 / img.width)}`);
       }
-      entry.canvas = [img.width, img.height];
+      sizes.add(`${img.width}x${img.height}`);
+      canvases[d] = [img.width, img.height];
     });
+    if (sizes.size > 1) failures.push(`${name} ${d}: frames of ${[...sizes].join(" and ")}`);
     const drift = Math.max(...heights) - Math.min(...heights);
     const count = (list) => list.reduce((n, s) => n + s.at.length, 0);
     const strayPixels = count(Object.values(stray));
@@ -292,6 +297,11 @@ for (const [name, spec] of Object.entries(SET)) {
     // colours far from every rotation colour are listed, and they are looked at, not refused.
     if (farPixels) review.push(`${name} ${d}: ${farPixels} px in colours far from any the character's rotations have`);
   }
+  // One pair where every direction agrees, and by direction where they differ: what the engine's test of a
+  // provenance against its files reads (docs/process/assets.md, rule 5). A direction that failed its frame
+  // count has no size, and then the animation is given no canvas: the failure is what the report says of it.
+  const each = spec.directions.map((d) => canvases[d]);
+  if (each.every(Boolean)) entry.canvas = new Set(each.map((size) => size.join("x"))).size === 1 ? each[0] : canvases;
 }
 
 // A failure the owner has looked at and accepted (rule 13) is recorded as waived, not failed.

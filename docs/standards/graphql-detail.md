@@ -56,7 +56,9 @@ Rule 22's third pair is `ReplayEnv` and `replayBucketFromEnv`. Rule 25 holds bec
 
 ## Held back
 
-- **A snapshot read for a lost race** (Issue-175, 2026-11-02). Rule 9's re-read is separate reads, a `Query` of the camp and a `GetItem` of the hero, and DynamoDB isolates them from a transaction only as read-committed: while the winner's transaction is committing, a read can see some of its items new and others old (the developer guide's "Isolation levels for DynamoDB transactions"). A loser that reads in that window can still answer a refusal for a repeat it lost to; the window is the winner's commit, milliseconds, against the seconds between a request and its repeat. `TransactGetItems` over the items a verb reads closes it, at the cost of a read per verb built from keys rather than the camp's `Query`, and a retry when the read conflicts with a write. Held back as out of proportion while nothing has shown the window; a race that does is the reason to build it.
+How an item here is checked is `docs/runbooks/checkup.md`, rule 5.
+
+- **A snapshot read for a lost race** (a standing scale-down, decided on Issue-175, 2026-11-02). Rule 9's re-read is separate reads, a `Query` of the camp and a `GetItem` of the hero, and DynamoDB isolates them from a transaction only as read-committed: while the winner's transaction is committing, a read can see some of its items new and others old (the developer guide's "Isolation levels for DynamoDB transactions"). A loser that reads in that window can still answer a refusal for a repeat it lost to; the window is the winner's commit, milliseconds, against the seconds between a request and its repeat. `TransactGetItems` over the items a verb reads closes it, at the cost of a read per verb built from keys rather than the camp's `Query`, and a retry when the read conflicts with a write. Held back as out of proportion while nothing has shown the window; a race that does is the reason to build it.
 
 ## Why
 

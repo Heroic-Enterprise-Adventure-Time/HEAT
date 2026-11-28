@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from "node:fs";
+import { readdirSync } from "node:fs";
 
 import { mapValues } from "es-toolkit";
 import { describe, expect, it } from "vitest";
@@ -33,14 +33,12 @@ import {
   warehouseCapacity,
 } from "../src/index.js";
 import { HIGHCRAG } from "./adventure/helpers.js";
+import { artDir, artSets, listed } from "./art.js";
 
-const heroes = new URL("../../../art/heroes/", import.meta.url);
-const facilities = new URL("../../../art/facilities/", import.meta.url);
+const facilities = artDir("facilities");
 
 describe("static content", () => {
-  const provenances = readdirSync(heroes)
-    .sort()
-    .map((set) => ({ set, ...(JSON.parse(readFileSync(new URL(`${set}/provenance.json`, heroes), "utf8")) as { classes: string[]; presentation: string }) }));
+  const provenances = artSets("heroes").map((set) => ({ set: set.set, classes: listed(set, "classes"), presentation: set.provenance["presentation"] }));
 
   it("lists the sprite sets each unit type allows exactly as the sets' provenance says", () => {
     const fromArt: Record<string, string[]> = {};

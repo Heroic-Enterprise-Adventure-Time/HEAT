@@ -4,6 +4,10 @@ The dated accounts behind the items of the documents in this directory that no d
 
 Nothing loads this file, and no session reads it at its start (`docs/README.md`, rule 17). It is read when an item's reason is in doubt, or when an item is about to be changed, by a search for the item under its document's heading. An account is added here in the pull request that adds or changes the item, and is not rewritten afterwards.
 
+## purpose.md
+
+The focus. Reworded on 2026-10-15: "containerized services" was dropped from the list with decision 0012, there being none.
+
 ## game.md
 
 The heroes hall, retiring. That a hero on an adventure cannot retire until the adventure is over was the owner's call on 2026-10-22, in Issue-113.

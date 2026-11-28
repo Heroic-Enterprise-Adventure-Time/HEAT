@@ -1,14 +1,15 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 
 import { uniq } from "es-toolkit";
 import { describe, expect, it } from "vitest";
 
 import { MATERIALS, MONSTERS, RESOURCE_NODES } from "../src/index.js";
+import { artKind } from "./art.js";
 
-const icons = new URL("../../../art/icons/", import.meta.url);
+const { dir: icons, provenance } = artKind("icons");
 
 /** The icons as their provenance lists them: each by what it stands for, with its file. */
-const listed = (JSON.parse(readFileSync(new URL("provenance.json", icons), "utf8")) as { icons: Record<string, { file: string }> }).icons;
+const listed = provenance["icons"] as Record<string, { file: string } | undefined>;
 
 /** Every resource an enemy of the content drops: what the battle scene shows a drop of (decision 0058, Issue-344). */
 const dropped = uniq([...Object.values(MONSTERS), ...Object.values(RESOURCE_NODES)].flatMap((enemy) => enemy.drops.map((drop) => drop.material)));

@@ -147,7 +147,7 @@
       "slice": {
         "top": 26,
         "right": 26,
-        "bottom": 26,
+        "bottom": 27,
         "left": 26
       }
     },
@@ -155,22 +155,22 @@
       "file": "primary.png",
       "uiAssetId": "734e87fc-ea33-496f-9d24-70ece792adb8",
       "slice": {
-        "top": 8,
-        "right": 10,
-        "bottom": 12,
-        "left": 10
+        "top": 10,
+        "right": 12,
+        "bottom": 14,
+        "left": 13
       }
     },
     "secondary": {
       "file": "secondary.png",
       "uiAssetId": "f2585aea-c959-487c-92a8-3bd9f646503e",
       "slice": {
-        "top": 8,
-        "right": 10,
-        "bottom": 12,
-        "left": 10
+        "top": 10,
+        "right": 12,
+        "bottom": 14,
+        "left": 13
       }
     }
   },
-  "sliceNote": "Each slice is in the pixels of the frame's opaque box, which the build trims each file to: every corner and every band of the edge lies inside it, so the edges and the middle repeat only flat runs."
+  "sliceNote": "Each slice is in the pixels of the frame's opaque box, which the build trims each file to, and holds every pixel of the frame's corners, their inner rounding and shading included, so that no edge repeats a piece of a corner. Measured on 2026-11-27 (Issue-271, from Issue-416), each frame read pixel by pixel. The primary's corners reach row 9 from the top, row 35 from the bottom (14 rows), column 12 from the left and column 98 from the right (12 columns) of its 110×49 box. The secondary's 109×49 box needs less, 5, 11, 13 and 10, and takes the primary's slice, because a toggle that is on is drawn on the primary's frame and a button must not change size when it is pressed. The panel's bottom-right corner begins its shading at row 114 of its 234×141 box, 27 rows from the bottom. What is left between the corners is flat on the secondary. On the primary and the panel it is the art as drawn and repeats with its edge: the primary's left edge has a notch at rows 22 to 27 and its right edge flecks at rows 10 to 14, its lower shadow has darker flecks along it, and the panel's side edges have a mark at rows 68 to 71 and flecks along them, its parchment stains by its lower corners and a broken line along its lower edge."
 }
