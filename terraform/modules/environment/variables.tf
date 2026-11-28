@@ -96,8 +96,16 @@ variable "alarm_email" {
 }
 
 variable "permissions_boundary_arn" {
-  description = "The bootstrap boundary of this account, which every role this module creates must carry (decision 0019)."
+  description = "The bootstrap boundary of this account, which every role this module creates must carry (decision 0019): arn:aws:iam::<account>:policy/heat-<environment>-boundary, which the root builds from the account id."
   type        = string
+
+  # The name is the bootstrap module's, heat-<its environment>-boundary. A
+  # role created with any other boundary is one the bootstrap boundary
+  # refuses at the apply, so the typo is refused here, at the plan.
+  validation {
+    condition     = can(regex("^arn:aws:iam::[0-9]{12}:policy/heat-(sandbox|dev|prod)-boundary$", var.permissions_boundary_arn))
+    error_message = "permissions_boundary_arn must be arn:aws:iam::<12-digit account id>:policy/heat-<sandbox, dev or prod>-boundary."
+  }
 }
 
 variable "log_retention_days" {
@@ -126,9 +134,18 @@ variable "throttling_burst_limit" {
 }
 
 variable "log_level" {
-  description = "POWERTOOLS_LOG_LEVEL for every function."
+  description = "POWERTOOLS_LOG_LEVEL for every function. No root sets it: INFO, Powertools' own default, in every environment."
   type        = string
   default     = "INFO"
+
+  # The seven levels of the Logger's "Log levels" table; the same page's
+  # settings table leaves TRACE out of the variable's allowed values, which
+  # the level table and the logger's own constants, at 2.36.0, do not
+  # (Powertools for AWS Lambda (TypeScript), "Logger", read 2026-11-27).
+  validation {
+    condition     = contains(["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "CRITICAL", "SILENT"], var.log_level)
+    error_message = "log_level must be TRACE, DEBUG, INFO, WARN, ERROR, CRITICAL or SILENT."
+  }
 }
 
 variable "hostname" {
