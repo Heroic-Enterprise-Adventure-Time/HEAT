@@ -32,6 +32,10 @@ export interface LayoutSizes {
   readonly panelShare: number;
   readonly panelMin: number;
   readonly panelMax: number;
+  /** The gutter of the page's colour between the regions and round their outer edge. */
+  readonly gap: number;
+  /** The outline each region is drawn in, the frames' own (decision 0061). */
+  readonly outline: number;
 }
 
 /** The token each length is read from. */
@@ -42,6 +46,8 @@ const LENGTH_TOKENS = {
   menuRow: '--menu-row-height',
   panelMin: '--panel-min-width',
   panelMax: '--panel-max-width',
+  gap: '--region-gap',
+  outline: '--frame-outline',
 } as const;
 const PANEL_SHARE_TOKEN = '--panel-share';
 
@@ -69,6 +75,8 @@ export function readLayoutSizes(root: Pick<CSSStyleDeclaration, 'fontSize' | 'ge
     panelShare: read(PANEL_SHARE_TOKEN, /^(\d*\.?\d+)vw$/) / 100,
     panelMin: length(LENGTH_TOKENS.panelMin),
     panelMax: length(LENGTH_TOKENS.panelMax),
+    gap: length(LENGTH_TOKENS.gap),
+    outline: length(LENGTH_TOKENS.outline),
   };
 }
 
@@ -82,14 +90,30 @@ export function sceneScale(width: number, height: number): number {
   return Math.max(1, Math.floor(Math.min(width / MAP_CORE_WIDTH, height / MAP_HEIGHT)));
 }
 
-/** The panel beside the scene: its share of the window, held between its bounds, as the CSS's `--panel-width` clamps it. */
+/** The panel beside the scene: its share of the window, held between its bounds, as the CSS's `--panel-width` clamps it; side by side, the regions' gutters and outlines come out of it. */
 export function panelPx(width: number, sizes: LayoutSizes): number {
   return clamp(width * sizes.panelShare, sizes.panelMin, sizes.panelMax);
 }
 
-/** The scene's scale with the regions side by side and the given menu width. */
+/**
+ * What a region's frame takes off one side of the scene's box: the gutter
+ * beside it and the scene's own outline. The CSS draws the scene's outline
+ * outside the box the scene measures (camp-scene.ts reads its client size).
+ */
+export function regionInset(sizes: LayoutSizes): number {
+  return sizes.gap + sizes.outline;
+}
+
+/**
+ * The scene's scale with the regions side by side and the given menu width.
+ * Across, the gutters and the outlines come out of the panel's column
+ * (camp.css), so the scene keeps the width the menu and the panel leave it,
+ * and a frame never costs it a step where the width is tight, as at
+ * 1920×1080 (Issue-444); down, the gutters above and below and the scene's
+ * outline.
+ */
 function sideScale(width: number, height: number, menu: number, sizes: LayoutSizes): number {
-  return sceneScale(width - menu - panelPx(width, sizes), height - sizes.header);
+  return sceneScale(width - menu - panelPx(width, sizes), height - sizes.header - 2 * regionInset(sizes));
 }
 
 /**
@@ -116,11 +140,13 @@ export function iconScale(width: number, height: number, sizes: LayoutSizes): nu
  * The scene's box height in CSS pixels when the regions stack: the map's
  * height at the largest scale, in device pixels, that fits both the page's
  * width and the height left under the header and the menu row, so the scene
- * and the menu stay on screen.
+ * and the menu stay on screen; each less the gutters and the scene's outline
+ * round it.
  */
 export function stackedStageHeight(width: number, height: number, sizes: LayoutSizes, ratio = 1): number {
-  const byHeight = Math.floor(((height - sizes.header - sizes.menuRow) * ratio) / MAP_HEIGHT);
-  return (MAP_HEIGHT * Math.max(1, Math.min(Math.floor((width * ratio) / MAP_CORE_WIDTH), byHeight))) / ratio;
+  const inset = 2 * regionInset(sizes);
+  const byHeight = Math.floor(((height - sizes.header - sizes.menuRow - inset) * ratio) / MAP_HEIGHT);
+  return (MAP_HEIGHT * Math.max(1, Math.min(Math.floor(((width - inset) * ratio) / MAP_CORE_WIDTH), byHeight))) / ratio;
 }
 
 /**

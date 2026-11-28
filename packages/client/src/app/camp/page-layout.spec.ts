@@ -2,7 +2,8 @@ import { mapValues } from 'es-toolkit';
 
 import { TEST_LAYOUT_SIZES as SIZES } from '../testing/layout-sizes';
 import { rootStyle } from '../testing/style-tokens';
-import { heroScale, iconScale, isSideBySide, menuLabels, panelPx, readLayoutSizes, sceneScale, sceneView, stackedStageHeight } from './page-layout';
+import { heroScale, iconScale, isSideBySide, menuLabels, panelPx, readLayoutSizes, regionInset, sceneScale, sceneView, stackedStageHeight } from './page-layout';
+import { MAP_CORE_WIDTH, MAP_HEIGHT } from './scene/layout';
 
 const HEADER = SIZES.header;
 
@@ -89,6 +90,12 @@ describe('stackedStageHeight', () => {
     // A phone at ratio 3: the map at 3 device px, one CSS px, as at ratio 1.
     expect(stackedStageHeight(...PHONE, SIZES, 3)).toBe(225);
   });
+
+  it("takes the gutters and the scene's outline off the width before it picks the scale", () => {
+    const frame = 2 * regionInset(SIZES);
+    expect(stackedStageHeight(2 * MAP_CORE_WIDTH + frame, 1024, SIZES)).toBe(2 * MAP_HEIGHT);
+    expect(stackedStageHeight(2 * MAP_CORE_WIDTH + frame - 1, 1024, SIZES)).toBe(MAP_HEIGHT);
+  });
 });
 
 describe('readLayoutSizes', () => {
@@ -102,19 +109,22 @@ describe('readLayoutSizes', () => {
     '--panel-min-width': '15rem',
     '--panel-share': '25vw',
     '--panel-max-width': '30rem',
+    '--region-gap': '0.5rem',
+    '--frame-outline': '2px',
   };
 
   it("resolves the rem tokens at the root font size, so the arithmetic follows the player's settings", () => {
-    expect(readLayoutSizes(style('16px', tokens))).toEqual({ header: 32, rail: 48, labelledMenu: 160, menuRow: 80, panelShare: 0.25, panelMin: 240, panelMax: 480 });
-    // A player at a 20px default font: every region a quarter larger, the panel's share unchanged.
-    expect(readLayoutSizes(style('20px', tokens))).toEqual({ header: 40, rail: 60, labelledMenu: 200, menuRow: 100, panelShare: 0.25, panelMin: 300, panelMax: 600 });
+    expect(readLayoutSizes(style('16px', tokens))).toEqual({ header: 32, rail: 48, labelledMenu: 160, menuRow: 80, panelShare: 0.25, panelMin: 240, panelMax: 480, gap: 8, outline: 2 });
+    // A player at a 20px default font: every region a quarter larger, the panel's share and the art's outline unchanged.
+    expect(readLayoutSizes(style('20px', tokens))).toEqual({ header: 40, rail: 60, labelledMenu: 200, menuRow: 100, panelShare: 0.25, panelMin: 300, panelMax: 600, gap: 10, outline: 2 });
   });
 
   it('reads every region from the tokens styles.css declares, so a token it cannot read fails here and not on the page', () => {
     for (const size of Object.values(SIZES)) expect(size).toBeGreaterThan(0);
-    const { panelShare, ...lengths } = SIZES;
+    const { panelShare, outline, ...lengths } = SIZES;
     const larger = readLayoutSizes(rootStyle('20px'));
     expect(larger.panelShare).toBe(panelShare);
+    expect(larger.outline).toBe(outline);
     for (const ratio of Object.values(mapValues(lengths, (length, region) => larger[region] / length))) expect(ratio).toBeCloseTo(1.25);
   });
 

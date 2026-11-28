@@ -20,8 +20,8 @@
 
   @if (session.user(); as user) {
     <span class="who">{{ user.email ?? user.name ?? 'Signed in' }}</span>
-    <button type="button" class="button secondary" (click)="session.signOut()">Sign out</button>
+    <button type="button" class="account" (click)="session.signOut()">Sign out</button>
   } @else {
-    <button type="button" class="button secondary" (click)="session.signIn()">{{ session.signInLabel }}</button>
+    <button type="button" class="account" (click)="session.signIn()">{{ session.signInLabel }}</button>
   }
 </header>

@@ -20,17 +20,35 @@ header {
   flex: 1;
 }
 
-.adventure {
+/*
+ * The bar's own controls, the open adventure's link and signing in or out:
+ * a thin outline in the bar's colours, slim enough for the bar. Signing in is
+ * the bar's chrome, not an action in the game, so it is not a framed button
+ * (Issue-444).
+ */
+.adventure,
+.account {
   padding: 0 var(--space-md);
   border: var(--border-thin) solid var(--link-on-bar);
+  background: none;
   color: var(--link-on-bar);
+  font: inherit;
   text-decoration: none;
   white-space: nowrap;
+  cursor: pointer;
 }
 
 .adventure:hover,
-.adventure:focus-visible {
+.adventure:focus-visible,
+.account:hover,
+.account:focus-visible {
   background: var(--surface-bar-raised);
+}
+
+.adventure:focus-visible,
+.account:focus-visible {
+  outline: var(--border) solid var(--focus-on-bar);
+  outline-offset: var(--border-thin);
 }
 
 /* A phone keeps the bar to one line: the email address goes, sign-out stays. */

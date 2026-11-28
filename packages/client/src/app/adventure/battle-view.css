@@ -4,7 +4,8 @@
  * (page-layout.ts, isSideBySide), the stage beside a content area of the
  * camp's width, reserved for the party and the controls and never over the
  * scene. What the content area holds is styled by the page that projects it
- * (battle-panel.css).
+ * (battle-panel.css). Each region is a card in the frames' outline with a
+ * gutter of the page between them, as in the camp (camp.css, Issue-444).
  */
 :host {
   display: block;
@@ -13,12 +14,20 @@
 .battle {
   display: flex;
   flex-direction: column;
+  gap: var(--region-gap);
   min-height: calc(100dvh - var(--header-height));
+  box-sizing: border-box;
+  padding: var(--region-gap);
   background: var(--surface-page);
 }
 
+.stage,
+.panel {
+  border: var(--frame-outline) solid var(--line-frame);
+  border-radius: var(--frame-corner);
+}
+
 .stage {
-  width: 100%;
   overflow: hidden;
   background: var(--surface-stage);
   color: var(--on-page);
@@ -39,10 +48,10 @@
 }
 
 .side .stage {
+  box-sizing: border-box;
   height: 100%;
 }
 
 .side .panel {
   overflow-y: auto;
-  border-left: var(--border-thick) solid var(--line-frame);
 }

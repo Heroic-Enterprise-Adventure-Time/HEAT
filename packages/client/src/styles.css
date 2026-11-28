@@ -134,6 +134,9 @@
   --panel-share: 26vw;
   --panel-max-width: 28rem;
   --panel-width: clamp(var(--panel-min-width), var(--panel-share), var(--panel-max-width));
+
+  /* Each region, the scene, the menu and the panel, is a card in the frames' outline, and this gutter of the page's colour stands between them and round their outer edge (Issue-444). */
+  --region-gap: 0.25rem;
 }
 
 body {
