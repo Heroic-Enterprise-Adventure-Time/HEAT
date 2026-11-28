@@ -145,4 +145,4 @@ The dated account of each rule, what was tried and what came out, is `docs/proce
 
 **The page's frames.** PixelLab's UI tool promises no exact edge and its art is not on a clean grid, so each slice is measured, and the edges repeat rather than stretch so that a fleck stays one pixel. The build trims a frame rather than the slice counting its margin, so the committed file stays the service's own (rule 6), and it writes the frames' names into a stylesheet because a border-image is CSS, which reads no index at runtime as the page reads the icons' (Issue-385; decision 0062).
 
-**What a provenance says of its files is tested.** A record nobody checks drifts from the files beside it: thirteen sets said their walk's canvas was 64×64 where the south walk's frames were 48×48, and nothing failed (Issue-271).
+**What a provenance says of its files is tested.** A record nobody checks drifts from the files beside it (Issue-271).
