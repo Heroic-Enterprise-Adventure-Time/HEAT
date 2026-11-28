@@ -1,5 +1,6 @@
 # What a login domain needs from its root: the pool it serves and the zone,
-# name and certificate of the base, all four from the base module's outputs.
+# name and certificate of the base, all four from the base module's outputs,
+# and whether the zone's apex needs a placeholder record, the root's literal.
 
 variable "user_pool_id" {
   description = "The account's shared user pool (terraform/modules/base), whose managed login this domain hosts."
@@ -24,4 +25,9 @@ variable "zone_id" {
 variable "certificate_arn" {
   description = "The base's certificate in us-east-1, which covers auth.<zone name> through its wildcard; Cognito's distribution serves it."
   type        = string
+}
+
+variable "apex_placeholder" {
+  description = "Whether this module writes a placeholder A record at the zone's apex, the parent record Cognito checks before it accepts the domain: true in the sandbox base, where nothing is served at the apex; false in dev and prod, where the apex is the site's record and the root orders this module after it."
+  type        = bool
 }

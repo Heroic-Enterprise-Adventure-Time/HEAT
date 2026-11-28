@@ -1,7 +1,7 @@
 # The sandbox base: what every per-issue stack in heat-sandbox shares, in one
-# permanent root applied from main (decision 0018). One module call with the
-# sandbox's values as literals (decision 0016); the dev and prod roots will
-# compose the same module beside the environment module.
+# permanent root applied from main (decision 0018). Two module calls with
+# the sandbox's values as literals (decision 0016); the dev and prod roots
+# compose the same two modules around the environment module.
 module "base" {
   source = "../../modules/base"
 
@@ -17,23 +17,8 @@ module "base" {
   google_client_secret = var.google_client_secret
 }
 
-# Cognito refuses a custom domain whose parent has no A record ("This record
-# must resolve to something, but the value of the record doesn't matter to
-# Amazon Cognito"; the guide, read 2026-10-17), and nothing is served at this
-# zone's apex: the sandbox's hostnames are its stacks'. So the apex carries
-# the guide's own example value, an address in the TEST-NET-2 range that
-# routes nowhere, for the check and nothing else. In dev and prod the apex is
-# the environment's site, and this record does not exist.
-resource "aws_route53_record" "apex_placeholder" {
-  zone_id = module.base.zone_id
-  name    = module.base.zone_name
-  type    = "A"
-  ttl     = 300
-  records = ["198.51.100.1"]
-}
-
-# auth.heat-sb.dcg-games.com, the pool's managed login domain, after the
-# parent record exists (terraform/modules/login-domain).
+# auth.heat-sb.dcg-games.com, the pool's managed login domain
+# (terraform/modules/login-domain).
 module "login_domain" {
   source = "../../modules/login-domain"
 
@@ -42,5 +27,17 @@ module "login_domain" {
   zone_id         = module.base.zone_id
   certificate_arn = module.base.certificate_arn
 
-  depends_on = [aws_route53_record.apex_placeholder]
+  # Nothing is served at this zone's apex, the sandbox's hostnames being its
+  # stacks', so the module writes the parent record Cognito checks. In dev
+  # and prod the apex is the site.
+  apex_placeholder = true
+}
+
+# The placeholder record was this root's own resource until Issue-270 moved
+# it into the module that needs it (terraform.md, rule 1). The block moves
+# the state to the new address at the first apply, and stays as history
+# afterwards (rule 11).
+moved {
+  from = aws_route53_record.apex_placeholder
+  to   = module.login_domain.aws_route53_record.apex_placeholder[0]
 }
