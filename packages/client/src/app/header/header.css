@@ -51,10 +51,23 @@ header {
   outline-offset: var(--border-thin);
 }
 
-/* A phone keeps the bar to one line: the email address goes, sign-out stays. */
+/*
+ * A phone keeps the bar to one line and the page's width: the email address
+ * goes, sign-out stays, and the open adventure's link reads "Adventure", its
+ * full name kept for a screen reader (Issue-444).
+ */
 @media (width <= 40rem) {
   .who {
     display: none;
+  }
+
+  .long {
+    position: absolute;
+    width: var(--pixel);
+    height: var(--pixel);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 }
 
