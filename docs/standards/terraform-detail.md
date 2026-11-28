@@ -26,9 +26,9 @@ What trivy does not see: a resource keyed by `for_each` on a value read with `fi
 
 ## Held back
 
-A standing scale-down names the decision that made it and waits on no release, so it has no open issue (`docs/runbooks/checkup.md`, rule 5).
+How an item here is checked is `docs/runbooks/checkup.md`, rule 5.
 
-- **The scale-downs trivy would fail, excused by id in `terraform/.trivyignore`** (standing scale-downs, decided on Issue-157, 2026-11-02, under rule 12): encryption with a customer-managed key on the buckets, the tables and the log groups, which costs at rest (rule 12; decision 0008 for the state bucket); a WAF on the distribution, which costs at rest (rule 12); CloudFront access logs and S3 server access logs, a destination per environment with no reader, where the gateway's access log and the function's log are the request record. Each leaves the ignore file, and this list, in the pull request that builds the thing.
+- **The scale-downs trivy would fail, excused by id in `terraform/.trivyignore`** (standing scale-downs, decision 0063, under rule 12): encryption with a customer-managed key on the buckets, the tables and the log groups, which costs at rest (rule 12; decision 0008 for the state bucket); a WAF on the distribution, which costs at rest (rule 12); CloudFront access logs and S3 server access logs, a destination per environment with no reader, where the gateway's access log and the function's log are the request record. Each leaves the ignore file, and this list, in the pull request that builds the thing.
 
 ## Why
 

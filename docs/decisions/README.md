@@ -86,3 +86,4 @@ The design and architecture documents say what is true now. They are edited as t
 | [0060](0060-what-a-session-costs.md) | What a session costs: a compaction window, rules kept apart from their accounts, and a size for what every session loads | Decided, amended |
 | [0061](0061-the-daylight-parchment-theme.md) | The daylight parchment theme: role tokens over the palette, shared primitives and pixel-art frames | Decided, amended |
 | [0062](0062-the-pages-frames-as-drawn.md) | The page's frames as drawn: PixelLab's 9-slice art at 1×, the buttons' states in CSS, and the actions' icons | Decided, amended |
+| [0063](0063-the-scale-downs-trivy-would-fail.md) | The scale-downs trivy would fail: no customer-managed keys, no WAF, and no edge or bucket access logs | Decided |
