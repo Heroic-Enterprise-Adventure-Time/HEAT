@@ -1,6 +1,6 @@
 # 0059: More locations: general unlocks, caravans with a cart, and Highcrag
 
-- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Built by Issue-353: the cart in the engine and the battle scene, with the owner's calls of 2026-11-25 on its shape and the numbers its tests play, in its amendment below. Built by Issue-354: the hub's caravan, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-355: the caravan hub's panel, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-356: Highcrag's quarry, stone, the knight and the route back, with their art, with the owner's calls of 2026-11-26, in its amendment below. Built by Issue-357: Millbrook's second levels, with the owner's calls of 2026-11-26, in its amendment below.
+- **Status:** Decided; the numbers are working assumptions. Built by Issue-350: the art, Highcrag's ground and layout and the caravan's cart, with the owner's calls of 2026-11-24 on what the record leaves open, the earth of Highcrag's camp, the cart's travel and its wreck, now in `docs/design/game.md`, "Locations and camps" and "Caravans". Built by Issue-351: unlocks and Highcrag in the engine and the hub, which amended it on 2026-11-24, the owner's calls, in the amendment below: the page works out which unlocks were new from the player's own, which the Decision leaves to that issue; and where the Decision says "Settlement writes each unlock of the result that the player does not hold" and "each unlock the run earned that the player does not hold adds one item", settlement writes one item for each unlock the result lists, each attribute only where it is absent, so one the player holds is not changed. Built by Issue-352: the job that opens the road and the client's second camp, with the owner's calls of 2026-11-24 on the road's numbers and the page's words, in its amendment below. Built by Issue-353: the cart in the engine and the battle scene, with the owner's calls of 2026-11-25 on its shape and the numbers its tests play, in its amendment below. Built by Issue-354: the hub's caravan, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-355: the caravan hub's panel, with the owner's calls of 2026-11-25, in its amendment below. Built by Issue-356: Highcrag's quarry, stone, the knight and the route back, with their art, with the owner's calls of 2026-11-26, in its amendment below. Built by Issue-357: Millbrook's second levels, with the owner's calls of 2026-11-26, in its amendment below. Amended by Issue-391, the owner's calls of 2026-11-27: "Passengers fight" no longer bounds who moves, since a caravan may carry riders, heroes who stay at the destination without being of the party, in its amendment below; the hub's side is built.
 - **Date:** 2026-11-23
 - **Settles:** Issue-292: the second location, how a location unlocks, caravans with their cargo and their passengers, what a caravan risks, the caravan hub's jobs, and the keys all of it needs, which the overview's "Open" and decision 0013 left to be designed before they are built. The owner's calls of 2026-11-23, made in the Issue-292 session.
 - **Amends:** 0026, "every location offers villagers, so no player is ever locked out": Highcrag offers none, and the guarantee is the starting location's; and 0026, "Recruitment", `recruitHero(unitType, requestId)`, which names no location: recruiting takes its location from Issue-351 on. 0032, "The first numbers", which give the mine, the lumber camp and the caravan hub one level each: each gains a second at Millbrook, costing stone (Issue-357). 0058, "a job's own penalty returns with caravans": no job states a penalty, and what a caravan loses is its cargo, by the one table below.
@@ -299,6 +299,39 @@ A dash is a count the probe did not take. The seam brings home 112 to 157 ore wi
 
 Not chosen in Issue-357: **a wolf on half the seam's runs,** which cost a miner, a fighter and a ranger a hero on two runs; **one goblin in the seam,** which a miner and a fighter cleared, leaving the second level nothing a first-level party could not do; **a picture for each second level,** which the agreed shape left out, so a level 2 is drawn as its level 1.
 
+## Amendment: riders, heroes who stay without escorting (Issue-391, 2026-11-27)
+
+The owner's calls of 2026-11-27, agreed in the session of Issue-386 and built by Issue-391. They amend "Passengers fight" in the Decision: a hero no longer has to be of the party to move.
+
+**A caravan may carry riders.** A rider is a hero who stays at the destination without being of the party. It rides in the cart with the cargo: it does not act, is not a unit of the battle and cannot be hit. There is no new art, and the replay shows nothing new; only the words say who rode. The escort is still a party of one to four, and a hero of the escort may still stay, so the party and the heroes who stay are two lists that may overlap.
+
+**Who can ride** is a living hero of the player's at the camp, on no adventure, which is what a hero of the party must be. A dead hero cannot ride.
+
+**What bounds the riders** is the destination hall's free slots, which they share with the escort's heroes who stay. It is not the party of four, and not the cart's load: a rider takes none of the cargo's room.
+
+**A rider is on the adventure.** It keeps its slot at home and holds one at the destination from the start, as a hero who stays does, and it cannot retire or set out again until the caravan settles.
+
+**What the end of the run does to a rider:**
+
+| The run ends | Riders |
+| --- | --- |
+| Arrives, cart standing or broken | land at the destination |
+| Retreat, ordered or by a time limit | stay home |
+| All down | home, alive: they were not in the fight |
+| Discarded after two updates | stay home |
+
+The other columns of the Decision's table stand. A rider gains no XP, since it met no enemy, and it cannot die on the road.
+
+**The wire keeps `staying`,** and a hero in it who is not of the party is a rider, so the start's input does not change shape. What was `BAD_USER_INPUT`, "a hero who stays and is not of the party", is now a rider, checked as a hero of the party is and refused with the same result types, `HeroDead`, `HeroRetired`, `HeroNotHere` and `HeroAdventuring`. `staying` holds at most eight ids, what the hall at its highest level holds. The start marks each rider with the adventure in its transaction, on the same condition as a hero of the party, so a retire that races the start fails one side or the other; settlement removes the mark and lands the rider or leaves it home; a discard removes the mark.
+
+**The record names the riders, and the snapshot does not.** Agreed in the Issue-391 session. The issue's table had "the frozen snapshot names the riders"; the snapshot is the engine's input, and nothing of the engine reads who stays or who rides, so a rider there would be a field no replay uses. The adventure's `caravan` gains `riders`, each a hero's id and the name it had at the start, beside `staying`, which still lists everyone who stays. It is written by the start and never changed, as the snapshot is, so the verified run still decides where the riders land; and a settled caravan's page can name a rider to a reader who is not its owner, as it names the party from the snapshot. `riders` is public with the rest of a settled adventure, and holds what the snapshot holds of a hero of the party and no more: an id and a hub-drawn name, with no owner (`docs/standards/graphql-detail.md`, "Rule 11"). A caravan written before Issue-391 has no `riders` and is read as having none. The result does not change: its lines are the party's, and who rode along is read from the caravan beside the outcome.
+
+**No change in the engine.** The issue said the engine's check that a hero who stays is of the party loosens. The engine has no such check, and knows nothing of who stays (the amendment of Issue-353); the hub's start held the rule alone.
+
+**The largest settlement** is now eight heroes landing, a party of four and four riders at a destination whose hall is at its highest level, with every resource credited and delivered and an unlock earned: measured at 50 items of the 100 a transaction allows. Eight is what one camp's hall holds, so no more than eight set out from one.
+
+Not chosen in Issue-391: **riders in the snapshot,** above; **a list of riders of its own in the start's input,** beside `staying`, which the hub would have to hold apart from the party and inside the hall's room, for what one list and the party already say; and **a rider's name read from the player's own heroes on the page,** which names nobody to another reader of a settled caravan.
+
 ## Considered and not chosen
 
 **The villager at Highcrag, with its free villager and a board job it cannot fail,** the agent's first shape, which kept decision 0026's "every location offers villagers". The owner's call is the miner in its place: Highcrag is supplied from Millbrook, and a camp that restarts itself from nothing is a second start.
@@ -317,7 +350,7 @@ Not chosen in Issue-357: **a wolf on half the seam's runs,** which cost a miner,
 
 **A new gathering trait for stone, and a quarryman to carry it.** A new unit type and its art for the puzzle that a row with no chance already makes. Many traits remain the direction (decision 0058); this is not the place for the next one.
 
-**Passengers who do not fight.** A second kind of party member, with rules of its own for who protects it, for nothing the cart does not already do.
+**Passengers who do not fight.** A second kind of party member, with rules of its own for who protects it, for nothing the cart does not already do. Chosen after all, as riders, by the amendment of Issue-391, which gives them no rules in the battle: a rider is not a party member and nothing has to protect it.
 
 **The whole party staying at the destination.** A supply run would then move every hero that guards it, and the origin would empty as the destination filled.
 

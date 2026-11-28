@@ -6,7 +6,7 @@ import { constantCase, sumBy } from "es-toolkit";
 import { type GraphQLSchema, isInputObjectType, isObjectType } from "graphql";
 import { beforeAll, describe, expect, it, onTestFinished, vi } from "vitest";
 
-import { CART_CAPACITY, location, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
+import { CART_CAPACITY, HALL_CAPACITY, location, MAX_PARTY, must, UNLOCK_IDS } from "@heat/engine";
 
 import type { Tables } from "../src/db/client.js";
 import { Repository } from "../src/db/repository.js";
@@ -395,6 +395,28 @@ describe("the camp through the graph", () => {
     const unposted = await gql(replays, { job: "a-job-of-another-version" }, viewer);
     expect(unposted.errors?.[0]?.extensions?.["code"]).toBe("BAD_USER_INPUT");
   });
+
+  it("answers a settled caravan's riders to any signed-in player, each by its id and the name it set out with, and nothing of whose they were (Issue-391)", async () => {
+    const [escort, rider] = [randomUUID(), randomUUID()];
+    // Settled long ago, so that it is last in the job's replays for the tests that read them.
+    const record = await putSettledAdventure(
+      db,
+      tables.location,
+      settledAdventure("caravan-to-highcrag", new Date("2020-01-01T00:00:00.000Z"), {
+        caravan: { destination: "highcrag", cargo: [{ material: "ore", amount: 30 }], staying: [escort, rider], riders: [{ heroId: rider, name: "Cora" }] },
+      }),
+    );
+    onTestFinished(async () => {
+      await db.send(new DeleteCommand({ TableName: tables.location, Key: locationKeys.adventure(record.adventureId) }));
+    });
+    const caravan = `query($id: ID!) { adventure(id: $id) { caravan { destination staying riders { heroId name } } } }` as Query<{ adventure: unknown }>;
+    const read = await gql(caravan, { id: record.adventureId }, player());
+    expect(read.errors).toBeUndefined();
+    expect(read.data?.adventure).toEqual({ caravan: { destination: "highcrag", staying: [escort, rider], riders: [{ heroId: rider, name: "Cora" }] } });
+    expect(JSON.stringify(read.data)).not.toContain(record.playerId);
+    const anonymous = await gql(caravan, { id: record.adventureId });
+    expect(anonymous.errors?.[0]?.extensions?.["code"]).toBe("UNAUTHENTICATED");
+  });
 });
 
 describe("the adventure loop through the graph", () => {
@@ -484,6 +506,7 @@ describe("the adventure loop through the graph", () => {
     const REPLAYS = `query($job: ID!) { replaysOf(job: $job) { __typename } }`;
     const hero = randomUUID();
     const largest = Math.max(...CART_CAPACITY);
+    const largestHall = Math.max(...HALL_CAPACITY);
     const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
     const NOT_A_UUID = `${randomUUID()}}`;
 
@@ -515,7 +538,10 @@ describe("the adventure loop through the graph", () => {
         ["a hero twice, in another case", START, { requestId: randomUUID(), heroIds: [hero, hero.toUpperCase()] }, "a hero is in the party twice"],
       ],
       "StartAdventureInput.requestId": [["what the scalar lets through as a UUID", START, { requestId: NOT_A_UUID, heroIds: [hero] }, "a request id is a UUID"]],
-      "StartAdventureInput.staying": [["a hero who stays twice, in another case", CARAVAN_START, { cargo: [], staying: [hero, hero.toUpperCase()] }, "a hero stays twice"]],
+      "StartAdventureInput.staying": [
+        ["more heroes who stay than the largest hall holds", CARAVAN_START, { cargo: [], staying: Array.from({ length: largestHall + 1 }, () => randomUUID()) }, `at most ${largestHall} heroes stay`],
+        ["a hero who stays twice, in another case", CARAVAN_START, { cargo: [], staying: [hero, hero.toUpperCase()] }, "a hero stays twice"],
+      ],
       "SubmitAdventureInput.overrides": [["a log of too many entries", ANY_LOG, { log: Array.from({ length: MAX_OVERRIDES + 1 }, () => unitEntry) }, `a log holds at most ${MAX_OVERRIDES} entries`]],
     };
 

@@ -132,7 +132,7 @@ export type StartAdventureInput = {
   readonly location: string | number;
   /** A UUID the client makes, which becomes the adventure's id; a repeat answers the adventure already started. */
   readonly requestId: string;
-  /** The heroes of the party who stay at a caravan's destination if it arrives, each once. Empty for a job that delivers nothing. */
+  /** The heroes who stay at a caravan's destination if it arrives, each once, at most 8, which the heroes hall at its highest level holds; a hall with fewer free slots refuses the start. One who is of the party fights and stays; one who is not is a rider, a living hero of the player's at that camp who rides in the cart. Empty for a job that delivers nothing. */
   readonly staying?: ReadonlyArray<string | number>;
 };
 

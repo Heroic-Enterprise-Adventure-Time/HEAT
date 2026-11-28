@@ -167,7 +167,7 @@ type Camp {
 }
 
 """
-A caravan as it set out (decision 0059): where it delivers, what it carries, and who of the party stays there on arrival.
+A caravan as it set out (decision 0059): where it delivers, what it carries, and who stays there on arrival.
 """
 type Caravan {
   """What the start took from the origin's warehouse, each resource once."""
@@ -177,9 +177,24 @@ type Caravan {
   destination: ID!
 
   """
-  The heroes of the party who stay at the destination if the caravan arrives.
+  Those of `staying` who are not of the party, in its order. They do not fight, gain no XP, and are home alive if the caravan does not arrive.
+  """
+  riders: [CaravanRider!]!
+
+  """
+  Everyone who stays at the destination if the caravan arrives: heroes of the party, and the riders.
   """
   staying: [ID!]!
+}
+
+"""
+A rider: a hero who rides a caravan's cart to stay at its destination and is not of its party, so the snapshot does not hold it.
+"""
+type CaravanRider {
+  heroId: ID!
+
+  """The hero's name when the caravan set out."""
+  name: String!
 }
 
 """An amount of one resource a caravan carries."""
@@ -461,7 +476,7 @@ type Mutation {
   retireHero(input: RetireHeroInput!): RetireHeroResult
 
   """
-  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of 1 to 4 of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.
+  Starts a job the location posts, on its job board or at a facility the camp has built, with a party of 1 to 4 of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party or a rider, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays. A hero who stays and is not of the party is a rider: it is checked as a hero of the party is, fights nothing, and is on the adventure until it settles. A destination the player has no camp at, a cargo the cart cannot carry, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.
   """
   startAdventure(input: StartAdventureInput!): StartAdventureResult
 
@@ -780,7 +795,7 @@ input StartAdventureInput {
   requestId: UUID!
 
   """
-  The heroes of the party who stay at a caravan's destination if it arrives, each once. Empty for a job that delivers nothing.
+  The heroes who stay at a caravan's destination if it arrives, each once, at most 8, which the heroes hall at its highest level holds; a hall with fewer free slots refuses the start. One who is of the party fights and stays; one who is not is a rider, a living hero of the player's at that camp who rides in the cart. Empty for a job that delivers nothing.
   """
   staying: [ID!]! = []
 }
