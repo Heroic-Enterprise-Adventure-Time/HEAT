@@ -14,7 +14,10 @@ const caravan: NonNullable<AdventureView['caravan']> = {
     { material: 'ore', amount: 40 },
   ],
   staying: ['h1', 'h2'],
+  riders: [],
 };
+// The same caravan with two riders beside the two of its party who stay: the caravan names them, the snapshot does not.
+const ridden: typeof caravan = { ...caravan, staying: ['h1', 'h2', 'h7', 'h8'], riders: [{ heroId: 'h7', name: 'Cora' }, { heroId: 'h8', name: 'Fenn' }] };
 
 /** A caravan's result: how it ended, and what of its cargo the destination's warehouse took and turned away. */
 function result(outcome: AdventureResultView['outcome'], delivered: AdventureResultView['delivered'] = [], deliveryLost: AdventureResultView['deliveryLost'] = []): AdventureResultView {
@@ -101,11 +104,22 @@ describe('caravan words', () => {
   });
 
   it('says who stayed, which a caravan does only by arriving, and nothing where nobody was to stay', () => {
-    expect(stayedWords(caravan, result('complete'), 'Highcrag', nameOf)).toBe('Stayed at Highcrag: Wren and Moss.');
-    expect(stayedWords({ ...caravan, staying: ['h1'] }, result('complete'), 'Highcrag', nameOf)).toBe('Stayed at Highcrag: Wren.');
+    expect(stayedWords(caravan, result('complete'), 'Millbrook', 'Highcrag', nameOf)).toEqual(['Stayed at Highcrag: Wren and Moss.']);
+    expect(stayedWords({ ...caravan, staying: ['h1'] }, result('complete'), 'Millbrook', 'Highcrag', nameOf)).toEqual(['Stayed at Highcrag: Wren.']);
     for (const ended of [result('retreat'), result('defeat'), null]) {
-      expect(stayedWords(caravan, ended, 'Highcrag', nameOf)).toBe('Nobody stayed at Highcrag: the caravan did not arrive.');
+      expect(stayedWords(caravan, ended, 'Millbrook', 'Highcrag', nameOf)).toEqual(['Nobody stayed at Highcrag: the caravan did not arrive.']);
     }
-    expect(stayedWords({ ...caravan, staying: [] }, result('complete'), 'Highcrag', nameOf)).toBeNull();
+    expect(stayedWords({ ...caravan, staying: [] }, result('complete'), 'Millbrook', 'Highcrag', nameOf)).toEqual([]);
+  });
+
+  it('says who rode along on a line of their own, by the names the caravan holds, and that they are back where it did not arrive, a party all down included (Issue-391)', () => {
+    expect(stayedWords(ridden, result('complete'), 'Millbrook', 'Highcrag', nameOf)).toEqual(['Stayed at Highcrag: Wren and Moss.', 'Rode along to Highcrag: Cora and Fenn.']);
+    for (const ended of [result('retreat'), result('defeat'), null]) {
+      expect(stayedWords(ridden, ended, 'Millbrook', 'Highcrag', nameOf)).toEqual(['Nobody stayed at Highcrag: the caravan did not arrive.', 'Cora and Fenn rode along and are back at Millbrook.']);
+    }
+    // Riders alone: nobody of the party was to stay.
+    const one = { ...ridden, staying: ['h7'], riders: [{ heroId: 'h7', name: 'Cora' }] };
+    expect(stayedWords(one, result('complete'), 'Millbrook', 'Highcrag', nameOf)).toEqual(['Rode along to Highcrag: Cora.']);
+    expect(stayedWords(one, result('defeat'), 'Millbrook', 'Highcrag', nameOf)).toEqual(['Nobody stayed at Highcrag: the caravan did not arrive.', 'Cora rode along and is back at Millbrook.']);
   });
 });

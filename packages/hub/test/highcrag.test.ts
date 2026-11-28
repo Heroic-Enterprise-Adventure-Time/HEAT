@@ -115,7 +115,7 @@ describe("a caravan from Highcrag to Millbrook", () => {
 
     const seed = seedWhere(back.id, party, (r) => whole(r) && r.delivered === true);
     const started = await startAdventure(repo, p, version, randomUUID(), highcrag.id, back.id, ids(heroes), { cargo: [{ material: "stone", amount: 40 }], staying: [] }, undefined, () => seed);
-    expect(started.caravan).toEqual({ destination, cargo: [{ material: "stone", amount: 40 }], staying: [] });
+    expect(started.caravan).toEqual({ destination, cargo: [{ material: "stone", amount: 40 }], staying: [], riders: [] });
     expect((await balances(repo, p, highcrag.id))["stone"]).toBe(0);
 
     const settled = await submitAdventure(repo, new MemoryTimelines(), p, version, started.adventureId, []);

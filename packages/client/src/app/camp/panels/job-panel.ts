@@ -31,12 +31,18 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
   AdventureOpen: 'An adventure is already under way. Only one can be open at a time.',
   InsufficientResources: 'The camp cannot pay for the cargo now.',
   HallFull: 'The heroes hall at the destination has no room for everyone who stays.',
-  HeroNotHere: 'A hero in the party is not at this camp.',
-  HeroDead: 'A hero in the party is dead.',
-  HeroRetired: 'A hero in the party has retired.',
-  HeroAdventuring: 'A hero in the party is already on an adventure.',
+  HeroNotHere: 'One of the heroes picked is not at this camp.',
+  HeroDead: 'One of the heroes picked is dead.',
+  HeroRetired: 'One of the heroes picked has retired.',
+  HeroAdventuring: 'One of the heroes picked is already on an adventure.',
   Conflict: 'The party changed while setting out, and nobody left. Try again.',
 };
+
+// The two groups of who stays at a caravan's destination (Issue-391), and what the riders' group says of itself.
+const ESCORTS_TITLE = 'Of the party';
+const RIDERS_TITLE = 'Riding along';
+const RIDERS_NOTE = 'A rider stays without fighting on the way.';
+const NO_RIDERS = 'Nobody else is here to ride.';
 
 /**
  * A job's detail under the poster that lists it, the job board,
@@ -58,8 +64,9 @@ const REFUSALS: Readonly<Record<Exclude<StartRefusal, 'Requires'>, string>> = {
  * "Caravans"): the cargo, an amount of each resource the camp holds, set by
  * steppers clamped to the balance and to what the cart carries, each beside
  * the camp's balance and the destination's room for it (Issue-386); and who
- * of the party stays at the destination, as hero tiles, beside its hall's
- * free slots. Under them, what cannot be undone: that a retreat abandons the
+ * stays at the destination, as hero tiles in two groups beside its hall's
+ * free slots, the party's heroes and everyone else here, who would ride
+ * along (Issue-391). Under them, what cannot be undone: that a retreat abandons the
  * cargo, which the retreat's line says, and where the destination has no
  * caravan hub, that a hero who stays cannot come back until it has one.
  * Depart is disabled with the reason while the picks break a rule the hub
@@ -152,16 +159,21 @@ export class JobPanel {
     return new Set([...this.chosen()].filter((id) => living.has(id)));
   });
   /**
-   * The heroes who may be marked to stay: the party's, in the camp's order,
-   * since every hero on a caravan fights (decision 0059). Issue-391 widens
-   * this to riders, heroes who stay without escorting.
+   * The heroes who may be marked to stay, in the camp's order, in two groups
+   * (Issue-391, amending decision 0059): the party's, who fight on the way,
+   * and every other living hero here, who would ride along in the cart.
    */
-  protected readonly mayStay = computed(() => this.game.livingHere().filter((h) => this.picked().has(h.id)));
+  protected readonly escorts = computed(() => this.game.livingHere().filter((h) => this.picked().has(h.id)));
+  protected readonly riders = computed(() => this.game.livingHere().filter((h) => !this.picked().has(h.id)));
+  protected readonly escortsTitle = ESCORTS_TITLE;
+  protected readonly ridersTitle = RIDERS_TITLE;
+  protected readonly ridersNote = RIDERS_NOTE;
+  protected readonly noRiders = NO_RIDERS;
   private readonly marked = signal<ReadonlySet<string>>(new Set());
-  /** The heroes marked to stay who still may. */
+  /** The heroes marked to stay who are still alive here, of the party or riding. */
   protected readonly staying = computed(() => {
-    const may = new Set(this.mayStay().map((h) => h.id));
-    return new Set([...this.marked()].filter((id) => may.has(id)));
+    const living = new Set(this.game.livingHere().map((h) => h.id));
+    return new Set([...this.marked()].filter((id) => living.has(id)));
   });
   /** Why the caravan cannot depart as picked, or null; always null for a job that delivers nothing. */
   protected readonly caravanReason = computed(() => {
@@ -173,10 +185,20 @@ export class JobPanel {
   protected readonly pending = signal(false);
   protected readonly refusal = signal<string | null>(null);
 
+  /**
+   * A hero who leaves the party leaves the caravan: it is no longer marked
+   * to stay, so that nobody becomes a rider, and moves camp, by a pick that
+   * meant the opposite. One who joins the party keeps its mark, and stays as
+   * a hero of the party where it would have ridden.
+   */
   protected toggle(id: string): void {
     const next = new Set(this.picked());
-    if (next.has(id)) next.delete(id);
-    else if (next.size < MAX_PARTY) next.add(id);
+    if (next.has(id)) {
+      next.delete(id);
+      this.marked.set(new Set([...this.staying()].filter((stays) => stays !== id)));
+    } else if (next.size < MAX_PARTY) {
+      next.add(id);
+    }
     this.chosen.set(next);
   }
 

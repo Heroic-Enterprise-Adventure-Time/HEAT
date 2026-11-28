@@ -7,6 +7,7 @@ import {
   CART_CAPACITY,
   FACILITY_KINDS,
   GATHERING_TRAITS,
+  HALL_CAPACITY,
   hallCapacity,
   type Job,
   jobOf,
@@ -28,7 +29,7 @@ import {
 
 import { buildFacility } from "../build.js";
 import { callerId } from "../context.js";
-import { type AdventureRecord, type Camp, campLevels, type Caravan, type EarnedUnlock, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
+import { type AdventureRecord, type Camp, campLevels, type Caravan, type CaravanRider, type EarnedUnlock, type Hero, type HeroOutcome, type Holding, type Player, type SettledResult } from "../db/repository.js";
 import { ADVENTURE_STATUSES, HERO_STATUSES } from "../db/statuses.js";
 import { discardAdventure } from "../discard.js";
 import { jobOfAdventure, readAdventure, readOpenAdventure, readTimeline } from "../read.js";
@@ -300,12 +301,21 @@ const AdventureResultRef = builder.objectRef<SettledResult>("AdventureResult").i
   }),
 });
 
+const CaravanRiderRef = builder.objectRef<CaravanRider>("CaravanRider").implement({
+  description: "A rider: a hero who rides a caravan's cart to stay at its destination and is not of its party, so the snapshot does not hold it.",
+  fields: (t) => ({
+    heroId: t.exposeID("heroId"),
+    name: t.exposeString("name", { description: "The hero's name when the caravan set out." }),
+  }),
+});
+
 const CaravanRef = builder.objectRef<Caravan>("Caravan").implement({
-  description: "A caravan as it set out (decision 0059): where it delivers, what it carries, and who of the party stays there on arrival.",
+  description: "A caravan as it set out (decision 0059): where it delivers, what it carries, and who stays there on arrival.",
   fields: (t) => ({
     destination: t.exposeID("destination", { description: "The location the job delivers to." }),
     cargo: t.expose("cargo", { type: [RewardRef], description: "What the start took from the origin's warehouse, each resource once." }),
-    staying: t.exposeIDList("staying", { description: "The heroes of the party who stay at the destination if the caravan arrives." }),
+    staying: t.exposeIDList("staying", { description: "Everyone who stays at the destination if the caravan arrives: heroes of the party, and the riders." }),
+    riders: t.expose("riders", { type: [CaravanRiderRef], description: "Those of `staying` who are not of the party, in its order. They do not fight, gain no XP, and are home alive if the caravan does not arrive." }),
   }),
 });
 
@@ -603,6 +613,10 @@ const PARTY_SIZE = `a party is 1 to ${MAX_PARTY} heroes`;
 /** What the cart of the caravan hub at its highest level carries in all, the most any cargo can be (decision 0059). */
 const LARGEST_CART = Math.max(0, ...CART_CAPACITY);
 
+/** What the heroes hall at its highest level holds, the most who can stay at a caravan's destination, of the party or riding (Issue-391). */
+const LARGEST_HALL = Math.max(0, ...HALL_CAPACITY);
+const STAYING_SIZE = `at most ${LARGEST_HALL} heroes stay`;
+
 const CargoInput = builder.inputType("CargoInput", {
   description: "An amount of one resource a caravan carries.",
   fields: (t) => ({
@@ -645,8 +659,11 @@ const StartAdventureInput = builder.inputType("StartAdventureInput", {
     staying: t.idList({
       required: true,
       defaultValue: [],
-      description: "The heroes of the party who stay at a caravan's destination if it arrives, each once. Empty for a job that delivers nothing.",
-      validate: z.array(z.string().check(z.toLowerCase())).check(z.refine((ids) => uniq(ids).length === ids.length, "a hero stays twice")),
+      description: `The heroes who stay at a caravan's destination if it arrives, each once, at most ${LARGEST_HALL}, which the heroes hall at its highest level holds; a hall with fewer free slots refuses the start. One who is of the party fights and stays; one who is not is a rider, a living hero of the player's at that camp who rides in the cart. Empty for a job that delivers nothing.`,
+      validate: z.array(z.string().check(z.toLowerCase())).check(
+        z.maxLength(LARGEST_HALL, STAYING_SIZE),
+        z.refine((ids) => uniq(ids).length === ids.length, "a hero stays twice"),
+      ),
     }),
   }),
 });
@@ -775,7 +792,7 @@ builder.mutationFields((t) => ({
     nullable: true,
     authScopes: { authenticated: true },
     description:
-      `Starts a job the location posts, on its job board or at a facility the camp has built, with a party of 1 to ${MAX_PARTY} of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays; a destination the player has no camp at, a cargo the cart cannot carry, a hero who stays and is not of the party, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.`,
+      `Starts a job the location posts, on its job board or at a facility the camp has built, with a party of 1 to ${MAX_PARTY} of the player's living heroes at that camp: issues the seed and the frozen snapshot, stamped with the deploy's version, and opens the player's one adventure. The client names the request, so a repeat finds the adventure it started and is answered with it as it is; the request id with another location, job or party is BAD_USER_INPUT. Refused with AdventureOpen while another is open, Requires while the facility that posts the job is not built, HeroDead, HeroRetired, HeroNotHere or HeroAdventuring for a hero of the party or a rider, or Conflict; a location the player has no camp at, a job the location does not post, a party of the wrong size or a hero that is not the player's is BAD_USER_INPUT. A caravan, a job that delivers, takes its cargo from the camp's warehouse and holds a slot in the destination's heroes hall for each hero who stays, and is also refused with InsufficientResources when the camp cannot pay the cargo and HallFull when the destination's hall has no room for everyone who stays. A hero who stays and is not of the party is a rider: it is checked as a hero of the party is, fights nothing, and is on the adventure until it settles. A destination the player has no camp at, a cargo the cart cannot carry, or a cargo or a hero who stays on a job that delivers nothing, is BAD_USER_INPUT, and so is the request id with another cargo or other heroes who stay.`,
     errors: answers("StartAdventure", { field: "adventure", what: "the adventure opened" }, [
       AdventureOpen,
       Requires,

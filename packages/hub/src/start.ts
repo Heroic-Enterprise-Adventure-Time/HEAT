@@ -75,20 +75,34 @@ import {
  * time it arrives (`StartAdventureInput`).
  *
  * A caravan, a job that delivers (decision 0059), also takes its cargo and
- * the heroes of the party who stay at the destination. Its start debits the
- * cargo from the origin's holdings and holds a slot in the destination's
- * hall for each hero who stays, in the same transaction. Its refusals are
+ * the heroes who stay at the destination. Its start debits the cargo from
+ * the origin's holdings and holds a slot in the destination's hall for each
+ * hero who stays, in the same transaction. Its refusals are
  * InsufficientResources, a cargo the origin cannot pay, and HallFull, a
  * destination hall with no slot for everyone who stays. A destination the
- * player has no camp at, a hero marked to stay who is not of the party, or
- * a cargo or a hero marked to stay on a job that delivers nothing, is
- * BAD_USER_INPUT: the page offers none of them. A cargo whose hub is below
- * the level that carries it is Requires, as a job's facility is. Each
- * resource is in the cargo once, and the cargo within the largest cart, by
+ * player has no camp at, or a cargo or a hero marked to stay on a job that
+ * delivers nothing, is BAD_USER_INPUT: the page offers none of them. A cargo
+ * whose hub is below the level that carries it is Requires, as a job's
+ * facility is. Each resource is in the cargo once, the cargo within the
+ * largest cart, and those who stay no more than the largest hall holds, by
  * the time it arrives (`StartAdventureInput`).
+ *
+ * A hero marked to stay who is not of the party is a rider (Issue-391,
+ * amending decision 0059): it rides in the cart, fights nothing, and stays
+ * at the destination if the caravan arrives. A rider is checked as a hero of
+ * the party is, the player's, alive, at this camp, not retired and on no
+ * adventure, with the same refusals, and is marked with the adventure in the
+ * same transaction, so it holds its slot at home and cannot retire or set out
+ * until the caravan settles. What bounds the riders is the destination
+ * hall's free slots, which they share with the party's heroes who stay: not
+ * the party's size, and not the cart's load. The record names each by the
+ * name it had at the start.
  */
 
-/** What a caravan carries and who stays, as the request names them; empty for any other job. */
+/**
+ * What a caravan carries and who stays, as the request names them; empty for
+ * any other job. Of those who stay, the ones not of the party are its riders.
+ */
 export interface CaravanRequest {
   cargo: readonly Reward[];
   staying: readonly string[];
@@ -212,7 +226,7 @@ async function startOnce(
   const at = await campLocation(repo, playerId, locationId);
   const job = jobAt(at.id, jobId);
   if (!job) badInput(`${at.name} has no job ${jobId}`);
-  const { destination, hubLevel } = await caravanShape(repo, playerId, job, heroIds, caravan);
+  const { destination, hubLevel } = await caravanShape(repo, playerId, job, caravan);
 
   // A facility's job needs the facility built to the level that posts it
   // (game.md, "Locations and camps"; Issue-357), and a caravan's hub the level
@@ -228,15 +242,18 @@ async function startOnce(
   };
   await checkFacilities();
 
-  const checkParty = async (): Promise<Hero[]> => {
-    const heroes = await Promise.all(heroIds.map((id) => repo.getHero(playerId, id)));
-    const party: Hero[] = [];
-    for (const hero of heroes) {
+  // A caravan's riders: those who stay and are not of the party (Issue-391). A job that delivers nothing has none (`caravanShape`).
+  const riderIds = caravan.staying.filter((id) => !heroIds.includes(id));
+  /** The heroes of these ids, each able to set out from here; a rider is checked as a hero of the party is. */
+  const setOut = async (ids: readonly string[]): Promise<Hero[]> => {
+    const read = await Promise.all(ids.map((id) => repo.getHero(playerId, id)));
+    const able: Hero[] = [];
+    for (const hero of read) {
       // Another player's hero is not said to exist.
       if (!hero) badInput("not one of your heroes");
       const refusal = heroRefusal(hero, at.id);
       if (!refusal) {
-        party.push(hero);
+        able.push(hero);
         continue;
       }
       // A hero on an adventure means the player's one adventure is open: a
@@ -247,9 +264,11 @@ async function startOnce(
       }
       throw refusal;
     }
-    return party;
+    return able;
   };
-  const heroes = await checkParty();
+  /** The party, then the riders, so that a refusal for a hero of the party is the one given when both would be refused. */
+  const checkParty = async (): Promise<{ heroes: Hero[]; riders: Hero[] }> => ({ heroes: await setOut(heroIds), riders: await setOut(riderIds) });
+  const { heroes, riders } = await checkParty();
 
   // A caravan's cargo against the origin's holdings, and its heroes who stay against the destination's hall.
   // Another start that committed since the first read took the balance or the slot with its own adventure,
@@ -272,7 +291,8 @@ async function startOnce(
     const there = await repo.camp(playerId, destination.id);
     const capacity = hallCapacity(there.hallLevel);
     if (there.activeHeroes + caravan.staying.length > capacity) return refuseCaravan(new HallFull(`the heroes hall at ${destination.name} has no room for everyone who stays`));
-    return { caravan: { destination: destination.id, cargo: [...caravan.cargo], staying: [...caravan.staying] }, destination: there, capacity };
+    const named = riders.map((rider) => ({ heroId: rider.id, name: rider.name }));
+    return { caravan: { destination: destination.id, cargo: [...caravan.cargo], staying: [...caravan.staying], riders: named }, destination: there, capacity };
   };
   const carrying = await checkCaravan();
 
@@ -309,21 +329,20 @@ async function startOnce(
  * the destination, which must be a camp of the player's, and the least hub
  * level whose cart carries the cargo, which the start holds as the hub's
  * requirement (decision 0059). A job that delivers nothing takes no cargo
- * and leaves nobody, and asks nothing more of its hub than the job does.
+ * and leaves nobody, and asks nothing more of its hub than the job does. Who
+ * stays is not checked against the party here: one who is not of it is a
+ * rider, checked with the party (Issue-391).
  */
 async function caravanShape(
   repo: Repository,
   playerId: string,
   job: Job,
-  heroIds: readonly string[],
   caravan: CaravanRequest,
 ): Promise<{ destination: Location | undefined; hubLevel: number }> {
   if (job.deliversTo === undefined) {
     if (caravan.cargo.length > 0 || caravan.staying.length > 0) badInput(`${job.name} carries no cargo and leaves nobody anywhere`);
     return { destination: undefined, hubLevel: 1 };
   }
-  const stray = caravan.staying.find((id) => !heroIds.includes(id));
-  if (stray !== undefined) badInput(`${stray} is not of the party`);
   const destination = await campLocation(repo, playerId, job.deliversTo);
   // The schema refuses a cargo larger than the largest cart (graphql.md, rule 14), so a level always carries it.
   const hubLevel = must(hubLevelCarrying(sumBy(caravan.cargo, (c) => c.amount)), "the hub level whose cart carries the cargo");

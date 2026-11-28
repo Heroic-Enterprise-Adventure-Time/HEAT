@@ -442,7 +442,7 @@ describe('Adventure', () => {
   });
 
   it('says what a caravan delivered, what the cap lost and who stayed (Issue-355)', async () => {
-    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 40 }], staying: ['h2'] };
+    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 40 }], staying: ['h2'], riders: [] };
     const delivered = { ...result, delivered: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 30 }], deliveryLost: [{ material: 'timber', amount: 0 }, { material: 'ore', amount: 10 }] };
     const { run } = await renderAdventure(fakeGame(() => delivered, { ...adventure, caravan }));
     await run(120_000);
@@ -450,8 +450,19 @@ describe('Adventure', () => {
     expect(textsOf(listItems('Caravan'))).toEqual(['Delivered to Highcrag: 60 timber and 30 ore.', "10 ore lost: Highcrag's warehouse was full.", 'Stayed at Highcrag: Wren.']);
   });
 
+  // Cora is of no party, so the snapshot does not hold her: the caravan names her (Issue-391).
+  it.each([
+    ['who rode along with a caravan that arrived', 'complete' as const, ['Stayed at Highcrag: Wren.', 'Rode along to Highcrag: Cora.']],
+    ['that a rider is back where the party went down', 'defeat' as const, ['Nobody stayed at Highcrag: the caravan did not arrive.', 'Cora rode along and is back at Millbrook.']],
+  ])('says %s, by the name the caravan holds', async (_what, outcome, lines) => {
+    const caravan = { destination: 'highcrag', cargo: [], staying: ['h2', 'h9'], riders: [{ heroId: 'h9', name: 'Cora' }] };
+    const { run } = await renderAdventure(fakeGame(() => ({ ...result, outcome }), { ...adventure, caravan }));
+    await run(120_000);
+    await waitFor(() => { expect(textsOf(listItems('Caravan'))).toEqual(lines); });
+  });
+
   it("says a discarded caravan's cargo went back to the camp it left", async () => {
-    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: ['h2'] };
+    const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: ['h2'], riders: [] };
     const { run } = await renderAdventure(fakeGame(() => null, { ...adventure, caravan }));
     await run(120_000);
     expect(await screen.findByText(/lost to a game update/)).toBeInTheDocument();
