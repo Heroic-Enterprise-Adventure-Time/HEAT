@@ -16,8 +16,9 @@
 # domain must therefore be created after the environment module, which
 # itself needs the base's outputs; inside the base that would be a cycle.
 # The root composes this module last, with depends_on where the parent
-# record is another module's. The sandbox base writes a placeholder parent
-# record itself, since nothing is served at its zone apex.
+# record is another module's. Where nothing is served at the zone apex, as
+# in the sandbox base, this module writes a placeholder parent record
+# itself (apex_placeholder, below).
 #
 # Managed login version 2 is the branding version the Essentials tier
 # carries (decision 0022); every app client on this domain needs a managed
@@ -30,6 +31,29 @@ resource "aws_cognito_user_pool_domain" "this" {
   user_pool_id          = var.user_pool_id
   certificate_arn       = var.certificate_arn
   managed_login_version = 2
+
+  # The parent's A record first, where it is this module's to write.
+  depends_on = [aws_route53_record.apex_placeholder]
+}
+
+# Cognito refuses a custom domain whose parent has no A record ("This record
+# must resolve to something, but the value of the record doesn't matter to
+# Amazon Cognito"; the guide, read 2026-10-17). Where nothing is served at
+# the zone's apex, the sandbox account, whose hostnames are its stacks', the
+# apex carries the guide's own example value, an address in the TEST-NET-2
+# range that routes nowhere, for the check and nothing else. In dev and prod
+# the apex is the environment's site, and this record does not exist.
+#
+# It was the sandbox base root's own resource until Issue-270 moved it here
+# (terraform.md, rule 1); that root keeps the moved block.
+resource "aws_route53_record" "apex_placeholder" {
+  count = var.apex_placeholder ? 1 : 0
+
+  zone_id = var.zone_id
+  name    = var.zone_name
+  type    = "A"
+  ttl     = 300
+  records = ["198.51.100.1"]
 }
 
 # The alias to the distribution Cognito created. One A record, as the guide

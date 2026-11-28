@@ -1,9 +1,15 @@
+# The prod bootstrap root's two providers, heat-platform and the workload
+# account, each refusing any other account, and the tags every resource the
+# stack creates carries, set once here (terraform.md, rule 7). Stack names
+# the stack as the environment roots' tags do, so the account's guardrails
+# read apart from its environment on the bill and in the console.
 locals {
   environment = "prod"
 
   tags = {
     Project     = "heat"
     Environment = local.environment
+    Stack       = "bootstrap"
     ManagedBy   = "terraform"
   }
 }

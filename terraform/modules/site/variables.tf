@@ -39,7 +39,7 @@ variable "api_host" {
 }
 
 variable "api_paths" {
-  description = "The paths the API serves, each an exact path pattern sent to the API origin with caching disabled: today [\"/graphql\"], from the manifest's routes. The live channel's path joins them in build order step 4."
+  description = "The paths the API serves, each an exact path pattern sent to the API origin with caching disabled, from the manifest's routes."
   type        = list(string)
 
   validation {

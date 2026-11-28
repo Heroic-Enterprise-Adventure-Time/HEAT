@@ -95,5 +95,8 @@ module "login_domain" {
   zone_id         = module.base.zone_id
   certificate_arn = module.base.certificate_arn
 
+  # The apex is the game: the site's alias is the parent record.
+  apex_placeholder = false
+
   depends_on = [module.environment]
 }

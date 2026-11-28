@@ -18,9 +18,7 @@
 #                              X-Content-Type-Options, X-Frame-Options,
 #                              X-XSS-Protection, the same in every
 #                              environment; a Content-Security-Policy is a
-#                              custom policy and arrives with sign-in
-#                              (Issue-46), when the origins it must name
-#                              are known
+#                              custom policy, which is Issue-58
 
 data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
@@ -101,9 +99,9 @@ resource "aws_cloudfront_distribution" "this" {
     }
   }
 
-  # One behavior per API path, each an exact pattern: /graphql today. The
-  # viewer must already be on HTTPS, since nothing links to these paths
-  # over HTTP and a redirect would turn a POST into a GET.
+  # One behavior per API path, each an exact pattern, from the manifest's
+  # routes. The viewer must already be on HTTPS, since nothing links to
+  # these paths over HTTP and a redirect would turn a POST into a GET.
   dynamic "ordered_cache_behavior" {
     for_each = toset(var.api_paths)
 
