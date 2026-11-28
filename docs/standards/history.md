@@ -92,6 +92,8 @@ Rule 1, 2026-11-28 (Issue-440). The sentence on `linkedSignal` was added with th
 
 Rule 15, 2026-11-28 (Issue-440). The sentence on browser storage in the companion is a candidate rule from the review of PR-442, accepted by the owner that day. Six spec files cleared storage in hooks of their own, five the local storage and one the session's, and from Issue-440 a Depart keeps the job's last party, so any spec that departs and then opens a job's page would have needed the line too. `src/test-setup.ts` clears local and session storage after each test, and the six files' own lines are gone.
 
+Rule 23, 2026-11-28 (Issue-441). Written with the client's first motion outside the battle scene: an adventure's gains counted up in the result's dialog (decision 0065). The issue asked the standard to say what an animation in the page's CSS must honour and how a count-up is driven so that a spec can step it. The frame loop was the battle view's own token until then; it moved to `frame-loop.ts` so that a primitive could ask for frames without reading the battle's module. Rule 14's sentences on the dialog and on a number that counts up, and rule 2's and the companion's mentions of them, came with it. The sentence that motion never holds a control back is the owner's call of that day, that OK works from the first frame.
+
 ## graphql.md
 
 The document. It was written on 2026-10-24 (Issue-145) from the code on `main` and from decisions 0012, 0013, 0014, 0023, 0024, 0029 and 0030, with the API shape accepted practice asks for stated as the rule; the code reached that shape on 2026-11-02 (Issue-155, decision 0038).

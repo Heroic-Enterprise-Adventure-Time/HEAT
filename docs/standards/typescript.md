@@ -68,7 +68,7 @@ Standards for every TypeScript package in this repository: the engine, the hub (
 
 ### What a test helper takes from the source
 
-24. **A value a shared test helper must agree with in the source is exported from the source and imported by the helper, never copied into it,** because a copy goes on driving the page with a value the page no longer uses, with nothing failing: `MAX_FRAME_MS` in `battle-view.ts`, which the specs' frame loop and `runToBlow` in `testing/fake-battle.ts` read (the review of PR-338, Issue-335).
+24. **A value a shared test helper must agree with in the source is exported from the source and imported by the helper, never copied into it,** because a copy goes on driving the page with a value the page no longer uses, with nothing failing: `MAX_FRAME_MS` in `frame-loop.ts`, which the specs' frame loop and `runToBlow` in `testing/fake-battle.ts` read (the review of PR-338, Issue-335).
 
 ### What a test says it covers
 
