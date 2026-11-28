@@ -1,5 +1,5 @@
 import { LowerCasePipe } from '@angular/common';
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, linkedSignal, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { sumBy } from 'es-toolkit';
 
@@ -14,6 +14,7 @@ import { type MoreItem, MoreMenu } from '../../primitives/more-menu';
 import { ResourceChip } from '../../primitives/resource-chip';
 import { caravanReason, cargoLines, cargoRows, cartCapacityAt, loadWords, noWayBackWords, roomWords } from './caravan-words';
 import { bonusWords, lockedWords, NO_PAY, retreatWords } from './job-words';
+import { loadLastParty, saveLastParty } from './last-party';
 import { injectRoutedJob } from './routed-job';
 
 /**
@@ -55,7 +56,9 @@ const NO_RIDERS = 'Nobody else is here to ride.';
  * what its enemies drop, so the room is shown for the pay alone (decision
  * 0058; the owner, 2026-11-20, Issue-339, on the stages); then the party
  * pick, one to four of the camp's living heroes as hero tiles in no order,
- * since a unit type's home line places it; and Depart, which starts it and
+ * since a unit type's home line places it, opening with the last party sent
+ * on the job picked, less whoever of it is not alive here now (Issue-440;
+ * decision 0064); and Depart, which starts it and
  * goes to `/adventure`. A refusal is shown in place, under Depart. The job's
  * replays are behind the panel's "more" menu, at `<job>/replays`
  * (`JobReplaysPanel`; decision 0061).
@@ -152,8 +155,17 @@ export class JobPanel {
     return destination && noWayBackWords(destination);
   });
 
-  private readonly chosen = signal<ReadonlySet<string>>(new Set());
-  /** The heroes picked who are still alive here: a refusal reloads the camp, and one may have gone. */
+  /**
+   * The heroes chosen, by id. A job's page opens with the last party sent on
+   * that job from this camp, as this browser kept it (`last-party.ts`;
+   * Issue-440), and starts from that again whenever the address names another
+   * job; `picked` leaves out whoever of it is no longer alive here.
+   */
+  private readonly chosen = linkedSignal<string | undefined, ReadonlySet<string>>({
+    source: () => this.job()?.id,
+    computation: (jobId) => new Set(jobId ? loadLastParty(this.game.location(), jobId) : []),
+  });
+  /** The heroes picked who are still alive here: a refusal reloads the camp, and one may have gone, as may one of the last party. */
   protected readonly picked = computed(() => {
     const living = new Set(this.game.livingHere().map((h) => h.id));
     return new Set([...this.chosen()].filter((id) => living.has(id)));
@@ -221,7 +233,11 @@ export class JobPanel {
     this.pending.set(true);
     try {
       const caravan = this.destination() ? { cargo: this.cargo(), staying: [...this.staying()] } : undefined;
-      await this.game.startAdventure(this.game.location(), jobId, [...this.picked()], caravan);
+      const location = this.game.location();
+      const party = [...this.picked()];
+      await this.game.startAdventure(location, jobId, party, caravan);
+      // Kept only once the party has left: a refused party is not the last one sent.
+      saveLastParty(location, jobId, party);
       await this.router.navigate(['/adventure']);
     } catch (e) {
       const facility = this.job()?.facility;

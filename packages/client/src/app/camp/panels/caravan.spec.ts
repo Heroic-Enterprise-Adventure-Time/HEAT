@@ -17,6 +17,7 @@ import { depart, panel } from '../../testing/page';
 import { renderAt } from '../../testing/render-at';
 import { wordsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
+import { saveLastParty } from './last-party';
 
 function hero(id: string, name: string): HeroView {
   return { id, name, unitType: 'fighter', spriteSet: 'fighter-02', location: 'millbrook', recruitedAt: '2026-10-20T07:00:00.000Z', level: 2, xp: 30, status: 'ALIVE', retiredAt: null };
@@ -81,6 +82,20 @@ const amountOf = (material: string) => wordsOf([group(material).getByRole('statu
 const cargo = () => screen.getByRole('group', { name: 'Cargo' });
 
 describe("A caravan's page (Issue-355)", () => {
+  // A job's last party is kept in the browser (Issue-440), and one a test keeps would be picked when the next opens the page.
+  beforeEach(() => { localStorage.clear(); });
+
+  it('opens with the last party sent on it picked, and with no cargo and nobody marked to stay (Issue-440)', async () => {
+    saveLastParty('millbrook', 'caravan-to-highcrag', ['h1', 'h3']);
+    await renderCaravan(fakeGame());
+    expect(partyTile('Wren')).toHaveAttribute('aria-pressed', 'true');
+    expect(partyTile('Moss')).toHaveAttribute('aria-pressed', 'false');
+    expect(tilesOf('Of the party')).toEqual(['Wren', 'Lark']);
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'false');
+    expect(stays('Lark')).toHaveAttribute('aria-pressed', 'false');
+    expect(amountOf('timber')).toBe('timber 0');
+  });
+
   it("offers each resource the camp holds, beside its balance and Highcrag's room for it, against what the cart carries", async () => {
     await renderCaravan(fakeGame());
     expect(panel().getByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).toBeInTheDocument();
