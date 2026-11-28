@@ -52,6 +52,8 @@
   height: 100%;
 }
 
+/* Positioned, so that a visually hidden label inside it is clipped by its scroll and gives the page no scrollbar (camp.css, Issue-444). */
 .side .panel {
+  position: relative;
   overflow-y: auto;
 }

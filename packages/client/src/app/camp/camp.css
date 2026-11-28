@@ -184,7 +184,9 @@
   visibility: visible;
 }
 
+/* Positioned, so that a visually hidden label inside it is clipped by its scroll and does not give the page a scrollbar, which would take the scene's width (Issue-444). */
 .side .panel {
+  position: relative;
   grid-area: panel;
   overflow-y: auto;
 }
