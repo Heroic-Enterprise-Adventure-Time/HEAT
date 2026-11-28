@@ -6,6 +6,8 @@ import { MATERIALS } from '@heat/engine';
 
 import { MAP_HEIGHT, MAP_WIDTH } from '../camp/scene/layout';
 import { BackLink } from '../primitives/back-link';
+import { Dialog } from '../primitives/dialog';
+import { type GainedHero, type GainedResource, Gains } from '../primitives/gains';
 import { HeroTile, type TileHero } from '../primitives/hero-tile';
 import { Icon } from '../primitives/icon';
 import { type MoreItem, MoreMenu } from '../primitives/more-menu';
@@ -20,6 +22,8 @@ const SCENE_SCALE = 3;
 /** The sample heroes; the first stands beside the scene. */
 const WREN: TileHero = { name: 'Wren', unitType: 'ranger', level: 3, spriteSet: 'ranger-01' };
 const BRAM: TileHero = { name: 'Bram', unitType: 'knight', level: 1, spriteSet: 'knight-06' };
+/** A third, for the gains block's hero who died. */
+const TANSY: TileHero = { name: 'Tansy', unitType: 'villager', level: 2, spriteSet: 'villager-01' };
 
 /** A button's kind, with the classes each of its states takes. */
 interface ButtonKind {
@@ -33,10 +37,12 @@ interface ButtonKind {
  * page and on a panel, beside a real frame of the scene, so that the theme
  * and the art are reviewed on one page at the stack's URL. It reads nothing
  * from the hub and needs no sign-in. The heroes and the amounts are samples.
+ * A dialog cannot stand open on the page, being modal, so a button opens
+ * it, and each opening counts its gains again (Issue-441).
  */
 @Component({
   selector: 'heat-gallery',
-  imports: [BackLink, HeroTile, Icon, MoreMenu, NgOptimizedImage, ResourceChip, RouterLink, Slots],
+  imports: [BackLink, Dialog, Gains, HeroTile, Icon, MoreMenu, NgOptimizedImage, ResourceChip, RouterLink, Slots],
   templateUrl: './gallery.html',
   styleUrl: './gallery.css',
 })
@@ -87,6 +93,18 @@ export class Gallery {
   protected readonly sceneHero = WREN;
   /** The hero the disabled and still tiles show. */
   protected readonly spareHero = BRAM;
+  /** What a gains block counts up: two resources, a hero who gains a level, one who gains none, and one who died. */
+  protected readonly gainedResources: readonly GainedResource[] = [
+    { material: 'timber', amount: 60 },
+    { material: 'ore', amount: 24 },
+  ];
+  protected readonly gainedHeroes: readonly GainedHero[] = [
+    { id: 'wren', hero: WREN, xp: 40, level: WREN.level + 1, died: false },
+    { id: 'bram', hero: BRAM, xp: 25, level: BRAM.level, died: false },
+    { id: 'tansy', hero: TANSY, xp: 0, level: TANSY.level, died: true },
+  ];
+  /** Whether the sample dialog is open. */
+  protected readonly dialogOpen = signal(false);
   /** The first sample hero starts picked; a tile toggles as it would in a party pick. */
   protected readonly picked = signal<ReadonlySet<string>>(new Set(['Wren']));
   protected toggle(name: string): void {

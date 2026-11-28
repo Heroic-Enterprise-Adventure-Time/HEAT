@@ -61,7 +61,6 @@ import {
   StartAdventureDocument,
   type StartAdventureMutation,
   SubmitAdventureDocument,
-  TimelineDocument,
   type AdventureOutcome as WireAdventureOutcome,
   type FacilityKind as WireFacilityKind,
   type GatheringTrait as WireGatheringTrait,
@@ -606,13 +605,6 @@ export class Game {
     } finally {
       await this.reload();
     }
-  }
-
-  /** The timeline the hub stored at settlement, for the replay: display only, played with no engine (decision 0030). */
-  async timeline(adventureId: string): Promise<AdventureTimeline | null> {
-    const data = await this.read(TimelineDocument, { id: adventureId });
-    // The JSON scalar carries the engine's own AdventureTimeline, which the hub's replay wrote (decision 0030).
-    return (data?.adventure?.timeline as AdventureTimeline | null | undefined) ?? null;
   }
 
   /**

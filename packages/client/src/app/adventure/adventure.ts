@@ -1,23 +1,22 @@
 import { Component, computed, DestroyRef, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { ABILITIES, type AbilityId, isPlayableTimeline, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
+import { ABILITIES, type AbilityId, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
 import { cargoWords, stayedWords } from '../camp/panels/caravan-words';
 import { rewardWords } from '../camp/panels/job-words';
 import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
-import { BackLink } from '../primitives/back-link';
+import { Dialog } from '../primitives/dialog';
+import { type GainedHero, Gains } from '../primitives/gains';
 import { HeroTile, type TileHero } from '../primitives/hero-tile';
-import { Icon } from '../primitives/icon';
 import { ResourceChip } from '../primitives/resource-chip';
 import { BattleView } from './battle-view';
-import { jobCast, timelineCast } from './cast';
+import { jobCast } from './cast';
 import { secondsLeft, waitingWords } from './field';
 import { Play } from './play';
 import { Playback } from './playback';
-import { partyAfter } from './replay-words';
-import { earnedWords, outcomeWords, stageResultWords } from './result-words';
+import { earnedWords, resultTitle } from './result-words';
 
 /** What a result says while the player could not be read again after the run was sent. */
 const UNREAD = 'Your camp could not be read again, so anything this run opened is not shown yet.';
@@ -28,19 +27,22 @@ const UNREAD = 'Your camp could not be read again, so anything this run opened i
  * the controls (game.md, "The page"): pause and the speeds, each hero's
  * abilities to force its next action, the party's orders, press on and
  * retreat, and in a stage's last ten seconds the time left before the party
- * turns back. When the run ends it is submitted, and the result takes the
- * controls' place, with each unlock the run earned that the player did not
- * hold (Issue-352), and for a caravan what became of its cargo, who
- * stayed (Issue-355) and who rode along (Issue-391), the replay, which plays the stored timeline in the
- * same scene with no engine, and the way out to the camp, which leaves the
- * result behind. With no adventure open and no
- * result to show, the address goes to the camp. The run waits for the scene
- * to load, and for the art of everyone this adventure sets against the party, so
- * that the party is seen running on from the start.
+ * turns back. When the run ends it is submitted, and the result is a dialog
+ * over the battle as it ended (Issue-441, decision 0065): how it ended as
+ * its title, what came home and each hero's XP counted up, what a full
+ * warehouse lost, each unlock the run earned that the player did not hold
+ * (Issue-352), and for a caravan what became of its cargo, who stayed
+ * (Issue-355) and who rode along (Issue-391). Its one button, OK, goes to
+ * the camp the party left from, which leaves the result behind; the stages
+ * and the replay are the replay's page's, behind the job's "Replays". With
+ * no adventure open and no result to show, the address goes to the camp.
+ * The run waits for the scene to load, and for the art of everyone this
+ * adventure sets against the party, so that the party is seen running on
+ * from the start.
  */
 @Component({
   selector: 'heat-adventure',
-  imports: [BackLink, BattleView, HeroTile, Icon, Playback, ResourceChip],
+  imports: [BattleView, Dialog, Gains, HeroTile, Playback, ResourceChip],
   templateUrl: './adventure.html',
   styleUrl: './battle-panel.css',
   providers: [Play],
@@ -49,19 +51,30 @@ export class Adventure {
   protected readonly game = inject(Game);
   protected readonly play = inject(Play);
   private readonly router = inject(Router);
-  protected readonly outcomeWords = outcomeWords;
-  /** Each stage of the settled result in words, "fight: won". */
   /**
-   * Each hero's tile by id, from the snapshot the adventure set out with: at
-   * the level the result gave it once settled, else the level it set out at.
-   * Read once for the party in battle and the result's heroes.
+   * The adventure the page shows: the open one, and once it has settled the
+   * same one, so that the battle as it ended stays behind the result's
+   * dialog, its controls unusable since the run is over.
    */
-  protected readonly tiles = computed((): ReadonlyMap<string, TileHero> => {
+  protected readonly shown = computed(() => this.game.settled()?.adventure ?? this.game.adventure());
+  /** Each hero's tile by id, from the snapshot the adventure set out with, at the level it set out at: a level gained is the result's to show. */
+  protected readonly tiles = computed((): ReadonlyMap<string, TileHero> => new Map((this.shown()?.snapshot.heroes ?? []).map((h) => [h.heroId, h])));
+  /** The title of the result's dialog: how the adventure ended, or that it was lost to a game update. */
+  protected readonly title = computed(() => resultTitle(this.game.settled()?.result?.outcome ?? null));
+  /**
+   * What each hero of the party gained, in the order the result lists them:
+   * the hero as it set out, from the snapshot, with the XP, the level and
+   * the death the result gave it. A hero the snapshot does not hold is left
+   * out, since nothing names it.
+   */
+  protected readonly gained = computed((): readonly GainedHero[] => {
     const settled = this.game.settled();
-    const setOut = (settled?.adventure ?? this.game.adventure())?.snapshot.heroes ?? [];
-    return new Map(partyAfter(setOut, settled?.result?.heroes).map((h) => [h.heroId, h]));
+    const tiles = this.tiles();
+    return (settled?.result?.heroes ?? []).flatMap((h) => {
+      const hero = tiles.get(h.heroId);
+      return hero ? [{ id: h.heroId, hero, xp: h.xpGained, level: h.level, died: h.dead }] : [];
+    });
   });
-  protected readonly stages = computed(() => stageResultWords(this.game.settled()?.result?.stages ?? []));
   /**
    * What the player is told for each unlock this run earned that they did
    * not hold, in the content's words (game.md, "Unlocks"): those of the
@@ -99,11 +112,9 @@ export class Adventure {
 
   private readonly view = viewChild.required(BattleView);
   private startedId: string | null = null;
-  /** The replay's timeline is being fetched, could not be, or was written before a change to the battle's events and is not played (decision 0051). */
-  protected readonly replayState = signal<'idle' | 'loading' | 'failed' | 'unavailable'>('idle');
 
   protected readonly from = computed(() => {
-    const at = (this.game.settled()?.adventure ?? this.game.adventure())?.location ?? '';
+    const at = this.shown()?.location ?? '';
     return location(at)?.name ?? at;
   });
   protected readonly countdown = computed(() => {
@@ -137,7 +148,7 @@ export class Adventure {
   protected readonly abilitiesWaitId = computed(() => (this.abilitiesWait() ? 'abilities-wait' : null));
 
   constructor() {
-    // The result is shown once: leaving it, by its way out or any other, puts it away, and the camp the player is read again for shows what it changed.
+    // The result is shown once: leaving it, by its dialog's button or any other way, puts it away, and the camp the player is read again for shows what it changed.
     inject(DestroyRef).onDestroy(() => { this.game.settled.set(null); });
     effect(() => {
       const adventure = this.game.adventure();
@@ -166,23 +177,10 @@ export class Adventure {
     }
   }
 
-  /** Plays the stored timeline of the adventure just settled, read through the hub, in the same scene. */
-  protected async replay(): Promise<void> {
+  /** The result's dialog was put away: to the camp the party left from, which leaves the result behind. */
+  protected leave(): void {
     const settled = this.game.settled();
-    if (!settled) return;
-    this.replayState.set('loading');
-    const timeline = await this.game.timeline(settled.adventure.id).catch(() => null);
-    if (!timeline) {
-      this.replayState.set('failed');
-      return;
-    }
-    if (!isPlayableTimeline(timeline)) {
-      this.replayState.set('unavailable');
-      return;
-    }
-    this.replayState.set('idle');
-    this.play.replay(timeline);
-    this.view().reset(new Map(timeline.party.map((h) => [h.heroId, h.spriteSet])), timelineCast(timeline.events), groundAt(settled.adventure.location));
+    if (settled) void this.router.navigate(['/camp', settled.adventure.location]);
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */
@@ -201,10 +199,4 @@ export class Adventure {
   protected heroName(heroId: string): string {
     return this.game.settled()?.adventure.snapshot.heroes.find((h) => h.heroId === heroId)?.name ?? heroId;
   }
-
-  /** The level a hero had when it set out, to say whether it gained one. */
-  protected startLevel(heroId: string): number {
-    return this.game.settled()?.adventure.snapshot.heroes.find((h) => h.heroId === heroId)?.level ?? 1;
-  }
-
 }

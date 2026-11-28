@@ -3,6 +3,7 @@ import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
 import { type AdventureSnapshot, must, replay, UNIT_PROFILES } from '@heat/engine';
 
+import { FRAME_LOOP } from '../frame-loop';
 import { Game, type ReplayedView } from '../game';
 import { ApiError } from '../hub';
 import { Blank } from '../testing/blank';
@@ -11,7 +12,7 @@ import { testLayoutSizes } from '../testing/layout-sizes';
 import { button, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf, wordsOf } from '../testing/texts-of';
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
+import { BATTLE_SCENE_FACTORY } from './battle-view';
 import { Replay } from './replay';
 
 const snapshot = {

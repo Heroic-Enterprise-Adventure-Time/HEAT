@@ -1,7 +1,8 @@
 /*
  * What a battle page's content area holds (battle-view.ts), shared by the
  * pages that project into it, the open adventure and a replay, and by the
- * playback controls they both show, as the panels share panel.css. A page
+ * playback controls they both show, as the panels share panel.css, and what
+ * the open adventure projects into its result's dialog. A page
  * builds its controls from the shared primitives (decision 0061) and styles
  * no button of its own: an element rule here would be scoped to the page and
  * outrank the global .button (found in the review of PR-388).
@@ -58,7 +59,6 @@ p {
 
 .party,
 .heroes,
-.chips,
 .caravan {
   list-style: none;
   margin: 0;
@@ -76,13 +76,6 @@ p {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-md);
-}
-
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
 }
 
 .health {
@@ -115,16 +108,15 @@ meter {
   padding-left: var(--space-2xl);
 }
 
-.outcome,
-.up {
+.outcome {
   font-weight: bold;
 }
 
 /*
  * An unlock the run earned that the player did not hold: the one line of a
- * result that is news beyond the run. Its region is in the page with the
- * result and empty until the player has been read again, so that the line is
- * spoken when it arrives (angular.md, rule 14).
+ * result that is news beyond the run. Its region is in the result's dialog
+ * from the start and empty until the player has been read again, so that the
+ * line is spoken when it arrives (angular.md, rule 14).
  */
 .unlocked p {
   padding-left: var(--space-sm);

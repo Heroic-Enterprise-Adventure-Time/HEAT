@@ -1,0 +1,39 @@
+/*
+ * A dialog (dialog.ts): the panel's frame, from the global .frame, in the
+ * middle of the window over a scrim. It is never wider than a panel or
+ * taller than the window: its content scrolls between the heading and the
+ * button, which stay in view. Only an open dialog is laid out, since a
+ * closed one must stay undrawn.
+ */
+dialog {
+  box-sizing: border-box;
+  width: min(100% - 2 * var(--space-xl), var(--panel-max-width));
+  max-height: calc(100dvh - 2 * var(--space-xl));
+  background: none;
+}
+
+dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog::backdrop {
+  background: var(--surface-scrim);
+}
+
+h2 {
+  margin: 0 var(--space-sm) var(--space-md);
+  font-size: var(--text-lg);
+}
+
+.content {
+  min-height: 0;
+  padding: 0 var(--space-sm);
+  overflow-y: auto;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  margin: var(--space-md) var(--space-sm) var(--space-sm);
+}

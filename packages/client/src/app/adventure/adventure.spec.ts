@@ -4,16 +4,19 @@ import { range } from 'es-toolkit';
 
 import { type AdventureLogEntry, type AdventureSnapshot, must, replay, UNIT_PROFILES, type UnlockId, UNLOCKS } from '@heat/engine';
 
+import { FRAME_LOOP } from '../frame-loop';
 import { type AdventureResultView, type AdventureView, Game, type SettledView } from '../game';
 import { ApiError } from '../hub';
+import { COUNT_TOTAL_MS } from '../primitives/count-up';
 import { Blank } from '../testing/blank';
 import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
+import { fakeIcons } from '../testing/fake-icons';
 import { testLayoutSizes } from '../testing/layout-sizes';
-import { button, itemHolding, listItems } from '../testing/page';
+import { button, itemHolding } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf, wordsOf } from '../testing/texts-of';
 import { Adventure } from './adventure';
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from './battle-view';
+import { BATTLE_SCENE_FACTORY } from './battle-view';
 import { isEntry } from './field';
 import { AdventureRun, loadRun, saveRun } from './run';
 
@@ -95,11 +98,6 @@ function fakeGame(answer: () => AdventureResultView | null | Error = () => resul
     adventure: open,
     settled,
     submitted: [] as (readonly AdventureLogEntry[])[],
-    timelines: [] as string[],
-    timeline: (id: string) => {
-      fake.timelines.push(id);
-      return Promise.resolve(replay(adventure.snapshot as AdventureSnapshot, adventure.seed, []).timeline);
-    },
     submitAdventure: (submittedAdventure: AdventureView, log: readonly AdventureLogEntry[]) => {
       fake.submitted.push([...log]);
       const answered = answer();
@@ -126,6 +124,7 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBa
       { provide: Game, useValue: game },
       { provide: FRAME_LOOP, useValue: frames.loop },
       { provide: BATTLE_SCENE_FACTORY, useValue: scene.factory },
+      fakeIcons,
       testLayoutSizes,
     ],
   );
@@ -139,7 +138,10 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBa
   return { run, router, user };
 }
 
-const link = (name: string) => screen.getByRole('link', { name });
+/** The result's dialog of that title, once the run has been sent and answered. */
+const resultDialog = (title: string) => screen.findByRole('dialog', { name: title });
+/** The items of the dialog's list of that name. */
+const dialogItems = (list: string) => within(within(screen.getByRole('dialog')).getByRole('list', { name: list })).getAllByRole('listitem');
 /** What a hero may do next: the group of its ability buttons. */
 const abilities = (hero: string) => within(screen.getByRole('group', { name: `${hero} next action` }));
 /** A hero's item in the party, which holds what it will do next. */
@@ -149,7 +151,7 @@ const ON_THE_ROAD = 'On the road: abilities are for a fight or a gather.';
 const onTheRoad = () => screen.getByText(ON_THE_ROAD);
 /** The villager's chop, which can be used once the party is among the trees. */
 const chop = () => abilities('Wren').getByRole('button', { name: 'Chop' });
-/** The live region that says what the party carries: in the page from the start, and empty while it carries nothing. */
+/** The live region that says what the party carries: in the page from the start, and empty while it carries nothing. Until the result's dialog brings its own, it is the page's one. */
 const carryingLine = () => screen.getByRole('status');
 /** What the party carries, as the page says it, or null while it carries nothing. */
 const carrying = () => carryingLine().textContent || null;
@@ -421,22 +423,71 @@ describe('Adventure', () => {
     expect(scene.fed.length).toBeGreaterThan(0);
   });
 
-  it("submits the log at the end, shows the result in the player's words, and goes back to camp", async () => {
+  it('submits the log at the end and shows the result in a dialog, what came home counted up from nothing (Issue-441)', async () => {
     const game = fakeGame();
-    const { run, router, user } = await renderAdventure(game);
+    const { run } = await renderAdventure(game);
     await run(120_000);
     expect(game.submitted).toHaveLength(1);
     expect(loadRun('a1')).toBeNull();
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
-    expect(textsOf(listItems('Stages'))).toEqual(['travel: done', 'gather: won', 'fight: won', 'arrive: done']);
-    expect(wordsOf(listItems('Rewards'))).toEqual(['timber 60', 'cloth 3']);
-    expect(wordsOf([screen.getByText(/lost: the warehouse was full/)])).toEqual(['timber 10 lost: the warehouse was full.']);
-    expect(screen.queryByText(/cloth lost/)).not.toBeInTheDocument();
-    expect(wordsOf(listItems('Heroes'))).toEqual(['Wat fighter, level 2 +15 XP level up', 'Wren villager, level 1 died']);
+    const dialog = within(await resultDialog('Victory!'));
+    // A screen reader is given each whole gain from the start, and never the counting.
+    expect(wordsOf(dialogItems('Resources'))).toEqual(['60 timber', '3 cloth']);
+    expect(wordsOf(dialogItems('Heroes'))).toEqual(['Wat, fighter, level 2: +15 XP, level up', 'Wren, villager, level 1: died']);
+    expect(wordsOf([dialog.getByText(/lost: the warehouse was full/)])).toEqual(['timber 10 lost: the warehouse was full.']);
+    expect(dialog.queryByText('Nothing came home.')).not.toBeInTheDocument();
 
-    await user.click(link('Back to Millbrook'));
-    await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
+    expect(dialog.getByText('+0 XP')).toBeInTheDocument();
+    expect(dialog.getByText('fighter, level 1')).toBeInTheDocument();
+    expect(dialog.queryByText('Level up')).not.toBeInTheDocument();
+    await run(COUNT_TOTAL_MS);
+    expect(dialog.getByText('+15 XP')).toBeInTheDocument();
+    expect(dialog.getByText('fighter, level 2')).toBeInTheDocument();
+    expect(dialog.getByText('Level up')).toBeInTheDocument();
+  });
+
+  it('keeps the battle as it ended behind the dialog, its orders unusable, and lists no stages and offers no replay there', async () => {
+    const { run } = await renderAdventure(fakeGame());
+    await run(120_000);
+    await resultDialog('Victory!');
+    expect(screen.getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
+    expect(textsOf(within(screen.getByRole('list', { name: 'Party' })).getAllByRole('listitem')).length).toBe(2);
+    expect(button('Press on')).toBeDisabled();
+    expect(button('Retreat')).toBeDisabled();
+    expect(screen.queryByRole('list', { name: 'Stages' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Watch the replay' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /^Back to/ })).not.toBeInTheDocument();
+  });
+
+  it('goes to the camp the party left from when the dialog is put away, and leaves the result behind', async () => {
+    const game = fakeGame(() => result, { ...adventure, location: 'highcrag' });
+    game.location.set('millbrook');
+    const { run, router, user } = await renderAdventure(game);
+    await run(120_000);
+    const dialog = within(await resultDialog('Victory!'));
+    // The one button works from the first frame: nothing waits for the count.
+    await user.click(dialog.getByRole('button', { name: 'OK' }));
+    await waitFor(() => { expect(router.url).toBe('/camp/highcrag'); });
     expect(game.settled()).toBeNull();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ['complete', 'Victory!'],
+    ['defeat', 'Defeat!'],
+    ['retreat', 'Retreat!'],
+  ] as const)('titles the dialog of a run that ended in %s "%s"', async (outcome, title) => {
+    const { run } = await renderAdventure(fakeGame(() => ({ ...result, outcome })));
+    await run(120_000);
+    expect(within(await resultDialog(title)).getByRole('heading', { name: title, level: 2 })).toBeInTheDocument();
+  });
+
+  it('says nothing came home where the party carried nothing back, and still says what each hero gained', async () => {
+    const { run } = await renderAdventure(fakeGame(() => ({ ...result, outcome: 'defeat', rewards: [], credited: [], lost: [] })));
+    await run(120_000);
+    const dialog = within(await resultDialog('Defeat!'));
+    expect(dialog.getByText('Nothing came home.')).toBeInTheDocument();
+    expect(dialog.queryByRole('list', { name: 'Resources' })).not.toBeInTheDocument();
+    expect(dialogItems('Heroes')).toHaveLength(2);
   });
 
   it('says what a caravan delivered, what the cap lost and who stayed (Issue-355)', async () => {
@@ -444,47 +495,47 @@ describe('Adventure', () => {
     const delivered = { ...result, delivered: [{ material: 'timber', amount: 60 }, { material: 'ore', amount: 30 }], deliveryLost: [{ material: 'timber', amount: 0 }, { material: 'ore', amount: 10 }] };
     const { run } = await renderAdventure(fakeGame(() => delivered, { ...adventure, caravan }));
     await run(120_000);
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
-    expect(textsOf(listItems('Caravan'))).toEqual(['Delivered to Highcrag: 60 timber and 30 ore.', "10 ore lost: Highcrag's warehouse was full.", 'Stayed at Highcrag: Wren.']);
+    await resultDialog('Victory!');
+    expect(textsOf(dialogItems('Caravan'))).toEqual(['Delivered to Highcrag: 60 timber and 30 ore.', "10 ore lost: Highcrag's warehouse was full.", 'Stayed at Highcrag: Wren.']);
   });
 
   // Cora is of no party, so the snapshot does not hold her: the caravan names her (Issue-391).
   it.each([
-    ['who rode along with a caravan that arrived', 'complete' as const, ['Stayed at Highcrag: Wren.', 'Rode along to Highcrag: Cora.']],
-    ['that a rider is back where the party went down', 'defeat' as const, ['Nobody stayed at Highcrag: the caravan did not arrive.', 'Cora rode along and is back at Millbrook.']],
-  ])('says %s, by the name the caravan holds', async (_what, outcome, lines) => {
+    ['who rode along with a caravan that arrived', 'complete' as const, 'Victory!', ['Stayed at Highcrag: Wren.', 'Rode along to Highcrag: Cora.']],
+    ['that a rider is back where the party went down', 'defeat' as const, 'Defeat!', ['Nobody stayed at Highcrag: the caravan did not arrive.', 'Cora rode along and is back at Millbrook.']],
+  ])('says %s, by the name the caravan holds', async (_what, outcome, title, lines) => {
     const caravan = { destination: 'highcrag', cargo: [], staying: ['h2', 'h9'], riders: [{ heroId: 'h9', name: 'Cora' }] };
     const { run } = await renderAdventure(fakeGame(() => ({ ...result, outcome }), { ...adventure, caravan }));
     await run(120_000);
-    await waitFor(() => { expect(textsOf(listItems('Caravan'))).toEqual(lines); });
+    await resultDialog(title);
+    expect(textsOf(dialogItems('Caravan'))).toEqual(lines);
   });
 
   it("says a discarded caravan's cargo went back to the camp it left", async () => {
     const caravan = { destination: 'highcrag', cargo: [{ material: 'timber', amount: 60 }], staying: ['h2'], riders: [] };
     const { run } = await renderAdventure(fakeGame(() => null, { ...adventure, caravan }));
     await run(120_000);
-    expect(await screen.findByText(/lost to a game update/)).toBeInTheDocument();
-    expect(screen.getByText("The cargo went back to Millbrook's warehouse.")).toBeInTheDocument();
-    expect(screen.getByText('Nobody stayed at Highcrag: the caravan did not arrive.')).toBeInTheDocument();
+    await resultDialog('Adventure lost');
+    expect(textsOf(dialogItems('Caravan'))).toEqual(["The cargo went back to Millbrook's warehouse.", 'Nobody stayed at Highcrag: the caravan did not arrive.']);
   });
 
   it('says nothing of a caravan for a job that delivers nothing', async () => {
     const { run } = await renderAdventure(fakeGame());
     await run(120_000);
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { name: 'Caravan' })).not.toBeInTheDocument();
+    const dialog = within(await resultDialog('Victory!'));
+    expect(dialog.queryByRole('list', { name: 'Caravan' })).not.toBeInTheDocument();
   });
 
-  it("tells the player an unlock the run earned that they did not hold, in the content's words, under how it ended (Issue-352)", async () => {
+  it("tells the player an unlock the run earned that they did not hold, in the content's words, in the dialog (Issue-352)", async () => {
     const game = fakeGame();
     // The player's own unlock names this adventure, so it was new.
     game.holdsAfter = [{ unlock: ROAD, adventureId: adventure.id }];
     const { run } = await renderAdventure(game);
     await run(120_000);
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
-    expect(await within(screen.getByRole('status')).findByText(UNLOCKS[ROAD].earned)).toBeInTheDocument();
+    const dialog = within(await resultDialog('Victory!'));
+    expect(await within(dialog.getByRole('status')).findByText(UNLOCKS[ROAD].earned)).toBeInTheDocument();
     expect(UNLOCKS[ROAD].earned).toMatch(/Highcrag/);
-    expect(screen.queryByRole('button', { name: 'Read again' })).not.toBeInTheDocument();
+    expect(dialog.queryByRole('button', { name: 'Read again' })).not.toBeInTheDocument();
   });
 
   it('says nothing of an unlock the run earned again: the player holds it from an earlier adventure', async () => {
@@ -492,16 +543,16 @@ describe('Adventure', () => {
     game.holdsAfter = [{ unlock: ROAD, adventureId: 'an-earlier-adventure' }];
     const { run } = await renderAdventure(game);
     await run(120_000);
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    await resultDialog('Victory!');
     expect(screen.queryByText(UNLOCKS[ROAD].earned)).not.toBeInTheDocument();
   });
 
-  it('has the place for that news in the page with the result, empty until there is some, so that it is spoken when it arrives', async () => {
+  it('has the place for that news in the dialog with the result, empty until there is some, so that it is spoken when it arrives', async () => {
     const game = fakeGame();
     const { run } = await renderAdventure(game);
     await run(120_000);
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
-    expect(screen.getByRole('status')).toBeEmptyDOMElement();
+    const dialog = within(await resultDialog('Victory!'));
+    expect(dialog.getByRole('status')).toBeEmptyDOMElement();
   });
 
   it('says so where the player could not be read again after the run was sent, and tells the unlock once Read again has read them', async () => {
@@ -510,13 +561,14 @@ describe('Adventure', () => {
     game.readFails = true;
     const { run, user } = await renderAdventure(game);
     await run(120_000);
-    expect(await screen.findByText('Your camp could not be read again, so anything this run opened is not shown yet.')).toHaveRole('alert');
+    const dialog = within(await resultDialog('Victory!'));
+    expect(dialog.getByText('Your camp could not be read again, so anything this run opened is not shown yet.')).toHaveRole('alert');
     expect(screen.queryByText(UNLOCKS[ROAD].earned)).not.toBeInTheDocument();
 
-    await user.click(button('Read again'));
-    expect(await within(screen.getByRole('status')).findByText(UNLOCKS[ROAD].earned)).toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: 'Read again' }));
+    expect(await within(dialog.getByRole('status')).findByText(UNLOCKS[ROAD].earned)).toBeInTheDocument();
     expect(game.reloads).toBe(1);
-    expect(screen.queryByRole('button', { name: 'Read again' })).not.toBeInTheDocument();
+    expect(dialog.queryByRole('button', { name: 'Read again' })).not.toBeInTheDocument();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
@@ -528,45 +580,15 @@ describe('Adventure', () => {
     });
   }
 
-  it('replays the stored timeline in the scene from its start, and goes back to the result', async () => {
-    const scene = fakeBattleScene();
-    const game = fakeGame();
-    const { run, user } = await renderAdventure(game, scene);
+  it('says so in the same dialog when the adventure was lost to a game update, and goes to the camp from it', async () => {
+    const game = fakeGame(() => null);
+    const { run, router, user } = await renderAdventure(game);
     await run(120_000);
-    await user.click(await screen.findByRole('button', { name: 'Watch the replay' }));
-    await waitFor(() => { expect(scene.resets).toHaveLength(2); });
-    expect(game.timelines).toEqual(['a1']);
-    expect(scene.resets[1]).toMatchObject({ field: { stage: 0, outcome: null }, enter: true });
-    expect(await screen.findByText('Replay')).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: /next action$/ })).not.toBeInTheDocument();
-    const before = scene.fed.length;
-    await run(10_000);
-    expect(scene.fed.length).toBeGreaterThan(before);
-    expect(game.submitted).toHaveLength(1);
-
-    await user.click(button('Back to the result'));
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
-  });
-
-  it('says a replay stored before the battles changed is unavailable, and plays none of it', async () => {
-    const scene = fakeBattleScene();
-    const game = fakeGame();
-    const stored = await game.timeline('a1');
-    game.timeline = () => Promise.resolve({ ...stored, schemaVersion: stored.schemaVersion - 1 });
-    const { run, user } = await renderAdventure(game, scene);
-    await run(120_000);
-    await user.click(await screen.findByRole('button', { name: 'Watch the replay' }));
-    expect(await screen.findByText('Replay unavailable: this adventure was played before the battles changed.')).toHaveRole('alert');
-    expect(scene.resets).toHaveLength(1);
-    expect(screen.queryByText('Replay')).not.toBeInTheDocument();
-    expect(screen.getByText('Job done.')).toBeInTheDocument();
-  });
-
-  it('says so when the adventure was lost to a game update', async () => {
-    const { run } = await renderAdventure(fakeGame(() => null));
-    await run(120_000);
-    expect(await screen.findByText('This adventure was lost to a game update. The party came home with nothing.')).toHaveRole('alert');
-    expect(link('Back to Millbrook')).toHaveAttribute('href', '/camp/millbrook');
+    const dialog = within(await resultDialog('Adventure lost'));
+    expect(dialog.getByText('This adventure was lost to a game update. The party came home with nothing.')).toHaveRole('alert');
+    expect(dialog.queryByRole('list')).not.toBeInTheDocument();
+    await user.click(dialog.getByRole('button', { name: 'OK' }));
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
   });
 
   it('keeps the log and offers to try again when the hub cannot be reached', async () => {
@@ -575,11 +597,12 @@ describe('Adventure', () => {
     const { run, user } = await renderAdventure(game);
     await run(120_000);
     expect(await screen.findByText('The run could not be sent: the hub answered 502')).toHaveRole('alert');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(loadRun('a1')).not.toBeNull();
 
     failing = false;
     await user.click(button('Try again'));
-    expect(await screen.findByText('Job done.')).toBeInTheDocument();
+    await resultDialog('Victory!');
     expect(game.submitted).toHaveLength(2);
     expect(game.submitted[1]).toEqual(game.submitted[0]);
   });

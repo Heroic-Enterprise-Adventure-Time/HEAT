@@ -1,0 +1,9 @@
+<dialog #box class="frame" [attr.aria-labelledby]="headingId" (close)="closed.emit()">
+  <h2 [id]="headingId">{{ heading() }}</h2>
+  <div class="content">
+    <ng-content />
+  </div>
+  <div class="actions">
+    <button #button type="button" class="button primary" (click)="close()">{{ action() }}</button>
+  </div>
+</dialog>
