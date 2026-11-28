@@ -11,6 +11,10 @@ fragment AdventureFields on Adventure {
       amount
       material
     }
+    riders {
+      heroId
+      name
+    }
   }
   job {
     id

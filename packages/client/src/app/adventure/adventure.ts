@@ -30,8 +30,8 @@ const UNREAD = 'Your camp could not be read again, so anything this run opened i
  * retreat, and in a stage's last ten seconds the time left before the party
  * turns back. When the run ends it is submitted, and the result takes the
  * controls' place, with each unlock the run earned that the player did not
- * hold (Issue-352), and for a caravan what became of its cargo and who
- * stayed (Issue-355), the replay, which plays the stored timeline in the
+ * hold (Issue-352), and for a caravan what became of its cargo, who
+ * stayed (Issue-355) and who rode along (Issue-391), the replay, which plays the stored timeline in the
  * same scene with no engine, and the way out to the camp, which leaves the
  * result behind. With no adventure open and no
  * result to show, the address goes to the camp. The run waits for the scene
@@ -84,8 +84,7 @@ export class Adventure {
     const caravan = settled?.adventure.caravan;
     if (!settled || !caravan) return null;
     const destination = location(caravan.destination)?.name ?? caravan.destination;
-    const stayed = stayedWords(caravan, settled.result, destination, (id) => this.heroName(id));
-    const lines = [...cargoWords(caravan, settled.result, this.from(), destination), ...(stayed ? [stayed] : [])];
+    const lines = [...cargoWords(caravan, settled.result, this.from(), destination), ...stayedWords(caravan, settled.result, this.from(), destination, (id) => this.heroName(id))];
     return lines.length > 0 ? lines : null;
   });
   /**

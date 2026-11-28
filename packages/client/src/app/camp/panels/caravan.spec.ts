@@ -69,6 +69,11 @@ const CARAVAN = '/camp/millbrook/caravan-hub/jobs/caravan-to-highcrag';
 const group = (name: string) => within(screen.getByRole('group', { name }));
 const partyTile = (name: string) => group('Party').getByRole('button', { name });
 const stays = (name: string) => group('Who stays at Highcrag').getByRole('button', { name });
+/** The two groups of who stays (Issue-391): the party's heroes, and everyone else here, who would ride along. */
+const ofTheParty = () => group('Of the party');
+const riding = () => group('Riding along');
+/** The heroes a group offers a tile for, by name, in the camp's order. */
+const tilesOf = (offered: 'Of the party' | 'Riding along') => party.map((h) => h.name).filter((name) => group(offered).queryByRole('button', { name }) !== null);
 /** One of a resource's stepper buttons, "+10" or "−1". */
 const step = (label: string, material: string) => group('Cargo').getByRole('button', { name: `${label} ${material}` });
 /** The amount a resource's stepper shows, as a reader hears its chip. */
@@ -99,20 +104,52 @@ describe("A caravan's page (Issue-355)", () => {
     expect(panel().queryByText(/cannot come back/)).not.toBeInTheDocument();
   });
 
-  it("offers who stays from the party alone, as tiles, beside Highcrag's free slots", async () => {
+  it("offers who stays in two groups, as tiles, beside Highcrag's free slots: the party's, and everyone else here, who would ride along (Issue-391)", async () => {
     const { user } = await renderCaravan(fakeGame());
     const staying = screen.getByRole('group', { name: 'Who stays at Highcrag' });
     expect(staying).toHaveAccessibleDescription("Highcrag's heroes hall has room for 2 more.");
-    expect(within(staying).queryAllByRole('button')).toHaveLength(0);
-    expect(within(staying).getByText('Pick the party first.')).toBeInTheDocument();
+    expect(tilesOf('Of the party')).toEqual([]);
+    expect(ofTheParty().getByText('Pick the party first.')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Riding along' })).toHaveAccessibleDescription('A rider stays without fighting on the way.');
+    expect(tilesOf('Riding along')).toEqual(['Wren', 'Moss', 'Lark']);
 
     await user.click(partyTile('Wren'));
     await user.click(partyTile('Lark'));
-    await waitFor(() => { expect(within(staying).getAllByRole('button')).toHaveLength(2); });
+    await waitFor(() => { expect(tilesOf('Of the party')).toEqual(['Wren', 'Lark']); });
+    expect(tilesOf('Riding along')).toEqual(['Moss']);
     expect(stays('Wren')).toHaveAttribute('aria-pressed', 'false');
-    expect(stays('Lark')).toBeInTheDocument();
     await user.click(stays('Wren'));
     expect(stays('Wren')).toHaveAttribute('aria-pressed', 'true');
+
+    // With everyone in the party, nobody is left to ride.
+    await user.click(partyTile('Moss'));
+    await waitFor(() => { expect(tilesOf('Riding along')).toEqual([]); });
+    expect(riding().getByText('Nobody else is here to ride.')).toBeInTheDocument();
+  });
+
+  it('Departs with a rider among who stays and not in the party', async () => {
+    const game = fakeGame();
+    const { user } = await renderCaravan(game);
+    await user.click(partyTile('Wren'));
+    await user.click(riding().getByRole('button', { name: 'Lark' }));
+    await waitFor(() => { expect(riding().getByRole('button', { name: 'Lark' })).toHaveAttribute('aria-pressed', 'true'); });
+    await user.click(depart());
+    expect(game.started[0]).toMatchObject({ heroIds: ['h1'], caravan: { staying: ['h3'] } });
+  });
+
+  it('keeps the mark of a rider picked into the party, who then stays as one of it, and lets go of it when it leaves the party', async () => {
+    const game = fakeGame();
+    const { user } = await renderCaravan(game);
+    await user.click(partyTile('Wren'));
+    await user.click(riding().getByRole('button', { name: 'Lark' }));
+    await user.click(partyTile('Lark'));
+    await waitFor(() => { expect(ofTheParty().getByRole('button', { name: 'Lark' })).toHaveAttribute('aria-pressed', 'true'); });
+
+    // Leaving the party is leaving the caravan: Lark does not become a rider by it.
+    await user.click(partyTile('Lark'));
+    await waitFor(() => { expect(riding().getByRole('button', { name: 'Lark' })).toHaveAttribute('aria-pressed', 'false'); });
+    await user.click(depart());
+    expect(game.started[0]).toMatchObject({ heroIds: ['h1'], caravan: { staying: [] } });
   });
 
   it('Departs with the cargo picked and who stays, leaving out a resource at 0', async () => {

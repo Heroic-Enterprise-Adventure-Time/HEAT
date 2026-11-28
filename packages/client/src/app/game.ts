@@ -287,7 +287,7 @@ interface Loaded {
   readonly error: unknown;
 }
 
-/** What a caravan's start sends beside its party: what it carries, each resource once, and the heroes of the party who stay at the destination. */
+/** What a caravan's start sends beside its party: what it carries, each resource once, and the heroes who stay at the destination: those of the party, and the riders, who are not of it (Issue-391). */
 export interface CaravanStart {
   readonly cargo: readonly { readonly material: Material; readonly amount: number }[];
   readonly staying: readonly string[];

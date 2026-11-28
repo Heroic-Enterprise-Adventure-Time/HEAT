@@ -250,7 +250,7 @@ describe('Job board', () => {
     await user.click(tile('Wren'));
     await waitFor(() => { expect(depart()).toBeEnabled(); });
     await user.click(depart());
-    expect(await screen.findByText('A hero in the party is dead.')).toHaveRole('alert');
+    expect(await screen.findByText('One of the heroes picked is dead.')).toHaveRole('alert');
     expect(router.url).toBe(WOLVES);
   });
 

@@ -80,13 +80,27 @@
       <h3 id="staying-title">Who stays at {{ destination.name }}</h3>
       <div role="group" aria-labelledby="staying-title" aria-describedby="staying-room">
         <p id="staying-room">{{ room() }}</p>
-        <ul class="tiles">
-          @for (hero of mayStay(); track hero.id) {
-            <li><heat-hero-tile [hero]="hero" [picked]="staying().has(hero.id)" (toggled)="toggleStay(hero.id)" /></li>
-          } @empty {
-            <li>Pick the party first.</li>
-          }
-        </ul>
+        <div role="group" aria-labelledby="escorts-title">
+          <h4 id="escorts-title">{{ escortsTitle }}</h4>
+          <ul class="tiles">
+            @for (hero of escorts(); track hero.id) {
+              <li><heat-hero-tile [hero]="hero" [picked]="staying().has(hero.id)" (toggled)="toggleStay(hero.id)" /></li>
+            } @empty {
+              <li>Pick the party first.</li>
+            }
+          </ul>
+        </div>
+        <div role="group" aria-labelledby="riders-title" aria-describedby="riders-note">
+          <h4 id="riders-title">{{ ridersTitle }}</h4>
+          <p id="riders-note">{{ ridersNote }}</p>
+          <ul class="tiles">
+            @for (hero of riders(); track hero.id) {
+              <li><heat-hero-tile [hero]="hero" [picked]="staying().has(hero.id)" (toggled)="toggleStay(hero.id)" /></li>
+            } @empty {
+              <li>{{ noRiders }}</li>
+            }
+          </ul>
+        </div>
       </div>
       @if (noWayBack(); as words) {
         <p class="note">{{ words }}</p>

@@ -170,10 +170,26 @@ export function cargoWords(caravan: Caravan, result: AdventureResultView | null,
   }
 }
 
-/** Who stayed at the destination, which a caravan does only by arriving, the dead too (decision 0059); null where nobody was to stay. */
-export function stayedWords(caravan: Caravan, result: AdventureResultView | null, destination: string, nameOf: (heroId: string) => string): string | null {
-  if (caravan.staying.length === 0) return null;
-  return result?.outcome === 'complete'
-    ? `Stayed at ${destination}: ${listWords(caravan.staying.map(nameOf))}.`
-    : `Nobody stayed at ${destination}: the caravan did not arrive.`;
+/**
+ * Who stayed at the destination, which a caravan does only by arriving, the
+ * dead too (decision 0059), and who rode along (Issue-391): the heroes of the
+ * party who stayed and the riders each have a line, since a rider was in no
+ * fight and, where the caravan did not arrive, is back where it set out, a
+ * party all down included. A rider is named by the caravan, which the
+ * snapshot's party does not hold. Nothing where nobody was to stay.
+ */
+export function stayedWords(caravan: Caravan, result: AdventureResultView | null, origin: string, destination: string, nameOf: (heroId: string) => string): string[] {
+  const riding = new Set(caravan.riders.map((r) => r.heroId));
+  const escorts = caravan.staying.filter((id) => !riding.has(id)).map(nameOf);
+  const riders = caravan.riders.map((r) => r.name);
+  if (result?.outcome === 'complete') {
+    return [
+      ...(escorts.length > 0 ? [`Stayed at ${destination}: ${listWords(escorts)}.`] : []),
+      ...(riders.length > 0 ? [`Rode along to ${destination}: ${listWords(riders)}.`] : []),
+    ];
+  }
+  return [
+    ...(caravan.staying.length > 0 ? [`Nobody stayed at ${destination}: the caravan did not arrive.`] : []),
+    ...(riders.length > 0 ? [`${listWords(riders)} rode along and ${riders.length === 1 ? 'is' : 'are'} back at ${origin}.`] : []),
+  ];
 }

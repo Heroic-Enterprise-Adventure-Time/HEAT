@@ -156,8 +156,15 @@ function fakeHub(start: PlayerView) {
         location,
         seed: 's1',
         version: 'v1',
-        // The one job that delivers, as the hub answers its caravan; any other job has none.
-        caravan: jobId === 'caravan-to-highcrag' ? { destination: 'highcrag', cargo: cargo.map((c) => ({ ...c, material: c.material.toLowerCase() })), staying } : null,
+        // The one job that delivers, as the hub answers its caravan, its riders those who stay and are not of the party; any other job has none.
+        caravan: jobId === 'caravan-to-highcrag'
+          ? {
+              destination: 'highcrag',
+              cargo: cargo.map((c) => ({ ...c, material: c.material.toLowerCase() })),
+              staying,
+              riders: player.heroes.filter((h) => staying.includes(h.id) && !heroIds.includes(h.id)).map((h) => ({ heroId: h.id, name: h.name })),
+            }
+          : null,
         job: { id: jobId, name: 'Wolves on the mill road', description: 'Two wolves.' },
         snapshot: {
           version: 'v1',
@@ -402,6 +409,19 @@ describe('Game', () => {
     expect(game.onTheWay()).toEqual([]);
     game.location.set('highcrag');
     expect(game.onTheWay().map((h) => h.id)).toEqual([villager.id]);
+  });
+
+  it('starts a caravan with a rider, who stays and is not of the party, reads its name from the caravan and knows it is on the way too (Issue-391)', async () => {
+    const rider: HeroView = { ...villager, id: '0b6d7c1e-3a4f-4c2b-9d8e-7f6a5b4c3d2e', name: 'Cora' };
+    const { hub, game, run } = setup(playerWith([villager, rider]));
+    await run();
+    await run(game.startAdventure('millbrook', 'caravan-to-highcrag', [villager.id], { cargo: [], staying: [rider.id] }));
+    const sent = hub.calls.find((c) => c.op === 'StartAdventure')?.variables['input'] as Record<string, unknown>;
+    expect(sent['heroIds']).toEqual([villager.id]);
+    expect(sent['staying']).toEqual([rider.id]);
+    expect(game.adventure()?.caravan?.riders).toEqual([{ heroId: rider.id, name: 'Cora' }]);
+    game.location.set('highcrag');
+    expect(game.onTheWay().map((h) => h.id)).toEqual([rider.id]);
   });
 
   it("throws a start's refusal, named by its type, and reads the player again", async () => {
