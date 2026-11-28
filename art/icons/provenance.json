@@ -457,7 +457,7 @@
     "candidates": 64,
     "generations": 10,
     "note": "Ideas for later facilities were rolled in the same pack; the ones not kept stay in the review object, tagged rejected, and can be promoted when their facility is added.",
-    "chosenBy": "The agent's picks (mine 2, lumber camp 6, caravan hub 10), 2026-10-20, for the owner to review on PR-92.",
+    "chosenBy": "The agent's picks (mine 2, lumber camp 6, caravan hub 10), 2026-10-20. The owner reviewed them on PR-92 and merged it on 2026-10-21 with each pick as it stood.",
     "verified": "Each file is byte-identical to a second download from /mcp/objects/<id>/download and to its candidate frame in the review object, 2026-10-20.",
     "rejects": "The candidates not kept stay in the review object e5f78cf5-6d73-4be5-98da-ef94d365e89b, tagged rejected."
   },
@@ -587,7 +587,7 @@
     "candidates": 64,
     "candidatesNote": "Indices 0 to 25 follow itemDescriptions; 26 to 63 were drawn by the service from the description alone.",
     "generations": 10,
-    "note": "The page’s action icons (Issue-385, decision 0061): four ideas for each of depart, recruit, build and back, and three or four for more, replays and settings. No earlier pack held an idea for any, so a pack of their own was rolled with the same style image as the others.",
+    "note": "The page’s action icons (Issue-385, decision 0061): four ideas for each of depart, recruit and build, three for back, and three or four for more, replays and settings. No earlier pack held an idea for any, so a pack of their own was rolled with the same style image as the others.",
     "chosenBy": "The owner’s picks from a numbered sheet of all 64 candidates at 3×, 2026-11-26 (Issue-385): recruit 6, the quill over a signed parchment, over the agent’s 4; build 8, more 15 and settings 22, the agent’s; replays 19, the open book, over the agent’s 21. Depart and back were rolled again in sixthPack.",
     "verified": "Each file is byte-identical to its download from /mcp/objects/<id>/download and to its candidate frame in the review object, saved before it was promoted: recruit.png, build.png, more.png, replays.png and settings.png on 2026-11-26.",
     "rejects": "The 59 candidates not kept stay in the review object 7c4f0236-1a29-4274-8f32-629672f9191e, tagged heat, ui-icon and rejected, with their indices as rolled."

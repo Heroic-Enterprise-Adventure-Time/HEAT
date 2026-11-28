@@ -74,6 +74,7 @@
       },
       "heldLast": true,
       "fadeAboveEnd": true,
+      "descriptionNote": "The kept take's description does not end \"no particles, no effects\", as a prop's animations do (docs/process/assets.md, rule 30) and as this set's hit does: it was written to hold the crown still and was not rolled again for the words. Its nine frames draw no particle and no effect.",
       "files": "down-<0..8>.png",
       "generations": 1,
       "replaced": [
