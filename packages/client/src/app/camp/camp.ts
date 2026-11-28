@@ -68,7 +68,7 @@ export class Camp {
   protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height, this.viewport().sizes));
   protected readonly labels = computed(() => menuLabels(this.viewport().width, this.viewport().height, this.viewport().sizes));
   protected readonly iconPx = computed(() => ICON_PX * iconScale(this.viewport().width, this.viewport().height, this.viewport().sizes));
-  /** Stacked, the scene's box is the page's width by the map's height at the scale that fits; side by side the grid sizes it. */
+  /** Stacked, the scene's box is the page's width, less its frame, by the map's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() =>
     this.side() ? null : stackedStageHeight(this.viewport().width, this.viewport().height, this.viewport().sizes, this.viewport().ratio),
   );

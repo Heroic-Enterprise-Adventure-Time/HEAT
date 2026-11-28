@@ -3,7 +3,7 @@ import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, I
 import { must } from '@heat/engine';
 
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
-import { isSideBySide, regionInset } from '../camp/page-layout';
+import { frameAcross, isSideBySide } from '../camp/page-layout';
 import { FRAME_LOOP } from '../frame-loop';
 import type { GroundSet } from '../ground-sets';
 import { stackedBattleHeight } from './battle/battle-layout';
@@ -57,7 +57,7 @@ export class BattleView {
   /** Stacked, the stage's box is the page's width, less its frame, by the stage's height at the scale that fits; side by side the grid sizes it. */
   protected readonly stageHeight = computed(() => {
     const { width, height, ratio, sizes } = this.viewport();
-    return this.side() ? null : stackedBattleHeight(width - 2 * regionInset(sizes), height, ratio);
+    return this.side() ? null : stackedBattleHeight(width - frameAcross(sizes), height, ratio);
   });
   private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
   private scene: BattleSceneHandle | null = null;

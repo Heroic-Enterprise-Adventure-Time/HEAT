@@ -42,9 +42,10 @@ export const PORTRAIT = { clip: 'still-south', side: 24, scale: 2 } as const sat
 /**
  * The page's frames (decision 0062): the build refuses an
  * art/frames/provenance.json that names other frames, and src/primitives.css
- * reads each as `--frame-<name>-image`, `-slice` and `-width`.
+ * reads each as `--frame-<name>-image`, `-slice` and `-width`, and the
+ * region's sides as `-top`, `-right`, `-bottom` and `-left` (Issue-444).
  */
-export const FRAMES = ['panel', 'primary', 'secondary'] as const;
+export const FRAMES = ['panel', 'primary', 'region', 'secondary'] as const;
 
 /** The areas under `art/` whose sets are packed, each served under `/art/<area>/<set>`, and the kind of set it holds. */
 export const PACKED_AREAS = { heroes: 'figure', monsters: 'figure', props: 'prop', weapons: 'weapon', fonts: 'font' } as const satisfies Record<string, SetKind>;

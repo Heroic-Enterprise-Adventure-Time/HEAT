@@ -135,8 +135,16 @@
   --panel-max-width: 28rem;
   --panel-width: clamp(var(--panel-min-width), var(--panel-share), var(--panel-max-width));
 
-  /* Each region, the scene, the menu and the panel, is a card in the frames' outline, and this gutter of the page's colour stands between them and round their outer edge (Issue-444). */
+  /* Each region, the scene, the menu and the panel, is a card in the region frame (primitives.css, .region), and this gutter of the page's colour stands between them and round their outer edge (Issue-444). */
   --region-gap: 0.25rem;
+
+  /*
+   * Side by side, the panel's column less the four gutters and the menu's and
+   * the scene's frames across, so that the scene keeps the width the menu and
+   * --panel-width leave it (page-layout.ts, sideScale); the camp and a battle
+   * both stand their panel in it.
+   */
+  --side-panel-width: calc(var(--panel-width) - 4 * var(--region-gap) - 2 * (var(--frame-region-left) + var(--frame-region-right)));
 }
 
 body {
