@@ -7,6 +7,7 @@ import { FRAME_LOOP } from '../frame-loop';
 import { REDUCED_MOTION } from '../reduced-motion';
 import { fakeFrameLoop } from '../testing/fake-battle';
 import { fakeIcons } from '../testing/fake-icons';
+import { pageItems } from '../testing/page';
 import { wordsOf } from '../testing/texts-of';
 import { COUNT_MS } from './count-up';
 import { type GainedHero, type GainedResource, Gains } from './gains';
@@ -35,9 +36,8 @@ async function renderGains(lessMotion = false, resources = TIMBER_AND_CLOTH, her
   return { run };
 }
 
-const items = (list: string) => within(screen.getByRole('list', { name: list })).getAllByRole('listitem');
 /** An item of a list by its place, to look inside: what counts is hidden from a screen reader, so it is found by its text and by no role. */
-const item = (list: string, index: number) => within(must(items(list)[index], `item ${index} of ${list}`));
+const item = (list: string, index: number) => within(must(pageItems(list)[index], `item ${index} of ${list}`));
 
 describe('Gains', () => {
   it('counts each amount up from nothing, one after the other, in the order shown', async () => {
@@ -91,16 +91,16 @@ describe('Gains', () => {
   it('gives a screen reader each whole gain in words from the start, and never the counting', async () => {
     const heard = { resources: ['60 timber', '3 cloth'], heroes: ['Wat, fighter, level 2: +15 XP, level up', 'Wren, villager, level 1: +8 XP', 'Bram, knight, level 3: died'] };
     const { run } = await renderGains();
-    expect(wordsOf(items('Resources'))).toEqual(heard.resources);
-    expect(wordsOf(items('Heroes'))).toEqual(heard.heroes);
+    expect(wordsOf(pageItems('Resources'))).toEqual(heard.resources);
+    expect(wordsOf(pageItems('Heroes'))).toEqual(heard.heroes);
     // The chip's icon is among what counts: it has a name, and no role finds it.
     expect(screen.queryByRole('img')).not.toBeInTheDocument();
 
     await run(COUNT_MS / 2);
-    expect(wordsOf(items('Resources'))).toEqual(heard.resources);
+    expect(wordsOf(pageItems('Resources'))).toEqual(heard.resources);
     await run(10 * COUNT_MS);
-    expect(wordsOf(items('Resources'))).toEqual(heard.resources);
-    expect(wordsOf(items('Heroes'))).toEqual(heard.heroes);
+    expect(wordsOf(pageItems('Resources'))).toEqual(heard.resources);
+    expect(wordsOf(pageItems('Heroes'))).toEqual(heard.heroes);
   });
 
   it('shows every amount whole at once for a player who asked for less motion', async () => {

@@ -12,7 +12,7 @@ import { Blank } from '../testing/blank';
 import { fakeBattleScene, fakeFrameLoop, landsBlow, runToBlow } from '../testing/fake-battle';
 import { fakeIcons } from '../testing/fake-icons';
 import { testLayoutSizes } from '../testing/layout-sizes';
-import { button, itemHolding } from '../testing/page';
+import { button, dialogItems, itemHolding, listItems } from '../testing/page';
 import { renderAt } from '../testing/render-at';
 import { textsOf, wordsOf } from '../testing/texts-of';
 import { Adventure } from './adventure';
@@ -140,8 +140,6 @@ async function renderAdventure(game: ReturnType<typeof fakeGame>, scene = fakeBa
 
 /** The result's dialog of that title, once the run has been sent and answered. */
 const resultDialog = (title: string) => screen.findByRole('dialog', { name: title });
-/** The items of the dialog's list of that name. */
-const dialogItems = (list: string) => within(within(screen.getByRole('dialog')).getByRole('list', { name: list })).getAllByRole('listitem');
 /** What a hero may do next: the group of its ability buttons. */
 const abilities = (hero: string) => within(screen.getByRole('group', { name: `${hero} next action` }));
 /** A hero's item in the party, which holds what it will do next. */
@@ -450,7 +448,7 @@ describe('Adventure', () => {
     await run(120_000);
     await resultDialog('Victory!');
     expect(screen.getByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
-    expect(textsOf(within(screen.getByRole('list', { name: 'Party' })).getAllByRole('listitem')).length).toBe(2);
+    expect(listItems('Party')).toHaveLength(2);
     expect(button('Press on')).toBeDisabled();
     expect(button('Retreat')).toBeDisabled();
     expect(screen.queryByRole('list', { name: 'Stages' })).not.toBeInTheDocument();
@@ -469,6 +467,32 @@ describe('Adventure', () => {
     await waitFor(() => { expect(router.url).toBe('/camp/highcrag'); });
     expect(game.settled()).toBeNull();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows the result again when the page could not go to the camp, since the dialog holds the only way out (the review of PR-443)', async () => {
+    const { run, router, user } = await renderAdventure(fakeGame());
+    await run(120_000);
+    const box = await resultDialog('Victory!');
+    const ok = within(box).getByRole('button', { name: 'OK' });
+    const going = vi.spyOn(router, 'navigate');
+
+    // A navigation the router refused: the dialog its button closed is open again, with the focus on that button.
+    going.mockResolvedValueOnce(false);
+    await user.click(ok);
+    expect(going).toHaveBeenLastCalledWith(['/camp', 'millbrook']);
+    await waitFor(() => { expect(box).toHaveAttribute('open'); });
+    expect(ok).toHaveFocus();
+
+    // And one that failed.
+    going.mockRejectedValueOnce(new Error('The page could not be loaded.'));
+    await user.click(ok);
+    await waitFor(() => { expect(box).toHaveAttribute('open'); });
+    expect(going).toHaveBeenCalledTimes(2);
+    expect(router.url).toBe('/adventure');
+
+    // It goes once the page can.
+    await user.click(ok);
+    await waitFor(() => { expect(router.url).toBe('/camp/millbrook'); });
   });
 
   it.each([

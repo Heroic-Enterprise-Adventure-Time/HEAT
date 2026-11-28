@@ -44,4 +44,18 @@ describe('Dialog', () => {
     fireEvent(screen.getByRole('dialog'), new Event('close'));
     expect(closed).toHaveBeenCalledOnce();
   });
+
+  it('is shown again, with the focus on its button, for an owner that could not act on its closing (the review of PR-443)', async () => {
+    const user = userEvent.setup();
+    await render('<heat-dialog #result heading="Victory!" /><button type="button" (click)="result.show()">Show it again</button>', { imports: [Dialog] });
+    const dialog = screen.getByRole('dialog');
+    const ok = within(dialog).getByRole('button', { name: 'OK' });
+    expect(dialog).toHaveAttribute('open');
+    await user.click(ok);
+    expect(dialog).not.toHaveAttribute('open');
+
+    await user.click(screen.getByRole('button', { name: 'Show it again' }));
+    expect(dialog).toHaveAttribute('open');
+    expect(ok).toHaveFocus();
+  });
 });

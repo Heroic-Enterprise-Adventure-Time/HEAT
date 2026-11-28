@@ -4,10 +4,10 @@ import { Router } from '@angular/router';
 import { ABILITIES, type AbilityId, location, type PartyOrder, UNIT_PROFILES, type UnitType } from '@heat/engine';
 
 import { cargoWords, stayedWords } from '../camp/panels/caravan-words';
-import { rewardWords } from '../camp/panels/job-words';
 import { groundAt } from '../camp/scene/layout';
 import { Game } from '../game';
 import { Dialog } from '../primitives/dialog';
+import { rewardWords } from '../primitives/gain-words';
 import { type GainedHero, Gains } from '../primitives/gains';
 import { HeroTile, type TileHero } from '../primitives/hero-tile';
 import { ResourceChip } from '../primitives/resource-chip';
@@ -109,6 +109,8 @@ export class Adventure {
   protected readonly unread = computed(() => (this.game.error() === null ? null : UNREAD));
   /** Whether the player is being read again, from the result. */
   protected readonly reading = signal(false);
+  /** The result's dialog, while there is a result. */
+  private readonly dialog = viewChild(Dialog);
 
   private readonly view = viewChild.required(BattleView);
   private startedId: string | null = null;
@@ -177,10 +179,17 @@ export class Adventure {
     }
   }
 
-  /** The result's dialog was put away: to the camp the party left from, which leaves the result behind. */
-  protected leave(): void {
+  /**
+   * The result's dialog was put away: to the camp the party left from, which
+   * leaves the result behind. If the page could not go, the dialog is shown
+   * again, since it holds the only way out of a battle that has ended (the
+   * review of PR-443).
+   */
+  protected async leave(): Promise<void> {
     const settled = this.game.settled();
-    if (settled) void this.router.navigate(['/camp', settled.adventure.location]);
+    if (!settled) return;
+    const left = await this.router.navigate(['/camp', settled.adventure.location]).catch(() => false);
+    if (!left) this.dialog()?.show();
   }
 
   /** A hero's abilities, from its unit type's one action list, as force buttons. */

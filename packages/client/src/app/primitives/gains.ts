@@ -3,6 +3,7 @@ import { Component, computed, DestroyRef, inject, input, signal } from '@angular
 import { FRAME_LOOP } from '../frame-loop';
 import { REDUCED_MOTION } from '../reduced-motion';
 import { countedAt } from './count-up';
+import { heroGainWords, rewardWords } from './gain-words';
 import { HeroTile, type TileHero } from './hero-tile';
 import { ResourceChip } from './resource-chip';
 
@@ -64,7 +65,7 @@ export class Gains {
     this.resources().map((resource, index) => ({
       material: resource.material,
       shown: this.counted()[index]?.shown ?? resource.amount,
-      words: `${resource.amount} ${resource.material}`,
+      words: rewardWords(resource),
     })),
   );
   protected readonly rows = computed(() => {
@@ -72,15 +73,13 @@ export class Gains {
     return this.heroes().map((gained, index) => {
       const counted = this.counted()[first + index];
       const done = counted?.done ?? true;
-      const up = gained.level > gained.hero.level;
-      const gain = gained.died ? 'died' : `+${gained.xp} XP${up ? ', level up' : ''}`;
       return {
         id: gained.id,
         tile: { ...gained.hero, level: done ? gained.level : gained.hero.level },
         died: gained.died,
         shown: counted?.shown ?? gained.xp,
-        up: up && done,
-        words: `${gained.hero.name}, ${gained.hero.unitType}, level ${gained.level}: ${gain}`,
+        up: gained.level > gained.hero.level && done,
+        words: heroGainWords(gained),
       };
     });
   });

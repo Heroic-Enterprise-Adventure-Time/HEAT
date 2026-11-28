@@ -12,10 +12,13 @@ let dialogs = 0;
  * over a scrim, with its heading, whatever its owner projects into it, and
  * one button, which is where the focus starts.
  *
- * It is open for as long as it is in the page: its owner renders it when
- * there is something to say and takes it out on `closed`, which is told
- * once, however the dialog was closed, by its button or by Escape. Nothing
- * else closes it: a click on the scrim does not.
+ * It opens when it is put in the page: its owner renders it when there is
+ * something to say and acts on `closed`, which is told once each time the
+ * dialog is closed, by its button or by Escape. Nothing else closes it: a
+ * click on the scrim does not. An owner that could not act on the closing,
+ * a page that could not go where the button leads, shows it again with
+ * `show()`, so that a closed dialog is never left in a page that waits
+ * for it (the review of PR-443).
  */
 @Component({
   selector: 'heat-dialog',
@@ -34,21 +37,28 @@ export class Dialog {
   private readonly button = viewChild.required<ElementRef<HTMLButtonElement>>('button');
 
   constructor() {
-    afterNextRender(() => {
-      const box = this.box().nativeElement;
-      // jsdom, where the specs run, has the element but not its methods, though the DOM types say every dialog has them: there it is shown open, and not modal.
-      if (typeof box.showModal === 'function') box.showModal();
-      else box.setAttribute('open', '');
-      // The browser would start at the first control inside, which may be one of the content's.
-      this.button().nativeElement.focus();
-    });
+    afterNextRender(() => { this.show(); });
+  }
+
+  /** Shows the dialog, modal, with the focus on its button: when it is first in the page, and again for an owner that could not act on its closing. It does nothing to a dialog that is open, or that has left the page. */
+  show(): void {
+    const box = this.box().nativeElement;
+    if (!box.isConnected || box.open) return;
+    // jsdom, where the specs run, has the element but not its methods, though the DOM types say every dialog has them: there it is shown open, and not modal.
+    if (typeof box.showModal === 'function') box.showModal();
+    else box.setAttribute('open', '');
+    // The browser would start at the first control inside, which may be one of the content's.
+    this.button().nativeElement.focus();
   }
 
   /** Closes the dialog, which tells `closed` through the element's own `close` event, as Escape does. */
   protected close(): void {
     const box = this.box().nativeElement;
-    // jsdom again: with no `close()` there is no event to wait for.
+    // jsdom again: with no `close()` there is no event to wait for, so the dialog is closed and its owner told here.
     if (typeof box.close === 'function') box.close();
-    else this.closed.emit();
+    else {
+      box.removeAttribute('open');
+      this.closed.emit();
+    }
   }
 }

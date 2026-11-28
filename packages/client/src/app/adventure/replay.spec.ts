@@ -126,7 +126,7 @@ describe('Replay page (Issue-290)', () => {
     expect(screen.queryByRole('group', { name: 'Party orders' })).not.toBeInTheDocument();
   });
 
-  it("has the player's own replay's pause and speeds, and plays again from the start", async () => {
+  it("has the pause and speeds of the adventure's own page, and plays again from the start", async () => {
     const scene = fakeBattleScene();
     const { run, user } = await renderReplay(fakeGame(() => Promise.resolve(settled())), scene);
     await waitFor(() => { expect(scene.resets).toHaveLength(1); });
