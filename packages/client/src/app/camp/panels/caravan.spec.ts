@@ -3,8 +3,9 @@ import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
 import { JOBS } from '@heat/engine';
 
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/battle-view';
+import { BATTLE_SCENE_FACTORY } from '../../adventure/battle-view';
 import { routes } from '../../app.routes';
+import { FRAME_LOOP } from '../../frame-loop';
 import { type AdventureView, type CampView, type CaravanStart, Game, type HeroView } from '../../game';
 import { Refusal } from '../../hub';
 import { Session } from '../../session';
@@ -17,6 +18,7 @@ import { depart, panel } from '../../testing/page';
 import { renderAt } from '../../testing/render-at';
 import { wordsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
+import { saveLastParty } from './last-party';
 
 function hero(id: string, name: string): HeroView {
   return { id, name, unitType: 'fighter', spriteSet: 'fighter-02', location: 'millbrook', recruitedAt: '2026-10-20T07:00:00.000Z', level: 2, xp: 30, status: 'ALIVE', retiredAt: null };
@@ -81,6 +83,38 @@ const amountOf = (material: string) => wordsOf([group(material).getByRole('statu
 const cargo = () => screen.getByRole('group', { name: 'Cargo' });
 
 describe("A caravan's page (Issue-355)", () => {
+  it('opens with the last party sent on it picked, and with no cargo and nobody marked to stay (Issue-440)', async () => {
+    saveLastParty('millbrook', 'caravan-to-highcrag', ['h1', 'h3']);
+    await renderCaravan(fakeGame());
+    expect(partyTile('Wren')).toHaveAttribute('aria-pressed', 'true');
+    expect(partyTile('Moss')).toHaveAttribute('aria-pressed', 'false');
+    expect(tilesOf('Of the party')).toEqual(['Wren', 'Lark']);
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'false');
+    expect(stays('Lark')).toHaveAttribute('aria-pressed', 'false');
+    expect(amountOf('timber')).toBe('timber 0');
+  });
+
+  it('starts again with no cargo and nobody marked to stay when the player comes back from another job, as the party does (PR-442)', async () => {
+    const { router, user } = await renderCaravan(fakeGame());
+    await user.click(partyTile('Wren'));
+    await waitFor(() => { expect(tilesOf('Of the party')).toEqual(['Wren']); });
+    await user.click(stays('Wren'));
+    await user.click(step('+1', 'timber'));
+    await waitFor(() => { expect(amountOf('timber')).toBe('timber 1'); });
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'true');
+
+    // A job of another facility is the same route, so the page is the same one and only what it follows changes.
+    await router.navigateByUrl('/camp/millbrook/mine/jobs/ore-from-the-hill');
+    await waitFor(() => { expect(screen.queryByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).not.toBeInTheDocument(); });
+    await router.navigateByUrl(CARAVAN);
+    expect(await screen.findByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).toBeInTheDocument();
+    // Nobody was sent on it, so the party is empty again; a mark that outlived it would send Wren as a rider.
+    expect(partyTile('Wren')).toHaveAttribute('aria-pressed', 'false');
+    expect(tilesOf('Riding along')).toEqual(['Wren', 'Moss', 'Lark']);
+    expect(stays('Wren')).toHaveAttribute('aria-pressed', 'false');
+    expect(amountOf('timber')).toBe('timber 0');
+  });
+
   it("offers each resource the camp holds, beside its balance and Highcrag's room for it, against what the cart carries", async () => {
     await renderCaravan(fakeGame());
     expect(panel().getByRole('heading', { name: 'Caravan to Highcrag', level: 2 })).toBeInTheDocument();

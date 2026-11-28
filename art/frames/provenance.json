@@ -1,7 +1,7 @@
 {
   "set": "frames",
   "kind": "ui-frame",
-  "madeFor": "The page's panel frame and its primary and secondary buttons, each a 9-slice image applied with border-image (decision 0061, Issue-385).",
+  "madeFor": "The page's panel frame and its primary and secondary buttons, each a 9-slice image applied with border-image (decision 0061, Issue-385); and the region frame round each of the page's regions, the scene, the menu and the panel (Issue-444).",
   "service": {
     "name": "PixelLab",
     "plan": "Tier 1: Pixel Apprentice",
@@ -136,10 +136,117 @@
       },
       "generations": 15,
       "note": "Not kept: the pressed state drew its shadow along the top, and the disabled state dropped the button's depth. The owner chose, in review of the gallery on 2026-11-26, the states drawn by CSS on the normal frame instead (docs/process/assets.md, rule 41). The call is recorded for its cost."
+    },
+    {
+      "tool": "create_ui_asset",
+      "via": "MCP",
+      "createdAt": "2026-11-28",
+      "templateId": "7d9173de-be41-4b5b-a4d8-fcceebe4bf4c",
+      "parameters": {
+        "description": "cozy light parchment RPG window frames: thin carved wooden picture frames, each a dark brown 1 pixel outline around a narrow 3 pixel warm wood band with a lighter highlight along its inner edge, tiny brass corner caps, small rounded corners, the middle left empty, NES-era retro pixel art, few colors, no text",
+        "name": "heat-region-frame-probe",
+        "width": 256,
+        "height": 256,
+        "palette": [
+          "#d9c7a3",
+          "#f7eedb",
+          "#ecdcbc",
+          "#c9b48e",
+          "#5a4330",
+          "#76604b",
+          "#e8b55a",
+          "#f6d590",
+          "#8a5d1c"
+        ],
+        "paletteName": "HEAT A2 daylight parchment",
+        "pieces": [
+          {
+            "id": "wide",
+            "kind": "rounded_rect",
+            "x": 24,
+            "y": 24,
+            "w": 320,
+            "h": 180,
+            "radius": 8
+          },
+          {
+            "id": "tall",
+            "kind": "rounded_rect",
+            "x": 376,
+            "y": 24,
+            "w": 112,
+            "h": 464,
+            "radius": 8
+          },
+          {
+            "id": "rail",
+            "kind": "rounded_rect",
+            "x": 24,
+            "y": 240,
+            "w": 64,
+            "h": 248,
+            "radius": 8
+          },
+          {
+            "id": "small",
+            "kind": "rounded_rect",
+            "x": 120,
+            "y": 240,
+            "w": 224,
+            "h": 248,
+            "radius": 8
+          }
+        ],
+        "styleImage": null,
+        "noBackground": true
+      },
+      "paletteNote": "The panel's palette, so that the region frame and the panel frame share their colours.",
+      "generations": 10
+    },
+    {
+      "tool": "update_ui_asset",
+      "via": "MCP",
+      "createdAt": "2026-11-28",
+      "parameters": {
+        "uiAssetId": "7d9173de-be41-4b5b-a4d8-fcceebe4bf4c",
+        "split": true,
+        "splitBoxes": [
+          {
+            "label": "region",
+            "x": 6,
+            "y": 6,
+            "width": 172,
+            "height": 102
+          },
+          {
+            "label": "tall",
+            "x": 184,
+            "y": 8,
+            "width": 64,
+            "height": 240
+          },
+          {
+            "label": "rail",
+            "x": 9,
+            "y": 117,
+            "width": 38,
+            "height": 130
+          },
+          {
+            "label": "square",
+            "x": 52,
+            "y": 112,
+            "width": 128,
+            "height": 140
+          }
+        ]
+      },
+      "note": "The boxes are the opaque boxes of the four frames drawn, measured from the template's picture. Only the region, the wide frame, is kept; the other three were the same frame at other proportions, rolled to choose from.",
+      "generations": 0
     }
   ],
-  "chosenBy": "The owner, 2026-11-26, from the template at 3× (Issue-385): taken for its panel border, \"more 90s-game-y and less web-y\", over the CSS frame of Issue-384.",
-  "verified": "Each file is byte-identical to its PNG in the template's ZIP, /mcp/ui-assets/e83958cb-2360-4f34-b12f-73fbc7d503c4/zip, downloaded twice on 2026-11-26.",
+  "chosenBy": "The owner, 2026-11-26, from the template at 3× (Issue-385): taken for its panel border, \"more 90s-game-y and less web-y\", over the CSS frame of Issue-384. The region frame: the owner, 2026-11-28, from the roll's four frames at 3× (Issue-444), the wide one, frame A, on every region, after the panel frame proved too wide round the scene; the scene draws at scale 3 rather than 4 in a 1920×1080 window with it, a trade the owner took.",
+  "verified": "Each file is byte-identical to its PNG in the template's ZIP, /mcp/ui-assets/e83958cb-2360-4f34-b12f-73fbc7d503c4/zip, downloaded twice on 2026-11-26. The region frame's file is byte-identical to elements/region.png in the ZIP of its own template, /mcp/ui-assets/7d9173de-be41-4b5b-a4d8-fcceebe4bf4c/zip, downloaded twice on 2026-11-28. The file is the ZIP's as it was; the clearing is the build's, so the published picture differs from it inside the band.",
   "frames": {
     "panel": {
       "file": "panel.png",
@@ -161,6 +268,25 @@
         "left": 13
       }
     },
+    "region": {
+      "file": "region.png",
+      "uiAssetId": "7facebdf-e6a9-4ef4-b8bb-f42b5bce7929",
+      "slice": {
+        "top": 11,
+        "right": 11,
+        "bottom": 12,
+        "left": 11
+      },
+      "inside": {
+        "clear": "#5a4330",
+        "band": {
+          "top": 8,
+          "right": 8,
+          "bottom": 8,
+          "left": 7
+        }
+      }
+    },
     "secondary": {
       "file": "secondary.png",
       "uiAssetId": "f2585aea-c959-487c-92a8-3bd9f646503e",
@@ -172,5 +298,5 @@
       }
     }
   },
-  "sliceNote": "Each slice is in the pixels of the frame's opaque box, which the build trims each file to, and holds every pixel of the frame's corners, their inner rounding and shading included, so that no edge repeats a piece of a corner. Measured on 2026-11-27 (Issue-271, from Issue-416), each frame read pixel by pixel. The primary's corners reach row 9 from the top, row 35 from the bottom (14 rows), column 12 from the left and column 98 from the right (12 columns) of its 110×49 box. The secondary's 109×49 box needs less, 5, 11, 13 and 10, and takes the primary's slice, because a toggle that is on is drawn on the primary's frame and a button must not change size when it is pressed. The panel's bottom-right corner begins its shading at row 114 of its 234×141 box, 27 rows from the bottom. What is left between the corners is flat on the secondary. On the primary and the panel it is the art as drawn and repeats with its edge: the primary's left edge has a notch at rows 22 to 27 and its right edge flecks at rows 10 to 14, its lower shadow has darker flecks along it, and the panel's side edges have a mark at rows 68 to 71 and flecks along them, its parchment stains by its lower corners and a broken line along its lower edge."
+  "sliceNote": "Each slice is in the pixels of the frame's opaque box, which the build trims each file to, and holds every pixel of the frame's corners, their inner rounding and shading included, so that no edge repeats a piece of a corner. Measured on 2026-11-27 (Issue-271, from Issue-416), each frame read pixel by pixel. The primary's corners reach row 9 from the top, row 35 from the bottom (14 rows), column 12 from the left and column 98 from the right (12 columns) of its 110×49 box. The secondary's 109×49 box needs less, 5, 11, 13 and 10, and takes the primary's slice, because a toggle that is on is drawn on the primary's frame and a button must not change size when it is pressed. The panel's bottom-right corner begins its shading at row 114 of its 234×141 box, 27 rows from the bottom. What is left between the corners is flat on the secondary. On the primary and the panel it is the art as drawn and repeats with its edge: the primary's left edge has a notch at rows 22 to 27 and its right edge flecks at rows 10 to 14, its lower shadow has darker flecks along it, and the panel's side edges have a mark at rows 68 to 71 and flecks along them, its parchment stains by its lower corners and a broken line along its lower edge. The region's 161×91 box was measured on 2026-11-28 (Issue-444): its band is a dark outline, five rows of wood and a dark outline, 7 pixels, inside which the art draws a tan and gold mat; the corners, their brass caps included, reach 11 pixels in from the top, left and right and 12 from the bottom. Its inside is cleared by the build (Issue-444): the tan and gold mat the art draws inside the band read on the page as padding between the frame and what it holds, so every pixel the band's inner outline, #5a4330, encloses is made transparent, and the region's own surface runs up to the band. The band is then 8 pixels deep at the top, the right and the bottom and 7 at the left, the same all along each edge, which the build checks; the border is the band, and the corners, their brass caps, reach 3 or 4 pixels past it into what the region holds."
 }

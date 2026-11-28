@@ -1,9 +1,10 @@
 <section class="camp" [class.side]="side()" [class.labels]="labels()">
-  <div #stage class="stage" [style.height.px]="stageHeight()"></div>
+  <div #stage class="stage region" [style.height.px]="stageHeight()"></div>
 
-  <nav class="menu" aria-label="Facilities">
+  <nav class="menu" aria-label="Facilities" [class.region]="side()">
     @for (facility of state.facilities(); track facility.kind) {
       <a
+        #entry="routerLinkActive"
         class="entry"
         routerLinkActive="active"
         ariaCurrentWhenActive="page"
@@ -14,7 +15,7 @@
         @if (icons.src(facility.kind); as icon) {
           <img alt="" [ngSrc]="icon" [width]="iconPx()" [height]="iconPx()" />
         }
-        <span class="label">{{ facility.name }}</span>
+        <span class="label" [class.narrow-hidden]="!entry.isActive">{{ facility.name }}</span>
       </a>
     }
     @if (game.adventure()) {
@@ -22,12 +23,12 @@
         @if (icons.src('adventure'); as icon) {
           <img alt="" [ngSrc]="icon" [width]="iconPx()" [height]="iconPx()" />
         }
-        <span class="label">Adventure</span>
+        <span class="label narrow-hidden">Adventure</span>
       </a>
     }
   </nav>
 
-  <aside class="panel" aria-labelledby="panel-title">
+  <aside class="panel region" aria-labelledby="panel-title">
     <router-outlet />
   </aside>
 

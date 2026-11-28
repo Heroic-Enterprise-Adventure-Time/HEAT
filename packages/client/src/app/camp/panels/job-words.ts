@@ -62,11 +62,6 @@ export function lockedWords(job: Job, campsAt: readonly string[] | null, facilit
 /** What a job says in place of its pay when whoever posted it pays nothing. */
 export const NO_PAY = 'No pay';
 
-/** One resource of a job's pay, "3 cloth". */
-export function rewardWords(reward: { readonly amount: number; readonly material: string }): string {
-  return `${reward.amount} ${reward.material}`;
-}
-
 /** A job's bonus on its poster's list, beside its pay's chips: "4 bonus XP". */
 export function bonusXpWords(job: Job): string {
   return `${job.bonusXp} bonus XP`;

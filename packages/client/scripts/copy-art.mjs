@@ -33,7 +33,9 @@
 // under a name that carries a hash of the trimmed picture, and its name and
 // its slice, from the frames' provenance, go into generated/frames.css, a
 // stylesheet the page is built with (frame-art.mjs; docs/process/assets.md,
-// rule 40).
+// rule 40). A frame whose provenance names an `inside` has what its inner
+// outline encloses cleared first, and its band goes into the stylesheet as
+// the border it stands in (Issue-444).
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -42,7 +44,7 @@ import sharp from "sharp";
 
 import { GROUND_FILES, GROUNDS } from "../src/app/ground-sets.ts";
 import { FRAMES, PACKED_AREAS, PORTRAIT, SET_CLIPS } from "../src/app/sprite-sets.ts";
-import { checkFrameNames, checkSlice, frameStyles, opaqueBox, portraitStyle } from "./frame-art.mjs";
+import { checkBand, checkFrameNames, checkSlice, clearInside, frameStyles, opaqueBox, portraitStyle } from "./frame-art.mjs";
 import { glyphFrames, opaqueRows, packSet, pictureName, portraitBox } from "./pack-art.mjs";
 import { colourToken } from "./style-tokens.mjs";
 
@@ -143,15 +145,18 @@ checkFrameNames(Object.keys(frameProvenance.frames), FRAMES);
 const framePictures = new Set(pictures(join(from, "frames")).map((file) => basename(file)));
 const frames = {};
 mkdirSync(join(to, "frames"), { recursive: true });
-for (const [name, { file, slice }] of Object.entries(frameProvenance.frames)) {
+for (const [name, { file, slice, inside }] of Object.entries(frameProvenance.frames)) {
   if (!framePictures.delete(file)) throw new Error(`art/frames/provenance.json names ${file} for the frame ${name}, and there is no such picture`);
-  const source = join(from, "frames", file);
-  const box = opaqueBox(await pixels(source), name);
+  const source = await pixels(join(from, "frames", file));
+  const box = opaqueBox(source, name);
   checkSlice(name, slice, box);
-  const trimmed = await sharp(source).extract(box).png({ compressionLevel: 9 }).toBuffer();
+  const picture = inside ? clearInside(source, box, inside.clear, name) : source;
+  if (inside) checkBand(name, inside.band, slice, picture, box);
+  const raw = { raw: { width: picture.width, height: picture.height, channels: 4 } };
+  const trimmed = await sharp(picture.data, raw).extract(box).png({ compressionLevel: 9 }).toBuffer();
   const image = pictureName(name, trimmed);
   writeFileSync(join(to, "frames", image), trimmed);
-  frames[name] = { image, slice };
+  frames[name] = { image, slice, ...(inside && { band: inside.band }) };
 }
 if (framePictures.size > 0) throw new Error(`art/frames holds ${[...framePictures].join(" and ")}, which its provenance names for no frame`);
 writeFileSync(fileURLToPath(new URL("../generated/frames.css", import.meta.url)), frameStyles(frames) + portraitStyle(PORTRAIT));

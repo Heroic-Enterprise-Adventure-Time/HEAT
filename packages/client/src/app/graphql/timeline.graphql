@@ -1,6 +1,0 @@
-query Timeline($id: ID!) {
-  adventure(id: $id) {
-    id
-    timeline
-  }
-}

@@ -3,31 +3,13 @@ import { afterNextRender, Component, computed, DestroyRef, ElementRef, inject, I
 import { must } from '@heat/engine';
 
 import { LAYOUT_SIZES } from '../camp/layout-sizes';
-import { isSideBySide } from '../camp/page-layout';
+import { frameAcross, isSideBySide } from '../camp/page-layout';
+import { FRAME_LOOP } from '../frame-loop';
 import type { GroundSet } from '../ground-sets';
 import { stackedBattleHeight } from './battle/battle-layout';
 import type { BattleSceneCallbacks, BattleSceneHandle } from './battle/battle-scene';
 import type { CastMember } from './cast';
 import { Play } from './play';
-
-/** Calls `onFrame` with the wall-clock milliseconds since the last frame until stopped; a test provides one it drives by hand. */
-export type FrameLoop = (onFrame: (elapsedMs: number) => void) => () => void;
-
-/** The longest step one frame may take, so a tab coming back from the background does not leap ahead. Exported for the specs' frame loop, which gives the page the frames the browser would (typescript.md, rule 24). */
-export const MAX_FRAME_MS = 250;
-
-export const FRAME_LOOP = new InjectionToken<FrameLoop>('heat.adventure.frames', {
-  providedIn: 'root',
-  factory: () => (onFrame) => {
-    let last: number | null = null;
-    let id = requestAnimationFrame(function frame(now) {
-      if (last !== null) onFrame(Math.min(now - last, MAX_FRAME_MS));
-      last = now;
-      id = requestAnimationFrame(frame);
-    });
-    return () => { cancelAnimationFrame(id); };
-  },
-});
 
 export type BattleSceneFactory = (host: HTMLElement, callbacks: BattleSceneCallbacks) => Promise<BattleSceneHandle>;
 
@@ -72,10 +54,11 @@ export class BattleView {
   /** The window and the regions' sizes, measured together, since a font-size change moves both. */
   private readonly viewport = signal(this.measured());
   protected readonly side = computed(() => isSideBySide(this.viewport().width, this.viewport().height, this.viewport().sizes));
-  /** Stacked, the stage's box is the page's width by the stage's height at the scale that fits; side by side the grid sizes it. */
-  protected readonly stageHeight = computed(() =>
-    this.side() ? null : stackedBattleHeight(this.viewport().width, this.viewport().height, this.viewport().ratio),
-  );
+  /** Stacked, the stage's box is the page's width, less its frame, by the stage's height at the scale that fits; side by side the grid sizes it. */
+  protected readonly stageHeight = computed(() => {
+    const { width, height, ratio, sizes } = this.viewport();
+    return this.side() ? null : stackedBattleHeight(width - frameAcross(sizes), height, ratio);
+  });
   private readonly box = viewChild.required<ElementRef<HTMLElement>>('box');
   private scene: BattleSceneHandle | null = null;
   /** The run handed over last, counted, so that an earlier run's art arriving late begins nothing. */

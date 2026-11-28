@@ -2,7 +2,8 @@ import { mapValues } from 'es-toolkit';
 
 import { TEST_LAYOUT_SIZES as SIZES } from '../testing/layout-sizes';
 import { rootStyle } from '../testing/style-tokens';
-import { heroScale, iconScale, isSideBySide, menuLabels, panelPx, readLayoutSizes, sceneScale, sceneView, stackedStageHeight } from './page-layout';
+import { frameAcross, frameDown, heroScale, iconScale, isSideBySide, menuLabels, panelPx, readLayoutSizes, sceneScale, sceneView, stackedStageHeight } from './page-layout';
+import { MAP_CORE_WIDTH, MAP_HEIGHT } from './scene/layout';
 
 const HEADER = SIZES.header;
 
@@ -10,6 +11,7 @@ const HEADER = SIZES.header;
 const LAPTOP = [1366, 614 + HEADER] as const;
 const MACBOOK = [1440, 744 + HEADER] as const;
 const DESKTOP = [1920, 914 + HEADER] as const;
+const TALL_DESKTOP = [1920, 1200] as const;
 const TABLET = [1024, 768] as const;
 const PHONE = [375, 812] as const;
 const BIG = [2560, 1274 + HEADER] as const;
@@ -55,11 +57,13 @@ describe('menuLabels and iconScale', () => {
     expect(menuLabels(...LAPTOP, SIZES)).toBe(true);
     expect(menuLabels(...MACBOOK, SIZES)).toBe(true);
     expect(menuLabels(...BIG, SIZES)).toBe(true);
+    // 1920×950: the height holds scale 3 only, under the header and the scene's frame, which the labels leave it too.
+    expect(menuLabels(...DESKTOP, SIZES)).toBe(true);
   });
 
   it('keeps the icon rail where labels would cost a step, and never labels a stacked menu', () => {
-    // 1920×950: the rail leaves 1416 px, scale 4; labels leave 1256 px, scale 3.
-    expect(menuLabels(...DESKTOP, SIZES)).toBe(false);
+    // 1920×1200: the rail leaves 1416 px, scale 4; labels leave 1256 px, scale 3.
+    expect(menuLabels(...TALL_DESKTOP, SIZES)).toBe(false);
     expect(menuLabels(...TABLET, SIZES)).toBe(false);
     expect(menuLabels(...PHONE, SIZES)).toBe(false);
   });
@@ -67,7 +71,8 @@ describe('menuLabels and iconScale', () => {
   it('draws the icons at 2× in a labelled menu beside a scene at scale 3 or more', () => {
     expect(iconScale(...BIG, SIZES)).toBe(2);
     expect(iconScale(...MACBOOK, SIZES)).toBe(1);
-    expect(iconScale(...DESKTOP, SIZES)).toBe(1);
+    expect(iconScale(...DESKTOP, SIZES)).toBe(2);
+    expect(iconScale(...TALL_DESKTOP, SIZES)).toBe(1);
   });
 });
 
@@ -89,6 +94,18 @@ describe('stackedStageHeight', () => {
     // A phone at ratio 3: the map at 3 device px, one CSS px, as at ratio 1.
     expect(stackedStageHeight(...PHONE, SIZES, 3)).toBe(225);
   });
+
+  it("takes the gutters and the scene's frame off the width before it picks the scale", () => {
+    const across = frameAcross(SIZES);
+    expect(stackedStageHeight(2 * MAP_CORE_WIDTH + across, 1024, SIZES)).toBe(2 * MAP_HEIGHT);
+    expect(stackedStageHeight(2 * MAP_CORE_WIDTH + across - 1, 1024, SIZES)).toBe(MAP_HEIGHT);
+  });
+
+  it("takes the gutters and the scene's frame off the height too", () => {
+    const down = SIZES.header + SIZES.menuRow + frameDown(SIZES);
+    expect(stackedStageHeight(2000, 2 * MAP_HEIGHT + down, SIZES)).toBe(2 * MAP_HEIGHT);
+    expect(stackedStageHeight(2000, 2 * MAP_HEIGHT + down - 1, SIZES)).toBe(MAP_HEIGHT);
+  });
 });
 
 describe('readLayoutSizes', () => {
@@ -102,19 +119,27 @@ describe('readLayoutSizes', () => {
     '--panel-min-width': '15rem',
     '--panel-share': '25vw',
     '--panel-max-width': '30rem',
+    '--region-gap': '0.5rem',
+    '--frame-region-top': '11px',
+    '--frame-region-right': '11px',
+    '--frame-region-bottom': '12px',
+    '--frame-region-left': '10px',
   };
 
+  const FRAME = { frameTop: 11, frameRight: 11, frameBottom: 12, frameLeft: 10 };
+
   it("resolves the rem tokens at the root font size, so the arithmetic follows the player's settings", () => {
-    expect(readLayoutSizes(style('16px', tokens))).toEqual({ header: 32, rail: 48, labelledMenu: 160, menuRow: 80, panelShare: 0.25, panelMin: 240, panelMax: 480 });
-    // A player at a 20px default font: every region a quarter larger, the panel's share unchanged.
-    expect(readLayoutSizes(style('20px', tokens))).toEqual({ header: 40, rail: 60, labelledMenu: 200, menuRow: 100, panelShare: 0.25, panelMin: 300, panelMax: 600 });
+    expect(readLayoutSizes(style('16px', tokens))).toEqual({ header: 32, rail: 48, labelledMenu: 160, menuRow: 80, panelShare: 0.25, panelMin: 240, panelMax: 480, gap: 8, ...FRAME });
+    // A player at a 20px default font: every region a quarter larger, the panel's share and the art's frame unchanged.
+    expect(readLayoutSizes(style('20px', tokens))).toEqual({ header: 40, rail: 60, labelledMenu: 200, menuRow: 100, panelShare: 0.25, panelMin: 300, panelMax: 600, gap: 10, ...FRAME });
   });
 
   it('reads every region from the tokens styles.css declares, so a token it cannot read fails here and not on the page', () => {
     for (const size of Object.values(SIZES)) expect(size).toBeGreaterThan(0);
-    const { panelShare, ...lengths } = SIZES;
+    const { panelShare, frameTop, frameRight, frameBottom, frameLeft, ...lengths } = SIZES;
     const larger = readLayoutSizes(rootStyle('20px'));
     expect(larger.panelShare).toBe(panelShare);
+    expect([larger.frameTop, larger.frameRight, larger.frameBottom, larger.frameLeft]).toEqual([frameTop, frameRight, frameBottom, frameLeft]);
     for (const ratio of Object.values(mapValues(lengths, (length, region) => larger[region] / length))) expect(ratio).toBeCloseTo(1.25);
   });
 

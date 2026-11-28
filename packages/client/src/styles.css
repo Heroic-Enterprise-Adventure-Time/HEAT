@@ -30,6 +30,7 @@
   --gold-light: #f6d590;
   --gold-dark: #8a5d1c;
   --rust: #8a2a17;
+  --sage: #cfd6a8;
 
   /*
    * The scene's: two kept from the first palette, and the three a unit's
@@ -50,6 +51,8 @@
   --surface-bar-active: var(--ink-active);
   --surface-panel: var(--card);
   --surface-panel-soft: var(--card-soft);
+  --surface-picked: var(--sage); /* a picked hero's tile */
+  --surface-scrim: color-mix(in srgb, var(--soot) 55%, transparent); /* what a dialog dims the page behind it with */
 
   /* Text, by what it stands on. */
   --on-page: var(--ink);
@@ -131,6 +134,17 @@
   --panel-share: 26vw;
   --panel-max-width: 28rem;
   --panel-width: clamp(var(--panel-min-width), var(--panel-share), var(--panel-max-width));
+
+  /* Each region, the scene, the menu and the panel, is a card in the region frame (primitives.css, .region), and this gutter of the page's colour stands between them and round their outer edge (Issue-444). */
+  --region-gap: 0.25rem;
+
+  /*
+   * Side by side, the panel's column less the four gutters and the menu's and
+   * the scene's frames across, so that the scene keeps the width the menu and
+   * --panel-width leave it (page-layout.ts, sideScale); the camp and a battle
+   * both stand their panel in it.
+   */
+  --side-panel-width: calc(var(--panel-width) - 4 * var(--region-gap) - 2 * (var(--frame-region-left) + var(--frame-region-right)));
 }
 
 body {

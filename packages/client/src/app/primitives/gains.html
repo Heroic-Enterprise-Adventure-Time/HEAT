@@ -1,0 +1,31 @@
+@if (chips().length > 0) {
+  <ul class="chips" aria-label="Resources">
+    @for (chip of chips(); track chip.material) {
+      <li>
+        <span aria-hidden="true"><heat-resource-chip [material]="chip.material" [amount]="chip.shown" /></span>
+        <span class="visually-hidden">{{ chip.words }}</span>
+      </li>
+    }
+  </ul>
+}
+<ng-content />
+@if (rows().length > 0) {
+  <ul class="heroes" aria-label="Heroes">
+    @for (row of rows(); track row.id) {
+      <li>
+        <span class="row" aria-hidden="true">
+          <heat-hero-tile [hero]="row.tile" [still]="true" />
+          @if (row.died) {
+            <span class="died">died</span>
+          } @else {
+            <span class="xp">+{{ row.shown }} XP</span>
+            @if (row.up) {
+              <strong class="up">Level up</strong>
+            }
+          }
+        </span>
+        <span class="visually-hidden">{{ row.words }}</span>
+      </li>
+    }
+  </ul>
+}

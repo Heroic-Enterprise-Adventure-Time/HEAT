@@ -42,8 +42,6 @@ function setup(loaded: PlayerView | null, version = 'v1') {
 }
 
 describe('Updates', () => {
-  beforeEach(() => { sessionStorage.clear(); });
-
   it('reloads at once when the hub says the client is outdated and no adventure is open', () => {
     const { hub, reloads } = setup(player(null));
     expect(reloads.count).toBe(0);

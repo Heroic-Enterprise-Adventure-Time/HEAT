@@ -1,7 +1,7 @@
 <section class="battle" [class.side]="side()">
-  <div #box class="stage" [style.height.px]="stageHeight()"></div>
+  <div #box class="stage region" [style.height.px]="stageHeight()"></div>
 
-  <aside class="panel" aria-labelledby="panel-title">
+  <aside class="panel region" aria-labelledby="panel-title">
     <ng-content />
   </aside>
 </section>

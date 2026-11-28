@@ -15,8 +15,8 @@ let tiles = 0;
 /**
  * A hero tile (decision 0061): a hero picked, not picked, or an empty slot.
  * A hero's tile is a toggle by default, a button pressed while the hero is
- * picked, as in a party pick, and only the picked hero has the ink outline;
- * a hero not picked has a soft tan one. Given a `link`, it is a link to the
+ * picked, as in a party pick, and only the picked hero has the ink outline
+ * and the sage fill (Issue-440); a hero not picked has a soft tan outline. Given a `link`, it is a link to the
  * hero instead, as in the hall's roster, since going to a hero's card
  * changes nothing (game.md, "The page"); `still`, it is no control, as for a
  * hero on its way to the camp. An empty slot is no control. A hero's

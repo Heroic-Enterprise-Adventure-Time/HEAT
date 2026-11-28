@@ -1,12 +1,12 @@
 /*
  * The shared primitives (decision 0061), styled once here as global classes so
  * that Angular's per-component scoping does not copy them into every panel: a
- * button, primary or secondary, a panel's frame, and the visually hidden text
- * a primitive gives a screen reader. The resource chip, the hero tile and the
+ * button, primary or secondary, a panel's frame, a region's frame, and the
+ * visually hidden text a primitive gives a screen reader. The resource chip, the hero tile and the
  * slot circles are components of their own (app/primitives/). Each reads only
  * the role tokens of styles.css and the frames of generated/frames.css.
  *
- * The button and the panel are framed by 9-slice pixel art under art/frames
+ * The button, the panel and the page's regions are framed by 9-slice pixel art under art/frames
  * (decision 0062; docs/process/assets.md, rule 40), drawn at 1× with
  * border-image: the build trims each picture and names it, with its slice and
  * the border it is drawn in, in generated/frames.css. Each corner is drawn as
@@ -91,6 +91,22 @@
   color: var(--on-panel);
 }
 
+/*
+ * A region's frame: the card each of the page's regions, the scene, the menu
+ * and the panel, stands in (Issue-444). The build clears the art's inside,
+ * so the region's own surface runs up to the frame's wooden band; the
+ * border is that band, and the corners, drawn at the slice's widths, reach
+ * a few pixels past it, under what the region holds. The frame is drawn
+ * outside the box a scene measures, and page-layout.ts reads its sides.
+ */
+.region {
+  border-style: solid;
+  border-width: var(--frame-region-border);
+  border-image: var(--frame-region-image) var(--frame-region-slice) / var(--frame-region-width) repeat;
+  background-clip: padding-box;
+  image-rendering: pixelated;
+}
+
 /* Text for a screen reader alone: kept in the page, drawn in one pixel and clipped away. */
 .visually-hidden {
   position: absolute;
@@ -98,4 +114,16 @@
   height: var(--pixel);
   overflow: hidden;
   clip-path: inset(50%);
+}
+
+/* Text a phone's width has no room for: visually hidden there, kept for a screen reader, and shown wherever there is room (Issue-444). */
+@media (width <= 37.5rem) {
+  .narrow-hidden {
+    position: absolute;
+    width: var(--pixel);
+    height: var(--pixel);
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
 }

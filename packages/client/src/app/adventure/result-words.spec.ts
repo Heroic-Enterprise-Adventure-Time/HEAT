@@ -1,6 +1,20 @@
-import { UNLOCK_IDS, UNLOCKS } from '@heat/engine';
+import { ADVENTURE_OUTCOMES, UNLOCK_IDS, UNLOCKS } from '@heat/engine';
 
-import { earnedWords } from './result-words';
+import { earnedWords, resultTitle } from './result-words';
+
+describe("the title of a result's dialog (Issue-441)", () => {
+  it('says how the adventure ended, in a word of its own for each way the engine ends one', () => {
+    expect(ADVENTURE_OUTCOMES.map(resultTitle)).toEqual(['Victory!', 'Retreat!', 'Defeat!']);
+  });
+
+  it('says an adventure with no outcome was lost, as one a game update discarded is', () => {
+    expect(resultTitle(null)).toBe('Adventure lost');
+  });
+
+  it("passes on an outcome this client's engine lacks, as a newer deploy may send", () => {
+    expect(resultTitle('abandoned')).toBe('abandoned');
+  });
+});
 
 describe('what a result says of an unlock (Issue-352)', () => {
   it("tells each of the player's unlocks that names this adventure as the one that first earned it, in the content's words", () => {

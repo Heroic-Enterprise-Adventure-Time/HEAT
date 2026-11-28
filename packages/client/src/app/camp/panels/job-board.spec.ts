@@ -3,8 +3,9 @@ import { screen, waitFor, within } from '@testing-library/angular/zoneless';
 
 import { JOBS, jobsPostedBy, must, UNIT_PROFILES } from '@heat/engine';
 
-import { BATTLE_SCENE_FACTORY, FRAME_LOOP } from '../../adventure/battle-view';
+import { BATTLE_SCENE_FACTORY } from '../../adventure/battle-view';
 import { routes } from '../../app.routes';
+import { FRAME_LOOP } from '../../frame-loop';
 import { type AdventureView, Game, type HeroView, type RecentAdventureView, type ReplayView } from '../../game';
 import { Refusal } from '../../hub';
 import { Session } from '../../session';
@@ -16,6 +17,7 @@ import { depart, itemHolding, listItems, menu, panel, panelBox } from '../../tes
 import { renderAt } from '../../testing/render-at';
 import { textsOf, wordsOf } from '../../testing/texts-of';
 import { CAMP_SCENE_FACTORY } from '../camp';
+import { loadLastParty, saveLastParty } from './last-party';
 
 function hero(id: string, name: string, status: HeroView['status'] = 'ALIVE'): HeroView {
   return {
@@ -226,6 +228,58 @@ describe('Job board', () => {
     expect(heroes).toHaveLength(2);
     expect(heroes[0]).toHaveAccessibleName('Wren next action');
     expect(heroes[1]).toHaveAccessibleName('Lark next action');
+  });
+
+  it('opens a job with the last party sent on it picked, less whoever is not alive here now, and another job with nobody (Issue-440)', async () => {
+    // Rook has died since and h9 is no longer at this camp.
+    saveLastParty('millbrook', 'wolves-on-the-mill-road', ['h1', 'h3', 'h6', 'h9']);
+    const { router } = await renderJobs(fakeGame([...party, hero('h6', 'Rook', 'DEAD')]), WOLVES);
+    expect(tile('Wren')).toHaveAttribute('aria-pressed', 'true');
+    expect(tile('Lark')).toHaveAttribute('aria-pressed', 'true');
+    for (const name of ['Moss', 'Fen', 'Ash']) expect(tile(name)).toHaveAttribute('aria-pressed', 'false');
+    expect(depart()).toBeEnabled();
+
+    await router.navigateByUrl('/camp/millbrook/job-board/jobs/timber-from-the-near-woods');
+    expect(await screen.findByRole('heading', { name: 'Timber from the near woods', level: 2 })).toBeInTheDocument();
+    expect(tile('Wren')).toHaveAttribute('aria-pressed', 'false');
+    expect(depart()).toBeDisabled();
+  });
+
+  it("keeps a party picked by hand while the job's facility reads as not built for a moment, in place of the last one sent (PR-442)", async () => {
+    saveLastParty('millbrook', 'ore-from-the-hill', ['h2']);
+    const game = fakeGame(party);
+    const { user } = await renderJobs(game, '/camp/millbrook/mine/jobs/ore-from-the-hill');
+    expect(tile('Moss')).toHaveAttribute('aria-pressed', 'true');
+    await user.click(tile('Moss'));
+    await user.click(tile('Wren'));
+    await waitFor(() => { expect(tile('Wren')).toHaveAttribute('aria-pressed', 'true'); });
+
+    // The camp read with no mine, so that the mine posts nothing, and then read as it is.
+    const camp = game.camp();
+    game.camp.set({ ...camp, facilities: [] });
+    await waitFor(() => { expect(screen.queryByRole('group', { name: 'Party' })).not.toBeInTheDocument(); });
+    game.camp.set(camp);
+    await waitFor(() => { expect(tile('Wren')).toHaveAttribute('aria-pressed', 'true'); });
+    expect(tile('Moss')).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it("keeps the party that left as the job's last at that camp, and nothing of a party the hub refused (Issue-440)", async () => {
+    const game = fakeGame(party, (heroIds) => (heroIds.includes('h2') ? new Refusal('HeroDead', 'hero h2 is dead') : adventureOf(heroIds)));
+    const { router, user } = await renderJobs(game, WOLVES);
+    await user.click(tile('Moss'));
+    await waitFor(() => { expect(depart()).toBeEnabled(); });
+    await user.click(depart());
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(loadLastParty('millbrook', 'wolves-on-the-mill-road')).toEqual([]);
+
+    await user.click(tile('Moss'));
+    await user.click(tile('Wren'));
+    await user.click(tile('Lark'));
+    await waitFor(() => { expect(depart()).toBeEnabled(); });
+    await user.click(depart());
+    await waitFor(() => { expect(router.url).toBe('/adventure'); });
+    expect(loadLastParty('millbrook', 'wolves-on-the-mill-road')).toEqual(['h1', 'h3']);
+    expect(loadLastParty('highcrag', 'wolves-on-the-mill-road')).toEqual([]);
   });
 
   it("lists Highcrag's own board at Highcrag, and Departs from the camp it is opened in (Issue-352)", async () => {
